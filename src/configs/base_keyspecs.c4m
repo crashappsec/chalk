@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.5.8-dev"
+chalk_version :=   "0.5.9-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -2438,7 +2438,7 @@ keyspec _OP_ARTIFACT_ACCESSED {
     type:             bool
     standard:         true
     system:           true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Whether artifact was accessed during chalk operation"
     doc:              """
 During chalk exec, whether the artifact was accessed.
@@ -2451,7 +2451,7 @@ keyspec _OP_ARTIFACT_ENV_VAR_NAME {
     type:             string
     standard:         true
     system:           true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Env var name where artifact was found during the current operation"
     doc:              """
 Name of the env var for a given artifact, in the environment local for
@@ -2464,7 +2464,7 @@ keyspec _OP_ARTIFACT_PATH_WITHIN_VCTL {
     type:             string
     standard:         true
     system:           false
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Path of the artifact within the repo"
     doc:              """
 Path of the artifact relative to the version control repo.
@@ -6234,7 +6234,7 @@ keyspec _X509_VERSION {
     kind:             RunTimeArtifact
     type:             int
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "X509 Certificate Version"
     doc: """
 This field describes the version of the encoded certificate.  When
@@ -6253,7 +6253,7 @@ keyspec _X509_SUBJECT {
     kind:             RunTimeArtifact
     type:             dict[string, string]
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Identity certificate is bound to"
     doc: """
 The subject field identifies the entity associated with the public
@@ -6284,7 +6284,7 @@ keyspec _X509_SUBJECT_SHORT {
     kind:             RunTimeArtifact
     type:             dict[string, string]
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Identity certificate is bound to"
     doc: """
 The subject field identifies the entity associated with the public
@@ -6315,7 +6315,7 @@ keyspec _X509_SUBJECT_ALTERNATIVE_NAME {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Alternate identities certificate is bound to"
     doc: """
 The subject alternative name extension allows identities to be bound
@@ -6341,7 +6341,7 @@ keyspec _X509_SERIAL {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate serial number"
     doc: """
 The serial number MUST be a positive integer assigned by the CA to
@@ -6367,7 +6367,7 @@ keyspec _X509_KEY {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate public key"
     doc: """
 Content of the public key.
@@ -6378,7 +6378,7 @@ keyspec _X509_KEY_TYPE {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate public key type"
     doc: """
 Certificate public key type - RSA, DSA, etc
@@ -6389,7 +6389,7 @@ keyspec _X509_KEY_SIZE {
     kind:             RunTimeArtifact
     type:             int
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate public key size"
     doc: """
 Cryptographic size of the public key
@@ -6400,7 +6400,7 @@ keyspec _X509_KEY_USAGE {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate key usage restrictions"
     doc: """
 The key usage extension defines the purpose (e.g., encipherment,
@@ -6421,7 +6421,7 @@ keyspec _X509_SIGNATURE {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate signature"
     doc: """
 Certificate signature in hex
@@ -6432,7 +6432,7 @@ keyspec _X509_SIGNATURE_TYPE {
     kind:             RunTimeArtifact
     type:             int
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate signature size"
     doc: """
 Type of the certificate signature - sha1, sha256, etc
@@ -6443,7 +6443,7 @@ keyspec _X509_EXTENDED_KEY_USAGE {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Purpose for the certificate usage (e.g. TLS)"
     doc: """
 This extension indicates one or more purposes for which the certified
@@ -6459,7 +6459,7 @@ keyspec _X509_BASIC_CONSTRAINTS {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "CA certificate indication"
     doc: """
 The basic constraints extension identifies whether the subject of the
@@ -6474,7 +6474,7 @@ keyspec _X509_ISSUER {
     kind:             RunTimeArtifact
     type:             dict[string, string]
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Subject of the CA which minted the cert"
     doc: """
 The issuer field identifies the entity that has signed and issued the
@@ -6491,7 +6491,7 @@ keyspec _X509_ISSUER_SHORT {
     kind:             RunTimeArtifact
     type:             dict[string, string]
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Subject of the CA which minted the cert"
     doc: """
 The issuer field identifies the entity that has signed and issued the
@@ -6508,7 +6508,7 @@ keyspec _X509_SUBJECT_KEY_IDENTIFIER {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Identity of the key for the certificate"
     doc: """
 The subject key identifier extension provides a means of identifying
@@ -6532,7 +6532,7 @@ keyspec _X509_AUTHORITY_KEY_IDENTIFIER {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Identity of the CA key used to mint certificate"
     doc: """
 The authority key identifier extension provides a means of
@@ -6551,7 +6551,7 @@ keyspec _X509_NOT_BEFORE {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate Creation Datetime"
     doc: """
 The certificate validity period is the time interval during which the
@@ -6570,7 +6570,7 @@ keyspec _X509_NOT_AFTER {
     kind:             RunTimeArtifact
     type:             string
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Certificate Expiration Datetime"
     doc: """
 The certificate validity period is the time interval during which the
@@ -6589,7 +6589,7 @@ keyspec _X509_EXTRA_EXTENSIONS {
     kind:             RunTimeArtifact
     type:             dict[string, string]
     standard:         true
-    since:            "0.5.8"
+    since:            "0.5.9"
     shortdoc:         "Extra Certificate Extensions"
     doc: """
 Extra certificate extensions not already reported in other chalk keys normalized as a string.

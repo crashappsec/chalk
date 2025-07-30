@@ -16,6 +16,5 @@ proc runCmdNoOutputCapture*(exe:       string,
                                        args,
                                        newStdIn,
                                        passthrough = true,
-                                       capture     = SPIoNone,
-                                       timeoutUsec = 0) # No timeout
+                                       capture     = SPIoNone)
   result = execOutput.getExit()
