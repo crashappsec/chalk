@@ -27,7 +27,6 @@ DOUBLE_EXT_ZIP = ZIPS / "misc" / "test.serverless.zip"
 SERVERLESS_CONFIG = CONFIGS / "serverless_zip.c4m"
 
 
-
 @pytest.mark.slow()
 @pytest.mark.parametrize(
     "copy_files",
@@ -166,7 +165,9 @@ def test_jar_files_never_injected(
     verify_binary_injection(test_file, virtual, expected_injection)
 
     # Explicitly verify .jar files never get injection
-    assert not expected_injection, f"JAR files should never have binary injection enabled"
+    assert (
+        not expected_injection
+    ), f"JAR files should never have binary injection enabled"
 
 
 @pytest.mark.slow()
@@ -233,6 +234,10 @@ def verify_binary_injection(file_path: Path, virtual: bool, expected_injection: 
     """Verify binary injection matches expectation with clear assertion message."""
     actual_injection = contains_chalk_binary(file_path)
     if expected_injection:
-        assert actual_injection, f"Expected chalk binary to be injected in {file_path.name} (virtual={virtual})"
+        assert (
+            actual_injection
+        ), f"Expected chalk binary to be injected in {file_path.name} (virtual={virtual})"
     else:
-        assert not actual_injection, f"Expected chalk binary NOT to be injected in {file_path.name} (virtual={virtual})"
+        assert (
+            not actual_injection
+        ), f"Expected chalk binary NOT to be injected in {file_path.name} (virtual={virtual})"
