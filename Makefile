@@ -191,3 +191,11 @@ src/utils/pingttl: src/utils/pingttl.nim
 
 .PHONY: sqlite
 sqlite: server/sqlite
+
+.PHONY: lint-dust
+lint-dust:
+	pre-commit run --files ./dust-lambda-extension/**
+
+.PHONY: lint-all
+lint-all:
+	pre-commit run --all-files
