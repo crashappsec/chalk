@@ -127,21 +127,21 @@ proc getSelfExtraction*(): Option[ChalkObj] =
                "Ensure chalk has both read and execute permissions. " &
                "To add permissions run: 'chmod +rx " & myPath & "'\n")
 
-    let ai = ArtifactIterationInfo(filePaths: @[myPath])
-    for i in ai.scanArtifactLocationsWith(getNativeCodecs()):
-      selfChalk = i
-      break
+    withInternalScan():
+      let ai = ArtifactIterationInfo(filePaths: @[myPath])
+      for i in ai.scanArtifactLocationsWith(getNativeCodecs()):
+        selfChalk = i
+        break
 
-    if selfChalk == nil:
-      canSelfInject = false
       setCommandName(cmd)
-      return none(ChalkObj)
 
-    if selfChalk.extract == nil:
-      selfChalk.marked = false
-      selfChalk.extract = ChalkDict()
+      if selfChalk == nil:
+        canSelfInject = false
+        return none(ChalkObj)
 
-    setCommandName(cmd)
+      if selfChalk.extract == nil:
+        selfChalk.marked = false
+        selfChalk.extract = ChalkDict()
 
   if selfChalk != nil:
     result = some(selfChalk)

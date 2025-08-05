@@ -70,65 +70,68 @@ proc elfScan*(codec: Plugin, location: string): Option[ChalkObj] {.cdecl.} =
       return none(ChalkObj)
     try:
       var magicBuffer: array[4, char]
-      stream.read(magicBuffer)
+      stream.peek(magicBuffer)
       if magicBuffer != ELF_MAGIC_BYTES:
         return none(ChalkObj)
-      stream.setPosition(0)
       let elf = newElfFileFromData(newFileStringStream(location))
-      if location != getMyAppPath():
+      if not getInternalScan():
         elf.fileData.load()
 
       if not elf.parse():
-        for err in elf.errors:
-          error(location & ": " & err)
         return none(ChalkObj)
 
+      let cache   = ElfCodecCache(elf: elf)
       var chalkObject: ChalkObj
-      if elf.chalkSectionHeader != nil and not elf.hasBeenUnchalked:
-        let sectionOffset   = elf.chalkSectionHeader.offset.value
-        var chalkMagicIndex = verifyChalkStart(elf.fileData[sectionOffset .. ^1])
-        if chalkMagicIndex != -1:
-          chalkMagicIndex += int(sectionOffset)
-          stream.setPosition(chalkMagicIndex)
-          chalkObject = codec.loadChalkFromFStream(stream, location)
+
+      if not elf.hasBeenUnchalked:
+        let
+          (data, start, _) = elf.getChalkSectionData()
+          magicOffset      = verifyChalkStart(data)
+        if magicOffset != -1:
+          stream.setPosition(start + magicOffset)
+          chalkObject = codec.loadChalkFromFStream(
+            stream,
+            location,
+            cache = cache,
+          )
 
       if chalkObject == nil:
-        chalkObject = newChalk(name         = location,
-                               fsRef        = location,
-                               codec        = codec,
-                               resourceType = {ResourceFile})
+        chalkObject = newChalk(
+          name         = location,
+          fsRef        = location,
+          codec        = codec,
+          resourceType = {ResourceFile},
+          cache        = cache,
+        )
 
-      chalkObject.cache = ElfCodecCache(elf: elf)
       return some(chalkObject)
     except:
       return none(ChalkObj)
 
 proc elfGetUnchalkedHash*(codec: Plugin, chalk: ChalkObj):
-                            Option[string] {.cdecl.} =
-  if not (chalk.cache of ElfCodecCache):
-    return none(string)
-  let cache = ElfCodecCache(chalk.cache)
-  let hashElf = cache.elf.copy()
-  if hashElf.parse() and hashElf.unchalk():
-    return some(hashElf.getChalkSectionData().hex())
-  return some(cache.elf.fileData.readAll().sha256Hex())
+                          Option[string] {.cdecl.} =
+  let elf = ElfCodecCache(chalk.cache).elf
+  return some(elf.getUnchalkedHash())
 
 proc elfHandleWrite*(codec: Plugin,
                      chalk: ChalkObj,
                      data: Option[string],
                      ) {.cdecl.} =
-  if not (chalk.cache of ElfCodecCache):
-    chalk.opFailed = true
-    return
-  let
-    cache = ElfCodecCache(chalk.cache)
-    elf   = cache.elf
+  let elf = ElfCodecCache(chalk.cache).elf
+  # mutating elf should be loaded, even if for internal scans
+  # as its no longer a scan... but a chalking operation
+  elf.fileData.load()
+  # compute unchalked hash before the file is mutated
+  # as otherwise to compute after the fact will need to modify
+  # file stream again hence more memory usage
+  discard chalk.callGetUnchalkedHash()
   try:
     let success =
       if len(data.get("")) > 0:
         elf.insertOrSetChalkSection(SH_NAME_CHALKMARK, data.get())
       else:
         elf.unchalk()
+    echo("READ ALL ", chalk.name)
     if success and chalk.fsRef.replaceFileContents(elf.fileData.readAll()):
       return
   except:

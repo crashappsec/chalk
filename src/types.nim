@@ -549,6 +549,7 @@ var
   canSelfInject*          = true
   doingTestRun*           = false
   onlyCodecs*             = newSeq[Plugin]()
+  inInternalScan*         = false
   passedHelpFlag*         = false
   installedPlugins*       = Table[string, Plugin]()
   externalActions*        = newSeq[seq[string]]()

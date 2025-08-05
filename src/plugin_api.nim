@@ -203,7 +203,9 @@ proc findFirstValidChalkMark*(s:            Stream,
 
 proc loadChalkFromFStream*(codec:  Plugin,
                            stream: FileStream,
-                           loc:    string): ChalkObj =
+                           loc:    string,
+                           cache   = RootRef(nil),
+                           ): ChalkObj =
   ## A helper function for codecs that use file streams to load
   ## an existing chalk mark.  The stream must be positioned over
   ## the start of the Chalk magic before you call this function.
@@ -211,7 +213,8 @@ proc loadChalkFromFStream*(codec:  Plugin,
   result = newChalk(name         = loc,
                     fsRef        = loc,
                     codec        = codec,
-                    resourceType = {ResourceFile})
+                    resourceType = {ResourceFile},
+                    cache        = cache)
 
   trace(result.name & ": chalk mark magic @ " & $(stream.getPosition()))
 

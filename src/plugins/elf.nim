@@ -595,6 +595,10 @@ proc parseSectionTable(self: ElfFile): bool =
   self.nameSectionHeader = nameSectionHeader
   return true
 
+proc showErrors(self: ElfFile) =
+  for e in self.errors:
+    error("elf @ " & self.fileData.path & ": " & e)
+
 proc parse*(self: ElfFile): bool =
   ## parse the ELF and return true if everything went OK,
   ## where failure is indicative of a malformed ELF, or maybe
@@ -608,8 +612,7 @@ proc parse*(self: ElfFile): bool =
   if result:
     self.locateChalkSection()
   else:
-    error("elf: " & $self.errors)
-  return result
+    self.showErrors()
 
 proc setChalkSection*(self: ElfFile, name, data: string): bool =
   # NOTE!
@@ -846,37 +849,55 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
 
 proc insertOrSetChalkSection*(self: ElfFile, name: string, data: string): bool =
   if self.chalkSectionHeader == nil:
-    return self.insertChalkSection(name, data)
+    result = self.insertChalkSection(name, data)
   else:
-    return self.setChalkSection(name, data)
+    result = self.setChalkSection(name, data)
+  if not result:
+    self.showErrors()
 
 proc unchalk*(self: ElfFile): bool =
   if not self.insertOrSetChalkSection(SH_NAME_CHALKFREE, newString(SHA256_BYTE_LENGTH)):
     return false
-  var chalkOffset = self.chalkSectionHeader.offset.value
-  var unchalked   = self.fileData[0 ..< chalkOffset] &
-                    self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
-  var hash        = unchalked.sha256()
-  self.fileData[chalkOffset] = (
-    hash &
-    self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
-  )
+  let
+    chalkOffset = self.chalkSectionHeader.offset.value
+    suffix      = self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
+  var hash = initSha256()
+  for c in self.fileData.chunks(0 ..< chalkOffset, 4096):
+    hash.update(@c)
+  hash.update(@suffix)
+  let sha256 = hash.final()
+  self.fileData[chalkOffset] = sha256 & suffix
   return true
 
-proc getChalkSectionData*(self: ElfFile): string =
+proc getChalkSectionData*(self: ElfFile): (string, int, int) =
   let chalkHeader = self.chalkSectionHeader
   if chalkHeader == nil:
-    return ""
-  let offset = chalkHeader.offset.value
-  let size   = chalkHeader.size.value
-  return self.fileData[offset ..< offset + size]
+    return ("", 0, 0)
+  let
+    start = chalkHeader.offset.value
+    done  = start + chalkHeader.size.value - 1
+    data  = self.fileData[start .. done]
+  return (data, int(start), int(done))
+
+proc copy*(self: ElfFile): ElfFile =
+  return ElfFile(
+    fileData: self.fileData.reset(),
+  )
+
+proc getUnchalkedHash*(self: ElfFile): string =
+  let copy = self.copy()
+  if copy.parse() and copy.unchalk():
+    let (data, _, _) = copy.getChalkSectionData()
+    return data.hex()
+  # there was an error parsing or unchalking elf
+  # so we compute hash of the raw file
+  let fileData = self.fileData.reset()
+  var hash = initSha256()
+  for c in fileData.chunks(0 .. ^1, 4096):
+    hash.update(@c)
+  return hash.finalHex()
 
 proc newElfFileFromData*(fileData: FileStringStream): ElfFile =
   return ElfFile(
     fileData: fileData,
-  )
-
-proc copy*(self: ElfFile): ElfFile =
-  return ElfFile(
-    fileData: self.fileData.copy(),
   )

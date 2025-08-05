@@ -1,12 +1,16 @@
 import std/[
+  # enumerate,
   os,
+  sequtils,
   streams,
   strutils,
 ]
 import ../../src/utils/file_string_stream {.all.}
 
 template assertEq(a, b: untyped) =
-  doAssert a == b, "\"" & $a & "\" != \"" & $b & "\""
+  let aa = a
+  let bb = b
+  doAssert aa == bb, "\"" & $aa & "\" != \"" & $bb & "\""
 
 proc test(load: bool) =
   var s = newFileStringStream("one")
@@ -46,9 +50,14 @@ proc test(load: bool) =
   assertEq(len(s), 25)
   s[23] = "derful"
   assertEq(len(s), 29)
+  assertEq(s[0..<5], "he11o")
+  assertEq(s[20..<25], "wonde")
   assertEq(s[20..<26], "wonder")
+  assertEq(s[20..<27], "wonderf")
+  assertEq(s[20..<28], "wonderfu")
   assertEq(s[20..<29], "wonderful")
   assertEq(s[20..^1], "wonderful")
+  assertEq(s[20..^2], "wonderfu")
   assertEq(s[23..<29], "derful")
   assertEq(s[23..<28], "derfu")
   assertEq(s[24..<29], "erful")
@@ -67,8 +76,16 @@ proc test(load: bool) =
     "wonderful".toHex(),
   )
 
-  s.writeAll("hello")
-  assertEq(s.readAll(), "hello")
+  let expected = @[
+    "he11o".toHex(),
+    "0A" & "1000" & "2000",
+    "0000" & "4000" & "00",
+    "00" & "0000" & "0000",
+    "wonde".toHex(),
+    "rful".toHex(),
+  ]
+  for (c, e) in zip(s.chunks(0 .. ^1, 5).toSeq(), expected):
+    assertEq(c.toHex(), e)
 
 proc main =
   let s = newFileStream("one", fmWrite)
