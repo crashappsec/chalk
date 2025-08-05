@@ -137,14 +137,37 @@ proc extractMarkFromLayer(self: ChalkObj): string =
 
 proc extractMarkFromInToto(self: ChalkObj, json: JsonNode): string =
   let
-    sigs      = json["signatures"]
-    payload   = parseJson(json["payload"].getStr().decode())
-    data      = payload["predicate"]["Data"].getStr().strip()
-    predicate = parseJson(data)["predicate"]
-    attrs     = predicate["attributes"].getElems()[0]
-    rawMark   = attrs["evidence"].getStr()
-  for subject in payload["subject"]:
-    let digest = subject["digest"]["sha256"].getStr()
+    sigs          = json{"signatures"}
+    payload       = parseJson(json{"payload"}.getStr().decode())
+    predicateKind = payload{"predicateType"}.getStr()
+    docPredicate  = payload{"predicate"}
+  if docPredicate.kind != JObject:
+    raise newException(
+      ValueError,
+      "Unsupported in-toto attestation " & predicateKind & ". " &
+      "Expecting predicate to be a JObject but it is " & $docPredicate.kind
+    )
+  let data        = docPredicate{"Data"}.getStr().strip()
+  if data == "":
+    raise newException(
+      ValueError,
+      "Unsupported in-toto attestation " & predicateKind & ". " &
+      "Predicate doest have any associated '.Data'."
+    )
+  let
+    attPredicate  = parseJson(data){"predicate"}
+    attributes    = attPredicate{"attributes"}
+  if attributes.kind != JArray or len(attributes) == 0:
+    raise newException(
+      ValueError,
+      "Unsupported in-toto attestation " & predicateKind & ". " &
+      "Predicate doest have any attributes."
+    )
+  let
+    attrs         = attributes.getElems()[0]
+    rawMark       = attrs{"evidence"}.getStr()
+  for subject in payload{"subject"}:
+    let digest = subject{"digest"}{"sha256"}.getStr()
     var
       matchesDigest = false
       digests       = newSeq[string]()
