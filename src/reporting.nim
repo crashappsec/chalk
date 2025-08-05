@@ -151,7 +151,7 @@ proc doCustomReporting() =
 
     safePublish(topic, buildHostReport(templateToUse))
 
-proc doReporting*(topic="report") {.exportc, cdecl.} =
+proc doReporting*(topic="report", clearState = false) {.exportc, cdecl.} =
   if inSubscan():
     let ctx = getCurrentCollectionCtx()
     ctx.report = doEmbeddedReport()
@@ -170,3 +170,5 @@ proc doReporting*(topic="report") {.exportc, cdecl.} =
     if not skipCustom:
       doCustomReporting()
     writeReportCache()
+  if clearState:
+    clearReportingState()

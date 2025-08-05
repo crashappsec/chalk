@@ -171,7 +171,6 @@ proc getParentExitStatus(trueParentPid: Pid): bool =
   return false
 
 proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
-  clearReportingState()
   initCollection()
   if chalkOpt.isSome():
     let chalk = chalkOpt.get()
@@ -186,7 +185,7 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
         chalk.collectedData[k] = v
 
     chalk.collectRunTimeArtifactInfo()
-  doReporting()
+  doReporting(clearState = true)
 
 proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
   let
@@ -195,7 +194,6 @@ proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
     limit         = int(attrGet[Con4mSize]("exec.heartbeat_rlimit"))
 
   setCommandName("heartbeat")
-  clearReportingState()
   setRlimit(limit)
 
   while true:
@@ -219,7 +217,7 @@ when hostOS == "linux":
       return none(PostExecState)
 
     let
-      toWatchPaths = tryToLoadFile(tmp).splitLines()
+      toWatchPaths = tryToLoadFile(tmp).splitLinesAnd(keepEmpty = false)
       watcher      = inotify_init1(O_NONBLOCK)
     var
       toWatchDirs  = initHashSet[string]()
@@ -260,24 +258,25 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   if state.isNone():
     return
 
-  let pid = fork()
-  if pid != 0:
-    # parent process
-    return
+  # let pid = fork()
+  # if pid != 0:
+  #   # parent process
+  #   return
 
-  let ws            = state.get()
-  var accessedPaths = initHashSet[string]()
+  let
+    ws            = state.get()
+    niceValue     = attrGet[int]("exec.postexec.nice")
+  var
+    accessedPaths = initHashSet[string]()
+
+  trace("postexec: using nice " & $niceValue)
+  discard nice(cint(niceValue))
 
   try:
-    clearReportingState()
     initCollection()
     setCommandName("postexec")
     if detach:
       detachFromParent()
-
-    let niceValue = attrGet[int]("exec.postexec.nice")
-    trace("postexec: using nice " & $niceValue)
-    discard nice(cint(niceValue))
 
     let
       pollInMicroSec     = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_poll_time"))
@@ -330,9 +329,12 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   trace("postexec: subscan complete")
 
   withSuspendChalkCollectionFor(getOptionalPluginNames()):
-    doReporting()
+    doReporting(clearState = true)
 
-  quitChalk()
+  trace("postexec: reverting nice " & $niceValue)
+  discard nice(cint(niceValue * -1))
+
+  # quitChalk()
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
@@ -419,7 +421,7 @@ proc runCmdExec*(args: seq[string]) =
       let chalkOpt = doExecCollection(allOpts, pid)
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
-      doReporting()
+      doReporting(clearState = true)
 
       postExecState.doPostExec(detach = false)
 
@@ -456,7 +458,7 @@ proc runCmdExec*(args: seq[string]) =
       # On some platforms we don't support
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
-      doReporting()
+      doReporting(clearState = true)
 
       postExecState.doPostExec(detach = true)
 

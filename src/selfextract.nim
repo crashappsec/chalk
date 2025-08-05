@@ -80,10 +80,10 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   # If we call twice and we're on a platform where we don't
   # have a codec for this type of executable, avoid dupe errors.
   once:
-    var
-      myPath = getMyAppPath()
-      cmd    = getCommandName()
+    var cmd    = getCommandName()
 
+    # /proc/self/exe is a symlink hence have to use absolute path of the exe
+    var myPath = getMyAppPath()
     try:
       myPath = myPath.resolvePath()
     except:
@@ -140,8 +140,6 @@ proc getSelfExtraction*(): Option[ChalkObj] =
     if selfChalk.extract == nil:
       selfChalk.marked = false
       selfChalk.extract = ChalkDict()
-
-      selfId = some(selfChalk.callGetChalkId())
 
     setCommandName(cmd)
 

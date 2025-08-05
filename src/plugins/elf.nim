@@ -9,6 +9,7 @@ import std/[
 ]
 import ".."/[
   types,
+  utils/files,
 ]
 
 # We've got a lot of ELF-specific defines we're not using but we
@@ -221,7 +222,7 @@ type
     name:                    string
 
   ElfFile*                   = ref object of RootRef
-    fileData*:               string
+    fileData*:               FileStringStream
     header*:                 ElfHeader
     programHeaders*:         seq[ElfProgramHeader]
     sectionHeaders*:         seq[ElfSectionHeader]
@@ -237,10 +238,10 @@ proc pad8(offset: uint64): uint64 =
   # pad8() returns to us how many bytes to pad for 64bit alignment
   return uint64((8 - (offset and 7)) and NOT8)
 
-proc getInt[T](data: var string, whence: int = 0): T =
-  return cast[ref [T]](addr data[whence])[]
+proc getInt[T](data: FileStringStream, whence: int = 0): T =
+  result = readInt[T](data, whence)
 
-proc setInt[T](data: var string, whence: uint64, value: T) =
+proc setInt[T](data: var (string | FileStringStream), whence: uint64, value: T) =
   for byteIndex in 0 ..< sizeof(T):
     var newValue = (uint(value) shr uint(byteIndex * 8)) and uint(0xFF)
     data[int(whence) + byteIndex] = char(newValue)
@@ -360,20 +361,23 @@ proc setElfIntValue[T](self:       ElfFile,
   elfValue.value = newValue
   setInt[T](self.fileData, elfValue.whence, newValue)
 
-proc getValue[T](data: var string, whence: uint64): ElfIntValue[T] =
+proc getValue[T](data: FileStringStream, whence: uint64): ElfIntValue[T] =
   return ElfIntValue[T](whence: whence, value: getInt[T](data, int(whence)))
 
 proc locateChalkSection(self: ElfFile) =
-  var sectionHeaders = self.sectionHeaders
-  for index in low(sectionHeaders) .. high(sectionHeaders):
-    var header = sectionHeaders[index]
+  for header in self.sectionHeaders:
     if header.headerType.value != uint32(SHT_PROGBITS):
       continue
-    if header.name == SH_NAME_CHALKMARK:
+    case header.name
+    of SH_NAME_CHALKMARK:
       self.chalkSectionHeader = header
-    if header.name == SH_NAME_CHALKFREE:
+      break
+    of SH_NAME_CHALKFREE:
       self.chalkSectionHeader = header
       self.hasBeenUnchalked   = true
+      break
+    else:
+      discard
 
 proc parseHeader*(self: ElfFile): bool =
   let
@@ -603,16 +607,9 @@ proc parse*(self: ElfFile): bool =
      self.parseSectionTable()
   if result:
     self.locateChalkSection()
+  else:
+    error("elf: " & $self.errors)
   return result
-
-proc parseAndShow*(fileData: string) =
-  var file = ElfFile(
-    fileData: fileData,
-  )
-  if not file.parse():
-    echo ERR_ELF_PARSE_GENERAL
-    return
-  file.ranges.show()
 
 proc setChalkSection*(self: ElfFile, name, data: string): bool =
   # NOTE!
@@ -695,10 +692,11 @@ proc setChalkSection*(self: ElfFile, name, data: string): bool =
                              NULLBYTE)
   sectionTableOffset += alignmentNeeded
   self.setElfIntValue(self.header.sectionTable, sectionTableOffset)
-  self.fileData = self.fileData[0 ..< chalkSectionOffset] &
-                  data                                    &
-                  stringTableData                         &
-                  sectionTableData
+  self.fileData[chalkSectionOffset] = (
+    data &
+    stringTableData &
+    sectionTableData
+  )
   return self.parse()
 
 proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
@@ -839,29 +837,30 @@ proc insertChalkSection*(self: ElfFile, name: string, data: string): bool =
   else:
     sectionTableData &= sectionHeader
 
-  var fileData  = self.fileData
-  fileData      = fileData[0 ..< truncateOffset]
-  fileData     &= chalkSectionData
-  fileData     &= stringTableData
-  fileData     &= sectionTableData
-  self.fileData = fileData
+  self.fileData[truncateOffset] = (
+    chalkSectionData &
+    stringTableData &
+    sectionTableData
+  )
   return self.parse()
 
-proc unchalk*(self: ElfFile): bool =
-  var unmark = newString(SHA256_BYTE_LENGTH)
+proc insertOrSetChalkSection*(self: ElfFile, name: string, data: string): bool =
   if self.chalkSectionHeader == nil:
-    if not self.insertChalkSection(SH_NAME_CHALKFREE, unmark):
-      return false
+    return self.insertChalkSection(name, data)
   else:
-    if not self.setChalkSection(SH_NAME_CHALKFREE, unmark):
-      return false
+    return self.setChalkSection(name, data)
+
+proc unchalk*(self: ElfFile): bool =
+  if not self.insertOrSetChalkSection(SH_NAME_CHALKFREE, newString(SHA256_BYTE_LENGTH)):
+    return false
   var chalkOffset = self.chalkSectionHeader.offset.value
   var unchalked   = self.fileData[0 ..< chalkOffset] &
                     self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
   var hash        = unchalked.sha256()
-  self.fileData   = self.fileData[0 ..< chalkOffset] &
-                    hash                             &
-                    self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
+  self.fileData[chalkOffset] = (
+    hash &
+    self.fileData[chalkOffset + SHA256_BYTE_LENGTH .. ^1]
+  )
   return true
 
 proc getChalkSectionData*(self: ElfFile): string =
@@ -872,10 +871,12 @@ proc getChalkSectionData*(self: ElfFile): string =
   let size   = chalkHeader.size.value
   return self.fileData[offset ..< offset + size]
 
-proc newElfFileFromData*(fileData: string): ElfFile =
+proc newElfFileFromData*(fileData: FileStringStream): ElfFile =
   return ElfFile(
     fileData: fileData,
   )
 
-proc newElfFileFromFilename*(filename: string): ElfFile =
-  return newElfFileFromData(open(filename, fmRead).readAll())
+proc copy*(self: ElfFile): ElfFile =
+  return ElfFile(
+    fileData: self.fileData.copy(),
+  )
