@@ -131,7 +131,6 @@ proc elfHandleWrite*(codec: Plugin,
         elf.insertOrSetChalkSection(SH_NAME_CHALKMARK, data.get())
       else:
         elf.unchalk()
-    echo("READ ALL ", chalk.name)
     if success and chalk.fsRef.replaceFileContents(elf.fileData.readAll()):
       return
   except:

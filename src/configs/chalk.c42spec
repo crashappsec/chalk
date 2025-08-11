@@ -2193,6 +2193,7 @@ well.
 """
 
   allow postexec
+  allow heartbeat
 
   field command_name {
     type:     string
@@ -2328,9 +2329,17 @@ If it is NOT true, set exec.searchpath to provide any locations Chalk should che
 """
   }
 
-  field heartbeat {
-    type:    bool
-    default: false
+}
+
+singleton heartbeat {
+  user_def_ok:   false
+  doc: """
+Chalk periodic heartbeats configuration.
+"""
+
+  field run {
+    type:      bool
+    default:   false
     shortdoc: "Report heartbeats"
     doc: """
 When this is true, Chalk will, after initial reporting, connect
@@ -2339,7 +2348,7 @@ controlled by the `heartbeat_rate` field.
 """
   }
 
-  field heartbeat_rate {
+  field rate {
     type:    Duration
     default: <<20 seconds>>
     shortdoc: "Heartbeat rate"
@@ -2357,13 +2366,23 @@ final report, if the monitored process has exited.
 """
   }
 
-  field heartbeat_rlimit {
+  field rlimit {
     type: Size
     default: <<0mb>>
     doc:     """
 rlimit for the heartbeat forked process.
 When set to 0, no limit is enforced.
 This can ensure heartbeat process does not consume more memory than allocated.
+"""
+  }
+
+  field nice {
+    type:    int
+    default: 5
+    range:   (0, 19)
+    doc: """
+Nice level for the heartbeat forked process to reduce system impact.
+See https://www.man7.org/linux/man-pages/man2/nice.2.html
 """
   }
 }
@@ -2384,6 +2403,17 @@ Post exec is executed after normal chalk exec which allows chalk to:
     default: false
     doc: """
 Whether postexec report collection should run after exec.
+"""
+  }
+
+  field fork {
+    type:    bool
+    default: false
+    doc: """
+Whether to fork to another pid for collecting postexec data.
+Using the same pid as the main exec/heartbeats process saves memory utilization
+however will delay initial heartbeats somewhat as heartbeat loop will only start
+after postexec is complete.
 """
   }
 

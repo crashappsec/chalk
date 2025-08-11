@@ -189,9 +189,13 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
 
 proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
   let
-    inMicroSec    = int(attrGet[Con4mDuration]("exec.heartbeat_rate"))
+    inMicroSec    = int(attrGet[Con4mDuration]("exec.heartbeat.rate"))
     sleepInterval = int(inMicroSec / 1000)
-    limit         = int(attrGet[Con4mSize]("exec.heartbeat_rlimit"))
+    limit         = int(attrGet[Con4mSize]("exec.heartbeat.rlimit"))
+    niceValue     = attrGet[int]("exec.heartbeat.nice")
+
+  trace("heartbeat: using nice " & $niceValue)
+  discard nice(cint(niceValue))
 
   setCommandName("heartbeat")
   setRlimit(limit)
@@ -258,10 +262,12 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   if state.isNone():
     return
 
-  # let pid = fork()
-  # if pid != 0:
-  #   # parent process
-  #   return
+  let toFork = attrGet[bool]("exec.postexec.fork")
+  if toFork:
+    let pid = fork()
+    if pid != 0:
+      # parent process
+      return
 
   let
     ws            = state.get()
@@ -331,10 +337,13 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   withSuspendChalkCollectionFor(getOptionalPluginNames()):
     doReporting(clearState = true)
 
-  trace("postexec: reverting nice " & $niceValue)
-  discard nice(cint(niceValue * -1))
-
-  # quitChalk()
+  # if forked exit postexec process
+  if toFork:
+    quitChalk()
+  # else restore previous nice as chalk can be doing things after postexec
+  else:
+    trace("postexec: reverting nice " & $niceValue)
+    discard nice(cint(niceValue * -1))
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
@@ -425,7 +434,7 @@ proc runCmdExec*(args: seq[string]) =
 
       postExecState.doPostExec(detach = false)
 
-      if attrGet[bool]("exec.heartbeat"):
+      if attrGet[bool]("exec.heartbeat.run"):
         chalkOpt.doHeartbeat(pid, getChildExitStatus)
       else:
         trace("Waiting for spawned process to exit.")
@@ -462,5 +471,5 @@ proc runCmdExec*(args: seq[string]) =
 
       postExecState.doPostExec(detach = true)
 
-      if attrGet[bool]("exec.heartbeat"):
+      if attrGet[bool]("exec.heartbeat.run"):
         chalkOpt.doHeartbeat(ppid, getParentExitStatus)
