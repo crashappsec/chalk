@@ -2422,8 +2422,7 @@ after postexec is complete.
     default: 5
     range:   (0, 19)
     doc: """
-Nice level for the post exec forked process to reduce impact to the
-primary exec process.
+Nice level for the post exec to reduce overall system impact.
 See https://www.man7.org/linux/man-pages/man2/nice.2.html
 """
   }
