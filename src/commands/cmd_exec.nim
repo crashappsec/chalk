@@ -171,7 +171,6 @@ proc getParentExitStatus(trueParentPid: Pid): bool =
   return false
 
 proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
-  clearReportingState()
   initCollection()
   if chalkOpt.isSome():
     let chalk = chalkOpt.get()
@@ -186,16 +185,19 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
         chalk.collectedData[k] = v
 
     chalk.collectRunTimeArtifactInfo()
-  doReporting()
+  doReporting(clearState = true)
 
 proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
   let
-    inMicroSec    = int(attrGet[Con4mDuration]("exec.heartbeat_rate"))
+    inMicroSec    = int(attrGet[Con4mDuration]("exec.heartbeat.rate"))
     sleepInterval = int(inMicroSec / 1000)
-    limit         = int(attrGet[Con4mSize]("exec.heartbeat_rlimit"))
+    limit         = int(attrGet[Con4mSize]("exec.heartbeat.rlimit"))
+    niceValue     = attrGet[int]("exec.heartbeat.nice")
+
+  trace("heartbeat: using nice " & $niceValue)
+  discard nice(cint(niceValue))
 
   setCommandName("heartbeat")
-  clearReportingState()
   setRlimit(limit)
 
   while true:
@@ -219,7 +221,7 @@ when hostOS == "linux":
       return none(PostExecState)
 
     let
-      toWatchPaths = tryToLoadFile(tmp).splitLines()
+      toWatchPaths = tryToLoadFile(tmp).splitLinesAnd(keepEmpty = false)
       watcher      = inotify_init1(O_NONBLOCK)
     var
       toWatchDirs  = initHashSet[string]()
@@ -260,24 +262,27 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   if state.isNone():
     return
 
-  let pid = fork()
-  if pid != 0:
-    # parent process
-    return
+  let toFork = attrGet[bool]("exec.postexec.fork")
+  if toFork:
+    let pid = fork()
+    if pid != 0:
+      # parent process
+      return
 
-  let ws            = state.get()
-  var accessedPaths = initHashSet[string]()
+  let
+    ws            = state.get()
+    niceValue     = attrGet[int]("exec.postexec.nice")
+  var
+    accessedPaths = initHashSet[string]()
+
+  trace("postexec: using nice " & $niceValue)
+  discard nice(cint(niceValue))
 
   try:
-    clearReportingState()
     initCollection()
     setCommandName("postexec")
     if detach:
       detachFromParent()
-
-    let niceValue = attrGet[int]("exec.postexec.nice")
-    trace("postexec: using nice " & $niceValue)
-    discard nice(cint(niceValue))
 
     let
       pollInMicroSec     = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_poll_time"))
@@ -330,9 +335,15 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   trace("postexec: subscan complete")
 
   withSuspendChalkCollectionFor(getOptionalPluginNames()):
-    doReporting()
+    doReporting(clearState = true)
 
-  quitChalk()
+  # if forked exit postexec process
+  if toFork:
+    quitChalk()
+  # else restore previous nice as chalk can be doing things after postexec
+  else:
+    trace("postexec: reverting nice " & $niceValue)
+    discard nice(cint(niceValue * -1))
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
@@ -419,11 +430,11 @@ proc runCmdExec*(args: seq[string]) =
       let chalkOpt = doExecCollection(allOpts, pid)
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
-      doReporting()
+      doReporting(clearState = true)
 
       postExecState.doPostExec(detach = false)
 
-      if attrGet[bool]("exec.heartbeat"):
+      if attrGet[bool]("exec.heartbeat.run"):
         chalkOpt.doHeartbeat(pid, getChildExitStatus)
       else:
         trace("Waiting for spawned process to exit.")
@@ -456,9 +467,9 @@ proc runCmdExec*(args: seq[string]) =
       # On some platforms we don't support
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
-      doReporting()
+      doReporting(clearState = true)
 
       postExecState.doPostExec(detach = true)
 
-      if attrGet[bool]("exec.heartbeat"):
+      if attrGet[bool]("exec.heartbeat.run"):
         chalkOpt.doHeartbeat(ppid, getParentExitStatus)

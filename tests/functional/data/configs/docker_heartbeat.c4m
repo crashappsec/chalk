@@ -3,8 +3,8 @@ subscribe("report", "json_console_out")
 custom_report.terminal_chalk_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 
-exec.heartbeat: true
-exec.heartbeat_rate: <<1 seconds>>
+exec.heartbeat.run: true
+exec.heartbeat.rate: <<1 seconds>>
 
 docker.wrap_entrypoint: true
 docker.wrap_cmd: true

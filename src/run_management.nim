@@ -51,6 +51,17 @@ template withOnlyCodecs*(codecs: seq[Plugin], c: untyped) =
 template getOnlyCodecs*(): seq[Plugin] =
   onlyCodecs
 
+template withInternalScan*(c: untyped) =
+  let old = inInternalScan
+  inInternalScan = true
+  try:
+    c
+  finally:
+    inInternalScan = old
+
+template getInternalScan*(): bool =
+  inInternalScan
+
 proc inSubscan*(): bool =
   return len(ctxStack) > 1
 

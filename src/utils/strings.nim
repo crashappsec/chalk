@@ -66,6 +66,14 @@ proc strip*(items: seq[string],
   for i in items:
     result.add(i.strip(leading = leading, trailing = trailing, chars = chars))
 
+proc splitLinesAnd*(items: string, keepEol = false, keepEmpty = true): seq[string] =
+  let lines = items.splitLines(keepEol = keepEol)
+  if keepEmpty:
+    return lines
+  for i in lines:
+    if i != "":
+      result.add(i)
+
 proc elseWhenEmpty*(s: string, default: string): string =
   if s == "":
     return default

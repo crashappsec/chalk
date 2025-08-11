@@ -1,0 +1,33 @@
+parameter exec.heartbeat.run {
+  default:  true
+  shortdoc: "Enable heartbeat reports"
+  doc:      "Whether to send periodic heartbeat reports"
+}
+# TODO add duration parameter with libcon4m
+# currently parameters cannot be of Duration type
+exec.heartbeat.rate = <<10 minutes>>
+
+# disable heartbeats in lambda as lambda cannot run on arbitrary schedule
+if env_exists("AWS_LAMBDA_FUNCTION_NAME") and env_exists("AWS_LAMBDA_FUNCTION_VERSION") {
+  exec.heartbeat.run = false
+}
+
+parameter sink_config.crashoverride_heartbeats.uri {
+  shortdoc: "Reporting URL where to send heartbeat reports"
+  doc:      "Reporting URL where to send heartbeat reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/heartbeats"
+}
+
+sink_config crashoverride_heartbeats {
+  ~enabled:         true
+  ~sink:            "post"
+  ~priority:        999998
+  ~auth:            "crashoverride_reporting"
+}
+
+custom_report crashoverride_heartbeats {
+  ~enabled:         true
+  ~report_template: "heartbeat"
+  ~sink_configs:    ["crashoverride_heartbeats"]
+  ~use_when:        ["heartbeat"]
+}

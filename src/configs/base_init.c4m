@@ -12,6 +12,7 @@ func get_args(key) { return command_argv(); }
 
 exec {
   search_path: array_add(split(env("PATH"), ":"), ["."])
+  heartbeat {}
   postexec {
     access_watch {}
   }
