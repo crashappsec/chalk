@@ -3453,7 +3453,6 @@ validate in the transparency log.
     default:  ["/dev/.*",
                "/proc/.*",
                "/sys/.*",
-               ".*/\\..*",
                ".*/\\.git/.*",
                ".*/__pycache__/.*",
                ".*/.mypy_cache/.*",
