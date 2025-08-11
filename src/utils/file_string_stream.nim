@@ -18,8 +18,12 @@ import "."/[
 export fd_cache
 
 type
-  # alias to allow using different ints in the same function signature generic
-  # as otherwise nim doesnt match signature
+  # Type aliases to work around Nim's generic type matching limitations.
+  # When using HSlice[IntA, IntB] in proc signatures, Nim requires both
+  # bounds to be the exact same integer type (e.g., both int or both int64).
+  # These aliases allow mixing different integer types in slices (e.g., myStream[0..len(data)])
+  # where 0 is int and len() returns int64, avoiding explicit type conversions.
+  # Without these aliases, users would need to write myStream[0.int..len(data)]
   IntA = SomeInteger
   IntB = SomeInteger
 
