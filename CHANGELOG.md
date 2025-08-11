@@ -13,14 +13,20 @@
 
   ([#515](https://github.com/crashappsec/chalk/pull/515))
 
-- Configuration `ignore_patterns` was used only in chalking operations.
-  Now it is used in all chalk operations.
+- Configuration `ignore_patterns` was used only in chalking operations. Now it
+  is used in all chalk operations.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
+
+- Removed the blanket "._/\\.._" pattern from the default ignore_patterns
+  configuration in src/configs/chalk.c42spec. The configuration still maintains
+  specific exclusions for known directories that should be ignored (.git,
+  **pycache**, .mypy_cache), but now allows other dot directories to be scanned.
+  ([#555](https://github.com/crashappsec/chalk/pull/555))
 
 ### New Features
 
-- X509 Certificate codec which can parse PEM/DER files and report
-  metadata keys about the certificate:
+- X509 Certificate codec which can parse PEM/DER files and report metadata keys
+  about the certificate:
   - `_X509_VERSION`
   - `_X509_SUBJECT`
   - `_X509_SUBJECT_SHORT`
@@ -75,8 +81,8 @@
   }
   ```
 
-  Certificate behavior can be customized via `certs` configuration block
-  which includes following configs:
+  Certificate behavior can be customized via `certs` configuration block which
+  includes following configs:
   - `certs.filter_method`
   - `certs.always_scan_paths`
   - `certs.scan_no_extension`
@@ -93,11 +99,10 @@
   [#532](https://github.com/crashappsec/chalk/pull/532),
   [#539](https://github.com/crashappsec/chalk/pull/539))
 
-- Asynchronous metadata collection after `chalk exec` with
-  new `postexec` report.
-  Currently it:
-  - watches when known artifacts are accessed by chalk exec
-    (by default watches for cert usage)
+- Asynchronous metadata collection after `chalk exec` with new `postexec`
+  report. Currently it:
+  - watches when known artifacts are accessed by chalk exec (by default watches
+    for cert usage)
 
   This added these configurations:
   - `docker.prep_postexec`
