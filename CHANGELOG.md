@@ -182,6 +182,10 @@
   Previously it was only honored for chalk pager outputs.
   ([#549](https://github.com/crashappsec/chalk/pull/549))
 
+- Better error handling when receiving different in-toto attestation
+  for docker images.
+  ([#552](https://github.com/crashappsec/chalk/pull/552)
+
 ## 0.5.8
 
 **July 29, 2025**
