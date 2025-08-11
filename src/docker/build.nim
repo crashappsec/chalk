@@ -32,6 +32,11 @@ import "."/[
   wrap,
 ]
 
+const
+  HEADER     = "# {{{ added by chalk - https://crashoverride.com/docs/chalk"
+  PIN_HEADER = "# {{{ pinned to specific digest by chalk - https://crashoverride.com/docs/chalk"
+  FOOTER     = "# }}}"
+
 proc processGitContext(ctx: DockerInvocation) =
   try:
     if isGitContext(ctx.foundContext):
@@ -218,9 +223,9 @@ proc getUpdatedDockerFile(ctx: DockerInvocation): string =
     for _, base in ctx.addedPlatform:
       updated = updated.join("\n").strip().splitLines() & @[
         "",
-        "# {{{ added by chalk - https://crashoverride.com/docs/chalk",
+        HEADER,
         base.join("\n"),
-        "# }}}",
+        FOOTER,
         "",
       ]
   for s in ctx.dfSections:
@@ -230,10 +235,10 @@ proc getUpdatedDockerFile(ctx: DockerInvocation): string =
         original &= @["# " & l]
       updated = updated.join("\n").strip().splitLines() & @[
         "",
-        "# {{{ pinned to specific digest by chalk - https://crashoverride.com/docs/chalk",
+        PIN_HEADER,
         original.join("\n"),
         s.asFrom(),
-        "# }}}",
+        FOOTER,
         "",
         lines[s.fromInfo.endLine + 1 .. s.endLine].join("\n"),
       ]
@@ -242,9 +247,9 @@ proc getUpdatedDockerFile(ctx: DockerInvocation): string =
     if s == target and len(ctx.addedInstructions) > 0:
       updated = updated.join("\n").strip().splitLines() & @[
         "",
-        "# {{{ added by chalk - https://crashoverride.com/docs/chalk",
+        HEADER,
         ctx.addedInstructions.join("\n"),
-        "# }}}",
+        FOOTER,
         "",
       ]
   updated &= lines[last.endLine + 1 .. ^1]
@@ -272,6 +277,27 @@ proc setDockerFile(ctx: DockerInvocation) =
     trace("docker: new docker file:\n" & dockerFile)
     ctx.newCmdLine.add("-f")
     ctx.newCmdLine.add(path)
+
+proc dockerignoreAlreadyUpdated(path: string): bool =
+  withFileStream(path, mode = fmRead, strict = true):
+    for l in stream.lines():
+      if l == HEADER:
+        return true
+  return false
+
+proc updateDockerignoreFile(ctx: DockerInvocation) =
+  if not ctx.updateDockerignore:
+    return
+  let path = ctx.foundContext.resolvePath().joinPath(".dockerignore")
+  if path.dockerignoreAlreadyUpdated():
+    trace("docker: " & path & " is already updated to allow to copy chalk files")
+    return
+  withFileStream(path, mode = fmAppend, strict = true):
+    stream.writeLine("")
+    stream.writeLine(HEADER)
+    stream.writeLine("!*.chalk")
+    stream.writeLine(FOOTER)
+    stream.writeLine("")
 
 proc setIidFile(ctx: DockerInvocation) =
   if ctx.foundIidFile == "":
@@ -563,6 +589,10 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   ctx.setDockerFile()
   ctx.setIidFile()
   ctx.setMetadataFile()
+  try:
+    ctx.updateDockerignoreFile()
+  except:
+    error("docker: could not update .dockerignore file: " & getCurrentExceptionMsg())
 
   result = setExitCode(ctx.runMungedDockerInvocation())
   if result != 0:

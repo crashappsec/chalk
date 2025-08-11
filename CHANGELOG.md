@@ -1,5 +1,14 @@
 # Chalk Release Notes
 
+## 0.5.9
+
+**August 13, 2025**
+
+- New configuration `docker.update_dockerignore` which allows chalk to
+  update `.dockerignore` to allow to copy files in `Dockerfile`.
+  This allows to wrap legacy builder builds which dont support `--build-context`.
+  ([#556](https://github.com/crashappsec/chalk/pull/556)
+
 ## 0.5.8
 
 **July 29, 2025**

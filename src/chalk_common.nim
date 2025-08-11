@@ -414,6 +414,7 @@ type
       inDockerFile*:          string
       addedPlatform*:         OrderedTableRef[string, seq[string]]
       addedInstructions*:     seq[string]
+      updateDockerignore*:    bool
 
       # parsed dockerfile
       dfSections*:            seq[DockerFileSection]

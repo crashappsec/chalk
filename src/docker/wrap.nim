@@ -50,6 +50,7 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
   let
     loc           = path.resolvePath()
     (dir, file)   = loc.splitPath()
+    (_, nfile) = newPath.splitPath()
     hasUser       = user != "" and user != "root" and user != "0"
 
   # if USER directive is present and --chmod is not requested
@@ -110,11 +111,6 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
       trace("docker: injection method: COPY")
 
     let contextDir = ctx.foundContext.resolvePath()
-    # using extension which is unlikely to be already ignored by .dockerignore
-    # by default temporary files use .tmp extension which might be ignored
-    # whereas chalk is a lot less likely
-    var dstLoc     = contextDir.joinPath(file & ".chalk")
-
     trace("docker: context directory is: " & contextDir)
     if not dirExists(contextDir):
       raise newException(
@@ -122,9 +118,14 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
         "Cannot find context directory (" & contextDir & ")"
       )
 
+    # using extension which is unlikely to be already ignored by .dockerignore
+    # by default temporary files use .tmp extension which might be ignored
+    # whereas chalk is a lot less likely
+    var dstLoc     = contextDir.joinPath(nfile & ".chalk")
+    while dirExists(dstLoc) or fileExists(dstLoc):
+      dstLoc &= ".chalk"
+
     try:
-      while dirExists(dstLoc) or fileExists(dstLoc):
-        dstLoc &= ".chalk"
       if move:
         moveFile(loc, dstLoc)
         trace("docker: moved " & loc & " to " & dstLoc)
@@ -160,6 +161,9 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
             toAdd.add("USER " & user)
         else:
           toAdd.add("COPY " & name & " " & newPath)
+
+      if contextDir.joinPath(".dockerignore").fileExists():
+        ctx.updateDockerignore = attrGet[bool]("docker.update_dockerignore")
 
     except:
       dumpExOnDebug()
