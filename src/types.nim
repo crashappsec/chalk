@@ -546,10 +546,10 @@ var
   subscribedKeys*         = Table[string, bool]()
   systemErrors*           = seq[string](@[])
   selfChalk*              = ChalkObj(nil)
-  selfId*                 = none(string)
   canSelfInject*          = true
   doingTestRun*           = false
   onlyCodecs*             = newSeq[Plugin]()
+  inInternalScan*         = false
   passedHelpFlag*         = false
   installedPlugins*       = Table[string, Plugin]()
   externalActions*        = newSeq[seq[string]]()

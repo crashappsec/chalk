@@ -25,5 +25,5 @@ sec_as_f := (heartbeat_minute_frequency - float(minutes)) * 60.0
 sec      := int(sec_as_f)
 
 duration := Duration($(minutes) + " min " + $(sec) + " sec")
-exec.heartbeat: true
-exec.heartbeat_rate: duration
+exec.heartbeat.run: true
+exec.heartbeat.rate: duration

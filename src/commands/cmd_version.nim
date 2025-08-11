@@ -11,6 +11,7 @@ import ".."/[
   attestation/utils,
   config,
   docker/exe,
+  plugin_api,
   types,
   utils/semver,
 ]
@@ -30,6 +31,8 @@ proc runCmdVersion*() =
     cosign = getCosignVersion()
 
   cells.add(@["Chalk Version", getChalkExeVersion()])
+  if selfChalk != nil:
+    cells.add(@["Chalk ID", selfChalk.callGetChalkId()])
   cells.add(@["Commit ID", getChalkCommitId()])
   cells.add(@["Build OS", hostOS])
   cells.add(@["Build CPU", hostCPU])

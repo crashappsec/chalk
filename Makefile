@@ -45,6 +45,10 @@ endif
 # when no source files change, recopy the backup
 # to get back to original compiled binary
 $(BINARY).bck: $(SOURCES)
+ifneq "$(TMUX)" ""
+	reset
+	tmux clear-history
+endif
 	$(DOCKER) nimble -y $(CHALK_BUILD)
 	mv $(BINARY) $@
 	cp $@ $(BINARY)

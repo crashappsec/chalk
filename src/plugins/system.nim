@@ -271,9 +271,8 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
     result.setIfNeeded("HOST_NODENAME_WHEN_CHALKED", uinfo.nodename)
     result.setIfNeeded("HOST_MACHINE_WHEN_CHALKED", uinfo.machine)
 
-  if isSubscribedKey("INJECTOR_CHALK_ID"):
-    let selfIdOpt = selfId
-    if selfIdOpt.isSome(): result["INJECTOR_CHALK_ID"] = pack(selfIdOpt.get())
+  if isSubscribedKey("INJECTOR_CHALK_ID") and selfChalk != nil:
+    result.setIfNeeded("INJECTOR_CHALK_ID", selfChalk.callGetChalkId())
 
 proc attestationGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
                                           ChalkDict {.cdecl.} =

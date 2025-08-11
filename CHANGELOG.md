@@ -17,6 +17,15 @@
   is used in all chalk operations.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
 
+- Heartbeat configurations moved from `exec.heartbeat_*` configs to
+  separate configuration singleton `exec.heartbeat.*`.
+  - `exec.heartbeat.run`
+  - `exec.heartbeat.rate`
+  - `exec.heartbeat.rlimit`
+  - `exec.heartbeat.nice`
+
+  ([#552](https://github.com/crashappsec/chalk/pull/552)
+
 - Removed the blanket "._/\\.._" pattern from the default ignore_patterns
   configuration in src/configs/chalk.c42spec. The configuration still maintains
   specific exclusions for known directories that should be ignored (.git,
@@ -107,6 +116,7 @@
   This added these configurations:
   - `docker.prep_postexec`
   - `exec.postexec.run`
+  - `exec.postexec.fork`
   - `exec.postexec.nice`
   - `exec.postexec.access_watch.prep_tmp_path`
   - `exec.postexec.access_watch.initial_poll_time`
@@ -115,7 +125,8 @@
   - `exec.postexec.access_watch.scan_paths`
 
   ([#539](https://github.com/crashappsec/chalk/pull/539),
-  [#548](https://github.com/crashappsec/chalk/pull/548))
+  [#548](https://github.com/crashappsec/chalk/pull/548),
+  [#552](https://github.com/crashappsec/chalk/pull/552))
 
 - `_OP_ARTIFACT_ACCESSED` key which indicates whether the artifact
   was accessed during chalk operation.
@@ -175,6 +186,10 @@
 - Chalk `color` configuration is now honored for logs.
   Previously it was only honored for chalk pager outputs.
   ([#549](https://github.com/crashappsec/chalk/pull/549))
+
+- Better error handling when receiving different in-toto attestation
+  for docker images.
+  ([#552](https://github.com/crashappsec/chalk/pull/552)
 
 ## 0.5.8
 

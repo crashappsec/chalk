@@ -53,4 +53,4 @@ task performance, "Get a build that adds execution profiling support":
   exec "nimble build --profiler:on --stackTrace:on -d:cprofiling"
 
 task memprofile, "Get a build that adds memory profiling to the binary":
-  exec "nimble build --profiler:off --stackTrace:on -d:memProfiler -d:cprofiling"
+  exec "nimble build --define:debug --profiler:off --stackTrace:on -d:memProfiler -d:cprofiling"

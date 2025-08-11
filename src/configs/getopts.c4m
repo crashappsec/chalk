@@ -498,7 +498,7 @@ This is most useful for short-lived processes, as it ensures chalk will complete
     }
 
     flag_yn heartbeat {
-    field_to_set: "exec.heartbeat"
+    field_to_set: "exec.heartbeat.run"
     doc: """
 When set to true, causes periodic reports to be run, past the initial one.
 """

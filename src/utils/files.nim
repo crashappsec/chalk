@@ -21,10 +21,12 @@ import ".."/[
 ]
 import "."/[
   fd_cache,
+  file_string_stream,
   times, # TODO remove
 ]
 
 export fd_cache
+export file_string_stream
 export managedtmp
 export os
 export tempfiles
@@ -63,6 +65,7 @@ proc replaceFileContents*(fsRef: string, contents: string): bool =
         if statResult == 0:
           discard chmod(cstring(fsRef), info.st_mode)
       except:
+        error("file: " & getCurrentExceptionMsg())
         removeFile(path)
         if not fileExists(fsRef):
           # We might have managed to move it but not copy the new guy in.

@@ -6,3 +6,5 @@ docker
 docker-compose*
 server
 tests
+nimble.develop
+nimble.paths
