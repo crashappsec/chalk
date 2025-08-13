@@ -298,19 +298,30 @@ proc dockerignoreAlreadyUpdated(path: string): bool =
         return true
   return false
 
-proc updateDockerignoreFile(ctx: DockerInvocation) =
-  if not ctx.updateDockerignore:
-    return
-  let path = ctx.foundContext.resolvePath().joinPath(".dockerignore")
-  if path.dockerignoreAlreadyUpdated():
-    trace("docker: " & path & " is already updated to allow to copy chalk files")
-    return
-  withFileStream(path, mode = fmAppend, strict = true):
-    stream.writeLine("")
-    stream.writeLine(HEADER)
-    stream.writeLine("!*.chalk")
-    stream.writeLine(FOOTER)
-    stream.writeLine("")
+proc updateDockerignoreFile(ctx: DockerInvocation): bool =
+  try:
+    if not ctx.updateDockerignore:
+      return
+    let path = ctx.foundContext.resolvePath().joinPath(".dockerignore")
+    ctx.existingDockerignore = tryToLoadFile(path)
+    if path.dockerignoreAlreadyUpdated():
+      trace("docker: " & path & " is already updated to allow to copy chalk files")
+      return
+    withFileStream(path, mode = fmAppend, strict = true):
+      stream.writeLine("")
+      stream.writeLine(HEADER)
+      stream.writeLine("!*.chalk")
+      stream.writeLine(FOOTER)
+    return true
+  except:
+    error("docker: could not update .dockerignore file: " & getCurrentExceptionMsg())
+
+proc revertDockerignoreFile(ctx: DockerInvocation) =
+  try:
+    let path = ctx.foundContext.resolvePath().joinPath(".dockerignore")
+    discard path.replaceFileContents(ctx.existingDockerignore)
+  except:
+    error("docker: could not revert .dockerignore file: " & getCurrentExceptionMsg())
 
 proc setIidFile(ctx: DockerInvocation) =
   if ctx.foundIidFile == "":
@@ -609,12 +620,15 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   ctx.setDockerFile()
   ctx.setIidFile()
   ctx.setMetadataFile()
-  try:
-    ctx.updateDockerignoreFile()
-  except:
-    error("docker: could not update .dockerignore file: " & getCurrentExceptionMsg())
 
-  result = setExitCode(ctx.runMungedDockerInvocation())
+  let updatedDockerignore = ctx.updateDockerignoreFile()
+
+  try:
+    result = setExitCode(ctx.runMungedDockerInvocation())
+  finally:
+    if updatedDockerignore:
+      ctx.revertDockerignoreFile()
+
   if result != 0:
     raise newException(
       ValueError,
