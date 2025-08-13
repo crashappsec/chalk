@@ -2002,6 +2002,19 @@ Whether to prepare postexec state which will be used during wrapped exec entrypo
 """
   }
 
+  field update_dockerignore {
+    type:    bool
+    default: true
+    doc: """
+When buildx is not available and therefore chalk cannot use additional contexts to
+copy files (e.g. chalkmark) in the `Dockerfile`. In that case chalk has no choice but
+to copy the file into the primary docker build context. There is however no guarantee
+that the file will actually be copied due to `.dockerignore`.
+In order to ensure the file is copied, this setting allows chalk to mutate the
+`.dockerignore` file by explicitly allowing to copy all `*.chalk` files.
+"""
+  }
+
 }
 
 singleton zip {

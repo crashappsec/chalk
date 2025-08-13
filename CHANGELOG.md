@@ -150,6 +150,11 @@
   By default no limit is set.
   ([#544](https://github.com/crashappsec/chalk/pull/544))
 
+- New configuration `docker.update_dockerignore` which allows chalk to
+  update `.dockerignore` to allow to copy files in `Dockerfile`.
+  This allows to wrap legacy builder builds which dont support `--build-context`.
+  ([#556](https://github.com/crashappsec/chalk/pull/556)
+
 ### Fixes
 
 - Docker pass-through commands (non build/push) commands were capturing all
