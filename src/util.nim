@@ -146,14 +146,14 @@ proc setExitCode*(code: int): int {.discardable.} =
   exitCode = code
   return code
 
-proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
-  if chalk.fsRef == "":
-    error(chalk.name & ": replaceFileContents() called on an artifact that " &
+proc replaceFileContents*(fsRef: string, contents: string): bool =
+  if fsRef == "":
+    error("replaceFileContents() called on an artifact that " &
           "isn't associated with a file.")
     return false
 
   # Need to close in order to successfully replace.
-  closeFileStream(chalk.fsRef)
+  closeFileStream(fsRef)
 
   result = true
 
@@ -170,25 +170,28 @@ proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
         ctx.close()
         # If we can successfully stat the file, we will try to
         # re-apply the same mode bits via chmod after the move.
-        let statResult = stat(cstring(chalk.fsRef), info)
-        moveFile(chalk.fsRef, path & ".old")
-        moveFile(path, chalk.fsRef)
+        let statResult = stat(cstring(fsRef), info)
+        moveFile(fsRef, path & ".old")
+        moveFile(path, fsRef)
         if statResult == 0:
-          discard chmod(cstring(chalk.fsRef), info.st_mode)
+          discard chmod(cstring(fsRef), info.st_mode)
       except:
         removeFile(path)
-        if not fileExists(chalk.fsRef):
+        if not fileExists(fsRef):
           # We might have managed to move it but not copy the new guy in.
           try:
-            moveFile(path & ".old", chalk.fsRef)
+            moveFile(path & ".old", fsRef)
           except:
-            error(chalk.fsRef & " was moved before copying in the new " &
+            error(fsRef & " was moved before copying in the new " &
               "file, but the op failed, and the file could not be replaced. " &
               " It currently is in: " & path & ".old")
         else:
-            error(chalk.fsRef & ": Could not write (no permission)")
+            error(fsRef & ": Could not write (no permission)")
         dumpExOnDebug()
         return false
+
+proc replaceFileContents*(chalk: ChalkObj, contents: string): bool =
+  return replaceFileContents(chalk.fsRef, contents)
 
 proc findExePath*(cmdName:    string,
                   extraPaths: seq[string] = @[],
