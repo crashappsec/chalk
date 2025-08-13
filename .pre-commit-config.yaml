@@ -29,13 +29,8 @@ repos:
     hooks:
       - id: pre-commit-sync
 
-  - repo: local
-    hooks:
-      - id: dockerignore
-        name: dockerignore
-        language: system
-        entry: ./.github/update_dockerignore.sh
-        files: \.dockerignore$
+  # - repo: local
+  #   hooks:
   # - id: licenseheaders
   #   name: licenseheaders
   #   language: python
