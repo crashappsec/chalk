@@ -12,7 +12,7 @@ import std/[
   algorithm,
 ]
 import pkg/[
-  zippy/ziparchives_v1,
+  zippy/ziparchives,
 ]
 import ".."/[
   chalkjson,
@@ -30,7 +30,8 @@ const chalkBinary = "chalk"
 
 type
   ZipCache = ref object of RootRef
-    onDisk:        ZipArchive
+    onDisk:        ZipArchive          # v1 API for writing
+    reader:        ZipArchiveReader    # new API for reading with deflate64
     embeddedChalk: Box
     tmpDir:        string
 
@@ -116,11 +117,19 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
     cache.onDisk  = ZipArchive()
     cache.tmpDir  = tmpDir
 
-    cache.onDisk.open(stream)
+    # Use new stream API for reading (deflate64 support)
+    try:
+      cache.reader = openZipArchive(stream)
+      trace(chalk.fsRef & ": successfully opened ZIP archive with deflate64 support")
+    except:
+      error(loc & ": failed to open ZIP archive: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
+      return none(ChalkObj)
     info(chalk.fsRef & ": temporarily extracting into " & tmpDir)
     tryOrBail:
-        cache.onDisk.extractAll(origD)
-        cache.onDisk.extractAll(hashD)
+        # Use path-based extractAll since we have the file path
+        extractAll(loc, origD)
+        extractAll(loc, hashD)
 
     # Even if subscans are off, we do this delete for the purposes of hashing.
     if not attrGet[bool]("chalk_debug"):
@@ -129,11 +138,11 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
     if not attrGet[bool]("chalk_debug"):
       toggleLoggingEnabled()
 
-    if zipChalkFile in cache.onDisk.contents:
+    if zipChalkFile in cache.reader.records:
       tryOrBail:
         removeFile(joinPath(hashD, zipChalkFile))
 
-      let contents = cache.onDisk.contents[zipChalkFile].contents
+      let contents = cache.reader.extractFile(zipChalkFile)
       if contents.contains(magicUTF8):
         let
           s           = newStringStream(contents)
@@ -147,7 +156,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
       else:
         chalk.marked  = false
 
-    if chalkBinary in cache.onDisk.contents:
+    if chalkBinary in cache.reader.records:
       info("Chalk binary exists, removing it.")
       tryOrBail:
         removeFile(joinPath(hashD, chalkBinary))
@@ -171,17 +180,17 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
         popChalkId()
         popZipDir()
 
-        # Update the internal accounting for the sake of the post-op hash
-        for k, v in cache.onDisk.contents:
-          let tmpPath = os.joinPath(origD, k)
-          if not tmpPath.fileExists():
-            continue
-
-          var newv = v
-          let c = tryToLoadFile(tmpPath)
-          newv.contents             = c
-          cache.onDisk.contents[k]  = newv
+        # Rebuild the v1 cache from extracted files for writing operations
+        # The new reader API doesn't have mutable contents, so we rebuild the v1 cache
+        cache.onDisk = ZipArchive()
+        cache.onDisk.addDir(origD & "/")
         cache.embeddedChalk = collectionCtx.report
+
+    # Close the reader to free resources
+    try:
+      cache.reader.close()
+    except:
+      discard  # Best effort cleanup
 
     return some(chalk)
 

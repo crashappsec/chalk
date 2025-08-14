@@ -16,7 +16,8 @@ bin           = @["chalk"]
 # Dependencies
 requires "nim >= 2.0.8"
 requires "https://github.com/crashappsec/con4m#abae0aaafc683d75cc04d00e720326e6c19790b1"
-requires "https://github.com/viega/zippy == 0.10.7" # MIT
+# TODO: move to viega's fork if/when merged
+requires "https://github.com/mbaltrusitis/zippy#687505f3114c7c237da9ec82d78efe4ac023a309" # MIT - stream API with deflate64 + extraction fix
 requires "https://github.com/NimParsers/parsetoml == 0.7.1" # MIT
 
 # this allows us to get version externally
