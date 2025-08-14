@@ -40,6 +40,7 @@ RUN apt-get update -y && \
         gettext-base \
         git \
         gpg \
+        libc6-dbg \
         strace \
         && \
     apt-get clean -y
