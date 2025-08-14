@@ -324,8 +324,8 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
         "out of known " & $len(ws.toWatchPaths) & " artifacts")
   withOnlyCodecs(getPluginsByName(codecs)):
     for chalk in runChalkSubScan(ws.toWatchPaths, "extract").allChalks:
-      chalk.accessed = chalk.fsRef in accessedPaths
-      if chalk.accessed:
+      chalk.accessed = some(chalk.fsRef in accessedPaths)
+      if chalk.accessed.get():
         trace(chalk.fsRef & ": chalkmark accessed")
       else:
         trace(chalk.fsRef & ": chalkmark not accessed")
