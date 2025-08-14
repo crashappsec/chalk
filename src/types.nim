@@ -84,7 +84,7 @@ type
                                              ## something else, use the cache field
                                              ## below, instead.
     fsRef*:                 string           ## Reference for this artifact on a fs
-    accessed*:              bool             ## Whether artifact was accessed during chalk operation (used only in exec)
+    accessed*:              Option[bool]     ## Whether artifact was accessed during chalk operation (used only in exec)
     envVarName*:            string           ## env var name from where artifact is found
     platform*:              DockerPlatform   ## platform
     baseChalk*:             ChalkObj
