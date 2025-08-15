@@ -1247,7 +1247,7 @@ def test_heartbeat(chalk_copy: Chalk, random_hex: str):
         assert exec_report.mark.contains(heartbeat_report.mark)
 
 
-def test_postexec(chalk_copy: Chalk):
+def test_postexec(chalk_copy: Chalk, server_cert: Path):
     chalk_copy.load(CONFIGS / "docker_postexec.c4m", use_embedded=True, replace=False)
 
     # build dockerfile with chalk docker entrypoint wrapping
@@ -1258,6 +1258,12 @@ def test_postexec(chalk_copy: Chalk):
     _, result = Docker.run(
         image=image_id,
         check=False,
+        volumes={
+            server_cert: "/cert.pem",
+        },
+        env={
+            "CERT": "/cert.pem",
+        },
     )
     chalk_result = ChalkProgram.from_program(result)
 
@@ -1265,14 +1271,22 @@ def test_postexec(chalk_copy: Chalk):
     assert postexec_report["_OPERATION"] == "postexec"
     assert postexec_report.artifacts_by_path.contains(
         {
-            "/etc/cert.pem": {
+            "/cert.pem": {
                 "_OP_ARTIFACT_TYPE": "x509 Cert",
                 "_OP_ARTIFACT_ACCESSED": True,
+                "_OP_ARTIFACT_MOUNTED": True,
                 "_X509_SUBJECT": {"commonName": "tls.chalk.local"},
+            },
+            "/etc/cert.pem": {
+                "_OP_ARTIFACT_TYPE": "x509 Cert",
+                "_OP_ARTIFACT_ACCESSED": False,
+                "_OP_ARTIFACT_MOUNTED": False,
+                "_X509_SUBJECT": {"commonName": "crashoverride.com"},
             },
             "/etc/ssl/certs/ca-certificates.crt": {
                 "_OP_ARTIFACT_TYPE": "x509 Cert",
                 "_OP_ARTIFACT_ACCESSED": False,
+                "_OP_ARTIFACT_MOUNTED": False,
             },
         }
     )

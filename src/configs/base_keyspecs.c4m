@@ -2446,6 +2446,18 @@ This is determined by watching for file access via inotify.
 """
 }
 
+keyspec _OP_ARTIFACT_MOUNTED {
+    kind:             RunTimeArtifact
+    type:             bool
+    standard:         true
+    system:           true
+    since:            "0.6.0"
+    shortdoc:         "Whether artifact is a mounted file"
+    doc:              """
+During chalk exec, whether the artifact is an externally mounted file.
+"""
+}
+
 keyspec _OP_ARTIFACT_ENV_VAR_NAME {
     kind:             RunTimeArtifact
     type:             string

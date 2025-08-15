@@ -160,6 +160,7 @@ proc sysGetRunTimeArtifactInfo*(self: Plugin, obj: ChalkObj, insert: bool):
     result.setIfNeeded("_OP_ARTIFACT_PATH", resolvePath(obj.fsRef))
   result.setIfNeeded("_OP_ARTIFACT_ENV_VAR_NAME", obj.envVarName)
   result.setIfNeeded("_OP_ARTIFACT_ACCESSED", obj.accessed)
+  result.setIfNeeded("_OP_ARTIFACT_MOUNTED", obj.mounted)
 
   let
     tmpl       = getReportTemplate()
