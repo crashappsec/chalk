@@ -2032,6 +2032,17 @@ When present, inject the executed chalk binary itself in the zip
 archive being processed upon insertion.
 """
   }
+
+  field allowed_extensions {
+    type:     list[string]
+    default:  ["zip"]
+    shortdoc: "File extensions allowed for zip binary injection"
+    doc:      """
+List of file extensions that are allowed for zip binary injection.
+Only files with these extensions will have the binary injected when
+zip.inject_binary is true.
+"""
+  }
 }
 
 singleton scan_context {
