@@ -68,3 +68,19 @@ repos:
           - -q
           - -c
           - .github/.md-link-check.json
+
+  # Shellcheck for shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        name: Lint shell scripts
+        files: (^dust-lambda-extension/extensions/.*\.(sh|bash)$|dust$)
+
+  # Shell script formatting with shfmt
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.7.0-1
+    hooks:
+      - id: shfmt
+        name: Format shell scripts
+        files: (^dust-lambda-extension/extensions/.*\.(sh|bash)$|dust$)
