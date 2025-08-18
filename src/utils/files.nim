@@ -157,3 +157,20 @@ proc getRelativePathBetween*(fromPath: string, toPath: string) : string =
   if result.startsWith("..") or result == "" or result == stdinIndicator:
     trace("File is ephemeral or not contained within VCS project")
     return ""
+
+when defined(linux):
+  iterator allFileMounts*(): string =
+    withFileStream("/proc/mounts", mode = fmRead, strict = true):
+      for l in stream.lines():
+        if l == "":
+          continue
+        let parts = strutils.splitWhitespace(l)
+        if len(parts) <= 2:
+          continue
+        let path = parts[1]
+        if path.fileExists():
+          yield path
+
+else:
+  iterator allFileMounts*(): string =
+    discard

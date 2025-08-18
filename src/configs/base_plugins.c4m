@@ -26,6 +26,7 @@ plugin system {
 
   post_chalk_keys: ["_OP_ARTIFACT_PATH",
                     "_OP_ARTIFACT_ACCESSED",
+                    "_OP_ARTIFACT_MOUNTED",
                     "_OP_ARTIFACT_ENV_VAR_NAME",
                     "_CURRENT_HASH",
                     "_OP_CHALKED_KEYS",

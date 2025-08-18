@@ -85,6 +85,7 @@ type
                                              ## below, instead.
     fsRef*:                 string           ## Reference for this artifact on a fs
     accessed*:              Option[bool]     ## Whether artifact was accessed during chalk operation (used only in exec)
+    mounted*:               Option[bool]     ## Whether artifact is a mounted file
     envVarName*:            string           ## env var name from where artifact is found
     platform*:              DockerPlatform   ## platform
     baseChalk*:             ChalkObj
