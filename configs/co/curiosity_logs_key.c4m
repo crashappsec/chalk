@@ -1,0 +1,20 @@
+keyspec _X_CURIOSITY_LOGS {
+  kind:  RunTimeHost
+  type:  string
+  callback: func curiosity_logs
+}
+
+func curiosity_logs(contexts) {
+  if command_name() != "env" {
+    return ""
+  }
+  # this is a compressed archive of any coredumps that are found, 
+  # as well as the corresponding host_server.log info, if a crash is detected
+  # it is generated conditionally (based on the presence of a crash) by 
+  # the post action of setup-chalk-build-observables
+  path := "/mnt/curiosity/curiosity_logs.bundle"
+  if not is_file(path) {
+    return ""
+  }
+  return base64(read_file(path))
+}
