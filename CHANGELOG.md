@@ -131,6 +131,9 @@
 - `_OP_ARTIFACT_ACCESSED` key which indicates whether the artifact
   was accessed during chalk operation.
   ([#539](https://github.com/crashappsec/chalk/pull/539))
+- `_OP_ARTIFACT_MOUNTED` key which indicates whether the artifact
+  file is externally mounted (e.g. docker volume).
+  ([#559](https://github.com/crashappsec/chalk/pull/559))
 - `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
   in the git repo.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
@@ -149,11 +152,6 @@
 - Chalk can set rlimit for heartbeats process.
   By default no limit is set.
   ([#544](https://github.com/crashappsec/chalk/pull/544))
-
-- New configuration `docker.update_dockerignore` which allows chalk to
-  update `.dockerignore` to allow to copy files in `Dockerfile`.
-  This allows to wrap legacy builder builds which dont support `--build-context`.
-  ([#556](https://github.com/crashappsec/chalk/pull/556)
 
 ### Fixes
 
@@ -195,6 +193,15 @@
 - Better error handling when receiving different in-toto attestation
   for docker images.
   ([#552](https://github.com/crashappsec/chalk/pull/552)
+
+## 0.5.9
+
+**August 14, 2025**
+
+- New configuration `docker.update_dockerignore` which allows chalk to
+  update `.dockerignore` to allow to copy files in `Dockerfile`.
+  This allows to wrap legacy builder builds which dont support `--build-context`.
+  ([#556](https://github.com/crashappsec/chalk/pull/556))
 
 ## 0.5.8
 

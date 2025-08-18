@@ -206,10 +206,18 @@ proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
     if fn(pid):
       break
 
-type PostExecState = ref object
-  toWatchPaths: seq[string]
-  watcher:      FileHandle
-  watchedDirs:  TableRef[FileHandle, string]
+type
+  WatchTarget   = enum
+    file
+    dir
+  Watching = tuple
+    target: WatchTarget
+    id:     string
+  PostExecState = ref object
+    prepPaths:      seq[string]
+    fileMountPaths: seq[string]
+    watcher:        FileHandle
+    watching:       TableRef[FileHandle, Watching]
 
 when hostOS == "linux":
   proc initPostExecWatch(): Option[PostExecState] =
@@ -221,11 +229,12 @@ when hostOS == "linux":
       return none(PostExecState)
 
     let
-      toWatchPaths = tryToLoadFile(tmp).splitLinesAnd(keepEmpty = false)
-      watcher      = inotify_init1(O_NONBLOCK)
+      prepPaths      = tryToLoadFile(tmp).splitLinesAnd(keepEmpty = false)
+      fileMountPaths = allFileMounts().toSeq()
+      watcher        = inotify_init1(O_NONBLOCK)
     var
-      toWatchDirs  = initHashSet[string]()
-      watchedDirs  = newTable[FileHandle, string]()
+      toWatchDirs    = initHashSet[string]()
+      watching       = newTable[FileHandle, Watching]()
 
     if watcher < 0:
       error("inotify: " & $osLastError())
@@ -234,7 +243,7 @@ when hostOS == "linux":
     # watch dirs where artifacts are contained to:
     # * reduces inotify FD overhead
     # * contains name in the watched event struct
-    for c in toWatchPaths:
+    for c in prepPaths:
       if c == "":
         continue
       let (dir, _) = c.splitPath()
@@ -246,12 +255,21 @@ when hostOS == "linux":
         error("inotify: could not watch " & d)
         continue
       trace("inotify: watching " & d)
-      watchedDirs[wd] = d
+      watching[wd] = (dir, d)
+
+    for p in fileMountPaths:
+      let wd = inotify_add_watch(watcher, cstring(p), IN_ACCESS)
+      if wd < 0:
+        error("inotify: could not watch " & p)
+        continue
+      trace("inotify: watching " & p)
+      watching[wd] = (file, p)
 
     return some(PostExecState(
-      toWatchPaths: toWatchPaths,
-      watcher:      watcher,
-      watchedDirs:  watchedDirs,
+      prepPaths:      prepPaths,
+      fileMountPaths: fileMountPaths,
+      watcher:        watcher,
+      watching:       watching,
     ))
 
 else:
@@ -279,8 +297,8 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   discard nice(cint(niceValue))
 
   try:
-    initCollection()
     setCommandName("postexec")
+    initCollection()
     if detach:
       detachFromParent()
 
@@ -300,15 +318,20 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
         n
       ) > 0:
         for e in inotify_events(buffer[0].addr, n):
-          let
-            name = $cast[cstring](addr e[].name)
-            wd   = e[].wd
-          if wd notin ws.watchedDirs:
+          let wd = e[].wd
+          if wd notin ws.watching:
             error("postexec: inotify notified for non-watched wd")
+            continue
           let
-            dir  = ws.watchedDirs[wd]
-            path = joinPath(dir, name)
-          if path in ws.toWatchPaths:
+            w = ws.watching[wd]
+            path =
+              case w.target
+              of file:
+                w.id
+              of dir:
+                let filename = $cast[cstring](addr e[].name)
+                w.id.joinPath(filename)
+          if path in ws.prepPaths or path in ws.fileMountPaths:
             trace("postexec: found accessed artifact " & path)
             accessedPaths.incl(path)
           else:
@@ -321,10 +344,12 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
 
   trace("postexec: subscan for chalkmarks in " &
         $len(accessedPaths) & " accessed artifacts " &
-        "out of known " & $len(ws.toWatchPaths) & " artifacts")
+        "out of prepped " & $len(ws.prepPaths) & " artifacts " &
+        "and mounted " & $len(ws.fileMountPaths) & " files")
   withOnlyCodecs(getPluginsByName(codecs)):
-    for chalk in runChalkSubScan(ws.toWatchPaths, "extract").allChalks:
+    for chalk in runChalkSubScan(ws.prepPaths & ws.fileMountPaths, "extract").allChalks:
       chalk.accessed = some(chalk.fsRef in accessedPaths)
+      chalk.mounted  = some(chalk.fsRef in ws.fileMountPaths)
       if chalk.accessed.get():
         trace(chalk.fsRef & ": chalkmark accessed")
       else:

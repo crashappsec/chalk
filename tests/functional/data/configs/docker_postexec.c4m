@@ -6,4 +6,5 @@ exec.postexec.access_watch.initial_poll_time  = <<1sec>>
 
 report_template report_default {
   key._OP_ARTIFACT_ACCESSED.use = true
+  key._OP_ARTIFACT_MOUNTED.use = true
 }
