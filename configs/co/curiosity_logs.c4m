@@ -1,0 +1,4 @@
+report_template crashoverride {
+  ~key._X_CURIOSITY_LOGS.use          = true
+  ~key._X_CURIOSITY_LOGS.object_store = "crashoverride"
+}
