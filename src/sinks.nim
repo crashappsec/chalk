@@ -9,17 +9,35 @@
 
 import std/[
   uri,
+  posix,
+]
+import nimutils/[
+  colortable,
 ]
 import "."/[
   auth,
+  config,
   run_management,
   types,
-  utils/json,
   utils/files,
+  utils/json,
+  utils/times,
 ]
 
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
   return (msg, true)
+
+proc chalkJsonLogs(msg: string, extra: StringTable): (string, bool) =
+  if getShowColor() or isInteractive:
+    return (msg, true)
+  let data = %*{
+    "chalk_version": getChalkExeVersion(),
+    "chalk_commit": getChalkCommitId(),
+    "chalk_magic": magicUTF8,
+    "timestamp": getTime().utc.format(timesIso8601Format),
+    "msg": msg,
+  }
+  return ($data, true)
 
 proc githubLogGroup(msg: string, extra: StringTable): (string, bool) =
   # https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#example-grouping-log-lines
@@ -66,7 +84,8 @@ proc getFilterName*(filter: MsgFilter): Option[string] =
 
 defaultLogHook.filters = @[MsgFilter(logLevelFilter),
                            MsgFilter(logPrefixFilter),
-                           MsgFilter(chalkLogWrap)]
+                           MsgFilter(chalkLogWrap),
+                           MsgFilter(chalkJsonLogs)]
 
 var availableSinkConfigs = { "log_hook"     : defaultLogHook,
                              "con4m_hook"   : defaultCon4mHook,
