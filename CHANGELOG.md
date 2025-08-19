@@ -24,7 +24,7 @@
   - `exec.heartbeat.rlimit`
   - `exec.heartbeat.nice`
 
-  ([#552](https://github.com/crashappsec/chalk/pull/552)
+  ([#552](https://github.com/crashappsec/chalk/pull/552))
 
 - Removed the blanket "._/\\.._" pattern from the default ignore_patterns
   configuration in src/configs/chalk.c42spec. The configuration still maintains
@@ -152,6 +152,14 @@
 - Chalk can set rlimit for heartbeats process.
   By default no limit is set.
   ([#544](https://github.com/crashappsec/chalk/pull/544))
+- Chalk will output its logs in `json` format for non-interactive sessions.
+  Each log will include:
+  - `chalk_version` - Chalks version number
+  - `chalk_commit` - Chalks commit ID
+  - `chalk_magic` - Chalks magic strict to allow to detect chalk logs
+  - `timestamp` - ISO8601 time of the log message
+  - `msg` - Log message
+    ([#561](https://github.com/crashappsec/chalk/pull/561))
 
 ### Fixes
 
@@ -192,7 +200,7 @@
 
 - Better error handling when receiving different in-toto attestation
   for docker images.
-  ([#552](https://github.com/crashappsec/chalk/pull/552)
+  ([#552](https://github.com/crashappsec/chalk/pull/552))
 
 ## 0.5.9
 
