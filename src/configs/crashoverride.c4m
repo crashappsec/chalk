@@ -208,6 +208,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.VCS_DIR_WHEN_CHALKED.use                = true
   ~key.VCS_MISSING_FILES.use                   = true
   ~key.BUILD_ID.use                            = true
+  ~key.BUILD_UNIQUE_ID.use                     = true
   ~key.BUILD_COMMIT_ID.use                     = true
   ~key.BUILD_URI.use                           = true
   ~key.BUILD_API_URI.use                       = true

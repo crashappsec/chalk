@@ -103,31 +103,33 @@ def test_codeowners(tmp_data_dir: Path, chalk: Chalk):
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_github(copy_files: list[Path], chalk: Chalk, server_imds: str):
+def test_github(
+    tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk, server_imds: str
+):
     bin_path = copy_files[0]
-    insert = chalk.insert(
-        bin_path,
-        env={
-            # https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
-            "CI": "true",
-            "GITHUB_SHA": "ffac537e6cbbf934b08745a378932722df287a53",
-            "GITHUB_SERVER_URL": "https://github.com",
-            "GITHUB_REPOSITORY": "octocat/Hello-World",
-            "GITHUB_RUN_ID": "1658821493",
-            "GITHUB_RUN_ATTEMPT": "5",
-            "GITHUB_API_URL": server_imds,
-            "GITHUB_ACTOR": "octocat",
-            "GITHUB_REPOSITORY_ID": "123",
-            "GITHUB_REPOSITORY_OWNER_ID": "456",
-            # there are a bunch of variations of these
-            # but for now at least we test basic flow
-            "GITHUB_EVENT_NAME": "push",
-            "GITHUB_REF_TYPE": "tag",
-        },
-    )
+    env = {
+        # https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
+        "CI": "true",
+        "GITHUB_SHA": "ffac537e6cbbf934b08745a378932722df287a53",
+        "GITHUB_SERVER_URL": "https://github.com",
+        "GITHUB_REPOSITORY": "octocat/Hello-World",
+        "GITHUB_RUN_ID": "1658821493",
+        "GITHUB_RUN_ATTEMPT": "5",
+        "GITHUB_API_URL": server_imds,
+        "GITHUB_ACTOR": "octocat",
+        "GITHUB_REPOSITORY_ID": "123",
+        "GITHUB_REPOSITORY_OWNER_ID": "456",
+        # there are a bunch of variations of these
+        # but for now at least we test basic flow
+        "GITHUB_EVENT_NAME": "push",
+        "GITHUB_REF_TYPE": "tag",
+        "RUNNER_TEMP": str(tmp_data_dir),
+    }
+    insert = chalk.insert(bin_path, env=env)
     assert insert.report.contains(
         {
             "BUILD_ID": "1658821493",
+            "BUILD_UNIQUE_ID": str,
             "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
             "BUILD_TRIGGER": "tag",
             "BUILD_CONTACT": ["octocat"],
@@ -140,6 +142,8 @@ def test_github(copy_files: list[Path], chalk: Chalk, server_imds: str):
             "BUILD_ORIGIN_URI": "https://github.com/octocat/Hello-World",
         }
     )
+    insert2 = chalk.insert(bin_path, env=env)
+    assert insert2.report.has(BUILD_UNIQUE_ID=insert.report["BUILD_UNIQUE_ID"])
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
