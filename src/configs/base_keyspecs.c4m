@@ -561,7 +561,6 @@ keyspec CONTAINING_ARTIFACT_WHEN_CHALKED {
     codec:            true
     since:            "0.1.0"
     doc:              """
-
 For items chalked when they were in a embedded into a ZIP file, this is the
 `CHALK_ID` of the containing artifact.
 """
@@ -1287,9 +1286,25 @@ keyspec BUILD_ID {
     since:            "0.1.0"
     shortdoc: "CI/CD job info when adding chalk mark"
     doc:              """
-
-If, at the time of chalking, the system can field will contain the
+If, at the time of chalking, the system field will contain the
 associated job ID.
+"""
+}
+
+keyspec BUILD_UNIQUE_ID {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.0"
+    shortdoc:         "For some CI systems, chalk generated unique build id"
+    doc:              """
+Chalk-generated unique build ID.
+
+In some CI systems `BUILD_ID` is sometimes reused. For example in GitHub Actions,
+`BUILD_ID` is populated from workflow ID which is the same for all jobs within
+the same workflow as well as it is reused for all job retries.
+In that case chalk will generate its own unique build ID to allow to associate
+multiple chalk operations within the same build.
 """
 }
 

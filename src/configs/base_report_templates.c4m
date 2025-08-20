@@ -97,6 +97,7 @@ report and subtract from it.
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
+  key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -723,6 +724,7 @@ doc: """
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
+  key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -1232,6 +1234,7 @@ container.
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
+  key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -1726,6 +1729,7 @@ and keep the run-time key.
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
+  key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true

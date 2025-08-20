@@ -154,7 +154,11 @@
   - `chalk_magic` - Chalks magic strict to allow to detect chalk logs
   - `timestamp` - ISO8601 time of the log message
   - `msg` - Log message
-    ([#561](https://github.com/crashappsec/chalk/pull/561))
+
+  ([#561](https://github.com/crashappsec/chalk/pull/561))
+
+- `BUILD_UNIQUE_ID` to uniquely identify jobs in GitHub.
+  ([#562](https://github.com/crashappsec/chalk/pull/562))
 
 ### Fixes
 

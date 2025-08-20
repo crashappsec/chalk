@@ -13,6 +13,7 @@ import ".."/[
   run_management,
   types,
   utils/envvars,
+  utils/files,
   utils/http,
   utils/json,
 ]
@@ -56,6 +57,7 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
     GITHUB_ACTOR               = getEnv("GITHUB_ACTOR")
     GITHUB_EVENT_NAME          = getEnv("GITHUB_EVENT_NAME")
     GITHUB_REF_TYPE            = getEnv("GITHUB_REF_TYPE")
+    RUNNER_TEMP                = getEnv("RUNNER_TEMP")
 
   # probably not running in github CI
   if CI == "" and GITHUB_SHA == "": return
@@ -65,6 +67,12 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   result.setIfNeeded("BUILD_ORIGIN_ID",       GITHUB_REPOSITORY_ID)
   result.setIfNeeded("BUILD_ORIGIN_OWNER_ID", GITHUB_REPOSITORY_OWNER_ID)
   result.setIfNeeded("BUILD_API_URI",         GITHUB_API_URL)
+
+  if RUNNER_TEMP != "":
+    # RUNNER_TEMP is automatically cleaned up by GitHub at the end of the job execution
+    # so we can safely write to it and have a guarantee it will be unique for the job duration
+    let uniquePath = RUNNER_TEMP.joinPath("BUILD_UNIQUE_ID.chalk")
+    result.trySetIfNeeded("BUILD_UNIQUE_ID",  getOrWriteExclusiveFile(uniquePath, secureRand[uint64]().toHex().toLower()))
 
   if (GITHUB_SERVER_URL != "" and GITHUB_REPOSITORY != "" and
       GITHUB_RUN_ID != ""):
