@@ -174,3 +174,21 @@ when defined(linux):
 else:
   iterator allFileMounts*(): string =
     discard
+
+proc getOrWriteExclusiveFile*(path: string, data: string, mode = S_IRUSR or S_IWUSR): string =
+    let fd = open(
+      cstring(path),
+      O_EXCL or O_CREAT or O_WRONLY,
+      mode,
+    )
+    if fd < 0:
+      if errno == EEXIST:
+        return tryToLoadFile(path)
+      else:
+        raiseOSError(osLastError(), "could not create exclusive file")
+    try:
+      if write(fd, cstring(data), len(data)) < 0:
+        raiseOSError(osLastError(), "could not write to exclusive file")
+      return data
+    finally:
+      discard close(fd)
