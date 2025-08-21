@@ -22,6 +22,7 @@ import ".."/[
 import "."/[
   fd_cache,
   file_string_stream,
+  strings,
   times, # TODO remove
 ]
 
@@ -168,7 +169,7 @@ when defined(linux):
         if len(parts) <= 2:
           continue
         let path = parts[1]
-        if path.fileExists():
+        if not path.startsWithAnyOf(systemIgnoreStartsWithPaths) and path.fileExists():
           yield path
 
 else:
