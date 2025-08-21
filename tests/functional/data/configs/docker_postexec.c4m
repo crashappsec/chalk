@@ -1,3 +1,4 @@
+log_level                                     = "trace"
 docker.wrap_entrypoint                        = true
 docker.scan_context.run                       = true
 docker.prep_postexec                          = true
