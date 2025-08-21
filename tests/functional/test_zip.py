@@ -8,18 +8,23 @@ import zipfile
 import pytest
 
 from .chalk.runner import Chalk
-from .conf import ZIPS
+from .conf import CONFIGS, ZIPS
 from .utils.log import get_logger
 
 
 logger = get_logger()
 
 # Test data fixtures
-PYTHON_LAMBDA_ZIP = ZIPS / "python" / "my_deployment_package.zip"
-NODEJS_LAMBDA_ZIP = ZIPS / "nodejs" / "function.zip"
-GOLANG_LAMBDA_ZIP = ZIPS / "golang" / "myFunction.zip"
-MISC_LAMBDA_ZIP = ZIPS / "misc" / "misc.zip"
 EMPTY_ZIP = ZIPS / "empty" / "empty.zip"
+GOLANG_LAMBDA_ZIP = ZIPS / "golang" / "myFunction.zip"
+MISC_LAMBDA_ZIP = ZIPS / "misc" / "misc.serverless.zip"
+NODEJS_LAMBDA_ZIP = ZIPS / "nodejs" / "function.zip"
+PYTHON_LAMBDA_ZIP = ZIPS / "python" / "my_deployment_package.zip"
+JAR_FILE = ZIPS / "misc" / "test.jar"
+DOUBLE_EXT_ZIP = ZIPS / "misc" / "test.serverless.zip"
+
+# Test configs
+SERVERLESS_CONFIG = CONFIGS / "serverless_zip.c4m"
 
 
 @pytest.mark.slow()
@@ -51,8 +56,8 @@ def test_valid_slow(
     assert insert.report.marks_by_path.contains({str(test_file): {}})
 
     # chalk binary is not injected if --virtual flag is present
-    if inject_binary_into_zip:
-        assert maybe_contains_chalk_binary(test_file, virtual)
+    if inject_binary_into_zip and should_inject_binary(test_file, virtual):
+        assert contains_chalk_binary(test_file)
     # array of json chalk objects as output, of which we are only expecting one
     extract = chalk.extract(artifact=tmp_data_dir, virtual=virtual)
     if not virtual:
@@ -124,16 +129,80 @@ def test_valid(
     if not virtual:
         assert extract.report.marks_by_path.contains({str(test_file): {}})
         assert extract.mark.contains(insert.mark.if_exists())
-    if inject_binary_into_zip:
-        assert maybe_contains_chalk_binary(test_file, virtual)
+    if inject_binary_into_zip and should_inject_binary(test_file, virtual):
+        assert contains_chalk_binary(test_file)
 
 
-def maybe_contains_chalk_binary(zip_path: Path, virtual: bool):
+@pytest.mark.slow()
+@pytest.mark.parametrize(
+    "copy_files",
+    [
+        [JAR_FILE],
+    ],
+    indirect=True,
+)
+def test_jar_files_never_injected(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    copy_files: list[Path],
+):
+    """Test that .jar files never have chalk binary injected."""
+    test_file = copy_files[0]
+
+    # Test with serverless config that has allowed extensions
+    insert = chalk.insert(
+        config=SERVERLESS_CONFIG,
+        artifact=test_file,
+        inject_binary_into_zip=True,
+    )
+    assert insert.report.marks_by_path.contains({str(test_file): {}})
+
+    # .jar files should never have binary injected
+    expected_injection = should_inject_binary(test_file, False)
+    verify_binary_injection(test_file, False, expected_injection)
+
+    # Explicitly verify .jar files never get injection
+    assert (
+        not expected_injection
+    ), f"JAR files should never have binary injection enabled"
+
+
+def contains_chalk_binary(zip_path: Path):
     """Helper function to verify chalk binary in the zip file."""
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        if virtual:
-            # virtual mode should not modify zip archive
-            return "chalk" not in zip_ref.namelist()
-        else:
-            # Verify the chalk binary was added
-            return "chalk" in zip_ref.namelist()
+        # Verify the chalk binary was added
+        return "chalk" in zip_ref.namelist()
+
+
+def should_inject_binary(file_path: Path, virtual: bool) -> bool:
+    """Determine if binary should be injected based on file extension and config."""
+    if virtual:
+        return False
+
+    # Based on serverless_zip.c4m config: zip.allowed_extensions: ["zip", "serverless.zip"]
+    # .jar files should never have binary injected
+    if file_path.suffix == ".jar":
+        return False
+
+    # Files with multiple extensions like "test.serverless.zip" should be handled
+    # by checking if the full extension matches allowed patterns
+    full_name = file_path.name
+    if full_name.endswith(".serverless.zip"):
+        return True
+    elif file_path.suffix == ".zip":
+        return True
+
+    return False
+
+
+def verify_binary_injection(file_path: Path, virtual: bool, expected_injection: bool):
+    """Verify binary injection matches expectation with clear assertion message."""
+    actual_injection = contains_chalk_binary(file_path)
+    if expected_injection:
+        assert (
+            actual_injection
+        ), f"Expected chalk binary to be injected in {file_path.name} (virtual={virtual})"
+    else:
+        assert (
+            not actual_injection
+        ), f"Expected chalk binary NOT to be injected in {file_path.name} (virtual={virtual})"
