@@ -133,7 +133,8 @@
   ([#539](https://github.com/crashappsec/chalk/pull/539))
 - `_OP_ARTIFACT_MOUNTED` key which indicates whether the artifact
   file is externally mounted (e.g. docker volume).
-  ([#559](https://github.com/crashappsec/chalk/pull/559))
+  ([#559](https://github.com/crashappsec/chalk/pull/559),
+  [#563](https://github.com/crashappsec/chalk/pull/563))
 - `_OP_ARTIFACT_PATH_WITHIN_VCTL` key which indicates path of the file
   in the git repo.
   ([#515](https://github.com/crashappsec/chalk/pull/515))
