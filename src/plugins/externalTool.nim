@@ -92,10 +92,12 @@ proc runTool(info: PIInfo, path: string): ChalkDict =
   return d
 
 proc runOneTool(info: PIInfo, path: string): ChalkDict =
-  # currently only support github runners for pre-existing runs during the same job
-  # as the runners clean up the tmp folder after each job hence tool data
-  # cannot be shared where the repo content has actually changed
-  # https://docs.github.com/en/actions/reference/workflows-and-actions/variables
+  # cache external tool results in GitHub Actions to avoid redundant executions
+  # within the same workflow job. This optimization only works on GitHub runners
+  # because they provide a job-specific RUNNER_TEMP directory that persists for
+  # the entire job but is cleaned up afterwards. This ensures cached data doesn't
+  # persist across jobs where repository content may have changed.
+  # See: https://docs.github.com/en/actions/reference/workflows-and-actions/variables
   let
     CI          = getEnv("CI")
     RUNNER_TEMP = getEnv("RUNNER_TEMP")
