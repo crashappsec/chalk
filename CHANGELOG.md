@@ -164,6 +164,12 @@
   target archive's extension is in the list of `allowed_extensions`. Defaults to
   `[zip]` and can be overriden with the `--zip-allowed-extensions` flag. (
   [#547](https://github.com/crashappsec/chalk/pull/547))
+- In GitHub in the same workflow job, for the same context,
+  cache external tool outputs. This avoid running same external
+  tool multiple times between multiple chalk operations.
+  For example SBOM will be collected only once if the job
+  does multiple `docker build`s in the same workflow job.
+  ([#566](https://github.com/crashappsec/chalk/pull/566))
 
 ### Fixes
 

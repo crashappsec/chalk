@@ -176,20 +176,32 @@ else:
   iterator allFileMounts*(): string =
     discard
 
+type AlreadyExists* = object of CatchableError
+
+proc acquireExclusiveFile*(path: string, mode = S_IRUSR or S_IWUSR, close = true): cint =
+  let fd = open(
+    cstring(path),
+    O_EXCL or O_CREAT or O_WRONLY,
+    mode,
+  )
+  if fd < 0:
+    if errno == EEXIST:
+      raise newException(AlreadyExists, path)
+    else:
+      raiseOSError(osLastError(), "could not create exclusive file")
+  if close:
+    discard close(fd)
+    return 0
+  return fd
+
 proc getOrWriteExclusiveFile*(path: string, data: string, mode = S_IRUSR or S_IWUSR): string =
-    let fd = open(
-      cstring(path),
-      O_EXCL or O_CREAT or O_WRONLY,
-      mode,
-    )
-    if fd < 0:
-      if errno == EEXIST:
-        return tryToLoadFile(path)
-      else:
-        raiseOSError(osLastError(), "could not create exclusive file")
+  try:
+    let fd = acquireExclusiveFile(path, mode = mode, close = false)
     try:
       if write(fd, cstring(data), len(data)) < 0:
         raiseOSError(osLastError(), "could not write to exclusive file")
       return data
     finally:
       discard close(fd)
+  except AlreadyExists:
+    return tryToLoadFile(path)
