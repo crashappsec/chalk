@@ -78,3 +78,9 @@ proc elseWhenEmpty*(s: string, default: string): string =
   if s == "":
     return default
   return s
+
+proc startsWithAnyOf*(s: string, suffixes: openArray[string]): bool =
+  for i in suffixes:
+    if s.startsWith(i):
+      return true
+  return false
