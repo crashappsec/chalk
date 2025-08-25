@@ -11,8 +11,10 @@
 import std/[
   algorithm,
   sequtils,
+  uri,
 ]
 import ".."/[
+  chalkjson,
   config,
   plugin_api,
   run_management,
@@ -42,7 +44,7 @@ proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
     raise newException(ValueError, "missing implementation of " & $(cb))
   return unpack[T](value.get())
 
-proc runOneTool(info: PIInfo, path: string): ChalkDict =
+proc runTool(info: PIInfo, path: string): ChalkDict =
   let key = info.name & ":" & path
   if key in alreadyRan:
     raise newException(AlreadyRanError, "")
@@ -88,6 +90,49 @@ proc runOneTool(info: PIInfo, path: string): ChalkDict =
   trace(info.name & ": produced keys " & $(d.keys().toSeq()))
   alreadyRan.incl(key)
   return d
+
+proc runOneTool(info: PIInfo, path: string): ChalkDict =
+  # cache external tool results in GitHub Actions to avoid redundant executions
+  # within the same workflow job. This optimization only works on GitHub runners
+  # because they provide a job-specific RUNNER_TEMP directory that persists for
+  # the entire job but is cleaned up afterwards. This ensures cached data doesn't
+  # persist across jobs where repository content may have changed.
+  # See: https://docs.github.com/en/actions/reference/workflows-and-actions/variables
+  let
+    CI          = getEnv("CI")
+    RUNNER_TEMP = getEnv("RUNNER_TEMP")
+    key         = info.name & "-" & path.encodeUrl()
+    tmp         = RUNNER_TEMP.joinPath(key)
+
+  result = ChalkDict()
+  if CI == "" or RUNNER_TEMP == "":
+    return runTool(info, path)
+  else:
+    try:
+      trace(info.name & ": acquiring exlusive tmp file " & tmp)
+      discard acquireExclusiveFile(tmp)
+      result = runTool(info, path)
+      discard tryToWriteFile(tmp, result.toJson())
+    except AlreadyExists:
+      # another build already ran external tool
+      let content = tryToLoadFile(tmp)
+      if content == "":
+        warn(
+          info.name & ": exlusive tmp file is empty. " &
+          "Possible due to race condition as another " &
+          "parallel chalk process didnt write it yet"
+        )
+        raise newException(AlreadyRanError, "")
+      else:
+        try:
+          trace(info.name & ": reading cached output from exlusive tmp file " & tmp)
+          result = content.extractOneChalkJson(tmp)
+        except:
+          error(info.name & ": could not parse output from exclusive tmp file due to: " & getCurrentExceptionMsg())
+          raise newException(AlreadyRanError, "")
+    except:
+      error(info.name & ": could not aquire exclusive tmp file due to " & getCurrentExceptionMsg())
+      return runTool(info, path)
 
 proc toolBase(path: string): ChalkDict =
   let resolved = path.resolvePath()

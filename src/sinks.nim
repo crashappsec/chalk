@@ -31,11 +31,11 @@ proc chalkJsonLogs(msg: string, extra: StringTable): (string, bool) =
   if getShowColor() or isInteractive:
     return (msg, true)
   let data = %*{
+    "msg": msg,
     "chalk_version": getChalkExeVersion(),
     "chalk_commit": getChalkCommitId(),
     "chalk_magic": magicUTF8,
     "timestamp": getTime().utc.format(timesIso8601Format),
-    "msg": msg,
   }
   return ($data, true)
 
