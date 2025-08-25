@@ -898,7 +898,10 @@ def test_metadata_gcp(
 
 @pytest.mark.parametrize("test_file", ["valid/sample_1"])
 def test_syft_docker(
-    chalk_copy: Chalk, test_file: str, random_hex: str, server_http: str
+    chalk_copy: Chalk,
+    test_file: str,
+    random_hex: str,
+    server_http: str,
 ):
     # we need to enable sboms + embed sboms
     chalk = chalk_copy
@@ -925,7 +928,9 @@ def test_syft_docker(
     image_hash, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
-        env={"OBJECT_STORE": f"{server_http}/presign/objects"},
+        env={
+            "OBJECT_STORE": f"{server_http}/presign/objects",
+        },
     )
 
     assert build.report.contains(
@@ -957,7 +962,12 @@ def test_syft_docker(
 
 @pytest.mark.parametrize("use_docker", [True, False])
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk, use_docker: bool):
+def test_syft_binary(
+    tmp_data_dir: Path,
+    copy_files: list[Path],
+    chalk_copy: Chalk,
+    use_docker: bool,
+):
     bin_path = copy_files[0]
 
     # we need to enable sboms + embed sboms so load test config
@@ -983,7 +993,14 @@ def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk, use_docker: bool
         }
     }
 
-    insert = chalk.insert(bin_path, env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)})
+    insert = chalk.insert(
+        bin_path,
+        env={
+            "EXTERNAL_TOOL_USE_DOCKER": str(use_docker),
+            "RUNNER_TEMP": str(tmp_data_dir),
+            "CI": "true",
+        },
+    )
     assert insert.marks_by_path.contains({str(bin_path): {}})
     assert insert.mark.contains(sbom_data)
     if use_docker:
@@ -994,6 +1011,16 @@ def test_syft_binary(copy_files: list[Path], chalk_copy: Chalk, use_docker: bool
     # check that sbom has been embedded into the artifact
     chalk_mark = ChalkMark.from_binary(bin_path)
     assert chalk_mark.contains(sbom_data)
+
+    insert2 = chalk.insert(
+        bin_path,
+        env={
+            "EXTERNAL_TOOL_USE_DOCKER": str(use_docker),
+            "RUNNER_TEMP": str(tmp_data_dir),
+            "CI": "true",
+        },
+    )
+    insert2.mark.has(SBOM=insert.mark["SBOM"])
 
 
 @pytest.mark.parametrize("use_docker", [True, False])

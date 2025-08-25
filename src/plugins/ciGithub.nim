@@ -44,6 +44,7 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()
 
   # https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
+  # https://docs.github.com/en/actions/reference/workflows-and-actions/variables
   let
     CI                         = getEnv("CI")
     GITHUB_SHA                 = getEnv("GITHUB_SHA")
