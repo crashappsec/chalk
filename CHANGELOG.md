@@ -216,6 +216,16 @@
 - Better error handling when receiving different in-toto attestation
   for docker images.
   ([#552](https://github.com/crashappsec/chalk/pull/552))
+- Handle `SIGTTOU`, `SIGTTIN` signals. In some cases, during chalk
+  exit machinery, when chalk restores full terminal state (as chalk itself
+  can emit terminal control characters such as for colorful logs),
+  it uses `tcsetattr` which then sends control sequence to the TTY
+  via `ioctl` which ends up blocking the operation if the `SIGTTOU`
+  signal is not handled. This normally does not happen as the `SIGTTOU`
+  is not sent to chalk however there are cases when it does such as
+  when chalk is wrapped with a `timeout` utility. Either way handling
+  the signals allows the reset sequence to not-block and exit chalk normally.
+  ([#567](https://github.com/crashappsec/chalk/pull/567))
 
 ## 0.5.9
 

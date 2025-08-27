@@ -73,11 +73,17 @@ proc setupTerminal*() =
   addExitProc(restoreTerminal)
 
 proc setupSignalHandlers*() =
-  var handler: Sigaction
-
-  handler.sa_handler = regularTerminationSignal
-  handler.sa_flags   = 0
+  var
+    handler = Sigaction(
+      sa_handler: regularTerminationSignal,
+      sa_flags:   0,
+    )
+    ignore = Sigaction(
+      sa_handler: SIG_IGN,
+    )
 
   for signal in [SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGBUS, SIGKILL,
                  SIGSEGV, SIGTERM]:
     discard sigaction(signal, handler, nil)
+  for signal in [SIGTTOU, SIGTTIN]:
+    discard sigaction(signal, ignore, nil)
