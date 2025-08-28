@@ -19,14 +19,26 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
   result = ChalkDict()
   for k in getChalkSubsections("keyspec"):
     let v = "keyspec." & k
-    if opt.isNone() and k in hostInfo:                continue
-    if opt.isSome() and k in opt.get().collectedData: continue
-    if attrGet[int](v & ".kind") != int(kt): continue
-    if not isSubscribedKey(k):
+    if opt.isNone() and k in hostInfo:
+      continue
+    if opt.isSome() and k in opt.get().collectedData:
       continue
     try:
-      let valueOpt = attrGetOpt[Box](v & ".value")
-      let callbackOpt = attrGetOpt[CallbackObj](v & ".callback")
+      # during configuration testing, some keys are registered
+      # which are not fully initialized so just skip here
+      # if the kind id missing.
+      # otherwise this should never happen as the config is validated
+      # while loading
+      if attrGet[int](v & ".kind") != int(kt):
+        continue
+      if not isSubscribedKey(k):
+        continue
+    except:
+      continue
+    try:
+      let
+        valueOpt    = attrGetOpt[Box](v & ".value")
+        callbackOpt = attrGetOpt[CallbackObj](v & ".callback")
       if valueOpt.isSome():
         result.setIfNeeded(k, valueOpt.get())
       elif callbackOpt.isSome():

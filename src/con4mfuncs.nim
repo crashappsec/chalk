@@ -40,6 +40,11 @@ proc getExeVersion(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getChalkExeVersion()))
 
 proc logBase(ll: string, args: seq[Box], s: ConfigState): Option[Box] =
+  # silence all logs during test run
+  # also prevent adjusting log level during config validationg
+  if doingTestRun:
+    return none(Box)
+
   let
     msg      = unpack[string](args[0])
     color    = s.attrLookup("color")

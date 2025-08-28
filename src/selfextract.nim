@@ -264,22 +264,23 @@ proc testConfigFile(newCon4m: string,
                addConfLoad(coConfName,        toStream(coConfig))
 
   try:
+    startTestRun()
     # Test Run will cause (un)subscribe() to ignore subscriptions, and
     # will suppress log messages, etc.
     stack.run()
     stack.configState.loadCachedComponents(cache)
     stack.configState.loadComponentParams(params)
-    startTestRun()
     stack.addConfLoad(uri, toStream(newCon4m))
     stack.run()
     if stack.errored:
       quit(1)
-    info(uri & ": Configuration successfully validated.")
+    endTestRun()
   except:
+    endTestRun()
     dumpExOnDebug()
     cantLoad(getCurrentExceptionMsg() & "\n")
-  finally:
-    endTestRun()
+
+  info(uri & ": Configuration successfully validated.")
 
 proc toBox(param: ParameterInfo, component: ComponentInfo): Box =
   # Though you can pack / unpack con4m types, we don't have a JSON
