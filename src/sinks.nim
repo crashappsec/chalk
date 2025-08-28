@@ -27,7 +27,7 @@ import "."/[
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
   return (msg, true)
 
-proc chalkJsonLogs(msg: string, extra: StringTable): (string, bool) =
+proc chalkJsonLogs(msg: string, info: StringTable): (string, bool) =
   if getShowColor() or isInteractive:
     return (msg, true)
   let data = %*{
@@ -37,6 +37,8 @@ proc chalkJsonLogs(msg: string, extra: StringTable): (string, bool) =
     "chalk_magic": magicUTF8,
     "timestamp": getTime().utc.format(timesIso8601Format),
   }
+  if keyLogLevel in info:
+    data["log_level"] = %*info[keyLogLevel]
   return ($data, true)
 
 proc githubLogGroup(msg: string, extra: StringTable): (string, bool) =
