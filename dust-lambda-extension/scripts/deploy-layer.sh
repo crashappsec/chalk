@@ -360,7 +360,7 @@ main() {
   fi
 
   # Get regions for deployment
-  if [ -n "$AWS_REGIONS" ]; then
+  if [ -n "${AWS_REGIONS:-}" ]; then
     # Use explicitly provided regions (comma-separated)
     regions=$(printf "%s" "$AWS_REGIONS" | tr ',' ' ')
     log_info "Using explicitly provided regions: $regions"
