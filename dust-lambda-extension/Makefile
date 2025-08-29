@@ -186,6 +186,14 @@ delete-layer-dry-run: ## Preview layer deletions without executing (dry-run)
 	@$(MAKE) delete-layer DRY_RUN=true DELETE_ALL=true
 .PHONY: delete-layer-dry-run
 
+list-extension-arns: ## List all published Lambda extension ARNs in tab-delimited format
+	@sh $(CURDIR)/scripts/list-extension-arns.sh \
+		$(if $(AWS_ACCOUNT_ID),-a "$(AWS_ACCOUNT_ID)") \
+		$(if $(LAYER_NAME),-n "$(LAYER_NAME)") \
+		$(if $(AWS_REGIONS),-R "$(AWS_REGIONS)") \
+		$(if $(REGION_FILTER),-r "$(REGION_FILTER)")
+.PHONY: list-extension-arns
+
 #> UTILITIES
 
 version: ## show the Dust extension version
