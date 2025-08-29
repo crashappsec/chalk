@@ -10,6 +10,25 @@ MAKEFLAGS += --warn-undefined-variables
 SHORT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 TAG := $(shell git describe --exact-match HEAD 2>/dev/null)
 IS_DIRTY := $(shell git diff-index --quiet HEAD -- 2>/dev/null || echo "dirty")
+
+# Determine Dust extension version
+DUST_TAG := $(shell git describe --exact-match --match "dust-*" --tags HEAD 2>/dev/null)
+ifneq ($(DUST_TAG),)
+  # Extract version from tag (dust-v1.0.0 -> 1.0.0)
+  DUST_VERSION := $(patsubst dust-%,%,$(DUST_TAG))
+else
+  # Use dev version with short hash
+  DUST_VERSION := dust-dev-$(SHORT_HASH)
+endif
+
+# Add dirty suffix if working tree is dirty
+ifeq ($(IS_DIRTY),dirty)
+  ifneq ($(findstring dust-dev,$(DUST_VERSION)),)
+    DUST_VERSION := $(DUST_VERSION)-dirty
+  else
+    DUST_VERSION := $(DUST_VERSION)-dirty
+  endif
+endif
 SOURCES := $(wildcard extensions/*)
 BUILD_PREFIX ?= "."
 BUILD_DIR ?= $(BUILD_PREFIX)/_build
@@ -168,6 +187,10 @@ delete-layer-dry-run: ## Preview layer deletions without executing (dry-run)
 .PHONY: delete-layer-dry-run
 
 #> UTILITIES
+
+version: ## show the Dust extension version
+	@echo $(DUST_VERSION)
+.PHONY: version
 
 clean: ## delete Lambda layer zip archives
 	rm -rf $(BUILD_DIR)
