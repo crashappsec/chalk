@@ -94,7 +94,7 @@ deploy-layer: package-layer ## Deploy Lambda layer to all AWS regions with publi
 .PHONY: deploy-layer
 
 deploy-layer-dry-run: package-layer ## Perform a dry-run of layer deployment (no actual changes)
-	@# Check if repository is dirty
+	# Check if repository is dirty
 	@if [ "$(IS_DIRTY)" = "dirty" ]; then \
 		echo "Warning: Git repository has uncommitted changes."; \
 		echo "In a real deployment, this would fail."; \
