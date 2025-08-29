@@ -29,9 +29,12 @@ var ctxStack = @[CollectionCtx()]
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
 proc startTestRun*() =
-  doingTestRun = true
+  doingTestRun  = true
+  savedLogLevel = getLogLevel()
 proc endTestRun*()   =
   doingTestRun = false
+  # the stack above might be adjusting global log level so restore it
+  setLogLevel(savedLogLevel)
 
 template withOnlyCodecs*(codecs: seq[Plugin], c: untyped) =
   if len(codecs) > 0:

@@ -550,6 +550,7 @@ var
   systemErrors*           = seq[string](@[])
   selfChalk*              = ChalkObj(nil)
   canSelfInject*          = true
+  savedLogLevel*          = llError
   doingTestRun*           = false
   onlyCodecs*             = newSeq[Plugin]()
   inInternalScan*         = false
