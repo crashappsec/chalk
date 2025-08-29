@@ -111,6 +111,62 @@ deploy-layer-dry-run: package-layer ## Perform a dry-run of layer deployment (no
 test: ## test dust script against fake lambda runtime
 	./extensions/dust
 
+delete-layer: ## Delete Lambda layer versions from AWS regions
+	@# Check if AWS_REGIONS is set
+	@if [ -z "$(AWS_REGIONS)" ]; then \
+		echo ""; \
+		echo "Error: AWS_REGIONS is required"; \
+		echo ""; \
+		echo "Usage:"; \
+		echo "  make delete-layer AWS_REGIONS=\"us-east-1\""; \
+		echo "  make delete-layer AWS_REGIONS=\"us-east-1,us-west-2\""; \
+		echo ""; \
+		echo "Options:"; \
+		echo "  AWS_ACCOUNT_ID=123456789012    # AWS Account ID (auto-detected if not set)"; \
+		echo "  LAYER_VERSION=5                # Delete specific version"; \
+		echo "  DELETE_ALL=true                # Delete all versions"; \
+		echo "  DRY_RUN=true                   # Preview deletions without executing"; \
+		echo ""; \
+		echo "Example:"; \
+		echo "  make delete-layer AWS_REGIONS=\"us-east-1\" DELETE_ALL=true"; \
+		echo "  make delete-layer AWS_ACCOUNT_ID=123456789012 AWS_REGIONS=\"us-east-1\" LAYER_VERSION=5"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@# Check if AWS_ACCOUNT_ID is set
+	@if [ -z "$(AWS_ACCOUNT_ID)" ]; then \
+		echo ""; \
+		echo "Error: Unable to determine AWS Account ID"; \
+		echo ""; \
+		echo "Please ensure you are authenticated with AWS CLI or provide AWS_ACCOUNT_ID:"; \
+		echo "  make delete-layer AWS_ACCOUNT_ID=123456789012 AWS_REGIONS=\"us-east-1\" DELETE_ALL=true"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@# Determine version flag
+	@if [ -n "$(LAYER_VERSION)" ]; then \
+		VERSION_FLAG="-V $(LAYER_VERSION)"; \
+	elif [ "$(DELETE_ALL)" = "true" ]; then \
+		VERSION_FLAG="-A"; \
+	else \
+		echo "Error: Must specify either LAYER_VERSION or DELETE_ALL=true"; \
+		exit 1; \
+	fi
+	@# Run delete script
+	@sh $(CURDIR)/scripts/delete-layer.sh \
+		-a "$(AWS_ACCOUNT_ID)" \
+		-n "$(LAYER_NAME)" \
+		-R "$(AWS_REGIONS)" \
+		$$VERSION_FLAG \
+		$(if $(filter true,$(DRY_RUN)),-d) \
+		$(if $(filter true,$(SKIP_CONFIRMATION)),-y) \
+		$(if $(filter true,$(VERBOSE)),-v)
+.PHONY: delete-layer
+
+delete-layer-dry-run: ## Preview layer deletions without executing (dry-run)
+	@$(MAKE) delete-layer DRY_RUN=true DELETE_ALL=true
+.PHONY: delete-layer-dry-run
+
 #> UTILITIES
 
 clean: ## delete Lambda layer zip archives
