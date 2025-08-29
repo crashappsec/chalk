@@ -29,6 +29,8 @@ import "."/[
   utils/json,
   utils/strings,
 ]
+export json
+export nimutils
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']
@@ -40,6 +42,7 @@ const
   eNoExponent      = "Exponent expected"
   eBadUniEscape    = "Invalid \\u escape in JSON"
   eBadEscape       = "Invalid escape command after '\\'"
+  eBadNumber       = "Invalid number"
   eEOFInStr        = "End of file in string"
   eBadUTF8         = "Invalid UTF-8 in JSON string literal"
   eBadArrayItem    = "Expected comma or end of array"
@@ -149,39 +152,18 @@ proc arrayFromJson(jobj: ChalkJsonNode, fname: string): seq[Box] =
 
   if jobj == nil:
     return
-  for item in jobj.items: result.add(valueFromJson(jobj = item, fname = fname))
+  for item in jobj.items:
+    result.add(valueFromJson(jobj = item, fname = fname))
 
 proc valueFromJson(jobj: ChalkJsonNode, fname: string): Box =
   case jobj.kind
-  of CJNull:   return
+  of CJNull:   return Box(kind: MkObj)
   of CJBool:   return pack(jobj.boolval)
   of CJInt:    return pack(jobj.intval)
-  of CJFloat:  raise newException(IOError, fname & ": float keys aren't valid")
+  of CJFloat:  return pack(jobj.floatval)
   of CJString: return pack(jobj.strval)
   of CJObject: return pack(objFromJson(jobj, fname))
   of CJArray:  return pack(arrayFromJson(jobj, fname))
-
-proc jsonNodeToBox*(n: ChalkJsonNode): Box =
-  case n.kind
-  of CJNull:   return nil
-  of CJBool:   return pack(n.boolval)
-  of CJInt:    return pack(int(n.intval))
-  of CJFloat:  return pack(n.floatval)
-  of CJString: return pack(n.strval)
-  of CJArray:
-    var res: seq[Box] = @[]
-
-    for item in n.items: res.add(item.jsonNodeToBox())
-
-    return pack[seq[Box]](res)
-  of CJObject:
-    var res: TableRef[string, Box] = newTable[string, Box]()
-
-    for k, v in n.kvpairs:
-      let b = v.jsonNodeToBox()
-      res[k] = b
-
-    return pack(res)
 
 proc nimJsonToBox*(node: JsonNode): Box =
   # Box doesn't really currently have a 'Null' type the way JSON does.
@@ -262,48 +244,48 @@ proc jsonNumber(s: Stream): ChalkJsonNode =
   var
     buf:    string
     gotNeg: bool
-    c = s.readOne()
 
-  case c
-  of '-':
+  while s.peekOne() == '-':
     if gotNeg:
       raise parseError(eDoubleNeg)
     gotNeg = true
-    buf.add(c)
+    buf.add(s.readOne())
+
+  var c = s.readOne()
+  case c
   of '0':
     buf.add(c)
   of '1' .. '9':
     buf.add(c)
     while true:
-      c = s.peekOne()
-      case c
+      case s.peekOne()
       of '0' .. '9':
         buf.add(s.readOne())
       else: break
-  else: unreachable
+  else:
+    raise parseError(eBadNumber)
 
   c = s.peekOne()
   case c
   of '.':
     buf.add(s.readOne())
     while true:
-      c = s.peekOne()
-      case c
+      case s.peekOne()
       of '0' .. '9':
         buf.add(s.readOne())
       of 'E', 'e':
         buf.add(s.readOne())
         break
       else:
-        var b: BiggestUInt
-        discard parseBiggestUInt(buf, b)
-        return ChalkJsonNode(kind: CJInt, intval: cast[int64](b))
+        var b: float
+        discard parseBiggestFloat(buf, b)
+        return ChalkJsonNode(kind: CJFloat, floatval: b)
   of 'E', 'e':
     buf.add(s.readOne())
   else:
-    var b: BiggestUInt
-    discard parseBiggestUInt(buf, b)
-    return ChalkJsonNode(kind: CJInt, intval: cast[int64](b))
+    var b: int64
+    discard parseBiggestInt(buf, b)
+    return ChalkJsonNode(kind: CJInt, intval: b)
 
   c = s.readOne()
   case c
@@ -314,7 +296,7 @@ proc jsonNumber(s: Stream): ChalkJsonNode =
       raise parseError(eNoExponent)
     buf.add(s.readOne())
   of '0' .. '9':
-    buf.add(s.readOne())
+    buf.add(c)
   else:
     raise parseError(eNoExponent)
 

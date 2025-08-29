@@ -149,7 +149,9 @@ proc objectifyByTemplate*(collectedData: ChalkDict,
       trace("object_store: using per-key " & k & " object store " & storeConfigName)
       objectifyKey(result, k, v, content, objectsData, storeConfigName)
     elif useDefault and Con4mSize(len(content)) > defaultThreshold:
-      trace("object_store: using default object store " & defaultStoreConfigName)
+      trace("object_store: " & k & " using default object store " & defaultStoreConfigName)
       objectifyKey(result, k, v, content, objectsData, defaultStoreConfigName)
     else:
+      when defined(debug):
+        trace("object_store: no object store for " & k)
       result[k] = v
