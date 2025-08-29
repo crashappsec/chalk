@@ -4763,7 +4763,7 @@ operation, derived from the same value used to set the _TIMESTAMP key.
 
 keyspec _CHALKS {
     kind:             RunTimeHost
-    type:             string
+    type:             list[dict[string, `x]]
     standard:         true
     system:           true
     since:            "0.1.0"
@@ -4781,7 +4781,7 @@ report will NOT output chalks.
 
 keyspec _COLLECTED_ARTIFACTS {
     kind:             RunTimeHost
-    type:             string
+    type:             list[dict[string, `x]]
     standard:         true
     system:           true
     since:            "0.5.0"
