@@ -438,20 +438,20 @@ proc handleConfigLoad*(inpath: string): bool =
   if paramsViaStdin:
     try:
       let
-        chalkJsonTree = newStringStream(stdin.readAll()).chalkParseJson()
+        chalkJsonTree = parseJson(stdin.readAll())
         runtime       = getChalkRuntime()
 
-      if chalkJsonTree.kind != CJArray:
+      if chalkJsonTree.kind != JArray:
         raise newException(IOError, "")
-      for row in chalkJsonTree.items:
-        if row.kind != CJArray or row.items.len() != 5:
+      for row in chalkJsonTree:
+        if row.kind != JArray or row.len() != 5:
           raise newException(IOError, "")
         let
-          attr    = row.items[0].boolval
-          url     = row.items[1].strval
-          sym     = row.items[2].strval
-          c4mType = row.items[3].strval.toCon4mType()
-          value   = row.items[4].jsonNodeToBox()
+          attr    = row[0].getBool()
+          url     = row[1].getStr()
+          sym     = row[2].getStr()
+          c4mType = row[3].getStr().toCon4mType()
+          value   = row[4].nimJsonToBox()
         if attr:
           runtime.setAttributeParamValue(url, sym, value, c4mType)
         else:

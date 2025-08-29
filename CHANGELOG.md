@@ -226,6 +226,13 @@
   when chalk is wrapped with a `timeout` utility. Either way handling
   the signals allows the reset sequence to not-block and exit chalk normally.
   ([#567](https://github.com/crashappsec/chalk/pull/567))
+- Fixed chalkmark JSON parser:
+  - support for `null` values
+  - fixed number parsing. specifically:
+    - parse float numbers (previously would always normalize to int)
+    - parse exponents
+
+  ([#570](https://github.com/crashappsec/chalk/issues/570))
 
 ## 0.5.9
 

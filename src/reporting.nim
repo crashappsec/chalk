@@ -126,6 +126,7 @@ proc doEmbeddedReport(): Box =
 
 proc doCustomReporting() =
   for topic in getChalkSubsections("custom_report"):
+    trace("Generating custom report " & topic)
     let spec = "custom_report." & topic
     let enabledOpt = attrGetOpt[bool](spec & ".enabled")
     if enabledOpt.isNone() or not enabledOpt.get(): continue
