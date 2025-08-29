@@ -26,7 +26,7 @@ proc scanForWork(kt: auto, opt: Option[ChalkObj], args: seq[Box]): ChalkDict =
     try:
       # during configuration testing, some keys are registered
       # which are not fully initialized so just skip here
-      # if the kind id missing.
+      # if the "kind" id missing.
       # otherwise this should never happen as the config is validated
       # while loading
       if attrGet[int](v & ".kind") != int(kt):
