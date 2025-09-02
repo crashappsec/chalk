@@ -14,7 +14,7 @@ IS_DIRTY := $(shell git diff-index --quiet HEAD -- 2>/dev/null || echo "dirty")
 # Determine Dust extension version
 DUST_TAG := $(shell git describe --exact-match --match "dust-*" --tags HEAD 2>/dev/null)
 ifneq ($(DUST_TAG),)
-  # Extract version from tag (dust-v1.0.0 -> 1.0.0)
+  # Extract version from tag (dust-1.0.0 -> 1.0.0)
   DUST_VERSION := $(patsubst dust-%,%,$(DUST_TAG))
 else
   # Use dev version with short hash
@@ -65,7 +65,7 @@ package-layer: $(ARCHIVE_NAME) ## create a zip archive for AWS Lambda Layer depl
 $(ARCHIVE_NAME): $(SOURCES)
 	@echo "Creating Lambda Layer package: $@"
 	@mkdir -p ./_build
-	@zip -r $@ extensions/
+	@zip -qr $@ extensions/
 	@echo "Lambda Layer package created: $@"
 
 deploy-layer: package-layer ## Deploy Lambda layer to all AWS regions with public access
@@ -131,35 +131,35 @@ test: ## test dust script against fake lambda runtime
 	./extensions/dust
 
 delete-layer: ## Delete Lambda layer versions from AWS regions
-	@# Check if AWS_REGIONS is set
+	# Check if AWS_REGIONS is set
 	@if [ -z "$(AWS_REGIONS)" ]; then \
-		echo ""; \
-		echo "Error: AWS_REGIONS is required"; \
-		echo ""; \
-		echo "Usage:"; \
-		echo "  make delete-layer AWS_REGIONS=\"us-east-1\""; \
-		echo "  make delete-layer AWS_REGIONS=\"us-east-1,us-west-2\""; \
-		echo ""; \
-		echo "Options:"; \
-		echo "  AWS_ACCOUNT_ID=123456789012    # AWS Account ID (auto-detected if not set)"; \
-		echo "  LAYER_VERSION=5                # Delete specific version"; \
-		echo "  DELETE_ALL=true                # Delete all versions"; \
-		echo "  DRY_RUN=true                   # Preview deletions without executing"; \
-		echo ""; \
-		echo "Example:"; \
-		echo "  make delete-layer AWS_REGIONS=\"us-east-1\" DELETE_ALL=true"; \
-		echo "  make delete-layer AWS_ACCOUNT_ID=123456789012 AWS_REGIONS=\"us-east-1\" LAYER_VERSION=5"; \
-		echo ""; \
+		@echo ""; \
+		@echo "Error: AWS_REGIONS is required"; \
+		@echo ""; \
+		@echo "Usage:"; \
+		@echo "  make delete-layer AWS_REGIONS=\"us-east-1\""; \
+		@echo "  make delete-layer AWS_REGIONS=\"us-east-1,us-west-2\""; \
+		@echo ""; \
+		@echo "Options:"; \
+		@echo "  AWS_ACCOUNT_ID=123456789012    # AWS Account ID (auto-detected if not set)"; \
+		@echo "  LAYER_VERSION=5                # Delete specific version"; \
+		@echo "  DELETE_ALL=true                # Delete all versions"; \
+		@echo "  DRY_RUN=true                   # Preview deletions without executing"; \
+		@echo ""; \
+		@echo "Example:"; \
+		@echo "  make delete-layer AWS_REGIONS=\"us-east-1\" DELETE_ALL=true"; \
+		@echo "  make delete-layer AWS_ACCOUNT_ID=123456789012 AWS_REGIONS=\"us-east-1\" LAYER_VERSION=5"; \
+		@echo ""; \
 		exit 1; \
 	fi
-	@# Check if AWS_ACCOUNT_ID is set
+	# Check if AWS_ACCOUNT_ID is set
 	@if [ -z "$(AWS_ACCOUNT_ID)" ]; then \
-		echo ""; \
-		echo "Error: Unable to determine AWS Account ID"; \
-		echo ""; \
-		echo "Please ensure you are authenticated with AWS CLI or provide AWS_ACCOUNT_ID:"; \
-		echo "  make delete-layer AWS_ACCOUNT_ID=123456789012 AWS_REGIONS=\"us-east-1\" DELETE_ALL=true"; \
-		echo ""; \
+		@echo ""; \
+		@echo "Error: Unable to determine AWS Account ID"; \
+		@echo ""; \
+		@echo "Please ensure you are authenticated with AWS CLI or provide AWS_ACCOUNT_ID:"; \
+		@echo "  make delete-layer AWS_ACCOUNT_ID=123456789012 AWS_REGIONS=\"us-east-1\" DELETE_ALL=true"; \
+		@echo ""; \
 		exit 1; \
 	fi
 	@# Determine version flag
@@ -168,7 +168,7 @@ delete-layer: ## Delete Lambda layer versions from AWS regions
 	elif [ "$(DELETE_ALL)" = "true" ]; then \
 		VERSION_FLAG="-A"; \
 	else \
-		echo "Error: Must specify either LAYER_VERSION or DELETE_ALL=true"; \
+		@echo "Error: Must specify either LAYER_VERSION or DELETE_ALL=true"; \
 		exit 1; \
 	fi
 	@# Run delete script
