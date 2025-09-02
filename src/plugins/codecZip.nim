@@ -250,7 +250,7 @@ proc zipHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
     else:
       let
         filename = chalk.fsRef.splitFile().name & chalk.fsRef.splitFile().ext
-        allowedExtensions = attrGet[seq[string]]("zip.allowed_extensions")
+        allowedExtensions = attrGet[seq[string]]("zip.inject_binary_allowed_extensions")
 
       var shouldInject = false
       for ext in allowedExtensions:

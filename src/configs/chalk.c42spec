@@ -2048,7 +2048,7 @@ not be a bad thing to leave some buffer room in there just in case.
 """
   }
 
-  field allowed_extensions {
+  field inject_binary_allowed_extensions {
     type:     list[string]
     default:  ["zip"]
     shortdoc: "File extensions allowed for zip binary injection"

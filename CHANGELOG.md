@@ -142,9 +142,17 @@
   ([#515](https://github.com/crashappsec/chalk/pull/515))
 - Reporting all IMDSv2 errors in `FAILED_KEYS` or `_OP_FAILED_KEYS`.
   ([#519](https://github.com/crashappsec/chalk/pull/519))
-- Adds `zip.inject_binary` config and `--inject-binary-into-zip` CLI flag to
-  the `chalk insert` command as part of chalk's AWS Lambda support
-  ([#498](https://github.com/crashappsec/chalk/pull/498))
+- During `chalk insert` allow chalk to inject itself (binary) into
+  ZIP archive as part of schalk's AWS Lambda support.
+  Added configurations:
+  - `zip.inject_binary` (`--inject-binary-into-zip` CLI flag)
+  - `zip.inject_binary_allowed_extensions` (default only `.zip`)
+  - `zip.inject_zip_size_threshold` (default `50Mb`)
+
+  ([#498](https://github.com/crashappsec/chalk/pull/498),
+  [#547](https://github.com/crashappsec/chalk/pull/547),
+  [#573](https://github.com/crashappsec/chalk/pull/573))
+
 - Chalk can set rlimit for heartbeats process.
   By default no limit is set.
   ([#544](https://github.com/crashappsec/chalk/pull/544))
@@ -160,10 +168,6 @@
 
 - `BUILD_UNIQUE_ID` to uniquely identify jobs in GitHub.
   ([#562](https://github.com/crashappsec/chalk/pull/562))
-- Adds `zip.allowed_extensions` which will only inject the chalk binary if a
-  target archive's extension is in the list of `allowed_extensions`. Defaults to
-  `[zip]` and can be overriden with the `--zip-allowed-extensions` flag. (
-  [#547](https://github.com/crashappsec/chalk/pull/547))
 - In GitHub in the same workflow job, for the same context,
   cache external tool outputs. This avoid running same external
   tool multiple times between multiple chalk operations.
