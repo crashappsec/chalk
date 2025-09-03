@@ -233,6 +233,9 @@
 
   ([#570](https://github.com/crashappsec/chalk/issues/570))
 
+- `chalk` now processes files explicitly passed to it without applying `ignore_patterns`
+  ([#575](https://github.com/crashappsec/chalk/pull/575))
+
 ## 0.5.9
 
 **August 14, 2025**

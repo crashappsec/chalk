@@ -14,6 +14,7 @@
 
 import std/[
   algorithm,
+  os,
 ]
 import "."/[
   chalkjson,
@@ -305,40 +306,72 @@ iterator scanArtifactLocationsWith*(state:  ArtifactIterationInfo,
   for path in state.filePaths:
     trace(path & ": beginning scan")
     let p = path.resolvePath()
-    for i in p.getAllFileNames(
-      recurse     = state.recurse,
-      fileLinks   = fileLinks,
-      ignore      = state.fileExclusions,
-      ignoreRegex = state.skips,
-    ):
-      if skipLinks and i.isSymlink():
-        warn(i.name & ": skipping symbolic link. Customize behavior with config " & symLinkBehaviorConfig)
-        continue
 
-      # with symlinks same file can be referenced multiple times
-      # and so we lookup any existing chalk and if present, ignore this i.name
+    # If the path is a specific file (not a directory), process it directly
+    # without applying ignore patterns, since the user explicitly specified it
+    if p.fileExists():
+      trace(p & ": processing explicitly specified file")
+
+      # Check if already scanned
       var alreadyScanned = false
       for chalk in getAllChalks() & getAllArtifacts():
-        if chalk.fsRef == i.name:
+        if chalk.fsRef == p:
           alreadyScanned = true
           break
       if alreadyScanned:
-        trace(i.name & ": was already previously scanned. ignoring")
+        trace(p & ": was already previously scanned. ignoring")
         continue
 
+      # Try each codec on this specific file
       for codec in codecs:
         var found = false
-        trace(i.name & ": scanning file with " & codec.name)
-        let opt = codec.scanLocation(i.name)
+        trace(p & ": scanning file with " & codec.name)
+        let opt = codec.scanLocation(p)
         if opt.isSome():
           let chalk = opt.get()
           yield chalk
           found = true
-        for chalk in codec.searchLocation(i.name):
+        for chalk in codec.searchLocation(p):
           yield chalk
           found = true
         if found:
           break
+    else:
+      # For directories or non-existent paths, use the normal scanning logic with ignore patterns
+      for i in p.getAllFileNames(
+        recurse     = state.recurse,
+        fileLinks   = fileLinks,
+        ignore      = state.fileExclusions,
+        ignoreRegex = state.skips,
+      ):
+        if skipLinks and i.isSymlink():
+          warn(i.name & ": skipping symbolic link. Customize behavior with config " & symLinkBehaviorConfig)
+          continue
+
+        # with symlinks same file can be referenced multiple times
+        # and so we lookup any existing chalk and if present, ignore this i.name
+        var alreadyScanned = false
+        for chalk in getAllChalks() & getAllArtifacts():
+          if chalk.fsRef == i.name:
+            alreadyScanned = true
+            break
+        if alreadyScanned:
+          trace(i.name & ": was already previously scanned. ignoring")
+          continue
+
+        for codec in codecs:
+          var found = false
+          trace(i.name & ": scanning file with " & codec.name)
+          let opt = codec.scanLocation(i.name)
+          if opt.isSome():
+            let chalk = opt.get()
+            yield chalk
+            found = true
+          for chalk in codec.searchLocation(i.name):
+            yield chalk
+            found = true
+          if found:
+            break
 
   if state.envVars:
     for k, v in envPairs():

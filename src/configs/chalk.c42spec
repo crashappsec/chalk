@@ -3529,7 +3529,8 @@ validate in the transparency log.
     shortdoc: "Ignore Patterns"
     doc:       """
 This is a list of regular expressions for files to ignore when scanning
-for artifacts to chalk.
+for artifacts to chalk. These rules are disregarded if a path to an artifact
+is passed to chalk directly (e.g., .some-dir/artifact.zip).
 """
   }
 
