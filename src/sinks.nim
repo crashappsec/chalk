@@ -234,7 +234,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     case k
     of "enabled":
       if not attrGet[bool](section & "." & k):
-        error("Sink configuration '" & name & " is disabled.")
+        error("Sink configuration '" & name & "' is disabled.")
         enabled = false
     of "priority":
       priority    = attrGetOpt[int](section & "." & k).getOrElse(0)
