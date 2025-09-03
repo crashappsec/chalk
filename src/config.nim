@@ -7,6 +7,9 @@
 
 ## Wrappers for more abstracted accessing of configuration information
 
+import std/[
+  os,
+]
 import "."/[
   config_version,
   types,
@@ -109,6 +112,11 @@ proc runCallback*(s: string, args: seq[Box]): Option[Box] =
 proc getChalkExeVersion*(): string =
   const version = getChalkVersion()
   version
+
+proc getChalkExeSize*(): int =
+  if chalkExeSize == 0:
+    chalkExeSize = getFileInfo(getMyAppPath()).size
+  return chalkExeSize
 
 proc getChalkCommitId*(): string     = commitID
 proc getChalkPlatform*(): string     = osStr & " " & archStr

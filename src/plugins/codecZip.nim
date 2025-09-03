@@ -30,6 +30,7 @@ const chalkBinary = "chalk"
 
 type
   ZipCache = ref object of RootRef
+    size:          int
     onDisk:        ZipArchive
     embeddedChalk: Box
     tmpDir:        string
@@ -104,7 +105,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
 
     let
       tmpDir   = getNewTempDir()
-      cache    = ZipCache()
+      cache    = ZipCache(size: getFileInfo(loc).size)
       origD    = tmpDir.joinPath("contents")
       hashD    = tmpDir.joinPath("hash")
       subscans = attrGet[bool]("chalk_contained_items")
@@ -237,25 +238,34 @@ proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
 proc zipHandleWrite*(self: Plugin, chalk: ChalkObj, encoded: Option[string])
                    {.cdecl.} =
   let injectBinary = attrGet[bool]("zip.inject_binary")
-  if injectBinary:
+
+  if injectBinary :
     let
-      filename = chalk.fsRef.splitFile().name & chalk.fsRef.splitFile().ext
-      allowedExtensions = attrGet[seq[string]]("zip.allowed_extensions")
-
-    var shouldInject = false
-    for ext in allowedExtensions:
-      if filename.toLowerAscii().endsWith("." & ext.toLowerAscii()):
-        shouldInject = true
-        break
-
-    if shouldInject:
-      try:
-        info(chalk.name & ": Inserting binary into zip archive")
-        insertChalkBinaryIntoZip(chalk)
-      except:
-        error(chalk.name & ": failed to insert chalk binary due to: " & getCurrentExceptionMsg())
+      cache        = ZipCache(chalk.cache)
+      threshold    = attrGet[int]("zip.inject_zip_size_threshold")
+      combinedSize = cache.size + getChalkExeSize()
+    if threshold > 0 and combinedSize > threshold:
+      warn(chalk.name & ": skipping inserting binary into zip as combined size " &
+           $combinedSize & " (bytes) >= " & $threshold & " (bytes)")
     else:
-      trace(chalk.name & ": skipping binary injection - no matching extension found")
+      let
+        filename = chalk.fsRef.splitFile().name & chalk.fsRef.splitFile().ext
+        allowedExtensions = attrGet[seq[string]]("zip.inject_binary_allowed_extensions")
+
+      var shouldInject = false
+      for ext in allowedExtensions:
+        if filename.toLowerAscii().endsWith("." & ext.toLowerAscii()):
+          shouldInject = true
+          break
+
+      if shouldInject:
+        try:
+          info(chalk.name & ": Inserting binary into zip archive")
+          insertChalkBinaryIntoZip(chalk)
+        except:
+          error(chalk.name & ": failed to insert chalk binary due to: " & getCurrentExceptionMsg())
+      else:
+        trace(chalk.name & ": skipping binary injection - no matching extension found")
 
   chalk.doZipWrite(encoded, virtual = false)
 

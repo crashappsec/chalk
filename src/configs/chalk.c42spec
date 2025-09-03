@@ -2033,7 +2033,22 @@ archive being processed upon insertion.
 """
   }
 
-  field allowed_extensions {
+  field inject_zip_size_threshold {
+    type:    Size
+    default: <<50mb>>
+    doc:     """
+Threshold of zip size + uncompressed chalk size at which chalk will refuse
+to inject itself into a zip file.
+
+Threshold of 0 will always inject chalk binary into zip.
+
+This uses uncompressed chalk size as chalk cant know to what size will
+chalk compress to to do most accurate calculation however it might
+not be a bad thing to leave some buffer room in there just in case.
+"""
+  }
+
+  field inject_binary_allowed_extensions {
     type:     list[string]
     default:  ["zip"]
     shortdoc: "File extensions allowed for zip binary injection"
