@@ -14,6 +14,7 @@ import "."/[
   config_version,
   types,
   utils/strings,
+  utils/tables,
 ]
 
 proc selfChalkGetKey*(keyName: string): Option[Box] =
@@ -69,6 +70,35 @@ proc getMarkTemplate*(): string =
   var tmplName = attrGetOpt[string](getOutputConfig() & ".mark_template").get("").elseWhenEmpty("mark_default")
   return "mark_template." & tmplName
 
+proc copyReportTemplateKeys(destinationSection: string) =
+  let destinationSectionKey = destinationSection & ".key"
+  for sourceSection in toCopyReportTemplateKeys.popOrDefault(destinationSection, @[]):
+    sourceSection.copyReportTemplateKeys()
+    let sourceSectionKey = sourceSection & ".key"
+    if not sectionExists(sourceSectionKey):
+      error(sourceSectionKey & " report template does not exist. Cannot copy from it")
+      continue
+
+    if not sectionExists(destinationSectionKey):
+      con4mSectionCreate(destinationSectionKey)
+
+    let sourceKeys = attrGetObject(sourceSectionKey).getContents()
+    for k in sourceKeys:
+      if sectionExists(destinationSectionKey & "." & k):
+        continue
+      con4mSectionCreate(destinationSectionKey & "." & k)
+      let
+        sourcePath = sourceSectionKey & "." & k & ".use"
+        sourceOpt   = attrGetOpt[bool](sourcePath)
+      if sourceOpt.isNone():
+        error(sourcePath & ": is unkown. copy_report_template_keys() is used before that key is defined. skipping")
+        continue
+      con4mAttrSet(
+        destinationSectionKey & "." & k & ".use",
+        pack(sourceOpt.get()),
+        Con4mType(kind: TypeBool),
+      )
+
 proc getReportTemplate*(spec = ""): string =
   let
     ns =
@@ -77,7 +107,8 @@ proc getReportTemplate*(spec = ""): string =
       else:
         spec
     tmplName = attrGetOpt[string](ns & ".report_template").get("").elseWhenEmpty("null")
-  return "report_template." & tmplName
+  result = "report_template." & tmplName
+  result.copyReportTemplateKeys()
 
 proc forceKeys(keynames: openArray[string], templateRef: string) =
   let section     = templateRef & ".key"

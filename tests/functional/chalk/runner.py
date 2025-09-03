@@ -197,14 +197,24 @@ class ChalkProgram(Program):
     def from_program(cls, program: Program):
         return cls(**program.asdict())
 
+    @classmethod
+    def _json_log(cls, s: str) -> str:
+        try:
+            result = json.loads(s)
+            if isinstance(result, dict) and "chalk_magic" in result:
+                return result["msg"]
+            return ""
+        except json.JSONDecodeError:
+            return s
+
     @property
     def errors(self):
         errors = itertools.takewhile(
             lambda i: "--debug" not in i,
             [
-                i
+                self._json_log(i)
                 for i in self.logs.splitlines() + self.text.splitlines()
-                if i.lower().startswith("error:")
+                if self._json_log(i).lower().startswith("error:")
             ],
         )
         return list(errors)
@@ -215,7 +225,10 @@ class ChalkProgram(Program):
             [
                 i
                 for i in self.text.splitlines()
-                if not any(i.startswith(j) for j in {"info:", "trace:", "error:"})
+                if not any(
+                    self._json_log(i).startswith(j)
+                    for j in {"info:", "trace:", "error:", "warn:"}
+                )
             ]
         )
         reports = []

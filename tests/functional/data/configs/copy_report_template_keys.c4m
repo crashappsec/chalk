@@ -1,0 +1,10 @@
+copy_report_template_keys("source", "insertion_default")
+copy_report_template_keys("insertion_default", "source") # check infinite recursion
+keyspec X_TEST {
+  kind:  ChalkTimeHost
+  type:  string
+  value: "TEST"
+}
+report_template source {
+  key.X_TEST.use = true
+}

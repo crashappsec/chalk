@@ -29,7 +29,11 @@ logger = get_logger()
 def test_insert_extract_repeated(copy_files: list[Path], chalk: Chalk):
     artifact = copy_files[0]
 
-    insert = chalk.insert(artifact=artifact, virtual=False)
+    insert = chalk.insert(
+        artifact=artifact,
+        virtual=False,
+        config=CONFIGS / "copy_report_template_keys.c4m",
+    )
     insert.marks_by_path.contains({str(artifact): {}})
 
     extract = chalk.extract(artifact=artifact)

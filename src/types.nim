@@ -543,24 +543,25 @@ const
   artX509Cert*            = "x509 Cert"
 
 var
-  hostInfo*               = ChalkDict()
-  objectsData*            = ObjectsDict()
-  failedKeys*             = ChalkDict()
-  subscribedKeys*         = Table[string, bool]()
-  systemErrors*           = seq[string](@[])
-  selfChalk*              = ChalkObj(nil)
-  canSelfInject*          = true
-  savedLogLevel*          = llError
-  doingTestRun*           = false
-  onlyCodecs*             = newSeq[Plugin]()
-  inInternalScan*         = false
-  passedHelpFlag*         = false
-  installedPlugins*       = Table[string, Plugin]()
-  externalActions*        = newSeq[seq[string]]()
-  commandName*            = ""
-  sshKeyscanExeLocation*  = ""
-  dockerInvocation*:      DockerInvocation # ca be nil
-  chalkExeSize*           = 0
+  hostInfo*                 = ChalkDict()
+  objectsData*              = ObjectsDict()
+  failedKeys*               = ChalkDict()
+  subscribedKeys*           = Table[string, bool]()
+  systemErrors*             = seq[string](@[])
+  selfChalk*                = ChalkObj(nil)
+  canSelfInject*            = true
+  savedLogLevel*            = llError
+  doingTestRun*             = false
+  onlyCodecs*               = newSeq[Plugin]()
+  inInternalScan*           = false
+  passedHelpFlag*           = false
+  installedPlugins*         = Table[string, Plugin]()
+  externalActions*          = newSeq[seq[string]]()
+  commandName*              = ""
+  sshKeyscanExeLocation*    = ""
+  dockerInvocation*:        DockerInvocation # ca be nil
+  chalkExeSize*             = 0
+  toCopyReportTemplateKeys* = TableRef[string, seq[string]]()
 
 template dumpExOnDebug*() =
   when not defined(release):
