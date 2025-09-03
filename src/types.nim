@@ -560,6 +560,7 @@ var
   commandName*            = ""
   sshKeyscanExeLocation*  = ""
   dockerInvocation*:      DockerInvocation # ca be nil
+  chalkExeSize*           = 0
 
 template dumpExOnDebug*() =
   when not defined(release):
