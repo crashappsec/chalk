@@ -12,6 +12,7 @@ class ServerlessPlugin implements Plugin {
   public hooks: Plugin.Hooks;
   public provider: any;
   private log: any;
+  private isChalkAvailable: boolean = false;
 
   private readonly symbols = {
     error: "✗",
@@ -87,18 +88,30 @@ class ServerlessPlugin implements Plugin {
   }
 
   private chalkBinaryAvailable(): boolean {
+    const customConfig = this.serverless.service.custom as
+      | CustomServerlessConfig
+      | undefined;
+    const chalkCheckEnabled = customConfig?.crashoverride?.chalkCheck ?? false;
+
     this.log.info(
       chalk.gray(`${this.symbols.info} Checking for chalk binary...`),
     );
+
     try {
-      execSync("which chalk", { stdio: "ignore" });
+      execSync("command -v chalk", { stdio: "ignore" });
       this.log.info(chalk.green(`${this.symbols.success} Chalk binary found`));
       return true;
     } catch {
-      this.log.warning(
-        chalk.yellow(`${this.symbols.warning} Chalk binary not found in PATH`),
-      );
-      return false;
+      if (chalkCheckEnabled) {
+        const errorMessage = `Chalk check failed: chalk binary not found in PATH`;
+        this.log.error(chalk.red(`${this.symbols.error} ${errorMessage}`));
+        throw new Error(errorMessage);
+      } else {
+        this.log.info(
+          chalk.gray(`${this.symbols.info} Chalk binary not found in PATH`),
+        );
+        return false;
+      }
     }
   }
 
@@ -112,7 +125,10 @@ class ServerlessPlugin implements Plugin {
     // Check memory configuration first (fail fast if needed)
     this.checkMemoryConfiguration();
 
-    if (this.chalkBinaryAvailable()) {
+    // Check chalk availability once and store the result
+    this.isChalkAvailable = this.chalkBinaryAvailable();
+
+    if (this.isChalkAvailable) {
       this.log.info(
         chalk.gray(
           `${this.symbols.info} Chalk binary found and will be used to add chalkmarks`,
@@ -147,8 +163,8 @@ class ServerlessPlugin implements Plugin {
   }
 
   private injectChalkBinary(): void {
-    if (!this.chalkBinaryAvailable()) {
-      this.log.warning(
+    if (!this.isChalkAvailable) {
+      this.log.info(
         chalk.yellow(
           `${this.symbols.warning} Chalk binary not available, skipping chalkmark injection`,
         ),
