@@ -343,4 +343,273 @@ describe('ServerlessPlugin', () => {
     const validFunc = (pluginMixedFunctions.serverless.service.functions as any)['validFunction'];
     expect(validFunc.layers).toEqual([]); // Should still be empty array, not modified
   });
+
+  describe('Memory Check Feature', () => {
+    let memoryCheckPlugin: ServerlessPlugin;
+
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should throw error when memoryCheck is true and memory < 512MB', () => {
+      memoryCheckPlugin = new ServerlessPlugin({
+        ...mockServerless,
+        service: {
+          ...mockServerless.service,
+          provider: {
+            ...mockServerless.service.provider,
+            memorySize: 256
+          },
+          custom: {
+            crashoverride: {
+              memoryCheck: true
+            }
+          }
+        }
+      } as any, {}, { log: mockLog });
+
+      const hook = memoryCheckPlugin.hooks['before:package:initialize'];
+
+      if (hook) {
+        expect(() => hook()).toThrow('Memory check failed: memorySize (256MB) is less than minimum required (512MB)');
+        expect(mockLog.error).toHaveBeenCalledWith('✗ Memory check failed: memorySize (256MB) is less than minimum required (512MB)');
+      }
+    });
+
+    it('should succeed when memoryCheck is true and memory >= 512MB', async () => {
+      memoryCheckPlugin = new ServerlessPlugin({
+        ...mockServerless,
+        service: {
+          ...mockServerless.service,
+          provider: {
+            ...mockServerless.service.provider,
+            memorySize: 1024
+          },
+          custom: {
+            crashoverride: {
+              memoryCheck: true
+            }
+          }
+        }
+      } as any, {}, { log: mockLog });
+
+      const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+      mockExecSync.mockImplementation(() => Buffer.from(''));
+
+      const hook = memoryCheckPlugin.hooks['before:package:initialize'];
+      if (hook) {
+        await hook();
+      }
+
+      expect(mockLog.info).toHaveBeenCalledWith('✓ Memory check passed: 1024MB >= 512MB');
+      expect(mockLog.error).not.toHaveBeenCalled();
+    });
+
+    it('should succeed when memoryCheck is true and memory = 512MB (edge case)', async () => {
+      memoryCheckPlugin = new ServerlessPlugin({
+        ...mockServerless,
+        service: {
+          ...mockServerless.service,
+          provider: {
+            ...mockServerless.service.provider,
+            memorySize: 512
+          },
+          custom: {
+            crashoverride: {
+              memoryCheck: true
+            }
+          }
+        }
+      } as any, {}, { log: mockLog });
+
+      const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+      mockExecSync.mockImplementation(() => Buffer.from(''));
+
+      const hook = memoryCheckPlugin.hooks['before:package:initialize'];
+      if (hook) {
+        await hook();
+      }
+
+      expect(mockLog.info).toHaveBeenCalledWith('✓ Memory check passed: 512MB >= 512MB');
+      expect(mockLog.error).not.toHaveBeenCalled();
+    });
+
+    it('should log warning when memoryCheck is false and memory < 512MB', async () => {
+      memoryCheckPlugin = new ServerlessPlugin({
+        ...mockServerless,
+        service: {
+          ...mockServerless.service,
+          provider: {
+            ...mockServerless.service.provider,
+            memorySize: 128
+          },
+          custom: {
+            crashoverride: {
+              memoryCheck: false
+            }
+          }
+        }
+      } as any, {}, { log: mockLog });
+
+      const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+      mockExecSync.mockImplementation(() => Buffer.from(''));
+
+      const hook = memoryCheckPlugin.hooks['before:package:initialize'];
+      if (hook) {
+        await hook();
+      }
+
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        '⚠ Memory size (128MB) is below recommended minimum (512MB). Set custom.crashoverride.memoryCheck: true to enforce this requirement'
+      );
+      expect(mockLog.error).not.toHaveBeenCalled();
+    });
+
+    it('should log warning when memoryCheck is undefined (default) and memory < 512MB', async () => {
+      memoryCheckPlugin = new ServerlessPlugin({
+        ...mockServerless,
+        service: {
+          ...mockServerless.service,
+          provider: {
+            ...mockServerless.service.provider,
+            memorySize: 256
+          },
+          custom: {} // No crashoverride config
+        }
+      } as any, {}, { log: mockLog });
+
+      const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+      mockExecSync.mockImplementation(() => Buffer.from(''));
+
+      const hook = memoryCheckPlugin.hooks['before:package:initialize'];
+      if (hook) {
+        await hook();
+      }
+
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        '⚠ Memory size (256MB) is below recommended minimum (512MB). Set custom.crashoverride.memoryCheck: true to enforce this requirement'
+      );
+      expect(mockLog.error).not.toHaveBeenCalled();
+    });
+
+    it('should handle missing memorySize when memoryCheck is true', async () => {
+      memoryCheckPlugin = new ServerlessPlugin({
+        ...mockServerless,
+        service: {
+          ...mockServerless.service,
+          provider: {
+            // No memorySize defined
+            stage: 'dev'
+          },
+          custom: {
+            crashoverride: {
+              memoryCheck: true
+            }
+          }
+        }
+      } as any, {}, { log: mockLog });
+
+      const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+      mockExecSync.mockImplementation(() => Buffer.from(''));
+
+      const hook = memoryCheckPlugin.hooks['before:package:initialize'];
+      if (hook) {
+        await hook();
+      }
+
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        '⚠ Memory check enabled but no memorySize configured in provider'
+      );
+      expect(mockLog.error).not.toHaveBeenCalled();
+    });
+
+    it('should not log anything when memoryCheck is false and memorySize >= 512MB', async () => {
+      memoryCheckPlugin = new ServerlessPlugin({
+        ...mockServerless,
+        service: {
+          ...mockServerless.service,
+          provider: {
+            ...mockServerless.service.provider,
+            memorySize: 1024
+          },
+          custom: {
+            crashoverride: {
+              memoryCheck: false
+            }
+          }
+        }
+      } as any, {}, { log: mockLog });
+
+      const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+      mockExecSync.mockImplementation(() => Buffer.from(''));
+
+      const hook = memoryCheckPlugin.hooks['before:package:initialize'];
+      if (hook) {
+        await hook();
+      }
+
+      // Should only see the standard initialization logs, no memory check logs
+      expect(mockLog.notice).toHaveBeenCalledWith('🔧 Dust Plugin: Initializing package process');
+      // Should not log any memory-related messages
+      expect(mockLog.info).not.toHaveBeenCalledWith(expect.stringContaining('Memory check'));
+      expect(mockLog.warning).not.toHaveBeenCalledWith(expect.stringContaining('Memory'));
+      expect(mockLog.error).not.toHaveBeenCalledWith(expect.stringContaining('Memory'));
+    });
+
+    it('should integrate with full plugin lifecycle', async () => {
+      // Test that memory check doesn't interfere with other plugin functionality
+      const integrationPlugin = new ServerlessPlugin({
+        ...mockServerless,
+        service: {
+          ...mockServerless.service,
+          provider: {
+            ...mockServerless.service.provider,
+            memorySize: 512
+          },
+          functions: {
+            'testFunction': {}
+          },
+          custom: {
+            crashoverride: {
+              memoryCheck: true
+            }
+          }
+        }
+      } as any, {}, { log: mockLog });
+
+      const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+      const mockFs = fs as jest.Mocked<typeof fs>;
+
+      mockExecSync.mockImplementation((cmd: string) => {
+        if (cmd === 'which chalk') {
+          return Buffer.from('');
+        }
+        if (cmd.includes('chalk insert')) {
+          return Buffer.from('Success');
+        }
+        return Buffer.from('');
+      });
+
+      mockFs.existsSync.mockReturnValue(true);
+
+      // Run before hook
+      const beforeHook = integrationPlugin.hooks['before:package:initialize'];
+      if (beforeHook) {
+        await beforeHook();
+      }
+
+      expect(mockLog.info).toHaveBeenCalledWith('✓ Memory check passed: 512MB >= 512MB');
+
+      // Run after hook
+      const afterHook = integrationPlugin.hooks['after:aws:package:finalize:mergeCustomProviderResources'];
+      if (afterHook) {
+        await afterHook();
+      }
+
+      // Verify both features work together
+      expect(mockLog.notice).toHaveBeenCalledWith('📦 Dust Plugin: Processing packaged functions');
+      expect(mockLog.notice).toHaveBeenCalledWith('✓ Successfully added Dust Lambda Extension to 1 function(s)');
+      expect(mockLog.notice).toHaveBeenCalledWith('✓ Successfully injected chalkmarks into package');
+    });
+  });
 });
