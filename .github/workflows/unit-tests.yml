@@ -38,6 +38,13 @@ jobs:
     name: "${{ matrix.os }}-${{ matrix.arch }}"
     runs-on: ${{ matrix.runs-on }}
 
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-unit-${{ github.ref }}
+      cancel-in-progress: true
+
     steps:
       - name: Checkout
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
