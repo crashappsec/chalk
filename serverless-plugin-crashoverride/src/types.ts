@@ -6,6 +6,7 @@ export interface PluginConfig {
 
 export interface CrashOverrideConfig {
   memoryCheck?: boolean;
+  chalkCheck?: boolean;
 }
 
 export interface CustomServerlessConfig {
