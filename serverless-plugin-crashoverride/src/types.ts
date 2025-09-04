@@ -4,6 +4,11 @@ export interface PluginConfig {
   options?: Record<string, unknown>;
 }
 
+export interface CrashOverrideConfig {
+  memoryCheck?: boolean;
+}
+
 export interface CustomServerlessConfig {
+  crashoverride?: CrashOverrideConfig;
   [key: string]: PluginConfig | unknown;
 }
