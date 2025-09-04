@@ -1,24 +1,14 @@
-name: unit-tests
+name: dust-tests
 
 on:
   push:
     branches:
       - main
     paths:
-      - src/**
-      - tests/unit/**
-      - config.nims
-      - "*.nimble"
-      # ignore docs not to waste CI minutes
-      - "!src/docs/**"
+      - dust-lambda-extension/unit/**
   pull_request:
     paths:
-      - src/**
-      - tests/unit/**
-      - config.nims
-      - "*.nimble"
-      # ignore docs not to waste CI minutes
-      - "!src/docs/**"
+      - dust-lambda-extension/unit/**
   workflow_dispatch:
 
 permissions:
@@ -26,7 +16,7 @@ permissions:
   packages: write
 
 jobs:
-  unit-tests:
+  dust-tests:
     strategy:
       fail-fast: false
       matrix:
@@ -42,7 +32,7 @@ jobs:
       # only allow one job per PR running
       # older pending jobs will be cancelled not to waste CI minutes
       # cannot use github.job here https://github.com/community/community/discussions/13496
-      group: ${{ github.workflow }}-unit-${{ github.ref }}
+      group: ${{ github.workflow }}-dust-${{ github.ref }}
       cancel-in-progress: true
 
     steps:
@@ -69,8 +59,13 @@ jobs:
 
       - name: Bake images
         run: |
-          docker buildx bake chalk --load
+          docker buildx bake tests server --load
+
+      - name: Start server
+        run: |
+          docker compose up -d server
 
       - name: Run unit tests
+        working-directory: dust-lambda-extension
         run: |
-          make unit-tests
+          make test
