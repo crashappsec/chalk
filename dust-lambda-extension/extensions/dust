@@ -11,21 +11,55 @@ set -eu
 # Enable debug mode only if DEBUG environment variable is set
 [ "${DEBUG:-}" = "true" ] && set -x
 
-# Logger helpers with consistent formatting and timestamps
-log_with_level() {
-    level="$1"
-    color="$2"
-    message="$3"
-    printf "\033[%sm[$(date '+%Y-%m-%dT%H:%M:%S%z')] [%s] %s\033[0m\n" "$color" "$level" "$message" >&2
+color() {
+    (
+        set +x
+        name=$1
+        shift
+        color=
+        end=
+        if [ -t 0 ] && [ -z "${NO_COLOR:-}" ]; then
+            case $name in
+                yellow)
+                    color="\033[0;33m"
+                    ;;
+                blue)
+                    color="\033[0;34m"
+                    ;;
+                red)
+                    color="\033[0;31m"
+                    ;;
+                green)
+                    color="\033[0;32m"
+                    ;;
+            esac
+            end="\033[0m"
+        fi
+        args="$*"
+        printf "$color%s$end" "$args"
+    )
 }
 
-LOG_DEBUG() { if [ "${DEBUG:-}" = "true" ]; then log_with_level "DEBUG" "0;34" "$1"; else true; fi; }
-LOG_INFO() { log_with_level "INFO" "0;32" "$1"; }
-LOG_ERROR() { log_with_level "ERROR" "0;31" "$1"; }
-LOG_WARNING() { log_with_level "WARN" "0;33" "$1"; }
+debug() {
+    if [ "${DEBUG:-}" = "true" ]; then
+        echo "$(color blue "[$(date '+%Y-%m-%dT%H:%M:%S%z')] [DEBUG]")" "$@" > /dev/stderr
+    fi
+}
+
+warn() {
+    echo "$(color yellow "[$(date '+%Y-%m-%dT%H:%M:%S%z')] [WARN]")" "$@" > /dev/stderr
+}
+
+error() {
+    echo "$(color red "[$(date '+%Y-%m-%dT%H:%M:%S%z')] [ERROR]")" "$@" > /dev/stderr
+}
+
+info() {
+    echo "$(color green "[$(date '+%Y-%m-%dT%H:%M:%S%z')] [INFO]")" "$@" > /dev/stderr
+}
 
 fatal() {
-    LOG_ERROR "$@"
+    error "$@"
     exit 1
 }
 
@@ -35,7 +69,7 @@ readonly MAX_FAILURES="${MAX_FAILURES:-5}"
 
 # Constants
 readonly TMP="${TMPDIR:-${TMP:-/tmp}}"
-readonly TASK_PATH="/var/task"
+readonly TASK_PATH="${TASK_PATH:-/var/task}"
 readonly CHALK_BIN_PATH="$TASK_PATH/chalk"
 readonly CHALK_MARK_PATH="$TASK_PATH/chalk.json"
 readonly TMP_CHALK_PATH="$TMP/chalk"
@@ -62,7 +96,9 @@ mktemp() {
 }
 
 cleanup() {
-    LOG_INFO "Cleaning-up"
+    if [ -z "${1:-}" ]; then
+        info "Cleaning-up"
+    fi
     rm -f "$TMP_CHALK_PATH"
     if [ -f "$tmp_files" ]; then
         while IFS= read -r f; do
@@ -83,8 +119,8 @@ make_api_request() {
     temp_headers_file=$(mktemp "$method.headers.XXXXXX")
 
     if ! curl --silent --show-error --fail -o "$temp_body_file" --dump-header "$temp_headers_file" -X "$method" "$url" "$@"; then
-        LOG_ERROR "Failed to make $method request to $url"
-        LOG_DEBUG "Response: $(cat "$temp_body_file")"
+        error "Failed to make $method request to $url"
+        debug "Response: $(cat "$temp_body_file")"
         return 1
     fi
 
@@ -110,19 +146,23 @@ extract_response_body() {
 
 # Handle signals cleanly with proper cleanup
 handle_signal() {
-    LOG_INFO "Received termination signal. Preparing to shut down."
+    info "Received termination signal. Preparing to shut down."
     EXIT_REQUESTED=true
     do_shutdown
 }
 
 do_shutdown() {
-    LOG_INFO "Starting clean shutdown process."
+    info "Starting clean shutdown process."
     cleanup
     if [ -n "$EXTENSION_ID" ] && [ "$EXIT_REQUESTED" = "true" ]; then
-        LOG_DEBUG "Signaling extension shutdown to Lambda."
+        debug "Signaling extension shutdown to Lambda."
         # Signal the Lambda platform that we are exiting
-        if ! make_api_request "POST" "$EXIT_API" "--header" "Lambda-Extension-Identifier: $EXTENSION_ID" > /dev/null 2>&1; then
-            LOG_WARNING "Failed to notify Lambda platform of extension shutdown"
+        if ! make_api_request \
+            POST \
+            "$EXIT_API" \
+            --header "Lambda-Extension-Identifier: $EXTENSION_ID" \
+            > /dev/null 2>&1; then
+            warn "Failed to notify Lambda platform of extension shutdown"
         fi
     fi
 
@@ -133,21 +173,21 @@ do_shutdown() {
 setup_chalk_binary() {
     # Check if chalk binary exists and is executable
     if ! [ -x "$CHALK_BIN_PATH" ]; then
-        LOG_ERROR "chalk binary not found or not executable at $CHALK_BIN_PATH"
+        error "chalk binary not found or not executable at $CHALK_BIN_PATH"
         return 1
     fi
 
     # Copy chalk binary to /tmp if it doesn't exist or is outdated
     if ! [ -x "$TMP_CHALK_PATH" ] \
         || [ -n "$(find "$CHALK_BIN_PATH" -newer "$TMP_CHALK_PATH" 2> /dev/null)" ]; then
-        LOG_INFO "Copying chalk binary to /tmp"
+        info "Copying chalk binary to /tmp"
         if ! cp "$CHALK_BIN_PATH" "$TMP_CHALK_PATH"; then
-            LOG_ERROR "Failed to copy chalk binary to /tmp"
+            error "Failed to copy chalk binary to /tmp"
             return 1
         fi
 
         if ! chmod +x "$TMP_CHALK_PATH"; then
-            LOG_ERROR "Failed to make chalk binary executable in /tmp"
+            error "Failed to make chalk binary executable in /tmp"
             return 1
         fi
     fi
@@ -157,15 +197,15 @@ setup_chalk_binary() {
 
 # Process chalk marks
 process_chalk_marks() {
-    LOG_INFO "$TMP_CHALK_PATH extracting $CHALK_MARK_PATH"
+    info "$TMP_CHALK_PATH extracting $CHALK_MARK_PATH"
     if [ -f "$CHALK_MARK_PATH" ]; then
-        LOG_DEBUG "Found $CHALK_MARK_PATH, running chalk extract."
-        if ! "$TMP_CHALK_PATH" extract "$TASK_PATH"; then
-            LOG_WARNING "chalk extract command failed"
+        debug "Found $CHALK_MARK_PATH, running chalk extract."
+        if ! "$TMP_CHALK_PATH" env; then
+            warn "chalk extract command failed"
             return 1
         fi
     else
-        LOG_WARNING "No chalk.json found at $CHALK_MARK_PATH"
+        warn "No chalk.json found at $CHALK_MARK_PATH"
         return 1
     fi
 
@@ -193,89 +233,92 @@ register_extension() {
     # Only register for SHUTDOWN events (INVOKE events are not needed)
     registration_payload='{"events":["SHUTDOWN"]}'
 
-    output=$(mktemp)
+    output=$(mktemp register.XXXXXX)
     # Use make_api_request for consistent error handling
-    if ! make_api_request "POST" "$REGISTER_API" \
-        "--data" "$registration_payload" \
-        "--header" "Lambda-Extension-Name: $EXTENSION_NAME" \
-        "--header" "Content-Type: application/json" > "$output"; then
+    if ! make_api_request \
+        POST \
+        "$REGISTER_API" \
+        --data "$registration_payload" \
+        --header "Lambda-Extension-Name: $EXTENSION_NAME" \
+        --header "Content-Type: application/json" \
+        > "$output"; then
         fatal "Extension registration failed."
     fi
 
     # Extract Extension ID from response headers
-    headers=$(extract_response_headers < "$output")
-
-    EXTENSION_ID=$(echo "$headers" | awk '/^[Ll]ambda-[Ee]xtension-[Ii]dentifier:/ {
-        gsub(/\r$/, "");
-        gsub(/^[^:]*:[[:space:]]*/, "");
-        print $0;
-        exit
-    }')
+    EXTENSION_ID=$(
+        extract_response_headers \
+            < "$output" \
+            | awk '/^[Ll]ambda-[Ee]xtension-[Ii]dentifier:/ {
+                gsub(/\r$/, "");
+                gsub(/^[^:]*:[[:space:]]*/, "");
+                print $0;
+                exit
+            }'
+    )
 
     if [ -z "$EXTENSION_ID" ]; then
-        LOG_ERROR "Failed to register extension or parse Extension ID."
+        error "Failed to register extension or parse Extension ID."
     fi
 
-    LOG_INFO "Extension registered with ID: $EXTENSION_ID"
+    info "Extension registered with ID: $EXTENSION_ID"
 }
 
-# Main execution starts here
 main() {
-    LOG_INFO "Starting Lambda extension: $EXTENSION_NAME"
+    info "Starting Lambda extension: $EXTENSION_NAME"
 
-    # Set up signal handlers
     trap handle_signal INT TERM
 
     register_extension
 
-    # Setup chalk binary
-    if ! setup_chalk_binary; then
-        LOG_ERROR "Failed to setup chalk binary"
-    fi
+    setup_chalk_binary || error "Failed to setup chalk binary"
+    process_chalk_marks || warn "Chalk mark processing failed, continuing anyway"
 
-    # Process chalk marks
-    process_chalk_marks || LOG_WARNING "Chalk mark processing failed, continuing anyway"
-
-    # Poll for events from the Lambda Runtime API
-    LOG_INFO "Starting event polling loop."
+    info "Starting event polling loop."
 
     consecutive_failures=0
 
     while [ "$EXIT_REQUESTED" = "false" ]; do
-        LOG_DEBUG "Polling for next event..."
+        debug "Polling for next event..."
 
-        if event_response=$(make_api_request "GET" "$NEXT_API" "--header" "Lambda-Extension-Identifier: $EXTENSION_ID" | extract_response_body); then
+        next=$(mktemp next.XXXXXX)
+        if make_api_request \
+            GET \
+            "$NEXT_API" \
+            --header "Lambda-Extension-Identifier: $EXTENSION_ID" \
+            > "$next"; then
             consecutive_failures=0
+            event_response=$(extract_response_body < "$next")
 
             # Extract event type from JSON response
             event_type=$(extract_json_field "$event_response" "eventType")
 
-            LOG_DEBUG "Received event: $event_type"
+            debug "Received event: $event_type"
 
             case "$event_type" in
                 "SHUTDOWN")
-                    LOG_INFO "Received SHUTDOWN event. Initiating clean shutdown."
+                    info "Received SHUTDOWN event. Initiating clean shutdown."
                     EXIT_REQUESTED=true
                     do_shutdown
                     ;;
                 "INVOKE")
-                    LOG_DEBUG "Received INVOKE event. Continuing to poll."
+                    debug "Received INVOKE event. Continuing to poll."
                     ;;
                 "")
-                    LOG_WARNING "Received event with no eventType field"
-                    LOG_DEBUG "Full event response: $event_response"
+                    warn "Received event with no eventType field"
+                    debug "Full event response: $event_response"
                     ;;
                 *)
-                    LOG_DEBUG "Received unknown event type: $event_type. Continuing to poll."
+                    debug "Received unknown event type: $event_type. Continuing to poll."
                     ;;
             esac
         else
             # Increment failure counter
             consecutive_failures=$((consecutive_failures + 1))
-            LOG_ERROR "Failed to get next event from Runtime API (failure $consecutive_failures/${MAX_FAILURES})"
+            error "Failed to get next event from Runtime API (failure $consecutive_failures/${MAX_FAILURES})"
 
             if [ "$consecutive_failures" -ge "$MAX_FAILURES" ]; then
-                LOG_ERROR "Too many consecutive failures. Shutting down."
+                error "Too many consecutive failures. Shutting down."
                 EXIT_REQUESTED=true
                 do_shutdown
             fi
@@ -283,8 +326,12 @@ main() {
             # Brief backoff before retrying
             sleep 1
         fi
+
+        # clean up tmp files as each iteration stores temporary files
+        # which if not cleaned up will indefinitely accumulate
+        # as this is potentially an infinite loop
+        cleanup silent
     done
 }
 
-# Run main function
 main "$@"

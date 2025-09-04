@@ -21,6 +21,15 @@ function_next_line = false # like -fn
 keep_padding       = false # like -kp
 never_split        = false # like -ns
 
+[*.{nim,c4m,c42spec,hcl,md}]
+indent_style = space
+indent_size = 2
+
 [*.sh,dust]
 indent_style = space
 indent_size = 4
+
+[Makefile]
+end_of_line = lf
+insert_final_newline = true
+indent_style = tab

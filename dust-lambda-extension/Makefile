@@ -13,6 +13,10 @@ IS_DIRTY := $(shell git diff-index --quiet HEAD -- 2>/dev/null || echo "dirty")
 SOURCES := $(wildcard extensions/*)
 BUILD_PREFIX ?= "."
 BUILD_DIR ?= $(BUILD_PREFIX)/_build
+AWS_LAMBDA_RUNTIME_API?=localhost:8585
+TASK_PATH?=..
+export AWS_LAMBDA_RUNTIME_API
+export TASK_PATH
 
 # Determine archive name based on git status
 ifeq ($(TAG),)
@@ -36,6 +40,9 @@ $(ARCHIVE_NAME): $(SOURCES)
 
 deploy-layer: ## TODO
 	@echo "Deploying..."
+
+test: ## test dust script against fake lambda runtime
+	./extensions/dust
 
 #> UTILITIES
 
