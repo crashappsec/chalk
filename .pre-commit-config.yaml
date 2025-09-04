@@ -29,8 +29,46 @@ repos:
     hooks:
       - id: pre-commit-sync
 
-  # - repo: local
-  #   hooks:
+  - repo: local
+    hooks:
+      ## serverless-plugin-crashoverride start
+      # lint
+      - id: serverless-plugin-eslint
+        name: ESLint (serverless-plugin-crashoverride)
+        entry: bash -c "cd serverless-plugin-crashoverride && npm run lint"
+        language: system
+        files: ^serverless-plugin-crashoverride/src/.*\.ts$
+        pass_filenames: false
+        stages: [commit]
+
+      # format
+      - id: serverless-plugin-prettier
+        name: Prettier Format (serverless-plugin-crashoverride)
+        entry: bash -c "cd serverless-plugin-crashoverride && npm run format"
+        language: system
+        files: ^serverless-plugin-crashoverride/src/.*\.ts$
+        pass_filenames: false
+        stages: [commit]
+
+      # compile
+      - id: serverless-plugin-typescript-build
+        name: TypeScript Build Check (serverless-plugin-crashoverride)
+        entry: bash -c "cd serverless-plugin-crashoverride && npm run build"
+        language: system
+        files: ^serverless-plugin-crashoverride/src/.*\.ts$
+        pass_filenames: false
+        stages: [commit]
+
+      # test
+      - id: serverless-plugin-jest-tests
+        name: Jest Tests (serverless-plugin-crashoverride)
+        entry: bash -c "cd serverless-plugin-crashoverride && npm test"
+        language: system
+        files: ^serverless-plugin-crashoverride/(src|tests)/.*\.(ts|test\.ts)$
+        pass_filenames: false
+        stages: [commit]
+      ## serverless-plugin-crashoverride final
+
   # - id: licenseheaders
   #   name: licenseheaders
   #   language: python
