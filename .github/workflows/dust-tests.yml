@@ -57,6 +57,10 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
 
+      - name: Bake images
+        run: |
+          docker buildx bake tests server --load
+
       - name: Start server
         run: |
           docker compose up -d server
