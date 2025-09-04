@@ -184,36 +184,17 @@ proc canonicalizeTool(args: seq[Box], usued = ConfigState(nil)): Option[Box] =
   return canonicalized
 
 proc copyReportTemplateKeys(args: seq[Box], c = ConfigState(nil)): Option[Box] =
-  let
-    copyFrom        = unpack[string](args[0])
-    copyFromSection = "report_template." & copyFrom & ".key"
-    copyTo          = unpack[string](args[1])
-    copyToSection   = "report_template." & copyTo & ".key"
-
-  if not sectionExists(c, copyFromSection):
-    error(copyFrom & " report template does not exist. Cannot copy from it")
+  if c != getChalkRuntime():
+    # ignore state if not primary state which will be used for reporting
     return none(Box)
 
-  if not sectionExists(c, copyToSection):
-    con4mSectionCreate(c, copyToSection)
+  let
+    copyFrom        = unpack[string](args[0])
+    copyFromSection = "report_template." & copyFrom
+    copyTo          = unpack[string](args[1])
+    copyToSection   = "report_template." & copyTo
 
-  let copyFromKeys = attrGetObject(c, copyFromSection).getContents()
-  for k in copyFromKeys:
-    if not sectionExists(c, copyToSection & "." & k):
-      con4mSectionCreate(c, copyToSection & "." & k)
-    let
-      toUsePath = copyFromSection & "." & k & ".use"
-      toUseOpt   = attrGetOpt[bool](toUsePath)
-    if toUseOpt.isNone():
-      error(toUsePath & ": is unkown. copy_report_template_keys() is used before that key is defined. skipping")
-      continue
-    con4mAttrSet(
-      c,
-      copyToSection & "." & k & ".use",
-      pack(toUseOpt.get()),
-      Con4mType(kind: TypeBool),
-    )
-
+  toCopyReportTemplateKeys.mgetOrPut(copyToSection, newSeq[string]()).add(copyFromSection)
   return none(Box)
 
 let chalkCon4mBuiltins* = [

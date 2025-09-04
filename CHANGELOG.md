@@ -233,6 +233,12 @@
 
   ([#570](https://github.com/crashappsec/chalk/issues/570))
 
+- `copy_report_template_keys()` now lazily copies keys when the report
+  template is used, not when the function is called.
+  This avoids errors when new keys are added to the source template
+  after the copy function is called.
+  ([#576](https://github.com/crashappsec/chalk/pull/576))
+
 ## 0.5.9
 
 **August 14, 2025**
