@@ -204,7 +204,9 @@ docker {
     command wait {
       args: (0, high())
     }
-
+    command compose {
+      args: (0, high())
+    }
     command buildx {
       args: (0, high())
       arg_sub_mutex: false
