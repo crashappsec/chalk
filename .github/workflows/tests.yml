@@ -9,6 +9,8 @@ on:
       - tests/functional/**
       - config.nims
       - "*.nimble"
+        # ignore server changes
+      - "!tests/functional/server/**"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
   pull_request:
@@ -21,6 +23,8 @@ on:
       - tests/functional/**
       - config.nims
       - "*.nimble"
+        # ignore server changes
+      - "!tests/functional/server/**"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
   workflow_dispatch:

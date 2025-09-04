@@ -21,7 +21,7 @@ function_next_line = false # like -fn
 keep_padding       = false # like -kp
 never_split        = false # like -ns
 
-[*.{nim,c4m,c42spec,hcl,md}]
+[*.{nim,c4m,c42spec,hcl,md,yml,yaml}]
 indent_style = space
 indent_size = 2
 
