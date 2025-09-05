@@ -239,6 +239,13 @@
   after the copy function is called.
   ([#576](https://github.com/crashappsec/chalk/pull/576))
 
+- `docker compose` commands immediately pass through to `docker`.
+  Previously `chalk` would attempt to wrap `docker compose build` due
+  to incorrect command line parsing which would then not work as expected
+  as `docker compose` is not supported. This would then send invalid
+  `build` reports to the sinks.
+  ([#578](https://github.com/crashappsec/chalk/pull/578))
+
 ## 0.5.9
 
 **August 14, 2025**
