@@ -62,10 +62,6 @@ jobs:
         run: |
           docker buildx bake tests server --load
 
-      - name: Start server
-        run: |
-          docker compose up -d --wait server
-
       - name: Run tests without chalk
         working-directory: dust-lambda-extension
         run: |
