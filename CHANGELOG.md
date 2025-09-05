@@ -251,6 +251,11 @@
   as `docker compose` is not supported. This would then send invalid
   `build` reports to the sinks.
   ([#578](https://github.com/crashappsec/chalk/pull/578))
+- `ignore_patterns` is ignored for explicitly passed paths.
+  For example `chalk insert .foo/bar` will insert `bar` even though
+  its in a hidden folder which would normally be ignored by the
+  ignore patterns.
+  ([#580](https://github.com/crashappsec/chalk/pull/580))
 
 ## 0.5.9
 
