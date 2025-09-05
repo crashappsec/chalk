@@ -197,18 +197,17 @@ setup_chalk_binary() {
 
 # Process chalk marks
 process_chalk_marks() {
-    info "$TMP_CHALK_PATH extracting $CHALK_MARK_PATH"
+    info "$TMP_CHALK_PATH checking $CHALK_MARK_PATH"
     if [ -f "$CHALK_MARK_PATH" ]; then
-        debug "Found $CHALK_MARK_PATH, running chalk extract."
-        if ! "$TMP_CHALK_PATH" env; then
-            warn "chalk extract command failed"
-            return 1
-        fi
+        debug "Found $CHALK_MARK_PATH"
     else
         warn "No chalk.json found at $CHALK_MARK_PATH"
+    fi
+    debug "Running chalk env"
+    if ! "$TMP_CHALK_PATH" env; then
+        warn "chalk env command failed"
         return 1
     fi
-
     return 0
 }
 

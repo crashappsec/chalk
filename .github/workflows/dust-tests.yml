@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - dust-lambda-extension/unit/**
+      - .github/workflows/dust-tests.yml
   workflow_dispatch:
 
 permissions:
@@ -63,9 +64,35 @@ jobs:
 
       - name: Start server
         run: |
-          docker compose up -d server
+          docker compose up -d --wait server
 
-      - name: Run unit tests
+      - name: Run tests without chalk
         working-directory: dust-lambda-extension
         run: |
           make test
+
+      - name: Download chalk
+        run: |
+          version=$(curl -fsSL "https://dl.crashoverride.run/chalk/current-version.txt")
+          curl -fsSL "https://dl.crashoverride.run/chalk/chalk-$version-$(uname -s)-$(uname -m)" > chalk
+          chmod +x chalk
+
+      - name: Run tests with chalk
+        working-directory: dust-lambda-extension
+        run: |
+          make test
+
+      - name: Extract chalk mark
+        run: |
+          unset CI
+          ./chalk --log-level=none extract chalk | tee /dev/stderr | jq '.[0]._CHALKS[0]' | tee chalk.json
+
+      - name: Run tests with chalk mark
+        working-directory: dust-lambda-extension
+        run: |
+          make test
+
+      - name: Show service logs
+        if: failure()
+        run: |
+          docker compose logs | grep -v health
