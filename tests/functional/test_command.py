@@ -9,6 +9,7 @@ dump + load tested in test_config.py
 docker commands are not tested here but as part of the docker codec tests in test_docker.py
 exec commands are tested in test_exec.py as they are more involved
 """
+import json
 import re
 from pathlib import Path
 
@@ -133,16 +134,33 @@ def test_version(chalk: Chalk):
     assert printed_version == internal_version
 
 
-def test_env(chalk: Chalk):
-    result = chalk.run(command="env")
-    report = result.report
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_env(
+    chalk: Chalk,
+    copy_files: list[Path],
+    tmp_data_dir: Path,
+):
+    insert = chalk.insert(copy_files[0])
+    (tmp_data_dir / "chalk.json").write_text(json.dumps(insert.mark))
+
+    env = chalk.run(
+        command="env",
+        env={
+            "TASK_PATH": str(tmp_data_dir),
+            "AWS_LAMBDA_RUNTIME_API": "localhost:8585",
+            "AWS_LAMBDA_FUNCTION_NAME": "test",
+        },
+    )
 
     # fields to check: platform, hostinfo, nodename
-    assert run(["uname", "-s"]).text in report["_OP_HOST_SYSNAME"]
-    assert run(["uname", "-r"]).text in report["_OP_HOST_RELEASE"]
-    assert run(["uname", "-v"]).text in report["_OP_HOST_VERSION"]
-    assert run(["uname", "-n"]).text in report["_OP_HOST_NODENAME"]
-    assert run(["uname", "-m"]).text in report["_OP_HOST_MACHINE"]
+    assert run(["uname", "-s"]).text in env.report["_OP_HOST_SYSNAME"]
+    assert run(["uname", "-r"]).text in env.report["_OP_HOST_RELEASE"]
+    assert run(["uname", "-v"]).text in env.report["_OP_HOST_VERSION"]
+    assert run(["uname", "-n"]).text in env.report["_OP_HOST_NODENAME"]
+    assert run(["uname", "-m"]).text in env.report["_OP_HOST_MACHINE"]
+
+    # serverless should report chalkmark from task path, if present
+    assert env.mark == insert.mark
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)

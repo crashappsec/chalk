@@ -11,8 +11,8 @@ import std/[
 
 export tables
 
-proc copy*[A, B](data: TableRef[A, B]): TableRef[A, B] =
-  result = newTable[A, B]()
+proc copy*[T: OrderedTableRef | TableRef](data: T): T =
+  new result
   for k, v in data:
     result[k] = v
 
