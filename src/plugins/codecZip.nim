@@ -12,7 +12,7 @@ import std/[
   algorithm,
 ]
 import pkg/[
-  zippy/ziparchives_v1,
+  zippy/ziparchives,
 ]
 import ".."/[
   chalkjson,
@@ -114,14 +114,13 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
                           fsRef  = loc,
                           codec  = self)
 
-    cache.onDisk  = ZipArchive()
     cache.tmpDir  = tmpDir
+    cache.onDisk  = ZipArchive()  # Initialize the archive
 
-    cache.onDisk.open(stream)
     info(chalk.fsRef & ": temporarily extracting into " & tmpDir)
     tryOrBail:
-        cache.onDisk.extractAll(origD)
-        cache.onDisk.extractAll(hashD)
+        extractAll(chalk.fsRef, origD)
+        extractAll(chalk.fsRef, hashD)
 
     # Even if subscans are off, we do this delete for the purposes of hashing.
     if not attrGet[bool]("chalk_debug"):
@@ -130,11 +129,13 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
     if not attrGet[bool]("chalk_debug"):
       toggleLoggingEnabled()
 
-    if zipChalkFile in cache.onDisk.contents:
+    # Check if chalk.json exists in extracted directory
+    let chalkJsonPath = joinPath(origD, zipChalkFile)
+    if fileExists(chalkJsonPath):
       tryOrBail:
         removeFile(joinPath(hashD, zipChalkFile))
 
-      let contents = cache.onDisk.contents[zipChalkFile].contents
+      let contents = tryToLoadFile(chalkJsonPath)
       if contents.contains(magicUTF8):
         let
           s           = newStringStream(contents)
@@ -148,7 +149,9 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
       else:
         chalk.marked  = false
 
-    if chalkBinary in cache.onDisk.contents:
+    # Check if chalk binary exists in extracted directory
+    let chalkBinaryPath = joinPath(origD, chalkBinary)
+    if fileExists(chalkBinaryPath):
       info("Chalk binary exists, removing it.")
       tryOrBail:
         removeFile(joinPath(hashD, chalkBinary))
@@ -172,16 +175,7 @@ proc zipScan*(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =
         popChalkId()
         popZipDir()
 
-        # Update the internal accounting for the sake of the post-op hash
-        for k, v in cache.onDisk.contents:
-          let tmpPath = os.joinPath(origD, k)
-          if not tmpPath.fileExists():
-            continue
-
-          var newv = v
-          let c = tryToLoadFile(tmpPath)
-          newv.contents             = c
-          cache.onDisk.contents[k]  = newv
+        # Store the embedded chalk report
         cache.embeddedChalk = collectionCtx.report
 
     return some(chalk)
@@ -226,10 +220,12 @@ proc doZipWrite(chalk: ChalkObj, encoded: Option[string], virtual: bool) =
     else:
       dirToUse = joinPath(cache.tmpDir, "hash")
 
+    # Create new archive by reading the directory
+    if not virtual:
+      createZipArchive(dirToUse & "/", chalk.fsRef)
+    # Re-read to calculate hash
     let newArchive = ZipArchive()
     newArchive.addDir(dirToUse & "/")
-    if not virtual:
-      newArchive.writeZipArchive(chalk.fsRef)
     chalk.cachedEndingHash = newArchive.hashZip()
   except:
     error(chalkFile & ": " & getCurrentExceptionMsg())
