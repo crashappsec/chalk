@@ -308,6 +308,7 @@ iterator scanArtifactLocationsWith*(state:  ArtifactIterationInfo,
     for i in p.getAllFileNames(
       recurse     = state.recurse,
       fileLinks   = fileLinks,
+      alwaysAllow = @[p],
       ignore      = state.fileExclusions,
       ignoreRegex = state.skips,
     ):
