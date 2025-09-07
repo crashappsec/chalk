@@ -101,9 +101,9 @@ delete-layer: $(patsubst %,$(DIST)/%/delete,$(ALL_REGIONS))
 #> TESTS
 
 AWS_LAMBDA_RUNTIME_API?=localhost:8585
-TASK_PATH?=..
+LAMBDA_TASK_ROOT?=..
 export AWS_LAMBDA_RUNTIME_API
-export TASK_PATH
+export LAMBDA_TASK_ROOT
 
 test: ## test dust script against fake lambda runtime
 	docker compose up -d --wait server

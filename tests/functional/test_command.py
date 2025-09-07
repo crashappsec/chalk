@@ -146,7 +146,7 @@ def test_env(
     env = chalk.run(
         command="env",
         env={
-            "TASK_PATH": str(tmp_data_dir),
+            "LAMBDA_TASK_ROOT": str(tmp_data_dir),
             "AWS_LAMBDA_RUNTIME_API": "localhost:8585",
             "AWS_LAMBDA_FUNCTION_NAME": "test",
         },
