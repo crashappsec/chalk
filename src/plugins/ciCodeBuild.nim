@@ -15,7 +15,7 @@ import ".."/[
   utils/envvars,
 ]
 
-proc codeBuildGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
+proc getCodeBuildMetadata(self: Plugin, prefix = ""): ChalkDict =
   result = ChalkDict()
 
   # https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-env-vars.html
@@ -29,7 +29,8 @@ proc codeBuildGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
     CODEBUILD_WEBHOOK_TRIGGER         = getEnv("CODEBUILD_WEBHOOK_TRIGGER")
 
   # probably not running in github CI
-  if CODEBUILD_BUILD_ARN == "" and CODEBUILD_SOURCE_REPO_URL == "": return
+  if CODEBUILD_BUILD_ARN == "" and CODEBUILD_SOURCE_REPO_URL == "":
+    return
 
   let
     isS3          = CODEBUILD_SOURCE_REPO_URL.startsWith("s3://")
@@ -40,19 +41,28 @@ proc codeBuildGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
       else:
         ""
 
-  result.setIfNeeded("BUILD_URI",         CODEBUILD_PUBLIC_BUILD_URL)
-  result.setIfNeeded("BUILD_ID",          CODEBUILD_BUILD_ARN)
-  result.setIfNeeded("BUILD_ORIGIN_URI",  CODEBUILD_SOURCE_REPO_URL & versionSuffix)
+  result.setIfNeeded(prefix & "BUILD_URI",         CODEBUILD_PUBLIC_BUILD_URL)
+  result.setIfNeeded(prefix & "BUILD_ID",          CODEBUILD_BUILD_ARN)
+  result.setIfNeeded(prefix & "BUILD_ORIGIN_URI",  CODEBUILD_SOURCE_REPO_URL & versionSuffix)
   if not isS3:
-    result.setIfNeeded("BUILD_COMMIT_ID", CODEBUILD_RESOLVED_SOURCE_VERSION)
+    result.setIfNeeded(prefix & "BUILD_COMMIT_ID", CODEBUILD_RESOLVED_SOURCE_VERSION)
 
   if CODEBUILD_WEBHOOK_TRIGGER != "":
     let event = CODEBUILD_WEBHOOK_TRIGGER.split("/")[0]
-    result.setIfNeeded("BUILD_TRIGGER", event)
+    result.setIfNeeded(prefix & "BUILD_TRIGGER", event)
 
   if CODEBUILD_INITIATOR != "":
-    result.setIfNeeded("BUILD_CONTACT", @[CODEBUILD_INITIATOR])
+    result.setIfNeeded(prefix & "BUILD_CONTACT", @[CODEBUILD_INITIATOR])
+
+proc codeBuildGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
+  return self.getCodeBuildMetadata()
+
+proc codeBuildGetRunTimeHostInfo(self: Plugin,
+                              chalks: seq[ChalkObj],
+                              ): ChalkDict {.cdecl.} =
+  return self.getCodeBuildMetadata(prefix = "_")
 
 proc loadCiCodeBuild*() =
   newPlugin("ci_codebuild",
-            ctHostCallback = ChalkTimeHostCb(codeBuildGetChalkTimeHostInfo))
+            ctHostCallback = ChalkTimeHostCb(codeBuildGetChalkTimeHostInfo),
+            rtHostCallback = RunTimeHostCb(codeBuildGetRunTimeHostInfo))

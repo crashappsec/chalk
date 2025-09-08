@@ -145,6 +145,24 @@ def test_github(
     insert2 = chalk.insert(bin_path, env=env)
     assert insert2.report.has(BUILD_UNIQUE_ID=insert.report["BUILD_UNIQUE_ID"])
 
+    env = chalk.run(command="env", env=env)
+    assert env.report.contains(
+        {
+            "_BUILD_ID": "1658821493",
+            "_BUILD_UNIQUE_ID": str,
+            "_BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+            "_BUILD_TRIGGER": "tag",
+            "_BUILD_CONTACT": ["octocat"],
+            "_BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493/attempts/5",
+            "_BUILD_API_URI": server_imds,
+            "_BUILD_ORIGIN_ID": "123",
+            "_BUILD_ORIGIN_KEY": "abc",
+            "_BUILD_ORIGIN_OWNER_ID": "456",
+            "_BUILD_ORIGIN_OWNER_KEY": "xyz",
+            "_BUILD_ORIGIN_URI": "https://github.com/octocat/Hello-World",
+        }
+    )
+
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_gitlab(copy_files: list[Path], chalk: Chalk):

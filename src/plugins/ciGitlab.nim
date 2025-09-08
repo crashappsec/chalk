@@ -16,7 +16,7 @@ import ".."/[
   utils/envvars,
 ]
 
-proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
+proc getGitlabMetadata(self: Plugin, prefix = ""): ChalkDict =
   result = ChalkDict()
 
   # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
@@ -36,22 +36,32 @@ proc gitlabGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.}  =
   # probably not running in gitlab CI
   if CI == "" and GITLAB_CI == "": return
 
-  result.setIfNeeded("BUILD_ID",              GITLAB_JOB_ID)
-  result.setIfNeeded("BUILD_COMMIT_ID",       GITLAB_COMMIT_SHA)
-  result.setIfNeeded("BUILD_URI",             GITLAB_JOB_URL)
-  result.setIfNeeded("BUILD_API_URI",         GITLAB_API_URL)
-  result.setIfNeeded("BUILD_ORIGIN_ID",       GITLAB_PROJECT_ID)
-  result.setIfNeeded("BUILD_ORIGIN_OWNER_ID", GITLAB_NAMESPACE_ID)
-  result.setIfNeeded("BUILD_ORIGIN_URI",      GITLAB_PROJECT_URL)
+  result.setIfNeeded(prefix & "BUILD_ID",              GITLAB_JOB_ID)
+  result.setIfNeeded(prefix & "BUILD_COMMIT_ID",       GITLAB_COMMIT_SHA)
+  result.setIfNeeded(prefix & "BUILD_URI",             GITLAB_JOB_URL)
+  result.setIfNeeded(prefix & "BUILD_API_URI",         GITLAB_API_URL)
+  result.setIfNeeded(prefix & "BUILD_ORIGIN_ID",       GITLAB_PROJECT_ID)
+  result.setIfNeeded(prefix & "BUILD_ORIGIN_OWNER_ID", GITLAB_NAMESPACE_ID)
+  result.setIfNeeded(prefix & "BUILD_ORIGIN_URI",      GITLAB_PROJECT_URL)
 
   # https://docs.gitlab.com/ci/jobs/job_rules/#ci_pipeline_source-predefined-variable
-  result.setIfNeeded("BUILD_TRIGGER", GITLAB_EVENT_NAME)
+  result.setIfNeeded(prefix & "BUILD_TRIGGER", GITLAB_EVENT_NAME)
 
   # Lots of potential 'user' vars to pick from here, long term will likely
   #  need to be configurable as different customers will attach different
   #  meaning to different user value depending on their pipeline
-  if GITLAB_USER != "": result.setIfNeeded("BUILD_CONTACT", @[GITLAB_USER])
+  if GITLAB_USER != "":
+    result.setIfNeeded(prefix & "BUILD_CONTACT", @[GITLAB_USER])
+
+proc gitlabGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
+  return self.getGitlabMetadata()
+
+proc gitlabGetRunTimeHostInfo(self: Plugin,
+                              chalks: seq[ChalkObj],
+                              ): ChalkDict {.cdecl.} =
+  return self.getGitlabMetadata(prefix = "_")
 
 proc loadCiGitlab*() =
   newPlugin("ci_gitlab",
-            ctHostCallback = ChalkTimeHostCb(gitlabGetChalkTimeHostInfo))
+            ctHostCallback = ChalkTimeHostCb(gitlabGetChalkTimeHostInfo),
+            rtHostCallback = RunTimeHostCb(gitlabGetRunTimeHostInfo))

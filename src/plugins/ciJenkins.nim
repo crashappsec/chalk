@@ -11,11 +11,12 @@
 
 import ".."/[
   plugin_api,
+  run_management,
   types,
   utils/envvars,
 ]
 
-proc jenkinsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
+proc getJenkinsMetadata(self: Plugin, prefix = ""): ChalkDict =
   result = ChalkDict()
 
   # https://www.jenkins.io/doc/book/pipeline/jenkinsfile/#using-environment-variables
@@ -37,15 +38,19 @@ proc jenkinsGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   # probably not running in jenkinsCI
   if CI == "" and JENKINS_BUILD_ID == "": return
 
-  if JENKINS_BUILD_ID != "":
-    result["BUILD_ID"] = pack(JENKINS_BUILD_ID)
+  result.setIfNeeded(prefix & "BUILD_ID",      JENKINS_BUILD_ID)
+  result.setIfNeeded(prefix & "BUILD_URI",     JENKINS_BUILD_URL)
+  result.setIfNeeded(prefix & "BUILD_API_URI", JENKINS_URL)
 
-  if JENKINS_BUILD_URL != "":
-    result["BUILD_URI"] = pack(JENKINS_BUILD_URL)
+proc jenkinsGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
+  return self.getJenkinsMetadata()
 
-  if JENKINS_URL != "":
-    result["BUILD_API_URI"] = pack(JENKINS_URL)
+proc jenkinsGetRunTimeHostInfo(self: Plugin,
+                              chalks: seq[ChalkObj],
+                              ): ChalkDict {.cdecl.} =
+  return self.getJenkinsMetadata(prefix = "_")
 
 proc loadCiJenkins*() =
   newPlugin("ci_jenkins",
-            ctHostCallback = ChalkTimeHostCb(jenkinsGetChalkTimeHostInfo))
+            ctHostCallback = ChalkTimeHostCb(jenkinsGetChalkTimeHostInfo),
+            rtHostCallback = RunTimeHostCb(jenkinsGetRunTimeHostInfo))
