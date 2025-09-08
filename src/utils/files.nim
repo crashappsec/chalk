@@ -194,7 +194,11 @@ proc acquireExclusiveFile*(path: string, mode = S_IRUSR or S_IWUSR, close = true
     return 0
   return fd
 
-proc getOrWriteExclusiveFile*(path: string, data: string, mode = S_IRUSR or S_IWUSR): string =
+proc getOrWriteExclusiveFile*(path: string,
+                              data: string,
+                              mode = S_IRUSR or S_IWUSR,
+                              retries = 64,
+                              ): string =
   try:
     let fd = acquireExclusiveFile(path, mode = mode, close = false)
     try:
@@ -204,4 +208,10 @@ proc getOrWriteExclusiveFile*(path: string, data: string, mode = S_IRUSR or S_IW
     finally:
       discard close(fd)
   except AlreadyExists:
-    return tryToLoadFile(path)
+    var attempts = 0
+    while attempts <= retries:
+      result = tryToLoadFile(path)
+      if len(result) == len(data):
+        return result
+      attempts += 1
+    raise newException(ValueError, "failed to read full content from exclusive file " & path)
