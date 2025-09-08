@@ -181,6 +181,10 @@
   if the zip was chalked.
   ([#579](https://github.com/crashappsec/chalk/pull/579),
   [#582](https://github.com/crashappsec/chalk/pull/582))
+- Add run-time keys mirroring all chalk time `_BUILD_*` keys.
+  This allows non-chalking operations to report the metadata
+  about the build such as during `chalk env` command.
+  ([#583](https://github.com/crashappsec/chalk/pull/583))
 
 ### Fixes
 

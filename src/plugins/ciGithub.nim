@@ -40,7 +40,7 @@ proc getRepo(api: string, repo: string): JsonNode =
     return
   return parseJson(response.body())
 
-proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
+proc getGithubMetadata(self: Plugin, prefix=""): ChalkDict =
   result = ChalkDict()
 
   # https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
@@ -63,17 +63,20 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   # probably not running in github CI
   if CI == "" and GITHUB_SHA == "": return
 
-  result.setIfNeeded("BUILD_ID",              GITHUB_RUN_ID)
-  result.setIfNeeded("BUILD_COMMIT_ID",       GITHUB_SHA)
-  result.setIfNeeded("BUILD_ORIGIN_ID",       GITHUB_REPOSITORY_ID)
-  result.setIfNeeded("BUILD_ORIGIN_OWNER_ID", GITHUB_REPOSITORY_OWNER_ID)
-  result.setIfNeeded("BUILD_API_URI",         GITHUB_API_URL)
+  result.setIfNeeded(prefix & "BUILD_ID",              GITHUB_RUN_ID)
+  result.setIfNeeded(prefix & "BUILD_COMMIT_ID",       GITHUB_SHA)
+  result.setIfNeeded(prefix & "BUILD_ORIGIN_ID",       GITHUB_REPOSITORY_ID)
+  result.setIfNeeded(prefix & "BUILD_ORIGIN_OWNER_ID", GITHUB_REPOSITORY_OWNER_ID)
+  result.setIfNeeded(prefix & "BUILD_API_URI",         GITHUB_API_URL)
 
   if RUNNER_TEMP != "":
     # RUNNER_TEMP is automatically cleaned up by GitHub at the end of the job execution
     # so we can safely write to it and have a guarantee it will be unique for the job duration
     let uniquePath = RUNNER_TEMP.joinPath("BUILD_UNIQUE_ID.chalk")
-    result.trySetIfNeeded("BUILD_UNIQUE_ID",  getOrWriteExclusiveFile(uniquePath, secureRand[uint64]().toHex().toLower()))
+    result.trySetIfNeeded(
+      prefix & "BUILD_UNIQUE_ID",
+      getOrWriteExclusiveFile(uniquePath, secureRand[uint64]().toHex().toLower()),
+    )
 
   if (GITHUB_SERVER_URL != "" and GITHUB_REPOSITORY != "" and
       GITHUB_RUN_ID != ""):
@@ -84,28 +87,38 @@ proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
     var uri = base & "/actions/runs/" & GITHUB_RUN_ID
     if GITHUB_RUN_ATTEMPT != "":
       uri = uri.strip(chars = {'/'}) & "/attempts/" & GITHUB_RUN_ATTEMPT
-    result.setIfNeeded("BUILD_ORIGIN_URI", base)
-    result.setIfNeeded("BUILD_URI",        uri)
+    result.setIfNeeded(prefix & "BUILD_ORIGIN_URI", base)
+    result.setIfNeeded(prefix & "BUILD_URI",        uri)
 
   if GITHUB_API_URL != "" and (
-    isSubscribedKey("BUILD_ORIGIN_KEY") or
-    isSubscribedKey("BUILD_ORIGIN_OWNER_KEY")
+    isSubscribedKey(prefix & "BUILD_ORIGIN_KEY") or
+    isSubscribedKey(prefix & "BUILD_ORIGIN_OWNER_KEY")
   ):
     try:
       let data = getRepo(GITHUB_API_URL, GITHUB_REPOSITORY)
-      result.setIfNeeded("BUILD_ORIGIN_KEY",       data{"node_id"}.getStr())
-      result.setIfNeeded("BUILD_ORIGIN_OWNER_KEY", data{"owner"}{"node_id"}.getStr())
+      result.setIfNeeded(prefix & "BUILD_ORIGIN_KEY",       data{"node_id"}.getStr())
+      result.setIfNeeded(prefix & "BUILD_ORIGIN_OWNER_KEY", data{"owner"}{"node_id"}.getStr())
     except:
       warn("github: could not fetch repo info: " & getCurrentExceptionMsg())
 
   # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
   if GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
-    result.setIfNeeded("BUILD_TRIGGER", "tag")
+    result.setIfNeeded(prefix & "BUILD_TRIGGER", "tag")
   else:
-    result.setIfNeeded("BUILD_TRIGGER", GITHUB_EVENT_NAME)
+    result.setIfNeeded(prefix & "BUILD_TRIGGER", GITHUB_EVENT_NAME)
 
-  if GITHUB_ACTOR != "": result.setIfNeeded("BUILD_CONTACT", @[GITHUB_ACTOR])
+  if GITHUB_ACTOR != "":
+    result.setIfNeeded(prefix & "BUILD_CONTACT", @[GITHUB_ACTOR])
+
+proc githubGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
+  return self.getGithubMetadata()
+
+proc githubGetRunTimeHostInfo(self: Plugin,
+                              chalks: seq[ChalkObj],
+                              ): ChalkDict {.cdecl.} =
+  return self.getGithubMetadata(prefix = "_")
 
 proc loadCiGitHub*() =
   newPlugin("ci_github",
-            ctHostCallback = ChalkTimeHostCb(githubGetChalkTimeHostInfo))
+            ctHostCallback = ChalkTimeHostCb(githubGetChalkTimeHostInfo),
+            rtHostCallback = RunTimeHostCb(githubGetRunTimeHostInfo))

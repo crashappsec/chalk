@@ -28,7 +28,11 @@ proc hasSubscribedKey(p: Plugin, keys: seq[string], dict: ChalkDict): bool =
 
   return false
 
-proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
+proc canWrite(plugin: Plugin,
+              key:    string,
+              decls:  seq[string],
+              phase:  string,
+              ): bool =
   # This would all be redundant to what we can check in the config file spec,
   # except that we do allow "*" fields for plugins, so we need the runtime
   # check to filter out inappropriate items.
@@ -41,11 +45,11 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
     if attrGet[bool]("plugin." & plugin.name & ".codec"):
       return true
     else:
-      error("Plugin '" & plugin.name & "' can't write codec key: '" & key & "'")
+      error("Plugin '" & plugin.name & "' can't write " & phase & " codec key: '" & key & "'")
       return false
 
   if key notin decls and "*" notin decls:
-    error("Plugin '" & plugin.name & "' produced undeclared key: '" & key & "'")
+    error("Plugin '" & plugin.name & "' produced undeclared " & phase & " key: '" & key & "'")
     return false
   if not attrGet[bool](section & ".system"):
     return true
@@ -59,7 +63,7 @@ proc canWrite(plugin: Plugin, key: string, decls: seq[string]): bool =
       return true
   else: discard
 
-  error("Plugin '" & plugin.name & "' can't write system key: '" & key & "'")
+  error("Plugin '" & plugin.name & "' can't write " & phase & " system key: '" & key & "'")
   return false
 
 proc registerKeys(templ: string) =
@@ -87,7 +91,11 @@ proc collectChalkTimeHostInfo*() =
         continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_run_keys")):
+        if not plugin.canWrite(
+          k,
+          attrGet[seq[string]]("plugin." & plugin.name & ".pre_run_keys"),
+          "chalk time host",
+        ):
           trace(plugin.name & ": cannot write " & k & ". skipping")
           continue
         if k notin hostInfo or
@@ -158,7 +166,11 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
         let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
         if dict == nil or len(dict) == 0: continue
         for k, v in dict:
-          if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")): continue
+          if not plugin.canWrite(
+            k,
+            attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys"),
+            "run time artifact",
+          ): continue
           if k notin artifact.collectedData or
               k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
               plugin.isSystem:
@@ -215,7 +227,11 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
           continue
 
         for k, v in dict:
-          if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")):
+          if not plugin.canWrite(
+            k,
+            attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys"),
+            "chalk time artifact",
+          ):
             trace(plugin.name & ": cannot write " & k & ". skipping")
             continue
           if k notin obj.collectedData or
@@ -246,7 +262,11 @@ proc collectRunTimeHostInfo*() =
       if dict == nil or len(dict) == 0: continue
 
       for k, v in dict:
-        if not plugin.canWrite(k, attrGet[seq[string]]("plugin." & plugin.name & ".post_run_keys")): continue
+        if not plugin.canWrite(
+          k,
+          attrGet[seq[string]]("plugin." & plugin.name & ".post_run_keys"),
+          "run time host",
+        ): continue
         if k notin hostInfo or
             k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
             plugin.isSystem:

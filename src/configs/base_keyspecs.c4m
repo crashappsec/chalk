@@ -1377,6 +1377,179 @@ associated with the triggered CI/CD job.
 """
 }
 
+keyspec _BUILD_ORIGIN_URI {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.0"
+    shortdoc:         "Origin for the build"
+    doc:              """
+What origin is being used for the build.
+In most cases this it the repository URI.
+However in some other cases it can be another reference such as
+S3 object path for AWS CodeBuilds.
+"""
+}
+
+keyspec _BUILD_ORIGIN_ID {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "0.6.0"
+  shortdoc: "ID of the ORIGIN_URI in the CI/CD system"
+  doc:      """
+The ORIGIN_URI key reports the URI of the git origin remote.
+This key, if available, will report the repo ID of the repository
+as it is stored internally by the CI/CD system.
+
+For GitHub this corresponds to repo REST ID.
+For GitLab this is the project ID.
+"""
+}
+
+keyspec _BUILD_ORIGIN_KEY {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "0.6.0"
+  shortdoc: "Key of the ORIGIN_URI in the CI/CD system"
+  doc:      """
+Similar to _BUILD_ORIGIN_ID and this reports supplemental repository
+key for easier CI/CD API interactions.
+
+For GitHub this corresponds to repo GraphQL node_id.
+For GitLab this is not used.
+"""
+}
+
+keyspec _BUILD_ORIGIN_OWNER_ID {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "0.6.0"
+  shortdoc: "ID of the owner of ORIGIN_URI in the CI/CD system"
+  doc:      """
+The ORIGIN_URI key reports the URI of the git origin remote.
+This key, if available, will report the repo owners ID of the repository
+as it is stored internally by the CI/CD system.
+
+For GitHub this corresponds to repo's org/user REST ID.
+For GitLab this is the namespace ID.
+"""
+}
+
+keyspec _BUILD_ORIGIN_OWNER_KEY {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "0.6.0"
+  shortdoc: "Key of the owner of ORIGIN_URI in the CI/CD system"
+  doc:      """
+Similar to _BUILD_ORIGIN_OWNER_ID and this reports supplemental owner
+key for easier CI/CD API interactions.
+
+For GitHub this corresponds to repos user/org GraphQL node_id.
+For GitLab this is not used.
+"""
+}
+
+keyspec _BUILD_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.0"
+    shortdoc: "CI/CD job info when adding chalk mark"
+    doc:              """
+If, at the time of chalking, the system field will contain the
+associated job ID.
+"""
+}
+
+keyspec _BUILD_UNIQUE_ID {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.0"
+    shortdoc:         "For some CI systems, chalk generated unique build id"
+    doc:              """
+Chalk-generated unique build ID.
+
+In some CI systems `_BUILD_ID` is sometimes reused. For example in GitHub Actions,
+`_BUILD_ID` is populated from workflow ID which is the same for all jobs within
+the same workflow as well as it is reused for all job retries.
+In that case chalk will generate its own unique build ID to allow to associate
+multiple chalk operations within the same build.
+"""
+}
+
+keyspec _BUILD_URI {
+    kind:                RunTimeHost
+    type:                string
+    standard:            true
+    since:               "0.6.0"
+    apply_substitutions: true
+    shortdoc: "URI associated with build job at time of chalk"
+    doc:                 """
+If, at the time of chalking, the system can identify a CI/CD job, this
+field will contain the URI associated with the job, if found.
+
+This field is generally expected to be supplied by the user, and can
+use the same substitutions allowed for the `CHALK_PTR` field (see that
+key's documentation for more detail).
+"""
+}
+
+keyspec _BUILD_API_URI {
+    kind:                RunTimeHost
+    type:                string
+    standard:            true
+    since:               "0.6.0"
+    apply_substitutions: true
+    shortdoc: "API endpoint associated with chalk-time CI/CD job"
+    doc:                 """
+If, at the time of chalking, the system an identify a CI/CD job, and
+there is a discernible API endpoint, this field will contain the URI
+for that endpoint.
+
+This field is generally expected to be supplied by the user, and can
+use the same substitutions allowed for the `CHALK_PTR` field (see that
+key's documentation for more detail).
+"""
+}
+
+keyspec _BUILD_COMMIT_ID {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "0.6.0"
+  shortdoc: "Commit ID which triggered the build"
+  doc:      """
+Commit ID which triggered the build in CI/CD at chalk time.
+"""
+}
+
+keyspec _BUILD_TRIGGER {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.0"
+    shortdoc: "Any recorded build trigger found at chalk time."
+    doc:              """
+Any recorded build trigger found at chalk time.
+"""
+}
+
+keyspec _BUILD_CONTACT {
+    kind:             RunTimeHost
+    type:             list[string]
+    standard:         true
+    since:            "0.6.0"
+    shortdoc: "CI/CD contact info"
+    doc:              """
+Contact information set at chalk time for the person or people
+associated with the triggered CI/CD job.
+"""
+}
 
 keyspec CHALK_RAND {
     kind:             ChalkTimeArtifact

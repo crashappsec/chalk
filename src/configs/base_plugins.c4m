@@ -133,12 +133,30 @@ artifacts will be attached to that info.
 
 plugin ci_github {
     enabled:         true
-    pre_run_keys:    ["BUILD_ID", "BUILD_UNIQUE_ID", "BUILD_COMMIT_ID",
-                      "BUILD_URI", "BUILD_API_URI",
-                      "BUILD_TRIGGER", "BUILD_CONTACT",
-                      "BUILD_ORIGIN_ID", "BUILD_ORIGIN_OWNER_ID",
-                      "BUILD_ORIGIN_KEY", "BUILD_ORIGIN_OWNER_KEY",
+    pre_run_keys:    ["BUILD_ID",
+                      "BUILD_UNIQUE_ID",
+                      "BUILD_COMMIT_ID",
+                      "BUILD_URI",
+                      "BUILD_API_URI",
+                      "BUILD_TRIGGER",
+                      "BUILD_CONTACT",
+                      "BUILD_ORIGIN_ID",
+                      "BUILD_ORIGIN_OWNER_ID",
+                      "BUILD_ORIGIN_KEY",
+                      "BUILD_ORIGIN_OWNER_KEY",
                       "BUILD_ORIGIN_URI"]
+    post_run_keys:   ["_BUILD_ID",
+                      "_BUILD_UNIQUE_ID",
+                      "_BUILD_COMMIT_ID",
+                      "_BUILD_URI",
+                      "_BUILD_API_URI",
+                      "_BUILD_TRIGGER",
+                      "_BUILD_CONTACT",
+                      "_BUILD_ORIGIN_ID",
+                      "_BUILD_ORIGIN_OWNER_ID",
+                      "_BUILD_ORIGIN_KEY",
+                      "_BUILD_ORIGIN_OWNER_KEY",
+                      "_BUILD_ORIGIN_URI"]
     doc: """
 Collects information about associated build jobs in github actions.
 
@@ -148,7 +166,12 @@ This only collects data when adding chalk marks.
 
 plugin ci_jenkins {
     enabled:         true
-    pre_run_keys:    ["BUILD_ID", "BUILD_URI", "BUILD_API_URI"]
+    pre_run_keys:    ["BUILD_ID",
+                      "BUILD_URI",
+                      "BUILD_API_URI"]
+    post_run_keys:   ["_BUILD_ID",
+                      "_BUILD_URI",
+                      "_BUILD_API_URI"]
     doc: """
 Collects information about associated build jobs in Jenkins.
 
@@ -158,11 +181,24 @@ This only collects data when adding chalk marks.
 
 plugin ci_gitlab {
     enabled:         true
-    pre_run_keys:    ["BUILD_ID",  "BUILD_COMMIT_ID",
-                      "BUILD_URI", "BUILD_API_URI",
-                      "BUILD_TRIGGER", "BUILD_CONTACT",
-                      "BUILD_ORIGIN_ID", "BUILD_ORIGIN_OWNER_ID",
+    pre_run_keys:    ["BUILD_ID",
+                      "BUILD_COMMIT_ID",
+                      "BUILD_URI",
+                      "BUILD_API_URI",
+                      "BUILD_TRIGGER",
+                      "BUILD_CONTACT",
+                      "BUILD_ORIGIN_ID",
+                      "BUILD_ORIGIN_OWNER_ID",
                       "BUILD_ORIGIN_URI"]
+    post_run_keys:   ["_BUILD_ID",
+                      "_BUILD_COMMIT_ID",
+                      "_BUILD_URI",
+                      "_BUILD_API_URI",
+                      "_BUILD_TRIGGER",
+                      "_BUILD_CONTACT",
+                      "_BUILD_ORIGIN_ID",
+                      "_BUILD_ORIGIN_OWNER_ID",
+                      "_BUILD_ORIGIN_URI"]
     doc: """
 Collects information about associated build jobs in Gitlab.
 
@@ -172,9 +208,18 @@ This only collects data when adding chalk marks.
 
 plugin ci_codebuild {
     enabled:         true
-    pre_run_keys:    ["BUILD_ID",  "BUILD_COMMIT_ID",
-                      "BUILD_URI", "BUILD_TRIGGER", "BUILD_CONTACT",
+    pre_run_keys:    ["BUILD_ID",
+                      "BUILD_COMMIT_ID",
+                      "BUILD_URI",
+                      "BUILD_TRIGGER",
+                      "BUILD_CONTACT",
                       "BUILD_ORIGIN_URI"]
+    post_run_keys:   ["_BUILD_ID",
+                      "_BUILD_COMMIT_ID",
+                      "_BUILD_URI",
+                      "_BUILD_TRIGGER",
+                      "_BUILD_CONTACT",
+                      "_BUILD_ORIGIN_URI"]
     doc: """
 Collects information about associated build jobs in AWS CodeBuild.
 
