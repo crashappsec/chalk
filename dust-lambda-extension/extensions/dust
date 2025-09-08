@@ -63,21 +63,25 @@ fatal() {
     exit 1
 }
 
+# https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html
+
+# Validate critical environment variables
+if [ -z "${AWS_LAMBDA_RUNTIME_API:-}" ]; then
+    fatal "AWS_LAMBDA_RUNTIME_API environment variable is not set"
+fi
+
 # Configurables (set via environment variables)
 readonly EXTENSION_NAME="${EXTENSION_NAME:-dust}"
 readonly MAX_FAILURES="${MAX_FAILURES:-5}"
 
 # Constants
 readonly TMP="${TMPDIR:-${TMP:-/tmp}}"
-readonly TASK_PATH="${TASK_PATH:-/var/task}"
-readonly CHALK_BIN_PATH="$TASK_PATH/chalk"
-readonly CHALK_MARK_PATH="$TASK_PATH/chalk.json"
+# this is usually set by AWS however its not guaranteed to set set for extensions
+readonly LAMBDA_TASK_ROOT="${LAMBDA_TASK_ROOT:-/var/task}"
+export LAMBDA_TASK_ROOT
+readonly CHALK_BIN_PATH="$LAMBDA_TASK_ROOT/chalk"
+readonly CHALK_MARK_PATH="$LAMBDA_TASK_ROOT/chalk.json"
 readonly TMP_CHALK_PATH="$TMP/chalk"
-
-# Validate critical environment variable
-if [ -z "${AWS_LAMBDA_RUNTIME_API:-}" ]; then
-    fatal "AWS_LAMBDA_RUNTIME_API environment variable is not set"
-fi
 
 readonly AWS_LAMBDA_RUNTIME_API
 readonly REGISTER_API="http://${AWS_LAMBDA_RUNTIME_API}/2020-01-01/extension/register"
@@ -118,7 +122,15 @@ make_api_request() {
     temp_body_file=$(mktemp "$method.body.XXXXXX")
     temp_headers_file=$(mktemp "$method.headers.XXXXXX")
 
-    if ! curl --silent --show-error --fail -o "$temp_body_file" --dump-header "$temp_headers_file" -X "$method" "$url" "$@"; then
+    if ! curl \
+        --silent \
+        --show-error \
+        --fail \
+        -o "$temp_body_file" \
+        --dump-header "$temp_headers_file" \
+        -X "$method" \
+        "$url" \
+        "$@"; then
         error "Failed to make $method request to $url"
         debug "Response: $(cat "$temp_body_file")"
         return 1

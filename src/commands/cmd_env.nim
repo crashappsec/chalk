@@ -27,15 +27,15 @@ import ".."/[
 # * serverless zips running in lambda
 proc collectServerlessChalkMark() =
   let
-    TASK_PATH                = getEnv("TASK_PATH")
+    LAMBDA_TASK_ROOT         = getEnv("LAMBDA_TASK_ROOT")
     AWS_LAMBDA_RUNTIME_API   = getEnv("AWS_LAMBDA_RUNTIME_API")
     AWS_LAMBDA_FUNCTION_NAME = getEnv("AWS_LAMBDA_FUNCTION_NAME")
 
-  if TASK_PATH == "" or AWS_LAMBDA_RUNTIME_API == "" or AWS_LAMBDA_FUNCTION_NAME == "":
+  if LAMBDA_TASK_ROOT == "" or AWS_LAMBDA_RUNTIME_API == "" or AWS_LAMBDA_FUNCTION_NAME == "":
     trace("env: not serverless environment")
     return
 
-  let chalkPath = TASK_PATH.joinPath("chalk.json")
+  let chalkPath = LAMBDA_TASK_ROOT.joinPath("chalk.json")
 
   trace("env: looking for a chalk file at: " & chalkPath)
   withFileStream(chalkPath, mode = fmRead, strict = false):
@@ -46,9 +46,9 @@ proc collectServerlessChalkMark() =
     info("env: extracting chalk mark from " & chalkPath)
     try:
       let
-        extract = stream.extractOneChalkJson(TASK_PATH)
+        extract = stream.extractOneChalkJson(LAMBDA_TASK_ROOT)
         chalk   = newChalk(name          = AWS_LAMBDA_RUNTIME_API,
-                           fsRef         = TASK_PATH,
+                           fsRef         = LAMBDA_TASK_ROOT,
                            resourceType  = {ResourcePid, ResourceFile},
                            extract       = extract,
                            collectedData = extract.copy(),

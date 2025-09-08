@@ -176,10 +176,11 @@
   ([#566](https://github.com/crashappsec/chalk/pull/566))
 
 - `chalk.env` will extract chalkmark from `chalk.json`
-  when running in AWS Lambda where `TASK_PATH` is defined.
+  when running in AWS Lambda where `LAMBDA_TASK_ROOT` is defined.
   This allows to include original zip archive chalk mark
   if the zip was chalked.
-  ([#579](https://github.com/crashappsec/chalk/pull/579))
+  ([#579](https://github.com/crashappsec/chalk/pull/579),
+  [#582](https://github.com/crashappsec/chalk/pull/582))
 
 ### Fixes
 
