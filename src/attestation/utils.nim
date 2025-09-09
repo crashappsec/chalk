@@ -21,13 +21,26 @@ var cosignLoc      = ""
 var cosignVersion  = parseVersion("0")
 let minimumVersion = parseVersion("2.2.0")
 
-proc getCosignLocation*(downloadCosign = false): string =
-  once:
+template getOrDownloadCosignLocation(downloadCosign: bool) =
+  if cosignLoc == "":
     const cosignLoader = "load_attestation_binary(bool) -> string"
     let args = @[pack(downloadCosign)]
     cosignLoc = unpack[string](runCallback(cosignLoader, args).get())
     if cosignLoc == "":
       warn("Could not find or install cosign; cannot sign or verify.")
+
+proc getCosignLocation*(downloadCosign = false): string =
+  # a bit repetitive however it allows once blocks to be per download branch
+  # otherwise if there is only a single once block
+  # if this function is called with downloadCosign=false
+  # even if it is later called with downloadCosign=true
+  # it will never be downloaded
+  if downloadCosign:
+    once:
+      getOrDownloadCosignLocation(downloadCosign)
+  else:
+    once:
+      getOrDownloadCosignLocation(downloadCosign)
   return cosignLoc
 
 proc getCosignVersion*(): Version =
