@@ -33,7 +33,7 @@ For easy deployment, Crash Override publishes its public ARNs of the
 extension layer for common regions. To get them use the URL:
 
 ```sh
-$ curl -fsSL "https://dl.crashoverride.run/test/dust/$REGION/extension.arn"
+$ curl -fsSL "https://dl.crashoverride.run/dust/$REGION/extension.arn"
 ```
 
 ### Terraform
