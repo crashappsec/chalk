@@ -84,8 +84,8 @@ proc clearReportingState*() =
     let cb = plugin.clearState
     cb(plugin)
 
-proc pushCollectionCtx*(): CollectionCtx =
-  result = CollectionCtx()
+proc pushCollectionCtx*(baseChalk = ChalkObj(nil)): CollectionCtx =
+  result = CollectionCtx(baseChalk: baseChalk)
   ctxStack.add(result)
 
 proc popCollectionCtx*() =
@@ -213,6 +213,7 @@ proc newChalk*(name:          string            = "",
                     platform:      platform,
                     noAttestation: noAttestation,
                     startOffset:   startOffset,
+                    baseChalk:     collectionCtx.baseChalk,
                    )
 
   if chalkId != "":

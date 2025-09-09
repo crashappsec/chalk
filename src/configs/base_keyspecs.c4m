@@ -545,7 +545,6 @@ keyspec PATH_WITHIN_ZIP {
     never_early:      true
     type:             string
     standard:         true
-    codec:            true
     since:            "0.1.0"
     doc:              """
 For items chalked when they were in a ZIP file, this field gets their path
@@ -558,7 +557,6 @@ keyspec CONTAINING_ARTIFACT_WHEN_CHALKED {
     never_early:      true
     type:             string
     standard:         true
-    codec:            true
     since:            "0.1.0"
     doc:              """
 For items chalked when they were in a embedded into a ZIP file, this is the

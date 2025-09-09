@@ -19,9 +19,11 @@ proc runCmdInsert*(path: seq[string]) {.importc.}
 proc runCmdExtract*(path: seq[string]) {.importc.}
 proc runCmdDelete*(path: seq[string]) {.importc.}
 
-proc runChalkSubScan*(location: seq[string],
-                      cmd:      string,
-                      suspendHost = true): CollectionCtx =
+proc runChalkSubScan*(location:     seq[string],
+                      cmd:          string,
+                      suspendHost    = true,
+                      baseChalk      = ChalkObj(nil),
+                      ): CollectionCtx =
   let
     oldRecursive = attrGet[bool]("recursive")
     oldCmd       = getCommandName()
@@ -41,7 +43,7 @@ proc runChalkSubScan*(location: seq[string],
     setLogLevel(llError)
 
   let runtime = getChalkRuntime()
-  result = pushCollectionCtx()
+  result = pushCollectionCtx(baseChalk = baseChalk)
   try:
     if suspendHost:
       suspendHostCollection()
@@ -66,8 +68,3 @@ proc runChalkSubScan*(location: seq[string],
     trace("subscan: found " & $len(result.allChalks) & " artifacts")
     trace("Subscan done. Restored command name to: " & oldCmd)
     runtime.con4mAttrSet("recursive", pack(oldRecursive))
-
-template runChalkSubScan*(location: string,
-                          cmd:      string,
-                          suspendHost = true): CollectionCtx =
-    runChalkSubScan(@[location], cmd, suspendHost)

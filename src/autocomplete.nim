@@ -119,7 +119,7 @@ proc autocompleteFileCheck*() =
   let alreadyExists = fileExists(dst)
   if alreadyExists:
     let
-      subscan   = runChalkSubScan(dst, "extract")
+      subscan   = runChalkSubScan(@[dst], "extract")
       allChalks = subscan.getAllChalks()
 
     if len(allChalks) != 0 and allChalks[0].extract != nil:
