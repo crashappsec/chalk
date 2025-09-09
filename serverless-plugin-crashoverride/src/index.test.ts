@@ -24,6 +24,9 @@ const mockServerless = {
     config: {
         servicePath: "/test/project",
     },
+    classes: {
+        Error: Error, // Use native Error class for testing
+    },
     service: {
         service: "test-service",
         provider: {
@@ -63,6 +66,7 @@ const mockLog = {
     notice: jest.fn(),
     info: jest.fn(),
     debug: jest.fn(),
+    success: jest.fn(),
 };
 
 describe("CrashOverrideServerlessPlugin", () => {
@@ -105,14 +109,14 @@ describe("CrashOverrideServerlessPlugin", () => {
         }
 
         expect(mockLog.notice).toHaveBeenCalledWith(
-            "🔧 Dust Plugin: Initializing package process",
+            "Dust Plugin: Initializing package process",
         );
         expect(mockLog.info).toHaveBeenCalledWith(
-            "ℹ Checking for chalk binary...",
+            "Checking for chalk binary...",
         );
-        expect(mockLog.info).toHaveBeenCalledWith("✓ Chalk binary found");
+        expect(mockLog.success).toHaveBeenCalledWith("Chalk binary found");
         expect(mockLog.info).toHaveBeenCalledWith(
-            "ℹ Chalk binary found and will be used to add chalkmarks",
+            "Chalk binary found and will be used to add chalkmarks",
         );
         expect(mockExecSync).toHaveBeenCalledWith("command -v chalk", {
             stdio: "ignore",
@@ -129,10 +133,10 @@ describe("CrashOverrideServerlessPlugin", () => {
 
         expect(result).toBe(false);
         expect(mockLog.info).toHaveBeenCalledWith(
-            "ℹ Checking for chalk binary...",
+            "Checking for chalk binary...",
         );
         expect(mockLog.info).toHaveBeenCalledWith(
-            "ℹ Chalk binary not found in PATH",
+            "Chalk binary not found in PATH",
         );
     });
 
@@ -181,23 +185,23 @@ describe("CrashOverrideServerlessPlugin", () => {
 
         // Check that afterPackageInitialize was called
         expect(mockLog.notice).toHaveBeenCalledWith(
-            "📦 Dust Plugin: Processing packaged functions",
+            "Dust Plugin: Processing packaged functions",
         );
 
         // Check that addDustLambdaExtension was called
         expect(mockLog.notice).toHaveBeenCalledWith(
-            "🚀 Adding Dust Lambda Extension to all functions",
+            "Adding Dust Lambda Extension to all functions",
         );
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "✓ Successfully added Dust Lambda Extension to 2 function(s)",
+        expect(mockLog.success).toHaveBeenCalledWith(
+            "Successfully added Dust Lambda Extension to 2 function(s)",
         );
 
         // Check that injectChalkBinary was called
         expect(mockLog.info).toHaveBeenCalledWith(
-            expect.stringContaining("ℹ Injecting chalkmarks into"),
+            expect.stringContaining("Injecting chalkmarks into"),
         );
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "✓ Successfully injected chalkmarks into package",
+        expect(mockLog.success).toHaveBeenCalledWith(
+            "Successfully injected chalkmarks into package",
         );
         expect(mockExecSync).toHaveBeenCalledWith(
             expect.stringContaining("chalk insert --inject-binary-into-zip"),
@@ -239,11 +243,11 @@ describe("CrashOverrideServerlessPlugin", () => {
         }
 
         expect(mockLog.notice).toHaveBeenCalledWith(
-            "📦 Dust Plugin: Processing packaged functions",
+            "Dust Plugin: Processing packaged functions",
         );
-        expect(mockLog.info).toHaveBeenCalledWith(
+        expect(mockLog.warning).toHaveBeenCalledWith(
             expect.stringMatching(
-                /⚠ Chalk binary not available, skipping chalkmark injection/,
+                /Chalk binary not available, skipping chalkmark injection/,
             ),
         );
     });
@@ -288,13 +292,13 @@ describe("CrashOverrideServerlessPlugin", () => {
         }
 
         expect(mockLog.notice).toHaveBeenCalledWith(
-            "📦 Dust Plugin: Processing packaged functions",
+            "Dust Plugin: Processing packaged functions",
         );
         expect(mockLog.warning).toHaveBeenCalledWith(
-            "⚠ Package zip file not found at /test/project/.serverless/test-service.zip",
+            "Package zip file not found at /test/project/.serverless/test-service.zip",
         );
         expect(mockLog.error).toHaveBeenCalledWith(
-            "✗ Could not locate package zip file",
+            "Could not locate package zip file",
         );
     });
 
@@ -317,13 +321,13 @@ describe("CrashOverrideServerlessPlugin", () => {
         (simplePlugin as any).addDustLambdaExtension();
 
         expect(mockLog.notice).toHaveBeenCalledWith(
-            "🚀 Adding Dust Lambda Extension to all functions",
+            "Adding Dust Lambda Extension to all functions",
         );
         expect(mockLog.info).toHaveBeenCalledWith(
-            "ℹ Added Dust Lambda Extension to function: testFunction (1/15 layers/extensions)",
+            "Added Dust Lambda Extension to function: testFunction (1/15 layers/extensions)",
         );
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "✓ Successfully added Dust Lambda Extension to 1 function(s)",
+        expect(mockLog.success).toHaveBeenCalledWith(
+            "Successfully added Dust Lambda Extension to 1 function(s)",
         );
 
         // Verify the layer was actually added
@@ -356,10 +360,10 @@ describe("CrashOverrideServerlessPlugin", () => {
         (pluginWithLayers as any).addDustLambdaExtension();
 
         expect(mockLog.info).toHaveBeenCalledWith(
-            "ℹ Added Dust Lambda Extension to function: testFunction (3/15 layers/extensions)",
+            "Added Dust Lambda Extension to function: testFunction (3/15 layers/extensions)",
         );
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "✓ Successfully added Dust Lambda Extension to 1 function(s)",
+        expect(mockLog.success).toHaveBeenCalledWith(
+            "Successfully added Dust Lambda Extension to 1 function(s)",
         );
 
         // Verify the layer was added to existing layers
@@ -395,10 +399,10 @@ describe("CrashOverrideServerlessPlugin", () => {
         (pluginWith14Layers as any).addDustLambdaExtension();
 
         expect(mockLog.info).toHaveBeenCalledWith(
-            "ℹ Added Dust Lambda Extension to function: testFunction (15/15 layers/extensions)",
+            "Added Dust Lambda Extension to function: testFunction (15/15 layers/extensions)",
         );
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "✓ Successfully added Dust Lambda Extension to 1 function(s)",
+        expect(mockLog.success).toHaveBeenCalledWith(
+            "Successfully added Dust Lambda Extension to 1 function(s)",
         );
     });
 
@@ -428,7 +432,7 @@ describe("CrashOverrideServerlessPlugin", () => {
         );
 
         expect(mockLog.error).toHaveBeenCalledWith(
-            "✗ Cannot add Dust Lambda Extension to function testFunction: would exceed maximum layer/extension limit of 15 (currently has 15)",
+            "Cannot add Dust Lambda Extension to function testFunction: would exceed maximum layer/extension limit of 15 (currently has 15)",
         );
     });
 
@@ -448,10 +452,10 @@ describe("CrashOverrideServerlessPlugin", () => {
         (pluginNoFunctions as any).addDustLambdaExtension();
 
         expect(mockLog.notice).toHaveBeenCalledWith(
-            "🚀 Adding Dust Lambda Extension to all functions",
+            "Adding Dust Lambda Extension to all functions",
         );
         expect(mockLog.warning).toHaveBeenCalledWith(
-            "⚠ No functions found in service - no extensions added",
+            "No functions found in service - no extensions added",
         );
     });
 
@@ -495,7 +499,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             jest.clearAllMocks();
         });
 
-        it("should throw error when memoryCheck is true and memory < 512MB", () => {
+        it("should throw error when memoryCheck is true and memory < 256MB", () => {
             memoryCheckPlugin = new CrashOverrideServerlessPlugin(
                 {
                     ...mockServerless,
@@ -503,7 +507,7 @@ describe("CrashOverrideServerlessPlugin", () => {
                         ...mockServerless.service,
                         provider: {
                             ...mockServerless.service.provider,
-                            memorySize: 256,
+                            memorySize: 128,
                         },
                         custom: {
                             crashoverride: {
@@ -520,10 +524,10 @@ describe("CrashOverrideServerlessPlugin", () => {
 
             if (hook) {
                 expect(() => hook()).toThrow(
-                    "Memory check failed: memorySize (256MB) is less than minimum required (512MB)",
+                    "Memory check failed: memorySize (128MB) is less than minimum required (512MB)",
                 );
                 expect(mockLog.error).toHaveBeenCalledWith(
-                    "✗ Memory check failed: memorySize (256MB) is less than minimum required (512MB)",
+                    "Memory check failed: memorySize (128MB) is less than minimum required (512MB)",
                 );
             }
         });
@@ -560,7 +564,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "✓ Memory check passed: 1024MB >= 512MB",
+                "Memory check passed: 1024MB >= 256MB",
             );
             expect(mockLog.error).not.toHaveBeenCalled();
         });
@@ -597,7 +601,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "✓ Memory check passed: 512MB >= 512MB",
+                "Memory check passed: 512MB >= 256MB",
             );
             expect(mockLog.error).not.toHaveBeenCalled();
         });
@@ -634,12 +638,12 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.warning).toHaveBeenCalledWith(
-                "⚠ Memory size (128MB) is below recommended minimum (512MB). Set custom.crashoverride.memoryCheck: true to enforce this requirement",
+                "Memory size (128MB) is below recommended minimum (256). Set custom.crashoverride.memoryCheck: true to enforce this requirement",
             );
             expect(mockLog.error).not.toHaveBeenCalled();
         });
 
-        it("should log warning when memoryCheck is undefined (default) and memory < 512MB", async () => {
+        it("should log warning when memoryCheck is undefined (default) and memory < 256MB", async () => {
             memoryCheckPlugin = new CrashOverrideServerlessPlugin(
                 {
                     ...mockServerless,
@@ -647,7 +651,7 @@ describe("CrashOverrideServerlessPlugin", () => {
                         ...mockServerless.service,
                         provider: {
                             ...mockServerless.service.provider,
-                            memorySize: 256,
+                            memorySize: 128,
                         },
                         custom: {}, // No crashoverride config
                     },
@@ -667,7 +671,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.warning).toHaveBeenCalledWith(
-                "⚠ Memory size (256MB) is below recommended minimum (512MB). Set custom.crashoverride.memoryCheck: true to enforce this requirement",
+                "Memory size (128MB) is below recommended minimum (256). Set custom.crashoverride.memoryCheck: true to enforce this requirement",
             );
             expect(mockLog.error).not.toHaveBeenCalled();
         });
@@ -704,7 +708,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.warning).toHaveBeenCalledWith(
-                "⚠ Memory check enabled but no memorySize configured in provider",
+                "Memory check enabled but no memorySize configured in provider",
             );
             expect(mockLog.error).not.toHaveBeenCalled();
         });
@@ -742,7 +746,7 @@ describe("CrashOverrideServerlessPlugin", () => {
 
             // Should only see the standard initialization logs, no memory check logs
             expect(mockLog.notice).toHaveBeenCalledWith(
-                "🔧 Dust Plugin: Initializing package process",
+                "Dust Plugin: Initializing package process",
             );
             // Should not log any memory-related messages
             expect(mockLog.info).not.toHaveBeenCalledWith(
@@ -806,7 +810,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "✓ Memory check passed: 512MB >= 512MB",
+                "Memory check passed: 512MB >= 256MB",
             );
 
             // Run after hook
@@ -820,13 +824,13 @@ describe("CrashOverrideServerlessPlugin", () => {
 
             // Verify both features work together
             expect(mockLog.notice).toHaveBeenCalledWith(
-                "📦 Dust Plugin: Processing packaged functions",
+                "Dust Plugin: Processing packaged functions",
             );
-            expect(mockLog.notice).toHaveBeenCalledWith(
-                "✓ Successfully added Dust Lambda Extension to 1 function(s)",
+            expect(mockLog.success).toHaveBeenCalledWith(
+                "Successfully added Dust Lambda Extension to 1 function(s)",
             );
-            expect(mockLog.notice).toHaveBeenCalledWith(
-                "✓ Successfully injected chalkmarks into package",
+            expect(mockLog.success).toHaveBeenCalledWith(
+                "Successfully injected chalkmarks into package",
             );
         });
     });
@@ -862,9 +866,9 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "ℹ Checking for chalk binary...",
+                "Checking for chalk binary...",
             );
-            expect(mockLog.info).toHaveBeenCalledWith("✓ Chalk binary found");
+            expect(mockLog.success).toHaveBeenCalledWith("Chalk binary found");
             expect(mockLog.error).not.toHaveBeenCalled();
         });
 
@@ -903,7 +907,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.error).toHaveBeenCalledWith(
-                "✗ Chalk check failed: chalk binary not found in PATH",
+                "Chalk check failed: chalk binary not found in PATH",
             );
         });
 
@@ -940,7 +944,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.warning).toHaveBeenCalledWith(
-                "⚠ Chalk binary not available. Continuing without chalkmarks",
+                "Chalk binary not available. Continuing without chalkmarks",
             );
             expect(mockLog.error).not.toHaveBeenCalled();
         });
@@ -974,7 +978,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.warning).toHaveBeenCalledWith(
-                "⚠ Chalk binary not available. Continuing without chalkmarks",
+                "Chalk binary not available. Continuing without chalkmarks",
             );
             expect(mockLog.error).not.toHaveBeenCalled();
         });
@@ -1013,9 +1017,9 @@ describe("CrashOverrideServerlessPlugin", () => {
 
             // Both checks should pass
             expect(mockLog.info).toHaveBeenCalledWith(
-                "✓ Memory check passed: 512MB >= 512MB",
+                "Memory check passed: 512MB >= 256MB",
             );
-            expect(mockLog.info).toHaveBeenCalledWith("✓ Chalk binary found");
+            expect(mockLog.success).toHaveBeenCalledWith("Chalk binary found");
             expect(mockLog.error).not.toHaveBeenCalled();
         });
 
@@ -1059,7 +1063,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             }
 
             expect(mockLog.error).toHaveBeenCalledWith(
-                "✗ Chalk check failed: chalk binary not found in PATH",
+                "Chalk check failed: chalk binary not found in PATH",
             );
         });
     });
@@ -1090,7 +1094,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             );
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "ℹ CrashOverride config initialized:\n\tmemoryCheck=false\n\tchalkCheck=false",
+                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=false",
             );
         });
 
@@ -1111,7 +1115,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             );
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "ℹ CrashOverride config initialized:\n\tmemoryCheck=true\n\tchalkCheck=true",
+                "CrashOverride config initialized:\n\tmemoryCheck=true\n\tmemoryCheckSize=256\n\tchalkCheck=true",
             );
         });
 
@@ -1137,7 +1141,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             );
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "ℹ CrashOverride config initialized:\n\tmemoryCheck=false\n\tchalkCheck=false",
+                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=false",
             );
         });
 
@@ -1163,7 +1167,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             );
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "ℹ CrashOverride config initialized:\n\tmemoryCheck=false\n\tchalkCheck=true",
+                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=true",
             );
         });
 
@@ -1184,7 +1188,7 @@ describe("CrashOverrideServerlessPlugin", () => {
             );
 
             expect(mockLog.info).toHaveBeenCalledWith(
-                "ℹ CrashOverride config initialized:\n\tmemoryCheck=false\n\tchalkCheck=false",
+                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=false",
             );
         });
 
@@ -1206,7 +1210,7 @@ describe("CrashOverrideServerlessPlugin", () => {
 
             // Should use defaults since env values are not "true"
             expect(mockLog.info).toHaveBeenCalledWith(
-                "ℹ CrashOverride config initialized:\n\tmemoryCheck=false\n\tchalkCheck=false",
+                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=false",
             );
         });
 
