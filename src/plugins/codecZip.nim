@@ -286,14 +286,12 @@ proc zitemGetChalkTimeArtifactInfo(self: Plugin,
   if obj.baseChalk == nil or obj.baseChalk.myCodec.name != "zip":
     return
   result.setIfNeeded("CONTAINING_ARTIFACT_WHEN_CHALKED", obj.baseChalk.callGetChalkId())
-  if "PATH_WHEN_CHALKED" in obj.collectedData:
-    let
-      cache = ZipCache(obj.baseChalk.cache)
-      path  = unpack[string](obj.collectedData["PATH_WHEN_CHALKED"])
-      name  = path.removePrefix(cache.origD)
-    obj.name = "zip:" & name
+  let cache = ZipCache(obj.baseChalk.cache)
+  if obj.fsRef.startsWith(cache.origD):
+    var name = obj.fsRef
+    name.removePrefix(cache.origD)
     result.setIfNeeded("PATH_WITHIN_ZIP", name)
-    obj.collectedData.del("PATH_WHEN_CHALKED")
+    obj.name = "zip:" & name
 
 proc loadCodecZip*() =
   newCodec("zip",

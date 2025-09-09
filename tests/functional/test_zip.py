@@ -9,6 +9,7 @@ import pytest
 
 from .chalk.runner import Chalk
 from .conf import CONFIGS, ZIPS
+from .utils.dict import Contains, IfExists
 from .utils.log import get_logger
 
 
@@ -22,6 +23,7 @@ NODEJS_LAMBDA_ZIP = ZIPS / "nodejs" / "function.zip"
 PYTHON_LAMBDA_ZIP = ZIPS / "python" / "my_deployment_package.zip"
 JAR_FILE = ZIPS / "misc" / "test.jar"
 DOUBLE_EXT_ZIP = ZIPS / "misc" / "test.serverless.zip"
+TERRAFORM_ZIP = ZIPS / "terraform" / "test.zip"
 
 # Test configs
 SERVERLESS_CONFIG = CONFIGS / "serverless_zip.c4m"
@@ -33,6 +35,7 @@ SERVERLESS_CONFIG = CONFIGS / "serverless_zip.c4m"
     [
         [NODEJS_LAMBDA_ZIP],
         [PYTHON_LAMBDA_ZIP],
+        [TERRAFORM_ZIP],
     ],
     indirect=True,
 )
@@ -52,8 +55,26 @@ def test_valid_slow(
         artifact=tmp_data_dir,
         virtual=virtual,
         inject_binary_into_zip=inject_binary_into_zip,
+        config=CONFIGS / "zip.c4m",
     )
-    assert insert.report.marks_by_path.contains({str(test_file): {}})
+    assert insert.report.marks_by_path.contains(
+        {
+            str(test_file): {
+                "EMBEDDED_CHALK": IfExists(
+                    Contains(
+                        [
+                            {
+                                "CONTAINING_ARTIFACT_WHEN_CHALKED": insert.mark[
+                                    "CHALK_ID"
+                                ],
+                                "PATH_WITHIN_ZIP": str,
+                            }
+                        ],
+                    ),
+                ),
+            },
+        },
+    )
 
     # chalk binary is not injected if --virtual flag is present
     if inject_binary_into_zip and should_inject_binary(test_file, virtual):
@@ -63,6 +84,24 @@ def test_valid_slow(
     if not virtual:
         assert extract.mark.contains(insert.mark.if_exists())
         assert extract.report.marks_by_path.contains({str(test_file): {}})
+
+    insert2 = chalk.insert(
+        artifact=tmp_data_dir,
+        virtual=virtual,
+        inject_binary_into_zip=inject_binary_into_zip,
+        config=CONFIGS / "zip.c4m",
+    )
+    assert insert.mark.contains(
+        insert2.mark.exclude(
+            "EMBEDDED_CHALK",
+            "EMBEDDED_TMPDIR",
+            "METADATA_HASH",
+            "METADATA_ID",
+            "HASH",
+            "_CURRENT_HASH",
+            "CHALK_RAND",
+        )
+    )
 
 
 @pytest.mark.parametrize(
