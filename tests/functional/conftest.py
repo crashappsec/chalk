@@ -13,7 +13,6 @@ from tempfile import TemporaryDirectory
 
 import pytest
 import requests
-from filelock import FileLock
 
 from . import conf
 from .chalk.runner import Chalk
@@ -30,6 +29,7 @@ from .conf import (
 )
 from .utils.log import get_logger
 from .utils.tmp import make_tmp_file
+from .utils.os import lock
 
 
 logger = get_logger()
@@ -46,10 +46,6 @@ def pytest_addoption(parser):
 @pytest.hookimpl
 def pytest_configure(config):
     config.inicfg["log_cli"] = config.getoption("--logs")
-
-
-def lock(name: str):
-    return FileLock(Path(__file__).with_name(name).resolve())
 
 
 @pytest.fixture(autouse=True)
