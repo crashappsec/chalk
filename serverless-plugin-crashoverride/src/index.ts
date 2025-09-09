@@ -15,16 +15,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
     private isChalkAvailable: boolean = false;
     private readonly config: Readonly<CrashOverrideConfig>;
 
-    private readonly symbols = {
-        error: "✗",
-        info: "ℹ",
-        package: "📦",
-        process: "🔧",
-        rocket: "🚀",
-        success: "✓",
-        warning: "⚠",
-    } as const;
-
     constructor(
         serverless: Serverless,
         options: Serverless.Options = {},
@@ -49,10 +39,32 @@ class CrashOverrideServerlessPlugin implements Plugin {
         };
     }
 
+    // Helper logging methods
+    private log_error(message: string): void {
+        this.log.error(chalk.red(`${message}`));
+    }
+
+    private log_warning(message: string): void {
+        this.log.warning(chalk.yellow(`${message}`));
+    }
+
+    private log_notice(message: string): void {
+        this.log.notice(chalk.cyan(`${message}`));
+    }
+
+    private log_success(message: string): void {
+        this.log.success(chalk.green(`${message}`));
+    }
+
+    private log_info(message: string): void {
+        this.log.info(chalk.gray(`${message}`));
+    }
+
     private initializeConfig(): Readonly<CrashOverrideConfig> {
         // Default values (lowest precedence)
         const defaults: CrashOverrideConfig = {
             memoryCheck: false,
+            memoryCheckSize: 256,
             chalkCheck: false,
         };
 
@@ -82,10 +94,8 @@ class CrashOverrideServerlessPlugin implements Plugin {
         };
 
         // Log the final configuration
-        this.log.info(
-            chalk.gray(
-                `${this.symbols.info} CrashOverride config initialized:\n\tmemoryCheck=${finalConfig.memoryCheck}\n\tchalkCheck=${finalConfig.chalkCheck}`,
-            ),
+        this.log_info(
+            `CrashOverride config initialized:\n\tmemoryCheck=${finalConfig.memoryCheck}\n\tmemoryCheckSize=${finalConfig.memoryCheckSize}\n\tchalkCheck=${finalConfig.chalkCheck}`,
         );
 
         return Object.freeze(finalConfig);
@@ -99,77 +109,55 @@ class CrashOverrideServerlessPlugin implements Plugin {
         // If memory size is not configured, warn and return
         if (!memorySize) {
             if (this.config.memoryCheck) {
-                this.log.warning(
-                    chalk.yellow(
-                        `${this.symbols.warning} Memory check enabled but no memorySize configured in provider`,
-                    ),
+                this.log_warning(
+                    `Memory check enabled but no memorySize configured in provider`,
                 );
             }
             return;
         }
 
         // Check if memory size is below minimum
-        if (memorySize < 512) {
+        if (memorySize < this.config.memoryCheckSize) {
             if (this.config.memoryCheck) {
                 // When memoryCheck is true, fail the build
                 const errorMessage = `Memory check failed: memorySize (${memorySize}MB) is less than minimum required (512MB)`;
-                this.log.error(
-                    chalk.red(`${this.symbols.error} ${errorMessage}`),
-                );
-                throw new Error(errorMessage);
+                this.log_error(errorMessage);
+                throw new this.serverless.classes.Error(errorMessage);
             } else {
                 // When memoryCheck is false, just warn
-                this.log.warning(
-                    chalk.yellow(
-                        `${this.symbols.warning} Memory size (${memorySize}MB) is below recommended minimum (512MB). Set custom.crashoverride.memoryCheck: true to enforce this requirement`,
-                    ),
+                this.log_warning(
+                    `Memory size (${memorySize}MB) is below recommended minimum (${this.config.memoryCheckSize}). Set custom.crashoverride.memoryCheck: true to enforce this requirement`,
                 );
             }
         } else if (this.config.memoryCheck) {
             // Only log success when check is enabled and passes
-            this.log.info(
-                chalk.green(
-                    `${this.symbols.success} Memory check passed: ${memorySize}MB >= 512MB`,
-                ),
+            this.log_info(
+                `Memory check passed: ${memorySize}MB >= ${this.config.memoryCheckSize}MB`,
             );
         }
     }
 
     private chalkBinaryAvailable(): boolean {
-        this.log.info(
-            chalk.gray(`${this.symbols.info} Checking for chalk binary...`),
-        );
+        this.log_info(`Checking for chalk binary...`);
 
         try {
             execSync("command -v chalk", { stdio: "ignore" });
-            this.log.info(
-                chalk.green(`${this.symbols.success} Chalk binary found`),
-            );
+            this.log_success(`Chalk binary found`);
             return true;
         } catch {
             if (this.config.chalkCheck) {
                 const errorMessage = `Chalk check failed: chalk binary not found in PATH`;
-                this.log.error(
-                    chalk.red(`${this.symbols.error} ${errorMessage}`),
-                );
-                throw new Error(errorMessage);
+                this.log_error(errorMessage);
+                throw new this.serverless.classes.Error(errorMessage);
             } else {
-                this.log.info(
-                    chalk.gray(
-                        `${this.symbols.info} Chalk binary not found in PATH`,
-                    ),
-                );
+                this.log_info(`Chalk binary not found in PATH`);
                 return false;
             }
         }
     }
 
     private beforePackageInitialize(): void {
-        this.log.notice(
-            chalk.cyan(
-                `${this.symbols.process} Dust Plugin: Initializing package process`,
-            ),
-        );
+        this.log_notice(`Dust Plugin: Initializing package process`);
 
         // Check memory configuration first (fail fast if needed)
         this.checkMemoryConfiguration();
@@ -178,16 +166,12 @@ class CrashOverrideServerlessPlugin implements Plugin {
         this.isChalkAvailable = this.chalkBinaryAvailable();
 
         if (this.isChalkAvailable) {
-            this.log.info(
-                chalk.gray(
-                    `${this.symbols.info} Chalk binary found and will be used to add chalkmarks`,
-                ),
+            this.log_info(
+                `Chalk binary found and will be used to add chalkmarks`,
             );
         } else {
-            this.log.warning(
-                chalk.yellow(
-                    `${this.symbols.warning} Chalk binary not available. Continuing without chalkmarks`,
-                ),
+            this.log_warning(
+                `Chalk binary not available. Continuing without chalkmarks`,
             );
         }
     }
@@ -207,54 +191,36 @@ class CrashOverrideServerlessPlugin implements Plugin {
             return zipPath;
         }
 
-        this.log.warning(
-            chalk.yellow(
-                `${this.symbols.warning} Package zip file not found at ${chalk.gray(zipPath)}`,
-            ),
+        this.log_warning(
+            `Package zip file not found at ${chalk.gray(zipPath)}`,
         );
         return null;
     }
 
     private injectChalkBinary(): void {
         if (!this.isChalkAvailable) {
-            this.log.info(
-                chalk.yellow(
-                    `${this.symbols.warning} Chalk binary not available, skipping chalkmark injection`,
-                ),
+            this.log_warning(
+                `Chalk binary not available, skipping chalkmark injection`,
             );
             return;
         }
 
         const zipPath = this.getPackageZipPath();
         if (!zipPath) {
-            this.log.error(
-                chalk.red(
-                    `${this.symbols.error} Could not locate package zip file`,
-                ),
-            );
+            this.log_error(`Could not locate package zip file`);
             return;
         }
 
         try {
-            this.log.info(
-                chalk.gray(
-                    `${this.symbols.info} Injecting chalkmarks into ${chalk.gray(zipPath)}`,
-                ),
-            );
+            this.log_info(`Injecting chalkmarks into ${chalk.gray(zipPath)}`);
             execSync(`chalk insert --inject-binary-into-zip "${zipPath}"`, {
                 stdio: "pipe",
                 encoding: "utf8",
             });
-            this.log.notice(
-                chalk.green(
-                    `${this.symbols.success} Successfully injected chalkmarks into package`,
-                ),
-            );
+            this.log_success(`Successfully injected chalkmarks into package`);
         } catch (error: any) {
-            this.log.error(
-                chalk.red(
-                    `${this.symbols.error} Failed to inject chalkmarks: ${chalk.bold(error.message)}`,
-                ),
+            this.log_error(
+                `Failed to inject chalkmarks: ${chalk.bold(error.message)}`,
             );
         }
     }
@@ -265,11 +231,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
         const functions = this.serverless.service.functions || {};
         const MAX_LAYERS_AND_EXTENSIONS = 15; // AWS Lambda limit: 5 layers + 10 extensions
 
-        this.log.notice(
-            chalk.cyan(
-                `${this.symbols.rocket} Adding Dust Lambda Extension to all functions`,
-            ),
-        );
+        this.log_notice(`Adding Dust Lambda Extension to all functions`);
 
         // Validate all functions first before modifying any
         Object.keys(functions).forEach((functionName) => {
@@ -280,8 +242,8 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
             if (currentLayers.length >= MAX_LAYERS_AND_EXTENSIONS) {
                 const error = `Cannot add Dust Lambda Extension to function ${chalk.bold(functionName)}: would exceed maximum layer/extension limit of ${MAX_LAYERS_AND_EXTENSIONS} (currently has ${currentLayers.length})`;
-                this.log.error(chalk.red(`${this.symbols.error} ${error}`));
-                throw new Error(error);
+                this.log_error(error);
+                throw new this.serverless.classes.Error(error);
             }
         });
 
@@ -294,35 +256,25 @@ class CrashOverrideServerlessPlugin implements Plugin {
                 func.layers = [];
             }
             func.layers.push(extensionArn);
-            this.log.info(
-                chalk.gray(
-                    `${this.symbols.info} Added Dust Lambda Extension to function: ${chalk.bold(functionName)} (${chalk.gray(`${func.layers.length}/${MAX_LAYERS_AND_EXTENSIONS} layers/extensions`)})`,
-                ),
+            this.log_info(
+                `Added Dust Lambda Extension to function: ${chalk.bold(functionName)} (${chalk.gray(`${func.layers.length}/${MAX_LAYERS_AND_EXTENSIONS} layers/extensions`)})`,
             );
         });
 
         const functionCount = Object.keys(functions).length;
         if (functionCount > 0) {
-            this.log.notice(
-                chalk.green(
-                    `${this.symbols.success} Successfully added Dust Lambda Extension to ${chalk.bold(functionCount)} function(s)`,
-                ),
+            this.log_success(
+                `Successfully added Dust Lambda Extension to ${chalk.bold(functionCount)} function(s)`,
             );
         } else {
-            this.log.warning(
-                chalk.yellow(
-                    `${this.symbols.warning} No functions found in service - no extensions added`,
-                ),
+            this.log_warning(
+                `No functions found in service - no extensions added`,
             );
         }
     }
 
     private afterPackageInitialize(): void {
-        this.log.notice(
-            chalk.cyan(
-                `${this.symbols.package} Dust Plugin: Processing packaged functions`,
-            ),
-        );
+        this.log_notice(`Dust Plugin: Processing packaged functions`);
         this.addDustLambdaExtension();
         this.injectChalkBinary();
     }
