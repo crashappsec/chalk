@@ -6,6 +6,7 @@ export interface PluginConfig {
 
 export interface CrashOverrideConfig {
     memoryCheck: boolean;
+    memoryCheckSize: number;
     chalkCheck: boolean;
 }
 
