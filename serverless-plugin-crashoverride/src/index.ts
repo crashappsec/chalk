@@ -3,24 +3,28 @@ import type Plugin from "serverless/classes/Plugin";
 import { execSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import * as https from "https";
 import chalk from "chalk"; // chalk the JS lib. Not chalk to CO project.
-import type { CustomServerlessConfig, CrashOverrideConfig } from "./types";
+import type {
+    CustomServerlessConfig,
+    CrashOverrideConfig,
+    ProviderConfig,
+} from "./types";
 
 class CrashOverrideServerlessPlugin implements Plugin {
     public serverless: Serverless;
     public options: Serverless.Options;
     public hooks: Plugin.Hooks;
-    public provider: any;
     private log: any;
     private isChalkAvailable: boolean = false;
-    private readonly config: Readonly<CrashOverrideConfig>;
+    public readonly config: Readonly<CrashOverrideConfig>;
+    private providerConfig: ProviderConfig | null = null;
 
     constructor(
         serverless: Serverless,
         options: Serverless.Options = {},
         { log }: { log: any },
     ) {
-        this.provider = serverless.getProvider("aws");
         this.serverless = serverless;
         this.options = options;
         this.log = log;
@@ -32,10 +36,12 @@ class CrashOverrideServerlessPlugin implements Plugin {
         this.config = this.initializeConfig();
 
         this.hooks = {
-            "before:package:initialize":
-                this.beforePackageInitialize.bind(this),
-            "after:aws:package:finalize:mergeCustomProviderResources":
-                this.afterPackageInitialize.bind(this),
+            "after:package:setupProviderConfiguration":
+                this.fetchProviderConfig.bind(this),
+            "after:package:createDeploymentArtifacts":
+                this.preFlightChecks.bind(this),
+            "before:package:compileFunctions":
+                this.mutateServerlessService.bind(this),
         };
     }
 
@@ -66,6 +72,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
             memoryCheck: false,
             memoryCheckSize: 256,
             chalkCheck: false,
+            arnUrlPrefix: "https://dl.crashoverride.run/dust"
         };
 
         // Environment variables (medium precedence)
@@ -74,15 +81,27 @@ class CrashOverrideServerlessPlugin implements Plugin {
             envConfig.memoryCheck =
                 process.env["CO_MEMORY_CHECK"].toLowerCase() === "true";
         }
+        if (process.env["CO_MEMORY_CHECK_SIZE_MB"] !== undefined) {
+            const memorySize: number = (envConfig.memoryCheckSize =
+                Number.parseInt(process.env["CO_MEMORY_CHECK_SIZE_MB"]));
+            if (Number.isSafeInteger(memorySize)) {
+                envConfig.memoryCheckSize = memorySize;
+            } else {
+                throw new this.serverless.classes.Error(
+                    `Received invalid memoryCheckSize value of: ${memorySize}`,
+                );
+            }
+        }
         if (process.env["CO_CHALK_CHECK_ENABLED"] !== undefined) {
             envConfig.chalkCheck =
                 process.env["CO_CHALK_CHECK_ENABLED"].toLowerCase() === "true";
         }
+        if (process.env["CO_ARN_URL_PREFIX"] !== undefined) {
+            envConfig.arnUrlPrefix = process.env["CO_ARN_URL_PREFIX"];
+        }
 
         // Serverless config (highest precedence)
-        const customConfig = this.serverless.service.custom as
-            | CustomServerlessConfig
-            | undefined;
+        const customConfig: CustomServerlessConfig | undefined = this.serverless.service.custom
         const serverlessConfig: Partial<CrashOverrideConfig> =
             customConfig?.crashoverride || {};
 
@@ -101,38 +120,87 @@ class CrashOverrideServerlessPlugin implements Plugin {
         return Object.freeze(finalConfig);
     }
 
-    private checkMemoryConfiguration(): void {
-        // Access memorySize from the provider object (it's a custom property added by serverless.yml)
-        const memorySize = (this.serverless.service.provider as any)
-            ?.memorySize;
-
-        // If memory size is not configured, warn and return
-        if (!memorySize) {
-            if (this.config.memoryCheck) {
-                this.log_warning(
-                    `Memory check enabled but no memorySize configured in provider`,
-                );
-            }
+    private fetchProviderConfig(): void {
+        if (this.providerConfig != null) {
+            // early exit if config has already been fetched
+            return;
+        }
+        // Verify provider configuration is available
+        const provider = this.serverless.service.provider as any;
+        if (!provider) {
+            this.log_error("No provider configuration found in serverless.yml");
             return;
         }
 
+        // Persist provider configuration
+        this.providerConfig = {
+            provider: "aws", // We're specifically an AWS plugin
+            region: provider.region || "us-east-1", // AWS default region
+            memorySize: provider.memorySize || 1024, // Serverless Framework AWS Lambda default
+        };
+
+        // Log provider configuration for debugging
+        this.log_info(
+            `Provider config: provider=${this.providerConfig.provider}, region=${this.providerConfig.region}, memorySize=${this.providerConfig.memorySize}`,
+        );
+    }
+
+    private async fetchDustExtensionArn(region: string): Promise<string> {
+        const urlPrefix = this.config.arnUrlPrefix
+        return new Promise((resolve, reject) => {
+            const url = `${urlPrefix}/${region}/extension.arn`;
+
+            https.get(url, (res) => {
+                let data = "";
+
+                if (res.statusCode !== 200) {
+                    this.log_warning(`Failed to fetch Dust extension ARN for region ${region}: HTTP ${res.statusCode}`);
+                    reject(new Error(`HTTP ${res.statusCode}`));
+                    return;
+                }
+
+                res.on("data", (chunk) => {
+                    data += chunk;
+                });
+
+                res.on("end", () => {
+                    const arn = data.trim();
+                    resolve(arn);
+                });
+            }).on("error", (error) => {
+                this.log_warning(`Failed to fetch Dust extension ARN for region ${region}: ${error.message}`);
+                reject(error);
+            });
+        });
+    }
+
+    private checkMemoryConfiguration(): void {
+        // Ensure provider configuration has been fetched
+        if (!this.providerConfig) {
+            throw new this.serverless.classes.Error(
+                "Provider configuration not initialized",
+            );
+        }
+
+        const providerMemorySize = this.providerConfig.memorySize;
+
         // Check if memory size is below minimum
-        if (memorySize < this.config.memoryCheckSize) {
+        if (providerMemorySize < this.config.memoryCheckSize) {
             if (this.config.memoryCheck) {
                 // When memoryCheck is true, fail the build
-                const errorMessage = `Memory check failed: memorySize (${memorySize}MB) is less than minimum required (512MB)`;
+                const errorMessage = `Memory check failed: memorySize (${providerMemorySize}MB) is less than minimum required (${this.config.memoryCheckSize}MB)`;
                 this.log_error(errorMessage);
                 throw new this.serverless.classes.Error(errorMessage);
             } else {
                 // When memoryCheck is false, just warn
                 this.log_warning(
-                    `Memory size (${memorySize}MB) is below recommended minimum (${this.config.memoryCheckSize}). Set custom.crashoverride.memoryCheck: true to enforce this requirement`,
+                    `Memory size (${providerMemorySize}MB) is below recommended minimum (${this.config.memoryCheckSize}). Set custom.crashoverride.memoryCheck: true to enforce this requirement`,
                 );
             }
         } else if (this.config.memoryCheck) {
-            // Only log success when check is enabled and passes
+            // log success when check is enabled and passes
             this.log_info(
-                `Memory check passed: ${memorySize}MB >= ${this.config.memoryCheckSize}MB`,
+                `Memory check passed: ${providerMemorySize}MB >= ${this.config.memoryCheckSize}MB`,
             );
         }
     }
@@ -156,11 +224,14 @@ class CrashOverrideServerlessPlugin implements Plugin {
         }
     }
 
-    private beforePackageInitialize(): void {
+    private preFlightChecks(): void {
         this.log_notice(`Dust Plugin: Initializing package process`);
 
-        // Check memory configuration first (fail fast if needed)
-        this.checkMemoryConfiguration();
+        // Only check memory configuration if provider config was successfully fetched
+        if (this.providerConfig) {
+            // Check memory configuration (fail fast if needed)
+            this.checkMemoryConfiguration();
+        }
 
         // Check chalk availability once and store the result
         this.isChalkAvailable = this.chalkBinaryAvailable();
@@ -225,9 +296,15 @@ class CrashOverrideServerlessPlugin implements Plugin {
         }
     }
 
-    private addDustLambdaExtension(): void {
-        const extensionArn =
-            "arn:aws:lambda:us-east-1:123456789012:layer:my-extension";
+    private async addDustLambdaExtension(): Promise<void> {
+        if (this.providerConfig === null) {
+            const errorMessage = `Cannot ascertain service's region from Provider configuration`
+            this.log_error(errorMessage)
+            throw new Error(errorMessage);
+        }
+
+        const extensionArn = await this.fetchDustExtensionArn(this.providerConfig.region)
+        this.log_info(`Dust Extension ARN for ${this.providerConfig.region} :: ${extensionArn}`)
         const functions = this.serverless.service.functions || {};
         const MAX_LAYERS_AND_EXTENSIONS = 15; // AWS Lambda limit: 5 layers + 10 extensions
 
@@ -273,9 +350,9 @@ class CrashOverrideServerlessPlugin implements Plugin {
         }
     }
 
-    private afterPackageInitialize(): void {
+    private async mutateServerlessService(): Promise<void> {
         this.log_notice(`Dust Plugin: Processing packaged functions`);
-        this.addDustLambdaExtension();
+        await this.addDustLambdaExtension();
         this.injectChalkBinary();
     }
 }
