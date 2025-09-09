@@ -14,10 +14,16 @@ from pathlib import Path
 from subprocess import PIPE, CalledProcessError, Popen, TimeoutExpired
 from typing import Literal, Optional
 
+from filelock import FileLock
+
 from .log import get_logger
 
 
 logger = get_logger()
+
+
+def lock(name: str):
+    return FileLock(Path(__file__).with_name(name).resolve())
 
 
 def bin_from_cmd(cmd: list[str] | tuple[str] | str) -> str:

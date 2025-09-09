@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from .log import get_logger
-from .os import run
+from .os import run, lock
 
 
 logger = get_logger()
@@ -59,6 +59,7 @@ class Git:
         self.run(["git", "add", "."])
         return self
 
+    @lock("git-op")
     def commit(self, message="dummy"):
         args = ["git", "commit", "--allow-empty"]
         if message == "":
@@ -67,6 +68,7 @@ class Git:
         self.run(args)
         return self
 
+    @lock("git-op")
     def tag(self, tag: str, message: Optional[str] = None):
         args = ["git", "tag", tag]
         if message is not None or self.sign:
