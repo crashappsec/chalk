@@ -1,1242 +1,546 @@
+import CrashOverrideServerlessPlugin from "./index";
+import {
+  createMockServerless,
+  createMockLogger,
+  createMockOptions,
+  ServerlessError,
+} from "./__mocks__/serverless.mock";
+import * as childProcessMock from "./__mocks__/child_process";
+import * as fsMock from "./__mocks__/fs";
+import {
+  createPlugin,
+  executeProviderConfigHook,
+  executeDeploymentHook,
+  executeAwsPackageHook,
+  TestSetupBuilder,
+  assertions,
+} from "./__tests__/test-helpers";
 import type Serverless from "serverless";
-import CrashOverrideServerlessPlugin from "../src/index.js";
-import { execSync } from "child_process";
-import * as fs from "fs";
 
-jest.mock("child_process");
-jest.mock("fs");
-jest.mock("chalk", () => ({
+jest.mock("child_process", () => require("./__mocks__/child_process"));
+jest.mock("fs", () => require("./__mocks__/fs"));
+jest.mock("https", () => require("./__mocks__/https"));
+// sidestep ANSI color codes
+jest.mock("chalk", () => {
+  const mockChalk = {
+    red: (str: string) => str,
+    yellow: (str: string) => str,
+    cyan: (str: string) => str,
+    green: (str: string) => str,
+    gray: (str: string) => str,
+    bold: (str: string) => str,
+  };
+  return {
     __esModule: true,
-    default: {
-        blue: (text: string) => text,
-        green: (text: string) => text,
-        yellow: (text: string) => text,
-        red: (text: string) => text,
-        cyan: (text: string) => text,
-        dim: (text: string) => text,
-        gray: (text: string) => text,
-        bold: (text: string) => text,
-    },
-}));
-
-const mockServerless = {
-    getProvider: jest.fn().mockReturnValue({}),
-    config: {
-        servicePath: "/test/project",
-    },
-    classes: {
-        Error: Error, // Use native Error class for testing
-    },
-    service: {
-        service: "test-service",
-        provider: {
-            stage: "dev",
-        },
-        functions: {
-            function1: {},
-            function2: {
-                layers: [
-                    "arn:aws:lambda:us-east-1:123456789012:layer:existing1",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:existing2",
-                ],
-            },
-            function3: {
-                layers: new Array(14)
-                    .fill(0)
-                    .map(
-                        (_, i) =>
-                            `arn:aws:lambda:us-east-1:123456789012:layer:layer${i}`,
-                    ),
-            },
-            function4: {
-                layers: new Array(15)
-                    .fill(0)
-                    .map(
-                        (_, i) =>
-                            `arn:aws:lambda:us-east-1:123456789012:layer:layer${i}`,
-                    ),
-            },
-        },
-    },
-} as any as Serverless;
-
-const mockLog = {
-    error: jest.fn(),
-    warning: jest.fn(),
-    notice: jest.fn(),
-    info: jest.fn(),
-    debug: jest.fn(),
-    success: jest.fn(),
-};
+    default: mockChalk,
+  };
+});
 
 describe("CrashOverrideServerlessPlugin", () => {
-    let plugin: CrashOverrideServerlessPlugin;
+  let mockServerless: Serverless;
+  let mockOptions: any;
+  let mockLog: ReturnType<typeof createMockLogger>;
+  let originalEnv: NodeJS.ProcessEnv;
 
-    beforeEach(() => {
-        plugin = new CrashOverrideServerlessPlugin(
-            mockServerless,
-            {},
-            { log: mockLog },
-        );
-    });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    childProcessMock.resetMocks();
+    fsMock.resetMocks();
 
-    afterEach(() => {
-        jest.clearAllMocks();
-    });
+    originalEnv = { ...process.env };
 
-    it("should initialize with correct properties", () => {
-        expect(plugin.serverless).toBe(mockServerless);
-        expect(plugin.options).toEqual({});
+    mockServerless = createMockServerless();
+    mockOptions = createMockOptions();
+    mockLog = createMockLogger();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  describe("Plugin Initialization", () => {
+    describe("Successful plugin installation", () => {
+      it("should initialize successfully with default configuration values", () => {
+        const { plugin } = createPlugin();
+
+        expect(plugin.config.memoryCheck).toBe(false);
+        expect(plugin.config.memoryCheckSize).toBe(256);
+        expect(plugin.config.chalkCheck).toBe(false);
+      });
+
+      it("should register lifecycle hooks correctly", () => {
+        const { plugin } = createPlugin();
+
         expect(plugin.hooks).toBeDefined();
-    });
+        expect(plugin.hooks["after:package:setupProviderConfiguration"]).toBeDefined();
+        expect(plugin.hooks["after:package:createDeploymentArtifacts"]).toBeDefined();
+        expect(plugin.hooks["before:package:compileFunctions"]).toBeDefined();
+      });
 
-    it("should have the correct hooks registered", () => {
-        expect(plugin.hooks["before:package:initialize"]).toBeDefined();
-        expect(
-            plugin.hooks[
-                "after:aws:package:finalize:mergeCustomProviderResources"
-            ],
-        ).toBeDefined();
-    });
+      it("should successfully log chalk binary was found", () => {
+        const { plugin, mockLog } = new TestSetupBuilder()
+          .withChalkAvailable()
+          .withPackageZipExists()
+          .build();
 
-    it("should log before package initialize and check for chalk binary", async () => {
-        const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
-        mockExecSync.mockImplementation(() => Buffer.from(""));
-
-        const hook = plugin.hooks["before:package:initialize"];
-        if (hook) {
-            await hook();
-        }
+        executeDeploymentHook(plugin);
 
         expect(mockLog.notice).toHaveBeenCalledWith(
-            "Dust Plugin: Initializing package process",
-        );
-        expect(mockLog.info).toHaveBeenCalledWith(
-            "Checking for chalk binary...",
-        );
-        expect(mockLog.success).toHaveBeenCalledWith("Chalk binary found");
-        expect(mockLog.info).toHaveBeenCalledWith(
-            "Chalk binary found and will be used to add chalkmarks",
-        );
-        expect(mockExecSync).toHaveBeenCalledWith("command -v chalk", {
-            stdio: "ignore",
-        });
-    });
-
-    it("should handle chalk binary not found", () => {
-        const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
-        mockExecSync.mockImplementation(() => {
-            throw new Error("Command not found");
-        });
-
-        const result = (plugin as any).chalkBinaryAvailable();
-
-        expect(result).toBe(false);
-        expect(mockLog.info).toHaveBeenCalledWith(
-            "Checking for chalk binary...",
-        );
-        expect(mockLog.info).toHaveBeenCalledWith(
-            "Chalk binary not found in PATH",
-        );
-    });
-
-    it("should run both addDustLambdaExtension and injectChalkBinary after package initialize", async () => {
-        const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
-        const mockFs = fs as jest.Mocked<typeof fs>;
-
-        // Create plugin with functions that won't exceed layer limit
-        const integrationPlugin = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {
-                        function1: {},
-                        function2: { layers: ["existing-layer-1"] },
-                    },
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
-
-        mockExecSync.mockImplementation((cmd: string) => {
-            if (cmd === "command -v chalk") {
-                return Buffer.from("");
-            }
-            if (cmd.includes("chalk insert")) {
-                return Buffer.from("Successfully inserted chalkmarks");
-            }
-            return Buffer.from("");
-        });
-
-        mockFs.existsSync.mockReturnValue(true);
-
-        // Set chalk as available since we're mocking it to succeed
-        (integrationPlugin as any).isChalkAvailable = true;
-
-        const hook =
-            integrationPlugin.hooks[
-                "after:aws:package:finalize:mergeCustomProviderResources"
-            ];
-        if (hook) {
-            await hook();
-        }
-
-        // Check that afterPackageInitialize was called
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "Dust Plugin: Processing packaged functions",
-        );
-
-        // Check that addDustLambdaExtension was called
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "Adding Dust Lambda Extension to all functions",
+          expect.stringContaining("Initializing package process")
         );
         expect(mockLog.success).toHaveBeenCalledWith(
-            "Successfully added Dust Lambda Extension to 2 function(s)",
+          expect.stringContaining("Chalk binary found")
         );
+      });
 
-        // Check that injectChalkBinary was called
+      it("should read provider configuration correctly", () => {
+        const { plugin, mockLog } = new TestSetupBuilder()
+          .withProviderMemory(1234)
+          .withProviderRegion("us-west-2")
+          .build();
+
+        executeProviderConfigHook(plugin);
+
         expect(mockLog.info).toHaveBeenCalledWith(
-            expect.stringContaining("Injecting chalkmarks into"),
+          expect.stringContaining(`provider=aws`)
         );
-        expect(mockLog.success).toHaveBeenCalledWith(
-            "Successfully injected chalkmarks into package",
+        expect(mockLog.info).toHaveBeenCalledWith(
+          expect.stringContaining(`region=us-west-2`)
         );
-        expect(mockExecSync).toHaveBeenCalledWith(
-            expect.stringContaining("chalk insert --inject-binary-into-zip"),
-            { stdio: "pipe", encoding: "utf8" },
+        expect(mockLog.info).toHaveBeenCalledWith(
+          expect.stringContaining(`memorySize=1234`)
         );
-    });
+      });
 
-    it("should skip chalkmark injection when chalk is not available", async () => {
-        const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+        it("should prioritize serverless.yml config over environment variables", () => {
+          const { mockLog } = new TestSetupBuilder()
+            .withEnvironmentVar("CO_MEMORY_CHECK", "false")
+            .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
+            .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "false")
+            .withCustomConfig({
+              memoryCheck: true,
+              memoryCheckSize: 512,
+              chalkCheck: true,
+            })
+            .build();
 
-        // Create plugin with functions that won't exceed layer limit
-        const chalkUnavailablePlugin = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {
-                        function1: {},
-                    },
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
-
-        mockExecSync.mockImplementation((cmd: string) => {
-            if (cmd === "command -v chalk") {
-                throw new Error("Command not found");
-            }
-            return Buffer.from("");
+                assertions.expectConfigValues(mockLog, true, 512, true);
         });
 
-        const hook =
-            chalkUnavailablePlugin.hooks[
-                "after:aws:package:finalize:mergeCustomProviderResources"
-            ];
-        if (hook) {
-            await hook();
-        }
+        it("should use environment variables when serverless.yml config is not provided", () => {
+          const { mockLog } = new TestSetupBuilder()
+            .withEnvironmentVar("CO_MEMORY_CHECK", "true")
+            .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
+            .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "true")
+            .build();
 
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "Dust Plugin: Processing packaged functions",
-        );
-        expect(mockLog.warning).toHaveBeenCalledWith(
-            expect.stringMatching(
-                /Chalk binary not available, skipping chalkmark injection/,
-            ),
-        );
-    });
-
-    it("should handle missing zip file", async () => {
-        const mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
-        const mockFs = fs as jest.Mocked<typeof fs>;
-
-        // Create plugin with functions that won't exceed layer limit
-        const zipMissingPlugin = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {
-                        function1: {},
-                    },
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
-
-        mockExecSync.mockImplementation((cmd: string) => {
-            if (cmd === "command -v chalk") {
-                return Buffer.from("");
-            }
-            return Buffer.from("");
+          assertions.expectConfigValues(mockLog, true, 1024, true);
         });
 
-        mockFs.existsSync.mockReturnValue(false);
+        it("should use default values when no configuration is provided", () => {
+          const { mockLog } = createPlugin();
 
-        // Set chalk as available since we're mocking it to succeed
-        (zipMissingPlugin as any).isChalkAvailable = true;
+          assertions.expectConfigValues(mockLog, false, 256, false);
+        });
 
-        const hook =
-            zipMissingPlugin.hooks[
-                "after:aws:package:finalize:mergeCustomProviderResources"
-            ];
-        if (hook) {
-            await hook();
-        }
+        it("should handle invalid memoryCheckSize in environment variable", () => {
+          process.env["CO_MEMORY_CHECK_SIZE_MB"] = "invalid";
+          mockServerless = createMockServerless();
 
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "Dust Plugin: Processing packaged functions",
+          expect(() => {
+            new CrashOverrideServerlessPlugin(
+              mockServerless,
+              mockOptions,
+              { log: mockLog }
+            );
+          }).toThrow(ServerlessError);
+        });
+
+        it("should merge configurations with correct precedence", () => {
+          const { mockLog } = new TestSetupBuilder()
+            .withEnvironmentVar("CO_MEMORY_CHECK", "true")
+            .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
+            .withCustomConfig({
+              memoryCheckSize: 512,
+              chalkCheck: true,
+            })
+            .build();
+
+          assertions.expectConfigValues(mockLog, true, 512, true);
+        });
+
+    it("should handle boolean string values in environment variables correctly", () => {
+      const { mockLog } = new TestSetupBuilder()
+        .withEnvironmentVar("CO_MEMORY_CHECK", "TRUE")
+        .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "FALSE")
+        .build();
+
+      assertions.expectConfigValues(mockLog, true, 256, false);
+    });
+    });
+  });
+
+  describe("Memory Check Validation", () => {
+    describe("Memory check validation failure", () => {
+      it("should fail when memoryCheck=true and memoryCheckSize is greater than provider memorySize", () => {
+        const { plugin } = new TestSetupBuilder()
+          .withMemoryCheck(true, 2048)
+          .withProviderMemory(1024)
+          .build();
+
+        executeProviderConfigHook(plugin);
+
+        expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
+        expect(() => executeDeploymentHook(plugin)).toThrow(
+          "Memory check failed: memorySize (1024MB) is less than minimum required (2048MB)"
         );
-        expect(mockLog.warning).toHaveBeenCalledWith(
-            "Package zip file not found at /test/project/.serverless/test-service.zip",
+      });
+
+      it("should compare configured memory with memoryCheckSize", () => {
+        const { plugin, mockLog } = new TestSetupBuilder()
+          .withMemoryCheck(true, 512)
+          .withProviderMemory(1024)
+          .build();
+
+        executeProviderConfigHook(plugin);
+        executeDeploymentHook(plugin);
+
+        expect(mockLog.info).toHaveBeenCalledWith(
+          expect.stringContaining(`Memory check passed: 1024MB >= 512MB`)
         );
+      });
+
+      it("should throw error when memoryCheckSize is larger than provider memorySize", () => {
+        const { plugin, mockLog } = new TestSetupBuilder()
+          .withCustomConfig({
+            memoryCheck: true,
+            memoryCheckSize: 2048,
+            chalkCheck: false,
+          })
+          .withProviderMemory(1024)
+          .build();
+
+        executeProviderConfigHook(plugin);
+
+        expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
         expect(mockLog.error).toHaveBeenCalledWith(
-            "Could not locate package zip file",
+          expect.stringContaining("Memory check failed")
         );
+      });
     });
 
-    it("should add dust Lambda Extension to functions with no existing layers", () => {
-        // Create a simple mock serverless with one function
-        const simplePlugin = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {
-                        testFunction: {},
-                    },
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
+    it("should only warn when memoryCheck=false and memory is insufficient", () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withMemoryCheck(false, 2048)
+        .withProviderMemory(1024)
+        .build();
 
-        (simplePlugin as any).addDustLambdaExtension();
+      expect(() => executeProviderConfigHook(plugin)).not.toThrow();
+      expect(() => executeDeploymentHook(plugin)).not.toThrow();
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Memory size (1024MB) is below recommended minimum (2048). Set custom.crashoverride.memoryCheck: true to enforce this requirement`
+      ));
+    });
+  });
 
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "Adding Dust Lambda Extension to all functions",
-        );
-        expect(mockLog.info).toHaveBeenCalledWith(
-            "Added Dust Lambda Extension to function: testFunction (1/15 layers/extensions)",
-        );
-        expect(mockLog.success).toHaveBeenCalledWith(
-            "Successfully added Dust Lambda Extension to 1 function(s)",
-        );
+  describe("Chalk Binary Validation", () => {
+    it("should fail when chalkCheck=true and chalk is not available", () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withChalkNotAvailable()
+        .withCustomConfig({
+            memoryCheck: false,
+            memoryCheckSize: 256,
+            chalkCheck: true,
+        })
+        .build();
 
-        // Verify the layer was actually added
-        const func = (simplePlugin.serverless.service.functions as any)[
-            "testFunction"
-        ];
-        expect(func.layers).toEqual([
-            "arn:aws:lambda:us-east-1:123456789012:layer:my-extension",
-        ]);
+      expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
+      expect(() => executeDeploymentHook(plugin)).toThrow("Chalk check failed: chalk binary not found in PATH");
+      expect(mockLog.error).toHaveBeenCalledWith(
+        expect.stringContaining("Chalk check failed")
+      );
     });
 
-    it("should add dust Lambda Extension to functions with existing layers", () => {
-        // Create a plugin with function that has 2 existing layers
-        const pluginWithLayers = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {
-                        testFunction: {
-                            layers: ["existing-layer-1", "existing-layer-2"],
-                        },
-                    },
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
+    it("should succeed when chalkCheck=true and chalk is available", () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withChalkAvailable()
+        .withCustomConfig({
+            memoryCheck: false,
+            memoryCheckSize: 256,
+            chalkCheck: true,
+        })
+        .build();
 
-        (pluginWithLayers as any).addDustLambdaExtension();
-
-        expect(mockLog.info).toHaveBeenCalledWith(
-            "Added Dust Lambda Extension to function: testFunction (3/15 layers/extensions)",
-        );
-        expect(mockLog.success).toHaveBeenCalledWith(
-            "Successfully added Dust Lambda Extension to 1 function(s)",
-        );
-
-        // Verify the layer was added to existing layers
-        const func = (pluginWithLayers.serverless.service.functions as any)[
-            "testFunction"
-        ];
-        expect(func.layers).toEqual([
-            "existing-layer-1",
-            "existing-layer-2",
-            "arn:aws:lambda:us-east-1:123456789012:layer:my-extension",
-        ]);
+      expect(() => executeDeploymentHook(plugin)).not.toThrow();
+      expect(mockLog.success).toHaveBeenCalledWith(
+        expect.stringContaining("Chalk binary found")
+      );
     });
 
-    it("should handle function with 14 existing layers (should accept extension)", () => {
-        const pluginWith14Layers = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {
-                        testFunction: {
-                            layers: new Array(14)
-                                .fill(0)
-                                .map((_, i) => `layer-${i}`),
-                        },
-                    },
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
+    it("should continue without error when chalkCheck=false and chalk is not available", () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withChalkNotAvailable()
+        .withCustomConfig({
+          memoryCheck: false,
+          memoryCheckSize: 256,
+          chalkCheck: false,
+        })
+        .build();
 
-        (pluginWith14Layers as any).addDustLambdaExtension();
-
-        expect(mockLog.info).toHaveBeenCalledWith(
-            "Added Dust Lambda Extension to function: testFunction (15/15 layers/extensions)",
-        );
-        expect(mockLog.success).toHaveBeenCalledWith(
-            "Successfully added Dust Lambda Extension to 1 function(s)",
-        );
+      expect(() => executeDeploymentHook(plugin)).not.toThrow();
+      expect(mockLog.info).toHaveBeenCalledWith(
+        expect.stringContaining("Chalk binary not found in PATH")
+      );
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Chalk binary not available. Continuing without chalkmarks")
+      );
     });
 
-    it("should throw error when function has 15 existing layers", () => {
-        const pluginWith15Layers = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {
-                        testFunction: {
-                            layers: new Array(15)
-                                .fill(0)
-                                .map((_, i) => `layer-${i}`),
-                        },
-                    },
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
+    it("should inject chalk binary when available", async () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withChalkAvailable()
+        .withPackageZipExists()
+        .withServiceName("test-service")
+        .build();
 
-        expect(() => {
-            (pluginWith15Layers as any).addDustLambdaExtension();
-        }).toThrow(
-            "Cannot add Dust Lambda Extension to function testFunction: would exceed maximum layer/extension limit of 15 (currently has 15)",
-        );
+      executeProviderConfigHook(plugin);
+      executeDeploymentHook(plugin);
+      await executeAwsPackageHook(plugin);
 
-        expect(mockLog.error).toHaveBeenCalledWith(
-            "Cannot add Dust Lambda Extension to function testFunction: would exceed maximum layer/extension limit of 15 (currently has 15)",
-        );
+      expect(childProcessMock.execSync).toHaveBeenCalledWith(
+        expect.stringContaining("chalk insert --inject-binary-into-zip"),
+        expect.any(Object)
+      );
+      expect(mockLog.success).toHaveBeenCalledWith(
+        expect.stringContaining("Successfully injected chalkmarks")
+      );
     });
 
-    it("should handle service with no functions", () => {
-        const pluginNoFunctions = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {},
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
+    it("should warn its skipping injection when chalk is not available", async () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withChalkNotAvailable()
+        .withPackageZipExists()
+        .build();
 
-        (pluginNoFunctions as any).addDustLambdaExtension();
+      executeProviderConfigHook(plugin);
+      executeDeploymentHook(plugin);
+      await executeAwsPackageHook(plugin);
 
-        expect(mockLog.notice).toHaveBeenCalledWith(
-            "Adding Dust Lambda Extension to all functions",
-        );
-        expect(mockLog.warning).toHaveBeenCalledWith(
-            "No functions found in service - no extensions added",
-        );
+      expect(childProcessMock.execSync).not.toHaveBeenCalledWith(
+        expect.stringContaining("chalk insert"),
+        expect.any(Object)
+      );
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        expect.stringContaining("skipping chalkmark injection")
+      );
+    });
+  });
+
+  describe("Lambda Extension Management", () => {
+    it("should add Dust Lambda Extension to all functions", async () => {
+      const sampleFunctions = {
+          function1: {
+              handler: "handler.function1",
+              runtime: "nodejs18.x",
+              memorySize: 512,
+              timeout: 30,
+              layers: [],
+          },
+          function2: {
+              handler: "handler.function2",
+              runtime: "nodejs18.x",
+              memorySize: 1024,
+              timeout: 60,
+              layers: ["arn:aws:lambda:us-east-1:123456789012:layer:existing-layer"],
+          },
+          function3: {
+              handler: "handler.function3",
+              runtime: "nodejs18.x",
+              memorySize: 256,
+              timeout: 15,
+          },
+      }
+      const { plugin, mockServerless, mockLog } = new TestSetupBuilder()
+        .withFunctions(sampleFunctions)
+        .build();
+
+      executeProviderConfigHook(plugin);
+      await executeAwsPackageHook(plugin);
+
+      const extensionArn = "arn:aws:lambda:us-east-1:123456789012:layer:test-crashoverride-dust-extension:8";
+      const expectedCount = Object.keys(sampleFunctions).length;
+      let count = 0;
+
+      Object.keys(mockServerless.service.functions || {}).forEach((funcName) => {
+        const func = mockServerless.service.functions[funcName] as any;
+        if (func.layers && func.layers.includes(extensionArn)) {
+          count++;
+        }
+      });
+
+      expect(count).toBe(expectedCount);
+      expect(mockLog.success).toHaveBeenCalledWith(
+        expect.stringContaining(`Successfully added Dust Lambda Extension to 3 function(s)`)
+      );
     });
 
-    it("should validate all functions before modifying any (atomic operation)", () => {
-        const pluginMixedFunctions = new CrashOverrideServerlessPlugin(
-            {
-                ...mockServerless,
-                service: {
-                    ...mockServerless.service,
-                    functions: {
-                        validFunction: { layers: [] },
-                        invalidFunction: {
-                            layers: new Array(15)
-                                .fill(0)
-                                .map((_, i) => `layer-${i}`),
-                        },
-                    },
-                },
-            } as any,
-            {},
-            { log: mockLog },
-        );
+    it("should fail when adding extension would exceed 15 layers limit", async () => {
+        const maxLayers = {
+            maxedFunction: {
+                handler: "handler.maxed",
+                runtime: "nodejs18.x",
+                layers: [
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer1",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer2",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer3",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer4",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer5",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer6",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer7",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer8",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer9",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer10",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer11",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer12",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer13",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer14",
+                    "arn:aws:lambda:us-east-1:123456789012:layer:layer15",
+                ],
+            },
+        }
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withFunctions(maxLayers)
+        .build();
 
-        expect(() => {
-            (pluginMixedFunctions as any).addDustLambdaExtension();
-        }).toThrow(
-            "Cannot add Dust Lambda Extension to function invalidFunction: would exceed maximum layer/extension limit of 15 (currently has 15)",
-        );
+      executeProviderConfigHook(plugin);
+      await expect(executeAwsPackageHook(plugin)).rejects.toThrow(ServerlessError);
 
-        // Verify that the valid function was not modified
-        const validFunc = (
-            pluginMixedFunctions.serverless.service.functions as any
-        )["validFunction"];
-        expect(validFunc.layers).toEqual([]); // Should still be empty array, not modified
+      // Check the error message in the mock logs
+      try {
+        executeProviderConfigHook(plugin);
+        await executeAwsPackageHook(plugin);
+      } catch (e: any) {
+        expect(e.message).toContain("would exceed maximum layer/extension limit");
+      }
+
+      expect(mockLog.error).toHaveBeenCalledWith(
+        expect.stringContaining("Cannot add Dust Lambda Extension")
+      );
     });
 
-    describe("Memory Check Feature", () => {
-        let memoryCheckPlugin: CrashOverrideServerlessPlugin;
+    it("should handle functions with existing layers", async () => {
+      const { plugin, mockServerless } = new TestSetupBuilder()
+        .withFunctions({
+          function2: {
+            handler: "handler.function2",
+            runtime: "nodejs18.x",
+            memorySize: 1024,
+            timeout: 60,
+            layers: ["arn:aws:lambda:us-east-1:123456789012:layer:existing-layer"],
+          }
+        })
+        .build();
 
-        afterEach(() => {
-            jest.clearAllMocks();
-        });
+      executeProviderConfigHook(plugin);
+      await executeAwsPackageHook(plugin);
 
-        it("should throw error when memoryCheck is true and memory < 256MB", () => {
-            memoryCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 128,
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const hook = memoryCheckPlugin.hooks["before:package:initialize"];
-
-            if (hook) {
-                expect(() => hook()).toThrow(
-                    "Memory check failed: memorySize (128MB) is less than minimum required (512MB)",
-                );
-                expect(mockLog.error).toHaveBeenCalledWith(
-                    "Memory check failed: memorySize (128MB) is less than minimum required (512MB)",
-                );
-            }
-        });
-
-        it("should succeed when memoryCheck is true and memory >= 512MB", async () => {
-            memoryCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 1024,
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation(() => Buffer.from(""));
-
-            const hook = memoryCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "Memory check passed: 1024MB >= 256MB",
-            );
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
-
-        it("should succeed when memoryCheck is true and memory = 512MB (edge case)", async () => {
-            memoryCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 512,
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation(() => Buffer.from(""));
-
-            const hook = memoryCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "Memory check passed: 512MB >= 256MB",
-            );
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
-
-        it("should log warning when memoryCheck is false and memory < 512MB", async () => {
-            memoryCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 128,
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: false,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation(() => Buffer.from(""));
-
-            const hook = memoryCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            expect(mockLog.warning).toHaveBeenCalledWith(
-                "Memory size (128MB) is below recommended minimum (256). Set custom.crashoverride.memoryCheck: true to enforce this requirement",
-            );
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
-
-        it("should log warning when memoryCheck is undefined (default) and memory < 256MB", async () => {
-            memoryCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 128,
-                        },
-                        custom: {}, // No crashoverride config
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation(() => Buffer.from(""));
-
-            const hook = memoryCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            expect(mockLog.warning).toHaveBeenCalledWith(
-                "Memory size (128MB) is below recommended minimum (256). Set custom.crashoverride.memoryCheck: true to enforce this requirement",
-            );
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
-
-        it("should handle missing memorySize when memoryCheck is true", async () => {
-            memoryCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            // No memorySize defined
-                            stage: "dev",
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation(() => Buffer.from(""));
-
-            const hook = memoryCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            expect(mockLog.warning).toHaveBeenCalledWith(
-                "Memory check enabled but no memorySize configured in provider",
-            );
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
-
-        it("should not log anything when memoryCheck is false and memorySize >= 512MB", async () => {
-            memoryCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 1024,
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: false,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation(() => Buffer.from(""));
-
-            const hook = memoryCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            // Should only see the standard initialization logs, no memory check logs
-            expect(mockLog.notice).toHaveBeenCalledWith(
-                "Dust Plugin: Initializing package process",
-            );
-            // Should not log any memory-related messages
-            expect(mockLog.info).not.toHaveBeenCalledWith(
-                expect.stringContaining("Memory check"),
-            );
-            expect(mockLog.warning).not.toHaveBeenCalledWith(
-                expect.stringContaining("Memory"),
-            );
-            expect(mockLog.error).not.toHaveBeenCalledWith(
-                expect.stringContaining("Memory"),
-            );
-        });
-
-        it("should integrate with full plugin lifecycle", async () => {
-            // Test that memory check doesn't interfere with other plugin functionality
-            const integrationPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 512,
-                        },
-                        functions: {
-                            testFunction: {},
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            const mockFs = fs as jest.Mocked<typeof fs>;
-
-            mockExecSync.mockImplementation((cmd: string) => {
-                if (cmd === "command -v chalk") {
-                    return Buffer.from("");
-                }
-                if (cmd.includes("chalk insert")) {
-                    return Buffer.from("Success");
-                }
-                return Buffer.from("");
-            });
-
-            mockFs.existsSync.mockReturnValue(true);
-
-            // Run before hook
-            const beforeHook =
-                integrationPlugin.hooks["before:package:initialize"];
-            if (beforeHook) {
-                await beforeHook();
-            }
-
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "Memory check passed: 512MB >= 256MB",
-            );
-
-            // Run after hook
-            const afterHook =
-                integrationPlugin.hooks[
-                    "after:aws:package:finalize:mergeCustomProviderResources"
-                ];
-            if (afterHook) {
-                await afterHook();
-            }
-
-            // Verify both features work together
-            expect(mockLog.notice).toHaveBeenCalledWith(
-                "Dust Plugin: Processing packaged functions",
-            );
-            expect(mockLog.success).toHaveBeenCalledWith(
-                "Successfully added Dust Lambda Extension to 1 function(s)",
-            );
-            expect(mockLog.success).toHaveBeenCalledWith(
-                "Successfully injected chalkmarks into package",
-            );
-        });
+      const func = mockServerless.service.functions["function2"] as any;
+      expect(func.layers).toHaveLength(2);
+      expect(func.layers).toContain("arn:aws:lambda:us-east-1:123456789012:layer:test-crashoverride-dust-extension:8");
+      expect(func.layers).toContain("arn:aws:lambda:us-east-1:123456789012:layer:existing-layer");
     });
 
-    describe("chalkCheck feature", () => {
-        let chalkCheckPlugin: CrashOverrideServerlessPlugin;
+    it("should handle service with no functions", async () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withFunctions({})
+        .build();
 
-        it("should pass when chalkCheck is true and chalk binary exists", async () => {
-            chalkCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {
-                            crashoverride: {
-                                chalkCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
+      executeProviderConfigHook(plugin);
+      await expect(executeAwsPackageHook(plugin)).resolves.not.toThrow();
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        expect.stringContaining("No functions found in service")
+      );
+    });
+  });
 
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation(() => Buffer.from(""));
+  describe("Package Processing", () => {
+    it("should handle missing package zip file gracefully", async () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withChalkAvailable()
+        .build();
 
-            const hook = chalkCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
+      fsMock.existsSync.mockReturnValue(false);
 
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "Checking for chalk binary...",
-            );
-            expect(mockLog.success).toHaveBeenCalledWith("Chalk binary found");
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
+      executeProviderConfigHook(plugin);
+      executeDeploymentHook(plugin);
+      await executeAwsPackageHook(plugin);
 
-        it("should throw error when chalkCheck is true and chalk binary not found", async () => {
-            chalkCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {
-                            crashoverride: {
-                                chalkCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation((command: string) => {
-                if (command === "command -v chalk") {
-                    throw new Error("Command not found");
-                }
-                return Buffer.from("");
-            });
-
-            const hook = chalkCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                expect(() => hook()).toThrow(
-                    "Chalk check failed: chalk binary not found in PATH",
-                );
-            }
-
-            expect(mockLog.error).toHaveBeenCalledWith(
-                "Chalk check failed: chalk binary not found in PATH",
-            );
-        });
-
-        it("should warn when chalkCheck is false and chalk binary not found", async () => {
-            chalkCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {
-                            crashoverride: {
-                                chalkCheck: false,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation((command: string) => {
-                if (command === "command -v chalk") {
-                    throw new Error("Command not found");
-                }
-                return Buffer.from("");
-            });
-
-            const hook = chalkCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            expect(mockLog.warning).toHaveBeenCalledWith(
-                "Chalk binary not available. Continuing without chalkmarks",
-            );
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
-
-        it("should warn when chalkCheck is undefined (default) and chalk binary not found", async () => {
-            chalkCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {}, // No crashoverride config
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation((command: string) => {
-                if (command === "command -v chalk") {
-                    throw new Error("Command not found");
-                }
-                return Buffer.from("");
-            });
-
-            const hook = chalkCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            expect(mockLog.warning).toHaveBeenCalledWith(
-                "Chalk binary not available. Continuing without chalkmarks",
-            );
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
-
-        it("should handle chalkCheck with memoryCheck together", async () => {
-            chalkCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 512,
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: true,
-                                chalkCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation(() => Buffer.from(""));
-
-            const hook = chalkCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                await hook();
-            }
-
-            // Both checks should pass
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "Memory check passed: 512MB >= 256MB",
-            );
-            expect(mockLog.success).toHaveBeenCalledWith("Chalk binary found");
-            expect(mockLog.error).not.toHaveBeenCalled();
-        });
-
-        it("should fail fast on chalkCheck failure even if memoryCheck would pass", async () => {
-            chalkCheckPlugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        provider: {
-                            ...mockServerless.service.provider,
-                            memorySize: 1024,
-                        },
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: true,
-                                chalkCheck: true,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            const mockExecSync = execSync as jest.MockedFunction<
-                typeof execSync
-            >;
-            mockExecSync.mockImplementation((command: string) => {
-                if (command === "command -v chalk") {
-                    throw new Error("Command not found");
-                }
-                return Buffer.from("");
-            });
-
-            const hook = chalkCheckPlugin.hooks["before:package:initialize"];
-            if (hook) {
-                expect(() => hook()).toThrow(
-                    "Chalk check failed: chalk binary not found in PATH",
-                );
-            }
-
-            expect(mockLog.error).toHaveBeenCalledWith(
-                "Chalk check failed: chalk binary not found in PATH",
-            );
-        });
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Package zip file not found")
+      );
+      expect(mockLog.error).toHaveBeenCalledWith(
+        expect.stringContaining("Could not locate package zip file")
+      );
     });
 
-    describe("Configuration Precedence", () => {
-        let originalEnv: NodeJS.ProcessEnv;
+    it("should handle chalk injection errors gracefully", async () => {
+      // Set up package zip to exist
+      fsMock.mockPackageZipExists();
 
-        beforeEach(() => {
-            originalEnv = { ...process.env };
-            jest.clearAllMocks();
-        });
+      // Set up the mock to simulate chalk being available but injection failing
+      childProcessMock.execSync.mockImplementation((command: string) => {
+        if (command === "command -v chalk") {
+          return Buffer.from("/usr/local/bin/chalk");
+        }
+        if (command.includes("chalk insert")) {
+          throw new Error("Injection failed");
+        }
+        return Buffer.from("");
+      });
 
-        afterEach(() => {
-            process.env = originalEnv;
-        });
+      const { plugin, mockLog } = createPlugin();
 
-        it("should use default values when no config is provided", () => {
-            new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {}, // No crashoverride config
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
+      executeProviderConfigHook(plugin);
+      executeDeploymentHook(plugin);
+      await executeAwsPackageHook(plugin);
 
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=false",
-            );
-        });
-
-        it("should use environment variables over defaults", () => {
-            process.env["CO_MEMORY_CHECK"] = "true";
-            process.env["CO_CHALK_CHECK_ENABLED"] = "true";
-
-            new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {}, // No crashoverride config
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "CrashOverride config initialized:\n\tmemoryCheck=true\n\tmemoryCheckSize=256\n\tchalkCheck=true",
-            );
-        });
-
-        it("should use serverless config over environment variables", () => {
-            process.env["CO_MEMORY_CHECK"] = "true";
-            process.env["CO_CHALK_CHECK_ENABLED"] = "true";
-
-            new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: false,
-                                chalkCheck: false,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=false",
-            );
-        });
-
-        it("should handle partial serverless config with env defaults", () => {
-            process.env["CO_MEMORY_CHECK"] = "true";
-            process.env["CO_CHALK_CHECK_ENABLED"] = "false";
-
-            new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: false, // Override env
-                                chalkCheck: true, // Override env
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=true",
-            );
-        });
-
-        it("should handle 'false' string in environment variables", () => {
-            process.env["CO_MEMORY_CHECK"] = "false";
-            process.env["CO_CHALK_CHECK_ENABLED"] = "false";
-
-            new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {},
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=false",
-            );
-        });
-
-        it("should ignore invalid environment variable values", () => {
-            process.env["CO_MEMORY_CHECK"] = "invalid";
-            process.env["CO_CHALK_CHECK_ENABLED"] = "yes";
-
-            new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {},
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            // Should use defaults since env values are not "true"
-            expect(mockLog.info).toHaveBeenCalledWith(
-                "CrashOverride config initialized:\n\tmemoryCheck=false\n\tmemoryCheckSize=256\n\tchalkCheck=false",
-            );
-        });
-
-        it("should create immutable config object", () => {
-            const plugin = new CrashOverrideServerlessPlugin(
-                {
-                    ...mockServerless,
-                    service: {
-                        ...mockServerless.service,
-                        custom: {
-                            crashoverride: {
-                                memoryCheck: true,
-                                chalkCheck: false,
-                            },
-                        },
-                    },
-                } as any,
-                {},
-                { log: mockLog },
-            );
-
-            // Try to modify the config (should fail silently in non-strict mode)
-            const config = (plugin as any).config;
-            expect(() => {
-                config.memoryCheck = false;
-            }).toThrow(); // Will throw in strict mode or if frozen
-        });
+      expect(mockLog.error).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to inject chalkmarks")
+      );
     });
+
+    it("should handle provider config not being available", () => {
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withNoProvider()
+        .build();
+
+      executeProviderConfigHook(plugin);
+
+      expect(mockLog.error).toHaveBeenCalledWith(
+        expect.stringContaining("No provider configuration found")
+      );
+    });
+
+    it("should use correct service path for package location", async () => {
+      const customServicePath = "/custom/service/path";
+
+      fsMock.existsSync.mockImplementation((path: string) => {
+        return path === `${customServicePath}/.serverless/test-service.zip`;
+      });
+
+      const { plugin } = new TestSetupBuilder()
+        .withChalkAvailable()
+        .withServicePath(customServicePath)
+        .build();
+
+      executeProviderConfigHook(plugin);
+      executeDeploymentHook(plugin);
+      await executeAwsPackageHook(plugin);
+
+      expect(fsMock.existsSync).toHaveBeenCalledWith(
+        `${customServicePath}/.serverless/test-service.zip`
+      );
+    });
+  });
 });

@@ -39,14 +39,27 @@ custom:
 
 ## Configuration
 
-Configure the plugin behavior through the `custom.crashoverride` section in your `serverless.yml`:
+The plugin can be configured through three methods with the following precedence:
 
-| Option        | Type    | Default | Description                                                                                                                                                                                |
-| ------------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `memoryCheck` | boolean | `false` | When `true`, enforces a minimum memory size of 512MB for all Lambda functions. Build will fail if any function has less memory configured. When `false`, only warns about low memory.      |
-| `chalkCheck`  | boolean | `false` | When `true`, requires the chalk binary to be available in `$PATH`. Build will fail if `chalk` is not found. When `false`, continues without chalkmark injection if `chalk` is unavailable. |
+1. **serverless.yml** `custom.crashoverride` section (highest priority)
+2. **Environment variables** (medium priority)
+3. **Default values** (lowest priority)
 
-### Example Configuration
+### Configuration Options
+
+The plugin can be configured in either the `serverless.yaml` file or their environment variable equivalent. Reference the
+table and usage examples below.
+
+| YAML Option       | Env Equivalent            | Type    | Default                             | Description                                                                                                                                                                            |
+| ----------------- | ------------------------- | ------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `memoryCheck`     | `CO_MEMORY_CHECK`         | boolean | `false`                             | When `true`, enforces minimum memory requirements. Build fails if any function has insufficient memory. When `false`, only warns about low memory.                                     |
+| `memoryCheckSize` | `CO_MEMORY_CHECK_SIZE_MB` | number  | `256`                               | Minimum required memory size in MB. Only enforced when `memoryCheck` is `true`.                                                                                                        |
+| `chalkCheck`      | `CO_CHALK_CHECK_ENABLED`  | boolean | `false`                             | When `true`, requires the chalk binary to be available in `$PATH`. Build fails if `chalk` is not found. When `false`, continues without chalkmark injection if `chalk` is unavailable. |
+| `arnUrlPrefix`    | `CO_ARN_URL_PREFIX`       | string  | `https://dl.crashoverride.run/dust` | Base URL for fetching Dust Lambda Extension ARNs. Used to construct region-specific ARN endpoints.                                                                                     |
+
+### Example Configurations
+
+#### Using serverless.yml
 
 ```yaml
 service: my-service
@@ -54,12 +67,13 @@ service: my-service
 provider:
   name: aws
   runtime: nodejs18.x
-  memorySize: 1024 # Must be >= 512 when memoryCheck is true
+  memorySize: 1024 # Must be >= memoryCheckSize when memoryCheck is true
 
 custom:
   crashoverride:
-    memoryCheck: true # enforce minimum 512MB memory
-    chalkCheck: false # allow deployment without chalk binary
+    memoryCheck: true # Enforce minimum memory
+    memoryCheckSize: 512 # Require at least 512MB
+    chalkCheck: false # Allow deployment without chalk binary
 
 functions:
   myFunction:
@@ -69,17 +83,54 @@ plugins:
   - serverless-plugin-crashoverride
 ```
 
+#### Using Environment Variables
+
+Using environment variables can be helpful when enforcing the checks across entire repositories
+or even entire organizations.
+
+The equivalent configuration to above, driven by environment variables. **Note:** env vars
+have a lower precedence than the more localized YAML configuration values. Feel free to mix-and-match
+but keep in mind that the YAML values will clobber duplicated configs in your env.
+
+In the example below the environement sets the memory check to fail-open but the YAML overrides it
+meaining the final configuration will lead to the memory check to failing closed.
+
+```bash
+# Set configuration via environment
+export CO_MEMORY_CHECK=false
+export CO_MEMORY_CHECK_SIZE_MB=512
+export CO_CHALK_CHECK_ENABLED=true
+
+# Deploy with environment configuration
+serverless deploy
+```
+
+#### Mixed Configuration (serverless.yml takes precedence)
+
+```yaml
+# serverless.yml
+custom:
+  crashoverride:
+    memoryCheck: true # This overrides CO_MEMORY_CHECK env var
+```
+
 ## How It Works
 
-The Crash Override plugin hooks into the Serverless Framework lifecycle at two key points:
+The Crash Override plugin hooks into the Serverless Framework lifecycle at three key points:
 
-1. **`before:package:initialize`**:
+1. **`after:package:setupProviderConfiguration`**:
+   - Reads and stores provider configuration (region, memory size)
+   - Prepares configuration for subsequent operations
+
+2. **`after:package:createDeploymentArtifacts`**:
+   - Performs pre-flight checks
    - Validates memory configuration against minimum requirements
    - Checks for `chalk` binary availability
-   - Logs initialization status
+   - Logs validation status
 
-2. **`after:aws:package:finalize:mergeCustomProviderResources`**:
+3. **`before:package:compileFunctions`**:
    - Adds Dust Lambda Extension to all functions (validates layer limits)
+   - Fetches region-specific extension ARNs
    - Injects chalkmarks into the deployment package (if chalk is available)
 
 ## Development
@@ -100,42 +151,9 @@ npm install
 npm run dev
 ```
 
-### Available NPM Scripts
-
-| Script       | Command              | Description                                                             |
-| ------------ | -------------------- | ----------------------------------------------------------------------- |
-| `build`      | `npm run build`      | Compiles TypeScript source files to JavaScript in the `dist/` directory |
-| `dev`        | `npm run dev`        | Runs TypeScript compiler in watch mode for active development           |
-| `test`       | `npm test`           | Runs the Jest test suite                                                |
-| `test:watch` | `npm run test:watch` | Runs Jest tests in watch mode for TDD workflow                          |
-| `lint`       | `npm run lint`       | Runs ESLint to check code quality issues                                |
-| `lint:fix`   | `npm run lint:fix`   | Automatically fixes ESLint issues where possible                        |
-| `format`     | `npm run format`     | Formats code using Prettier                                             |
-| `prepare`    | `npm run prepare`    | Automatically runs build before npm publish (lifecycle hook)            |
-
-### Development Workflow
-
-1. **Make changes** to source files in `src/`
-2. **Run tests** to ensure functionality: `npm test`
-3. **Lint and format** your code: `npm run lint:fix && npm run format`
-4. **Build** the project: `npm run build`
-5. **Test locally** by linking to a test Serverless project:
-
-   ```bash
-   npm link
-   cd /path/to/test/serverless/project
-   npm link serverless-plugin-crashoverride
-   ```
-
 ### Testing
 
-The plugin uses Jest for testing with TypeScript support via `ts-jest`. Tests are located alongside source files with the `.test.ts` extension.
-
-Run a single test file:
-
-```bash
-npm test -- src/index.test.ts
-```
+For comprehensive testing documentation, see [TESTING.md](./TESTING.md).
 
 ## A Closer Look
 
@@ -143,6 +161,7 @@ npm test -- src/index.test.ts
 
 The plugin automatically adds the Dust Lambda Extension ARN to all Lambda functions in your service. It:
 
+- Fetches region-specific ARNs from the configured endpoint
 - Validates that adding the extension won't exceed AWS's 15 layer/extension limit
 - Provides detailed logging about layer counts for each function
 - Fails fast if any function would exceed limits
@@ -153,17 +172,15 @@ When the `chalk` binary is available, the plugin:
 
 - Locates the packaged `.zip` file in `.serverless/` directory
 - Runs `chalk insert --inject-binary-into-zip` to add chalkmarks
-- Provides detailed logging about the injection process
 
 ### Memory Validation
 
-The memory required for `chalk` requires no less than 512MB to safely run both your application workload and the `chalk` extraction. To
-mitigate issues in production you can configure the plugin to perform a hard check against the `memorySize` configuration at the `provider`
-level:
+The memory required for `chalk` extraction and runtime monitoring requires adequate memory allocation. The plugin can enforce minimum memory requirements to prevent issues in production:
 
-- Warns when memory is below 512MB (if `memoryCheck: false`)
-- Fails the build when memory is below 512MB (if `memoryCheck: true`)
-- Helps prevent performance issues in production
+- **Default minimum**: 256MB (configurable via `memoryCheckSize`)
+- **Warning mode** (`memoryCheck: false`): Logs warnings when memory is below the minimum
+- **Enforcement mode** (`memoryCheck: true`): Fails the build when memory is below the minimum
+- Helps prevent performance issues and out-of-memory errors in production
 
 **Note:** The AWS provider sets `memorySize` to 1024MB as the default.
 
