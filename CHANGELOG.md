@@ -261,6 +261,9 @@
   its in a hidden folder which would normally be ignored by the
   ignore patterns.
   ([#580](https://github.com/crashappsec/chalk/pull/580))
+- During `chalk setup`, cosign would not be downloaded if not already
+  installed on the system.
+  ([#585](https://github.com/crashappsec/chalk/pull/585))
 
 ## 0.5.9
 
