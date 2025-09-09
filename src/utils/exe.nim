@@ -45,7 +45,7 @@ proc findExePath*(cmdName:    string,
       withOnlyCodecs(getNativeCodecs()):
         for location in foundExes:
           let
-            subscan   = runChalkSubScan(location, "extract")
+            subscan   = runChalkSubScan(@[location], "extract")
             allChalks = subscan.getAllChalks()
             isChalk   = (
               len(allChalks) != 0 and

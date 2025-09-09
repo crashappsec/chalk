@@ -27,9 +27,12 @@ proc runCmdDelete*(path: seq[string]) {.exportc,cdecl.} =
       continue
     if not item.isMarked():
       info(item.fsRef & ": no chalk mark to delete.")
-      continue
+      # even though artifact is not marked, continue
+      # as that will normalize file by unchalking it
+      # for example this important for nested operations
+      # such as chalking zip file with subscan enabled
     try:
-      if "$CHALK_IMPLEMENTATION_NAME" in item.extract:
+      if item.extract != nil and "$CHALK_IMPLEMENTATION_NAME" in item.extract:
         warn(item.fsRef & ": Is a chalk exe and cannot be unmarked.")
         item.opFailed = true
         toRm.add(item)

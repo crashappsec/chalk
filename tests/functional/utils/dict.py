@@ -286,6 +286,9 @@ class ContainsDict(ContainsMixin, dict):
         """
         return ContainsDict({k: IfExists(v) for k, v in self.items()})
 
+    def exclude(self, *keys) -> "ContainsDict":
+        return ContainsDict({k: v for k, v in self.items() if k not in keys})
+
 
 class ContainsList(ContainsMixin, list):
     def __init__(self, items: Optional[Iterable[Any]] = None):

@@ -180,6 +180,7 @@ type
     report*:                   Box
     args*:                     seq[string]
     contextDirectories*:       seq[string]
+    baseChalk*:                ChalkObj
 
   ArtifactIterationInfo* = ref object
     filePaths*:       seq[string]
