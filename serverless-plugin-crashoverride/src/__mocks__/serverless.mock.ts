@@ -77,6 +77,21 @@ export function createMockServerless(
         classes: {
             Error: ServerlessError,
         } as any,
+
+        // https://github.com/DefinitelyTyped/DefinitelyTyped/blob/3ac9530120bcb4553e5598afbda76ade3f3162cd/types/serverless/plugins/aws/provider/awsProvider.d.ts#L809-L825
+        getProvider: jest.fn(() => {
+            // Return a mock AWS provider instance
+            return {
+                naming: {},
+                getCredentials: jest.fn(),
+                getProviderName: jest.fn(() => "aws"),
+                getRegion: jest.fn(() => "us-east-1"),
+                getServerlessDeploymentBucketName: jest.fn(),
+                getStage: jest.fn(() => "dev"),
+                getAccountId: jest.fn(),
+                request: jest.fn(),
+            };
+        }),
     } as unknown as Serverless;
 
     return mockServerless;
