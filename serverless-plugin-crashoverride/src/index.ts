@@ -1,5 +1,7 @@
 import type Serverless from "serverless";
 import type Plugin from "serverless/classes/Plugin";
+import type Aws from "serverless/plugins/aws/provider/awsProvider";
+import type AwsProvider from "serverless/plugins/aws/provider/awsProvider";
 import { execSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
@@ -12,12 +14,13 @@ import type {
 } from "./types";
 
 class CrashOverrideServerlessPlugin implements Plugin {
-    public serverless: Serverless;
-    public options: Serverless.Options;
-    public hooks: Plugin.Hooks;
+    serverless: Serverless;
+    options: Serverless.Options;
+    hooks: Plugin.Hooks;
+    provider: AwsProvider;
+    readonly config: Readonly<CrashOverrideConfig>;
     private log: any;
     private isChalkAvailable: boolean = false;
-    public readonly config: Readonly<CrashOverrideConfig>;
     private providerConfig: ProviderConfig | null = null;
 
     constructor(
@@ -28,6 +31,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
         this.serverless = serverless;
         this.options = options;
         this.log = log;
+        this.provider = serverless.getProvider("aws")
 
         // Initialize config with the following precedence:
         //   1. serverless.yml custom.crashoverride values
@@ -126,17 +130,25 @@ class CrashOverrideServerlessPlugin implements Plugin {
             return;
         }
         // Verify provider configuration is available
-        const provider = this.serverless.service.provider as any;
+        const provider = this.serverless.service.provider as Aws.Provider;
         if (!provider) {
             this.log_error("No provider configuration found in serverless.yml");
             return;
+        }
+
+        // Parse memorySize to ensure it's a number
+        let memorySize = 1024; // Serverless Framework AWS Lambda default
+        if (provider.memorySize !== undefined) {
+            memorySize = typeof provider.memorySize === 'string'
+                ? parseInt(provider.memorySize, 10)
+                : provider.memorySize;
         }
 
         // Persist provider configuration
         this.providerConfig = {
             provider: "aws", // We're specifically an AWS plugin
             region: provider.region || "us-east-1", // AWS default region
-            memorySize: provider.memorySize || 1024, // Serverless Framework AWS Lambda default
+            memorySize: memorySize,
         };
 
         // Log provider configuration for debugging
@@ -305,38 +317,39 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
         const extensionArn = await this.fetchDustExtensionArn(this.providerConfig.region)
         this.log_info(`Dust Extension ARN for ${this.providerConfig.region} :: ${extensionArn}`)
-        const functions = this.serverless.service.functions || {};
         const MAX_LAYERS_AND_EXTENSIONS = 15; // AWS Lambda limit: 5 layers + 10 extensions
 
         this.log_notice(`Adding Dust Lambda Extension to all functions`);
 
+        const functions = this.serverless.service.functions || {};
         // Validate all functions first before modifying any
-        Object.keys(functions).forEach((functionName) => {
-            const func = functions[functionName] as any;
+        for (const [functionName, func] of Object.entries(functions)) {
             if (!func) return;
 
-            const currentLayers = func.layers || [];
+            const awsFunc = func as Aws.AwsFunction;
+            const currentLayers = awsFunc.layers || [];
 
             if (currentLayers.length >= MAX_LAYERS_AND_EXTENSIONS) {
                 const error = `Cannot add Dust Lambda Extension to function ${chalk.bold(functionName)}: would exceed maximum layer/extension limit of ${MAX_LAYERS_AND_EXTENSIONS} (currently has ${currentLayers.length})`;
                 this.log_error(error);
                 throw new this.serverless.classes.Error(error);
             }
-        });
+        };
 
         // Add extension to all functions
-        Object.keys(functions).forEach((functionName) => {
-            const func = functions[functionName] as any;
+        for (const [functionName, func] of Object.entries(functions)) {
             if (!func) return;
 
-            if (!func.layers) {
-                func.layers = [];
+            const awsFunc = func as Aws.AwsFunction;
+
+            if (!awsFunc.layers) {
+                awsFunc.layers = [];
             }
-            func.layers.push(extensionArn);
+            awsFunc.layers = [...(awsFunc.layers ?? []), extensionArn];
             this.log_info(
-                `Added Dust Lambda Extension to function: ${chalk.bold(functionName)} (${chalk.gray(`${func.layers.length}/${MAX_LAYERS_AND_EXTENSIONS} layers/extensions`)})`,
+                `Added Dust Lambda Extension to function: ${chalk.bold(functionName)} (${chalk.gray(`${awsFunc.layers.length}/${MAX_LAYERS_AND_EXTENSIONS} layers/extensions`)})`,
             );
-        });
+        };
 
         const functionCount = Object.keys(functions).length;
         if (functionCount > 0) {
