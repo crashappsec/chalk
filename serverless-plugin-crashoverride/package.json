@@ -21,6 +21,8 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
+    "@tsconfig/node18": "^18.2.4",
+    "@tsconfig/strictest": "^2.0.5",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
     "@types/serverless": "^3.12.27",
