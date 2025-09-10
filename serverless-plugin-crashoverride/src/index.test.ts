@@ -1,21 +1,15 @@
-import CrashOverrideServerlessPlugin from "./index";
 import {
-  createMockServerless,
-  createMockLogger,
-  createMockOptions,
   ServerlessError,
 } from "./__mocks__/serverless.mock";
 import * as childProcessMock from "./__mocks__/child_process";
 import * as fsMock from "./__mocks__/fs";
 import {
-  createPlugin,
   executeProviderConfigHook,
   executeDeploymentHook,
   executeAwsPackageHook,
   TestSetupBuilder,
   assertions,
 } from "./__tests__/test-helpers";
-import type Serverless from "serverless";
 
 jest.mock("child_process", () => require("./__mocks__/child_process"));
 jest.mock("fs", () => require("./__mocks__/fs"));
@@ -37,10 +31,8 @@ jest.mock("chalk", () => {
 });
 
 describe("CrashOverrideServerlessPlugin", () => {
-  let mockServerless: Serverless;
-  let mockOptions: any;
-  let mockLog: ReturnType<typeof createMockLogger>;
   let originalEnv: NodeJS.ProcessEnv;
+  let originalPlatform: NodeJS.Platform;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -48,20 +40,66 @@ describe("CrashOverrideServerlessPlugin", () => {
     fsMock.resetMocks();
 
     originalEnv = { ...process.env };
-
-    mockServerless = createMockServerless();
-    mockOptions = createMockOptions();
-    mockLog = createMockLogger();
+    originalPlatform = process.platform;
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+    });
+  });
+
+  describe("Platform Support", () => {
+    it("should early exit and not register hooks on Windows", () => {
+      // Mock process.platform to return 'win32'
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+
+      const { plugin, mockLog } = new TestSetupBuilder().build();
+
+      // Verify warning was logged
+      expect(mockLog.warning).toHaveBeenCalledWith(
+        expect.stringContaining("Crash Override plugin is not supported on Windows")
+      );
+
+      // Verify no hooks were registered
+      expect(plugin.hooks).toEqual({});
+
+      // Verify config was set to safe defaults
+      expect(plugin.config.memoryCheck).toBe(false);
+      expect(plugin.config.memoryCheckSize).toBe(256);
+      expect(plugin.config.chalkCheck).toBe(false);
+    });
+
+    it("should initialize normally on non-Windows platforms", () => {
+      // Mock process.platform to return 'linux'
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true,
+      });
+
+      const { plugin, mockLog } = new TestSetupBuilder().build();
+
+      // Verify no Windows warning was logged
+      expect(mockLog.warning).not.toHaveBeenCalledWith(
+        expect.stringContaining("Windows")
+      );
+
+      // Verify hooks were registered
+      expect(Object.keys(plugin.hooks).length).toBeGreaterThan(0);
+      expect(plugin.hooks["after:package:setupProviderConfiguration"]).toBeDefined();
+      expect(plugin.hooks["after:package:createDeploymentArtifacts"]).toBeDefined();
+      expect(plugin.hooks["before:package:compileFunctions"]).toBeDefined();
+    });
   });
 
   describe("Plugin Initialization", () => {
     describe("Successful plugin installation", () => {
       it("should initialize successfully with default configuration values", () => {
-        const { plugin } = createPlugin();
+        const { plugin } = new TestSetupBuilder().build();
 
         expect(plugin.config.memoryCheck).toBe(false);
         expect(plugin.config.memoryCheckSize).toBe(256);
@@ -69,7 +107,7 @@ describe("CrashOverrideServerlessPlugin", () => {
       });
 
       it("should register lifecycle hooks correctly", () => {
-        const { plugin } = createPlugin();
+        const { plugin } = new TestSetupBuilder().build();
 
         expect(plugin.hooks).toBeDefined();
         expect(plugin.hooks["after:package:setupProviderConfiguration"]).toBeDefined();
@@ -138,21 +176,16 @@ describe("CrashOverrideServerlessPlugin", () => {
         });
 
         it("should use default values when no configuration is provided", () => {
-          const { mockLog } = createPlugin();
+          const { mockLog } = new TestSetupBuilder().build();
 
           assertions.expectConfigValues(mockLog, false, 256, false);
         });
 
         it("should handle invalid memoryCheckSize in environment variable", () => {
-          process.env["CO_MEMORY_CHECK_SIZE_MB"] = "invalid";
-          mockServerless = createMockServerless();
-
           expect(() => {
-            new CrashOverrideServerlessPlugin(
-              mockServerless,
-              mockOptions,
-              { log: mockLog }
-            );
+            new TestSetupBuilder()
+              .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "invalid")
+              .build();
           }).toThrow(ServerlessError);
         });
 
@@ -485,10 +518,12 @@ describe("CrashOverrideServerlessPlugin", () => {
     });
 
     it("should handle chalk injection errors gracefully", async () => {
-      // Set up package zip to exist
-      fsMock.mockPackageZipExists();
+      const { plugin, mockLog } = new TestSetupBuilder()
+        .withChalkAvailable()
+        .withPackageZipExists()
+        .build();
 
-      // Set up the mock to simulate chalk being available but injection failing
+      // Override the mock after builder sets it up to simulate injection failure
       childProcessMock.execSync.mockImplementation((command: string) => {
         if (command === "command -v chalk") {
           return Buffer.from("/usr/local/bin/chalk");
@@ -498,8 +533,6 @@ describe("CrashOverrideServerlessPlugin", () => {
         }
         return Buffer.from("");
       });
-
-      const { plugin, mockLog } = createPlugin();
 
       executeProviderConfigHook(plugin);
       executeDeploymentHook(plugin);

@@ -125,6 +125,8 @@ export function createMockLogger() {
         notice: jest.fn(),
         success: jest.fn(),
         info: jest.fn(),
+        debug: jest.fn(),
+        verbose: jest.fn(),
     };
 }
 

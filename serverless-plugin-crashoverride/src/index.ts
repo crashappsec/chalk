@@ -19,19 +19,31 @@ class CrashOverrideServerlessPlugin implements Plugin {
     hooks: Plugin.Hooks;
     provider: AwsProvider;
     readonly config: Readonly<CrashOverrideConfig>;
-    private log: any;
+    private log: Plugin.Logging["log"];
     private isChalkAvailable: boolean = false;
     private providerConfig: ProviderConfig | null = null;
 
     constructor(
         serverless: Serverless,
         options: Serverless.Options = {},
-        { log }: { log: any },
+        { log }: Plugin.Logging,
     ) {
         this.serverless = serverless;
         this.options = options;
         this.log = log;
         this.provider = serverless.getProvider("aws")
+
+        // Check if running on Windows and short-circuit if so
+        if (process.platform === "win32") {
+            this.log.warning(
+                chalk.yellow(
+                    "Crash Override plugin is not supported on Windows. Skipping plugin initialization."
+            ));
+            this.hooks = {}; // do not register any hooks
+            this.config = { memoryCheck: false, memoryCheckSize: 256, chalkCheck: false };
+            return;
+        }
+
 
         // Initialize config with the following precedence:
         //   1. serverless.yml custom.crashoverride values
