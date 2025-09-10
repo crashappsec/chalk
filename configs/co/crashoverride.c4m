@@ -33,7 +33,7 @@ custom_report crashoverride {
   ~enabled:         true
   ~report_template: "crashoverride"
   ~sink_configs:    ["crashoverride"]
-  ~use_when:        ["insert", "build", "push", "exec", "env"]
+  ~use_when:        ["insert", "extract", "build", "push", "exec", "env"]
 }
 
 # requirements for crashoverride integration
