@@ -238,7 +238,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
             return true;
         } catch {
             if (this.config.chalkCheck) {
-                const errorMessage = `Chalk check failed: chalk binary not found in PATH`;
+                const errorMessage = `Chalk check failed: chalk binary not found in PATH. Please add and try again.`;
                 this.log_error(errorMessage);
                 throw new this.serverless.classes.Error(errorMessage);
             } else {
