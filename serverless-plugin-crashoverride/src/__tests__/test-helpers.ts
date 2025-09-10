@@ -57,7 +57,16 @@ export function createPlugin(
     const plugin = new CrashOverrideServerlessPlugin(
         mockServerless,
         mockOptions,
-        { log: mockLog },
+        {
+            log: mockLog,
+            writeText: jest.fn(),
+            progress: {
+                create: jest.fn(),
+                remove: jest.fn(),
+                update: jest.fn(),
+                get: jest.fn(),
+            },
+        } as any,
     );
 
     return { plugin, mockServerless, mockLog, mockOptions };
