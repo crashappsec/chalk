@@ -233,7 +233,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
         this.log_info(`Checking for chalk binary...`);
 
         try {
-            execSync("command -v chalk", { stdio: "ignore" });
+            execSync("which chalk");
             this.log_success(`Chalk binary found`);
             return true;
         } catch {
