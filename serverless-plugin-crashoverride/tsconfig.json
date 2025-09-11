@@ -17,8 +17,7 @@
     "noUnusedParameters": true,
     "noImplicitOverride": true,
 
-    // Override module to CommonJS for Serverless Framework compatibility
-    "module": "commonjs",
+    "module": "esnext",
     "moduleResolution": "node",
 
     // Keep existing JSON and synthetic imports support
