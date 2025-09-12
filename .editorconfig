@@ -25,7 +25,7 @@ never_split        = false # like -ns
 indent_style = space
 indent_size = 2
 
-[*.sh,dust]
+[*.{sh,ts,js},dust]
 indent_style = space
 indent_size = 4
 
