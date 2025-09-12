@@ -44,6 +44,9 @@ class MockIncomingMessage extends EventEmitter {
     }
 }
 
+// Store custom ARN if set
+let customArn: string | null = null;
+
 /**
  * Mock implementation of https.get function.
  *
@@ -71,8 +74,10 @@ export const get = jest.fn(
         setImmediate(() => {
             callback(mockResponse);
 
-            // Emit the ARN data with the extracted region
-            const arn = `arn:aws:lambda:${region}:123456789012:layer:test-crashoverride-dust-extension:8`;
+            // Emit the ARN data - use custom ARN if set, otherwise generate based on region
+            const arn =
+                customArn ||
+                `arn:aws:lambda:${region}:123456789012:layer:test-crashoverride-dust-extension:8`;
             mockResponse.emit("data", arn);
             mockResponse.emit("end");
         });
@@ -86,5 +91,37 @@ export const get = jest.fn(
         } as MockRequestOptions;
     },
 );
+
+/**
+ * Sets a custom ARN to be returned by the mock https.get function.
+ * This overrides the automatic region-based ARN generation.
+ *
+ * @param arn - The custom ARN to return for all requests
+ *
+ * @example
+ * ```typescript
+ * import * as httpsMock from './__mocks__/https';
+ *
+ * httpsMock.mockDustExtensionArn('arn:aws:lambda:us-east-1:123:layer:custom:1');
+ * // Now all https.get requests will return this specific ARN
+ * ```
+ */
+export function mockDustExtensionArn(arn: string): void {
+    customArn = arn;
+}
+
+/**
+ * Resets the mock to use automatic region-based ARN generation.
+ *
+ * @example
+ * ```typescript
+ * httpsMock.resetMock();
+ * // Now https.get will generate ARNs based on the region in the URL
+ * ```
+ */
+export function resetMock(): void {
+    customArn = null;
+    get.mockClear();
+}
 
 export default { get };
