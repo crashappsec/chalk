@@ -10,6 +10,7 @@ This plugin integrates with the Serverless Framework to provide:
 - **Chalkmark Injection**: Integrates with the chalk binary to inject chalkmarks into deployment packages for supply chain security
 - **Memory Configuration Validation**: Enforces minimum memory requirements for Lambda functions to ensure optimal performance
 - **Layer Limit Validation**: Prevents exceeding AWS Lambda's layer/extension limits
+- **CloudFormation Validation**: Validates that Dust Lambda Extension is present in the generated CloudFormation template
 
 ## Installation
 
@@ -29,6 +30,7 @@ custom:
   crashoverride:
     memoryCheck: true # Optional: enforce minimum memory requirements
     chalkCheck: true # Optional: enforce chalk binary availability
+    layerCheck: true # Optional: validate Dust Extension ARN in CloudFormation
 ```
 
 ### Requirements
@@ -50,12 +52,13 @@ The plugin can be configured through three methods with the following precedence
 The plugin can be configured in either the `serverless.yaml` file or their environment variable equivalent. Reference the
 table and usage examples below.
 
-| YAML Option       | Env Equivalent            | Type    | Default                             | Description                                                                                                                                                                            |
-| ----------------- | ------------------------- | ------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `memoryCheck`     | `CO_MEMORY_CHECK`         | boolean | `false`                             | When `true`, enforces minimum memory requirements. Build fails if any function has insufficient memory. When `false`, only warns about low memory.                                     |
-| `memoryCheckSize` | `CO_MEMORY_CHECK_SIZE_MB` | number  | `256`                               | Minimum required memory size in MB. Only enforced when `memoryCheck` is `true`.                                                                                                        |
-| `chalkCheck`      | `CO_CHALK_CHECK_ENABLED`  | boolean | `false`                             | When `true`, requires the chalk binary to be available in `$PATH`. Build fails if `chalk` is not found. When `false`, continues without chalkmark injection if `chalk` is unavailable. |
-| `arnUrlPrefix`    | `CO_ARN_URL_PREFIX`       | string  | `https://dl.crashoverride.run/dust` | Base URL for fetching Dust Lambda Extension ARNs. Used to construct region-specific ARN endpoints.                                                                                     |
+| YAML Option       | Env Equivalent            | Type    | Default                             | Description                                                                                                                                                                                                          |
+| ----------------- | ------------------------- | ------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `memoryCheck`     | `CO_MEMORY_CHECK`         | boolean | `false`                             | When `true`, enforces minimum memory requirements. Build fails if any function has insufficient memory. When `false`, only warns about low memory.                                                                   |
+| `memoryCheckSize` | `CO_MEMORY_CHECK_SIZE_MB` | number  | `256`                               | Minimum required memory size in MB. Only enforced when `memoryCheck` is `true`.                                                                                                                                      |
+| `chalkCheck`      | `CO_CHALK_CHECK_ENABLED`  | boolean | `false`                             | When `true`, requires the chalk binary to be available in `$PATH`. Build fails if `chalk` is not found. When `false`, continues without chalkmark injection if `chalk` is unavailable.                               |
+| `layerCheck`      | `CO_LAYER_CHECK`          | boolean | `false`                             | When `true`, validates that all Lambda functions in the CloudFormation template include the Dust Extension. Build fails if any function is missing the extension. When `false`, only warns about missing extensions. |
+| `arnUrlPrefix`    | `CO_ARN_URL_PREFIX`       | string  | `https://dl.crashoverride.run/dust` | Base URL for fetching Dust Lambda Extension ARNs. Used to construct region-specific ARN endpoints.                                                                                                                   |
 
 ### Example Configurations
 
@@ -74,6 +77,7 @@ custom:
     memoryCheck: true # Enforce minimum memory
     memoryCheckSize: 512 # Require at least 512MB
     chalkCheck: false # Allow deployment without chalk binary
+    layerCheck: true # Enforce Dust Extension presence in CloudFormation
 
 functions:
   myFunction:
@@ -100,6 +104,7 @@ meaining the final configuration will lead to the memory check to failing closed
 export CO_MEMORY_CHECK=false
 export CO_MEMORY_CHECK_SIZE_MB=512
 export CO_CHALK_CHECK_ENABLED=true
+export CO_LAYER_CHECK=true
 
 # Deploy with environment configuration
 serverless deploy
@@ -116,7 +121,7 @@ custom:
 
 ## How It Works
 
-The Crash Override plugin hooks into the Serverless Framework lifecycle at three key points:
+The Crash Override plugin hooks into the Serverless Framework lifecycle at four key points:
 
 1. **`after:package:setupProviderConfiguration`**:
    - Reads and stores provider configuration (region, memory size)
@@ -129,9 +134,15 @@ The Crash Override plugin hooks into the Serverless Framework lifecycle at three
    - Logs validation status
 
 3. **`before:package:compileFunctions`**:
-   - Adds Dust Lambda Extension to all functions (validates layer limits)
+   - Adds Dust Lambda Extension to all functions (while validating layer limits)
    - Fetches region-specific extension ARNs
    - Injects chalkmarks into the deployment package (if chalk is available)
+
+4. **`after:package:finalize`**:
+   - Validates the generated CloudFormation template
+   - Checks that all Lambda functions include the Dust Extension
+   - Reports comprehensive status of function compliance
+   - Fails or warns based on `layerCheck` configuration
 
 ## Development
 
@@ -177,12 +188,39 @@ When the `chalk` binary is available, the plugin:
 
 The memory required for `chalk` extraction and runtime monitoring requires adequate memory allocation. The plugin can enforce minimum memory requirements to prevent issues in production:
 
-- **Default minimum**: 256MB (configurable via `memoryCheckSize`)
+- **Default minimum**: 256MB (configurable via `memoryCheckSize`, see table above)
 - **Warning mode** (`memoryCheck: false`): Logs warnings when memory is below the minimum
 - **Enforcement mode** (`memoryCheck: true`): Fails the build when memory is below the minimum
 - Helps prevent performance issues and out-of-memory errors in production
 
 **Note:** The AWS provider sets `memorySize` to 1024MB as the default.
+
+### Layer Validation
+
+The plugin can validate that the Dust Lambda Extension was successfully added to all Lambda functions in the generated CloudFormation template. This provides an extra layer of assurance that your functions will have runtime monitoring enabled.
+
+When `layerCheck` is enabled, the plugin:
+
+- Parses the generated `cloudformation-template-update-stack.json`
+- Checks every Lambda function resource for the Dust Extension ARN
+- Reports comprehensive status showing which functions are compliant
+- **Enforcement mode** (`layerCheck: true`): Fails the build if any function is missing the extension
+- **Warning mode** (`layerCheck: false`): Only warns about missing extensions but allows deployment
+
+This validation occurs after the CloudFormation template is generated, ensuring that the final deployment artifacts include the required security extensions.
+
+Example output when functions are missing the extension:
+
+```
+Layer check status:
+  Functions with Dust Extension (2/3):
+    - HandlerLambdaFunction
+    - WorkerLambdaFunction
+  Functions MISSING Dust Extension (1/3):
+    - ProcessorLambdaFunction
+```
+
+When `layerCheck: true` is set and functions are missing the extension, the build will fail with a clear error message listing all non-compliant functions. This helps catch configuration issues before deployment.
 
 ## Contributing
 
