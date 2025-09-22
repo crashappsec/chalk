@@ -5,7 +5,6 @@ import type AwsProvider from "serverless/plugins/aws/provider/awsProvider";
 import { execSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
-import * as https from "https";
 import chalk from "chalk"; // chalk the JS lib. Not chalk to CO project.
 import type {
   CustomServerlessConfig,
@@ -194,42 +193,33 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
   private async fetchDustExtensionArn(region: string): Promise<string> {
     const urlPrefix = this.config.arnUrlPrefix;
-    return new Promise((resolve, reject) => {
-      // Construct URL with version if specified, otherwise use latest
-      const url = this.config.arnVersion
-        ? `${urlPrefix}/${region}/extension-v${this.config.arnVersion}.arn`
-        : `${urlPrefix}/${region}/extension.arn`;
+    // Construct URL with version if specified, otherwise use latest
+    const url = this.config.arnVersion
+      ? `${urlPrefix}/${region}/extension-v${this.config.arnVersion}.arn`
+      : `${urlPrefix}/${region}/extension.arn`;
 
-      https
-        .get(url, (res) => {
-          let data = "";
+    try {
+      const response = await fetch(url);
 
-          if (res.statusCode !== 200) {
-            const versionInfo = this.config.arnVersion ? ` (v${this.config.arnVersion})` : "";
-            this.log_warning(
-              `Failed to fetch Dust extension ARN for region ${region}${versionInfo}: HTTP ${res.statusCode}`
-            );
-            reject(new Error(`HTTP ${res.statusCode}`));
-            return;
-          }
+      if (!response.ok) {
+        const versionInfo = this.config.arnVersion ? ` (v${this.config.arnVersion})` : "";
+        this.log_warning(
+          `Failed to fetch Dust extension ARN for region ${region}${versionInfo}: HTTP ${response.status}`
+        );
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-          res.on("data", (chunk) => {
-            data += chunk;
-          });
-
-          res.on("end", () => {
-            const arn = data.trim();
-            resolve(arn);
-          });
-        })
-        .on("error", (error) => {
-          const versionInfo = this.config.arnVersion ? ` (v${this.config.arnVersion})` : "";
-          this.log_warning(
-            `Failed to fetch Dust extension ARN for region ${region}${versionInfo}: ${error.message}`
-          );
-          reject(error);
-        });
-    });
+      const data = await response.text();
+      const arn = data.trim();
+      return arn;
+    } catch (error) {
+      const versionInfo = this.config.arnVersion ? ` (v${this.config.arnVersion})` : "";
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.log_warning(
+        `Failed to fetch Dust extension ARN for region ${region}${versionInfo}: ${errorMessage}`
+      );
+      throw error;
+    }
   }
 
   private checkMemoryConfiguration(): boolean {
