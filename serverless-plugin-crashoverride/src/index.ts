@@ -16,23 +16,19 @@ import type {
 } from "./types";
 
 class CrashOverrideServerlessPlugin implements Plugin {
-    serverless: Serverless;
-    options: Serverless.Options;
     hooks: Plugin.Hooks;
-    provider: AwsProvider;
     readonly config: Readonly<CrashOverrideConfig>;
-    private log: Plugin.Logging["log"];
+    private readonly log: Plugin.Logging["log"];
     private isChalkAvailable: boolean = false;
     private providerConfig: ProviderConfig | null = null;
     private dustExtensionArn: string | null = null;
+    public readonly provider: AwsProvider;
 
     constructor(
-        serverless: Serverless,
-        options: Serverless.Options = {},
+        public readonly serverless: Serverless,
+        public readonly options: Serverless.Options = {},
         { log }: Plugin.Logging,
     ) {
-        this.serverless = serverless;
-        this.options = options;
         this.log = log;
         this.provider = serverless.getProvider("aws")
 
