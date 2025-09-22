@@ -13,6 +13,7 @@ import type {
   ProviderConfig,
   FunctionValidationResult,
   CloudFormationTemplate,
+  RuntimeAwsFunction,
 } from "./types";
 
 class CrashOverrideServerlessPlugin implements Plugin {
@@ -329,7 +330,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
   }
 
   private validateLayerCount(
-    functions: Record<string, Aws.AwsFunction>,
+    functions: { [key: string]: RuntimeAwsFunction },
     maxLayers: number = 15
   ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
@@ -337,8 +338,8 @@ class CrashOverrideServerlessPlugin implements Plugin {
     for (const [functionName, func] of Object.entries(functions)) {
       if (!func) continue;
 
-      const awsFunc = func as Aws.AwsFunction;
-      const currentLayers = awsFunc.layers || [];
+      // Access layers from the runtime AWS function
+      const currentLayers = func.layers || [];
 
       if (currentLayers.length >= maxLayers) {
         errors.push(
@@ -364,7 +365,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
   }
 
   private addDustLambdaExtension(
-    functions: Record<string, Aws.AwsFunction>,
+    functions: { [key: string]: RuntimeAwsFunction },
     extensionArn: string
   ): { success: boolean; skipped: string[]; added: string[] } {
     const skippedFunctions: string[] = [];
@@ -377,21 +378,20 @@ class CrashOverrideServerlessPlugin implements Plugin {
       for (const [functionName, func] of Object.entries(functions)) {
         if (!func) continue;
 
-        const awsFunc = func as Aws.AwsFunction;
-
-        if (!awsFunc.layers) {
-          awsFunc.layers = [];
+        // Initialize layers array if not present
+        if (!func.layers) {
+          func.layers = [];
         }
 
         // Check if the same extension (ignoring version) already exists
-        const alreadyHasExtension = awsFunc.layers.some(
+        const alreadyHasExtension = func.layers.some(
           (layer) => this.getArnWithoutVersion(layer) === extensionArnBase
         );
 
         if (alreadyHasExtension) {
           skippedFunctions.push(functionName);
         } else {
-          awsFunc.layers = [...(awsFunc.layers ?? []), extensionArn];
+          func.layers = [...(func.layers ?? []), extensionArn];
           addedFunctions.push(functionName);
         }
       }
@@ -412,8 +412,10 @@ class CrashOverrideServerlessPlugin implements Plugin {
       throw new Error(errorMessage);
     }
 
-    // Get functions from service
-    const functions = this.serverless.service.functions || {};
+    // Get functions from service (cast to RuntimeAwsFunction for AWS-specific properties)
+    const functions = (this.serverless.service.functions || {}) as {
+      [key: string]: RuntimeAwsFunction;
+    };
     const functionCount = Object.keys(functions).length;
 
     // Handle Dust Lambda Extension
@@ -449,10 +451,9 @@ class CrashOverrideServerlessPlugin implements Plugin {
         for (const functionName of result.added) {
           const func = functions[functionName];
           if (!func) continue;
-          const awsFunc = func as Aws.AwsFunction;
           this.log_info(
             `Added Dust Lambda Extension to function: ${chalk.bold(functionName)} (${chalk.gray(
-              `${awsFunc.layers?.length || 0}/${MAX_LAYERS_AND_EXTENSIONS} layers/extensions`
+              `${func.layers?.length || 0}/${MAX_LAYERS_AND_EXTENSIONS} layers/extensions`
             )})`
           );
         }
