@@ -1,6 +1,4 @@
-import {
-  ServerlessError,
-} from "./__mocks__/serverless.mock";
+import { ServerlessError } from "./__mocks__/serverless.mock";
 import * as childProcessMock from "./__mocks__/child_process";
 import * as fsMock from "./__mocks__/fs";
 import * as httpsMock from "./__mocks__/https";
@@ -49,7 +47,7 @@ describe("CrashOverrideServerlessPlugin", () => {
 
   afterEach(() => {
     process.env = originalEnv;
-    Object.defineProperty(process, 'platform', {
+    Object.defineProperty(process, "platform", {
       value: originalPlatform,
     });
   });
@@ -57,8 +55,8 @@ describe("CrashOverrideServerlessPlugin", () => {
   describe("Platform Support", () => {
     it("should early exit and not register hooks on Windows", () => {
       // Mock process.platform to return 'win32'
-      Object.defineProperty(process, 'platform', {
-        value: 'win32',
+      Object.defineProperty(process, "platform", {
+        value: "win32",
         configurable: true,
       });
 
@@ -76,8 +74,8 @@ describe("CrashOverrideServerlessPlugin", () => {
 
     it("should initialize normally on non-Windows platforms", () => {
       // Mock process.platform to return 'linux'
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
+      Object.defineProperty(process, "platform", {
+        value: "linux",
         configurable: true,
       });
 
@@ -139,142 +137,156 @@ describe("CrashOverrideServerlessPlugin", () => {
         expect(providerConfig.memorySize).toBe(1234);
       });
 
-        it("should prioritize serverless.yml config over environment variables", () => {
-          const { plugin } = new TestSetupBuilder()
-            .withEnvironmentVar("CO_MEMORY_CHECK", "false")
-            .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
-            .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "false")
-            .withCustomConfig({
-              memoryCheck: true,
-              memoryCheckSize: 512,
-              chalkCheck: true,
-            })
-            .build();
-
-          // Verify serverless.yml config takes precedence
-          expect(plugin.config.memoryCheck).toBe(true);
-          expect(plugin.config.memoryCheckSize).toBe(512);
-          expect(plugin.config.chalkCheck).toBe(true);
-        });
-
-        it("should use environment variables when serverless.yml config is not provided", () => {
-          const { plugin } = new TestSetupBuilder()
-            .withEnvironmentVar("CO_MEMORY_CHECK", "true")
-            .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
-            .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "true")
-            .build();
-
-          expect(plugin.config.memoryCheck).toBe(true);
-          expect(plugin.config.memoryCheckSize).toBe(1024);
-          expect(plugin.config.chalkCheck).toBe(true);
-        });
-
-        it("should use default values when no configuration is provided", () => {
-          const { plugin } = new TestSetupBuilder().build();
-
-          expect(plugin.config.memoryCheck).toBe(false);
-          expect(plugin.config.memoryCheckSize).toBe(256);
-          expect(plugin.config.chalkCheck).toBe(false);
-        });
-
-        it("should handle invalid memoryCheckSize in environment variable", () => {
-          expect(() => {
-            new TestSetupBuilder()
-              .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "invalid")
-              .build();
-          }).toThrow(ServerlessError);
-        });
-
-        it("should merge configurations with correct precedence", () => {
-          const { plugin } = new TestSetupBuilder()
-            .withEnvironmentVar("CO_MEMORY_CHECK", "true")
-            .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
-            .withCustomConfig({
-              memoryCheckSize: 512,
-              chalkCheck: true,
-            })
-            .build();
-
-          expect(plugin.config.memoryCheck).toBe(true); // from env
-          expect(plugin.config.memoryCheckSize).toBe(512); // from serverless.yml
-          expect(plugin.config.chalkCheck).toBe(true); // from serverless.yml
-        });
-
-    it("should handle boolean string values in environment variables correctly", () => {
-      const { plugin } = new TestSetupBuilder()
-        .withEnvironmentVar("CO_MEMORY_CHECK", "TRUE")
-        .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "FALSE")
-        .build();
-
-      expect(plugin.config.memoryCheck).toBe(true);
-      expect(plugin.config.memoryCheckSize).toBe(256); // default
-      expect(plugin.config.chalkCheck).toBe(false);
-    });
-
-    it("should handle ARN version configuration from environment variable", () => {
-      const { plugin } = new TestSetupBuilder()
-        .withEnvironmentVar("CO_ARN_VERSION", "7")
-        .build();
-
-      expect(plugin.config.arnVersion).toBe(7);
-    });
-
-    it("should handle ARN version configuration from serverless.yml", () => {
-      const { plugin } = new TestSetupBuilder()
-        .withCustomConfig({
-          arnVersion: 22,
-        })
-        .build();
-
-      expect(plugin.config.arnVersion).toBe(22);
-    });
-
-    it("should prioritize serverless.yml ARN version over environment variable", () => {
-      const { plugin } = new TestSetupBuilder()
-        .withEnvironmentVar("CO_ARN_VERSION", "7")
-        .withCustomConfig({
-          arnVersion: 22,
-        })
-        .build();
-
-      expect(plugin.config.arnVersion).toBe(22); // serverless.yml takes precedence
-    });
-
-    it("should throw error for invalid ARN version in environment variable", () => {
-      expect(() => {
-        new TestSetupBuilder()
-          .withEnvironmentVar("CO_ARN_VERSION", "invalid")
+      it("should prioritize serverless.yml config over environment variables", () => {
+        const { plugin } = new TestSetupBuilder()
+          .withEnvironmentVar("CO_MEMORY_CHECK", "false")
+          .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
+          .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "false")
+          .withCustomConfig({
+            memoryCheck: true,
+            memoryCheckSize: 512,
+            chalkCheck: true,
+          })
           .build();
-      }).toThrow("Received invalid arnVersion value: invalid");
 
-      expect(() => {
-        new TestSetupBuilder()
-          .withEnvironmentVar("CO_ARN_VERSION", "-1")
+        // Verify serverless.yml config takes precedence
+        expect(plugin.config.memoryCheck).toBe(true);
+        expect(plugin.config.memoryCheckSize).toBe(512);
+        expect(plugin.config.chalkCheck).toBe(true);
+      });
+
+      it("should use environment variables when serverless.yml config is not provided", () => {
+        const { plugin } = new TestSetupBuilder()
+          .withEnvironmentVar("CO_MEMORY_CHECK", "true")
+          .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
+          .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "true")
           .build();
-      }).toThrow("Received invalid arnVersion value: -1");
 
-      expect(() => {
-        new TestSetupBuilder()
-          .withEnvironmentVar("CO_ARN_VERSION", "0")
+        expect(plugin.config.memoryCheck).toBe(true);
+        expect(plugin.config.memoryCheckSize).toBe(1024);
+        expect(plugin.config.chalkCheck).toBe(true);
+      });
+
+      it("should use default values when no configuration is provided", () => {
+        const { plugin } = new TestSetupBuilder().build();
+
+        expect(plugin.config.memoryCheck).toBe(false);
+        expect(plugin.config.memoryCheckSize).toBe(256);
+        expect(plugin.config.chalkCheck).toBe(false);
+      });
+
+      it("should handle invalid memoryCheckSize in environment variable", () => {
+        expect(() => {
+          new TestSetupBuilder().withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "invalid").build();
+        }).toThrow(ServerlessError);
+      });
+
+      it("should merge configurations with correct precedence", () => {
+        const { plugin } = new TestSetupBuilder()
+          .withEnvironmentVar("CO_MEMORY_CHECK", "true")
+          .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
+          .withCustomConfig({
+            memoryCheckSize: 512,
+            chalkCheck: true,
+          })
           .build();
-      }).toThrow("Received invalid arnVersion value: 0");
-    });
 
-    it("should use undefined ARN version by default", () => {
-      const { plugin } = new TestSetupBuilder().build();
+        expect(plugin.config.memoryCheck).toBe(true); // from env
+        expect(plugin.config.memoryCheckSize).toBe(512); // from serverless.yml
+        expect(plugin.config.chalkCheck).toBe(true); // from serverless.yml
+      });
 
-      expect(plugin.config.arnVersion).toBeUndefined();
-    });
+      it("should handle boolean string values in environment variables correctly", () => {
+        const { plugin } = new TestSetupBuilder()
+          .withEnvironmentVar("CO_MEMORY_CHECK", "TRUE")
+          .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "FALSE")
+          .build();
+
+        expect(plugin.config.memoryCheck).toBe(true);
+        expect(plugin.config.memoryCheckSize).toBe(256); // default
+        expect(plugin.config.chalkCheck).toBe(false);
+      });
+
+      it("should handle ARN version configuration from environment variable", () => {
+        const { plugin } = new TestSetupBuilder().withEnvironmentVar("CO_ARN_VERSION", "7").build();
+
+        expect(plugin.config.arnVersion).toBe(7);
+      });
+
+      it("should handle ARN version configuration from serverless.yml", () => {
+        const { plugin } = new TestSetupBuilder()
+          .withCustomConfig({
+            arnVersion: 22,
+          })
+          .build();
+
+        expect(plugin.config.arnVersion).toBe(22);
+      });
+
+      it("should prioritize serverless.yml ARN version over environment variable", () => {
+        const { plugin } = new TestSetupBuilder()
+          .withEnvironmentVar("CO_ARN_VERSION", "7")
+          .withCustomConfig({
+            arnVersion: 22,
+          })
+          .build();
+
+        expect(plugin.config.arnVersion).toBe(22); // serverless.yml takes precedence
+      });
+
+      it("should throw error for invalid ARN version in environment variable", () => {
+        expect(() => {
+          new TestSetupBuilder().withEnvironmentVar("CO_ARN_VERSION", "invalid").build();
+        }).toThrow("Received invalid arnVersion value: invalid");
+
+        expect(() => {
+          new TestSetupBuilder().withEnvironmentVar("CO_ARN_VERSION", "-1").build();
+        }).toThrow("Received invalid arnVersion value: -1");
+
+        expect(() => {
+          new TestSetupBuilder().withEnvironmentVar("CO_ARN_VERSION", "0").build();
+        }).toThrow("Received invalid arnVersion value: 0");
+      });
+
+      it("should use undefined ARN version by default", () => {
+        const { plugin } = new TestSetupBuilder().build();
+
+        expect(plugin.config.arnVersion).toBeUndefined();
+      });
     });
   });
 
   describe("Memory Check Validation", () => {
     describe.each([
-      { memoryCheck: true, providerMemory: 1024, requiredMemory: 512, shouldThrow: false, description: "passes when memory is sufficient" },
-      { memoryCheck: true, providerMemory: 512, requiredMemory: 512, shouldThrow: false, description: "passes when memory equals requirement" },
-      { memoryCheck: true, providerMemory: 256, requiredMemory: 512, shouldThrow: true, description: "throws when memory is insufficient" },
-      { memoryCheck: false, providerMemory: 256, requiredMemory: 512, shouldThrow: false, description: "warns but doesn't throw when check is disabled" },
-    ])('$description', ({ memoryCheck, providerMemory, requiredMemory, shouldThrow }) => {
+      {
+        memoryCheck: true,
+        providerMemory: 1024,
+        requiredMemory: 512,
+        shouldThrow: false,
+        description: "passes when memory is sufficient",
+      },
+      {
+        memoryCheck: true,
+        providerMemory: 512,
+        requiredMemory: 512,
+        shouldThrow: false,
+        description: "passes when memory equals requirement",
+      },
+      {
+        memoryCheck: true,
+        providerMemory: 256,
+        requiredMemory: 512,
+        shouldThrow: true,
+        description: "throws when memory is insufficient",
+      },
+      {
+        memoryCheck: false,
+        providerMemory: 256,
+        requiredMemory: 512,
+        shouldThrow: false,
+        description: "warns but doesn't throw when check is disabled",
+      },
+    ])("$description", ({ memoryCheck, providerMemory, requiredMemory, shouldThrow }) => {
       it(`memoryCheck=${memoryCheck}, provider=${providerMemory}MB, required=${requiredMemory}MB`, () => {
         const { plugin } = new TestSetupBuilder()
           .withMemoryCheck(memoryCheck, requiredMemory)
@@ -308,9 +320,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     });
 
     it("should throw if provider config not initialized", () => {
-      const { plugin } = new TestSetupBuilder()
-        .withMemoryCheck(true, 512)
-        .build();
+      const { plugin } = new TestSetupBuilder().withMemoryCheck(true, 512).build();
 
       // Don't execute provider config hook
       // Access private method for unit testing
@@ -322,18 +332,37 @@ describe("CrashOverrideServerlessPlugin", () => {
 
   describe("Chalk Binary Validation", () => {
     describe.each([
-      { chalkCheck: true, chalkAvailable: true, shouldThrow: false, description: "passes when chalk available and required" },
-      { chalkCheck: true, chalkAvailable: false, shouldThrow: true, description: "throws when chalk required but not available" },
-      { chalkCheck: false, chalkAvailable: true, shouldThrow: false, description: "passes when chalk available but not required" },
-      { chalkCheck: false, chalkAvailable: false, shouldThrow: false, description: "passes when chalk not available and not required" },
-    ])('$description', ({ chalkCheck, chalkAvailable, shouldThrow }) => {
+      {
+        chalkCheck: true,
+        chalkAvailable: true,
+        shouldThrow: false,
+        description: "passes when chalk available and required",
+      },
+      {
+        chalkCheck: true,
+        chalkAvailable: false,
+        shouldThrow: true,
+        description: "throws when chalk required but not available",
+      },
+      {
+        chalkCheck: false,
+        chalkAvailable: true,
+        shouldThrow: false,
+        description: "passes when chalk available but not required",
+      },
+      {
+        chalkCheck: false,
+        chalkAvailable: false,
+        shouldThrow: false,
+        description: "passes when chalk not available and not required",
+      },
+    ])("$description", ({ chalkCheck, chalkAvailable, shouldThrow }) => {
       it(`chalkCheck=${chalkCheck}, available=${chalkAvailable}`, () => {
-        const builder = new TestSetupBuilder()
-          .withCustomConfig({
-            memoryCheck: false,
-            memoryCheckSize: 256,
-            chalkCheck: chalkCheck,
-          });
+        const builder = new TestSetupBuilder().withCustomConfig({
+          memoryCheck: false,
+          memoryCheckSize: 256,
+          chalkCheck: chalkCheck,
+        });
 
         if (chalkAvailable) {
           builder.withChalkAvailable();
@@ -361,9 +390,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     });
 
     it("should correctly detect chalk availability", () => {
-      const { plugin } = new TestSetupBuilder()
-        .withChalkAvailable()
-        .build();
+      const { plugin } = new TestSetupBuilder().withChalkAvailable().build();
 
       // Access private method for unit testing
       const result = (plugin as any).chalkBinaryAvailable();
@@ -371,9 +398,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     });
 
     it("should correctly detect chalk unavailability", () => {
-      const { plugin } = new TestSetupBuilder()
-        .withChalkNotAvailable()
-        .build();
+      const { plugin } = new TestSetupBuilder().withChalkNotAvailable().build();
 
       // Access private method for unit testing
       const result = (plugin as any).chalkBinaryAvailable();
@@ -401,46 +426,43 @@ describe("CrashOverrideServerlessPlugin", () => {
         packageExists: false,
         shouldInject: false,
       },
-    ])(
-      "injection behavior - $description",
-      ({ chalkAvailable, packageExists, shouldInject }) => {
-        it("should handle injection correctly", async () => {
-          const builder = new TestSetupBuilder().withServiceName("test-service");
+    ])("injection behavior - $description", ({ chalkAvailable, packageExists, shouldInject }) => {
+      it("should handle injection correctly", async () => {
+        const builder = new TestSetupBuilder().withServiceName("test-service");
 
-          if (chalkAvailable) {
-            builder.withChalkAvailable();
-          } else {
-            builder.withChalkNotAvailable();
-          }
+        if (chalkAvailable) {
+          builder.withChalkAvailable();
+        } else {
+          builder.withChalkNotAvailable();
+        }
 
-          if (packageExists) {
-            builder.withPackageZipExists();
-          } else {
-            fsMock.existsSync.mockReturnValue(false);
-          }
+        if (packageExists) {
+          builder.withPackageZipExists();
+        } else {
+          fsMock.existsSync.mockReturnValue(false);
+        }
 
-          const { plugin } = builder.build();
+        const { plugin } = builder.build();
 
-          executeProviderConfigHook(plugin);
-          executeDeploymentHook(plugin);
-          await executeAwsPackageHook(plugin);
+        executeProviderConfigHook(plugin);
+        executeDeploymentHook(plugin);
+        await executeAwsPackageHook(plugin);
 
-          if (shouldInject) {
-            // Verify chalk injection was attempted with the correct path
-            expect(childProcessMock.execSync).toHaveBeenCalledWith(
-              expect.stringContaining("chalk insert --inject-binary-into-zip"),
-              expect.any(Object)
-            );
-          } else {
-            // Verify chalk injection was not attempted
-            expect(childProcessMock.execSync).not.toHaveBeenCalledWith(
-              expect.stringContaining("chalk insert"),
-              expect.any(Object)
-            );
-          }
-        });
-      }
-    );
+        if (shouldInject) {
+          // Verify chalk injection was attempted with the correct path
+          expect(childProcessMock.execSync).toHaveBeenCalledWith(
+            expect.stringContaining("chalk insert --inject-binary-into-zip"),
+            expect.any(Object)
+          );
+        } else {
+          // Verify chalk injection was not attempted
+          expect(childProcessMock.execSync).not.toHaveBeenCalledWith(
+            expect.stringContaining("chalk insert"),
+            expect.any(Object)
+          );
+        }
+      });
+    });
   });
 
   describe("Lambda Extension Management", () => {
@@ -496,7 +518,8 @@ describe("CrashOverrideServerlessPlugin", () => {
           executeProviderConfigHook(plugin);
           await executeAwsPackageHook(plugin);
 
-          const extensionArn = "arn:aws:lambda:us-east-1:123456789012:layer:test-crashoverride-dust-extension:8";
+          const extensionArn =
+            "arn:aws:lambda:us-east-1:123456789012:layer:test-crashoverride-dust-extension:8";
 
           if (shouldAddExtension) {
             // Verify all functions have the correct number of layers
@@ -520,9 +543,9 @@ describe("CrashOverrideServerlessPlugin", () => {
           maxedFunction: {
             handler: "handler.maxed",
             runtime: "nodejs18.x",
-            layers: Array(15).fill(0).map((_, i) =>
-              `arn:aws:lambda:us-east-1:123456789012:layer:layer${i+1}`
-            ),
+            layers: Array(15)
+              .fill(0)
+              .map((_, i) => `arn:aws:lambda:us-east-1:123456789012:layer:layer${i + 1}`),
           },
         },
         shouldThrow: true,
@@ -534,9 +557,9 @@ describe("CrashOverrideServerlessPlugin", () => {
           almostMaxed: {
             handler: "handler.almost",
             runtime: "nodejs18.x",
-            layers: Array(14).fill(0).map((_, i) =>
-              `arn:aws:lambda:us-east-1:123456789012:layer:layer${i+1}`
-            ),
+            layers: Array(14)
+              .fill(0)
+              .map((_, i) => `arn:aws:lambda:us-east-1:123456789012:layer:layer${i + 1}`),
           },
         },
         shouldThrow: false,
@@ -573,9 +596,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     );
 
     it("should handle service with no functions", async () => {
-      const { plugin, mockServerless } = new TestSetupBuilder()
-        .withFunctions({})
-        .build();
+      const { plugin, mockServerless } = new TestSetupBuilder().withFunctions({}).build();
 
       executeProviderConfigHook(plugin);
       await expect(executeAwsPackageHook(plugin)).resolves.not.toThrow();
@@ -592,7 +613,7 @@ describe("CrashOverrideServerlessPlugin", () => {
 
     beforeEach(() => {
       originalCwd = process.cwd;
-      jest.spyOn(process, 'cwd').mockReturnValue('/mock/cwd');
+      jest.spyOn(process, "cwd").mockReturnValue("/mock/cwd");
     });
 
     afterEach(() => {
@@ -614,65 +635,65 @@ describe("CrashOverrideServerlessPlugin", () => {
           servicePath: "/absolute/service/path",
           packagePath: undefined,
           expected: "/absolute/service/path/.serverless",
-          description: "absolute servicePath with default package path"
+          description: "absolute servicePath with default package path",
         },
         {
           servicePath: "./relative/path",
           packagePath: undefined,
           expected: "relative/path/.serverless", // Will be checked with toContain
-          description: "relative servicePath with default package path"
+          description: "relative servicePath with default package path",
         },
         {
           servicePath: undefined,
           packagePath: undefined,
           expected: "/mock/cwd/.serverless",
           description: "undefined servicePath with default package path",
-          shouldCallCwd: true
+          shouldCallCwd: true,
         },
         {
           servicePath: "",
           packagePath: undefined,
           expected: "/mock/cwd/.serverless",
           description: "empty servicePath with default package path",
-          shouldCallCwd: true
+          shouldCallCwd: true,
         },
         // Custom package paths
         {
           servicePath: "/service/path",
           packagePath: "/absolute/package/path",
           expected: "/absolute/package/path",
-          description: "absolute package path"
+          description: "absolute package path",
         },
         {
           servicePath: "/service/path",
           packagePath: "custom/package/dir",
           expected: "/service/path/custom/package/dir",
-          description: "relative package path"
+          description: "relative package path",
         },
         {
           servicePath: undefined,
           packagePath: "dist/serverless",
           expected: "/mock/cwd/dist/serverless",
           description: "undefined servicePath with custom package path",
-          shouldCallCwd: true
+          shouldCallCwd: true,
         },
         // Edge cases
         {
           servicePath: "/path/with/trailing/slash/",
           packagePath: undefined,
           expected: "/path/with/trailing/slash/.serverless",
-          description: "servicePath with trailing slash"
+          description: "servicePath with trailing slash",
         },
         {
           servicePath: "/service/path",
           packagePath: "",
           expected: "/service/path/.serverless",
-          description: "empty package path falls back to default"
-        }
+          description: "empty package path falls back to default",
+        },
       ];
 
       test.each(testCases)(
-        '$description',
+        "$description",
         ({ servicePath, packagePath, expected, shouldCallCwd }) => {
           const builder = new TestSetupBuilder();
 
@@ -699,7 +720,7 @@ describe("CrashOverrideServerlessPlugin", () => {
           const location = (plugin as any).getServerlessPackagingLocation();
 
           // Check the result
-          if (servicePath?.startsWith('./')) {
+          if (servicePath?.startsWith("./")) {
             // For relative paths, just check it contains the expected part
             expect(location).toContain(expected);
           } else {
@@ -719,12 +740,27 @@ describe("CrashOverrideServerlessPlugin", () => {
 
     describe("complex relative path handling", () => {
       test.each([
-        ["/service/sub/path", "../parent/package", "/service/sub/parent/package", "parent directory references"],
-        ["/service/path", "./nested/./package", "/service/path/nested/package", "current directory references"],
-        ["/service/sub/deep", "../../up/two", "/service/up/two", "multiple parent directory references"],
-        ["/service", "./././nested", "/service/nested", "multiple current directory references"]
+        [
+          "/service/sub/path",
+          "../parent/package",
+          "/service/sub/parent/package",
+          "parent directory references",
+        ],
+        [
+          "/service/path",
+          "./nested/./package",
+          "/service/path/nested/package",
+          "current directory references",
+        ],
+        [
+          "/service/sub/deep",
+          "../../up/two",
+          "/service/up/two",
+          "multiple parent directory references",
+        ],
+        ["/service", "./././nested", "/service/nested", "multiple current directory references"],
       ])(
-        'should handle %s with packagePath=%s correctly',
+        "should handle %s with packagePath=%s correctly",
         (servicePath: string, packagePath: string, expected: string, description: string) => {
           const { plugin } = new TestSetupBuilder()
             .withServicePath(servicePath)
@@ -746,59 +782,62 @@ describe("CrashOverrideServerlessPlugin", () => {
       fsMock.readFileSync.mockReturnValue(JSON.stringify(template));
 
       const { plugin } = new TestSetupBuilder().build();
-      const result = (plugin as any).parseCloudFormationTemplate('/path/to/template.json');
+      const result = (plugin as any).parseCloudFormationTemplate("/path/to/template.json");
 
       expect(result).toEqual(template);
     });
 
     it("should throw meaningful error for missing file", () => {
       fsMock.readFileSync.mockImplementation(() => {
-        const error: any = new Error('ENOENT');
-        error.code = 'ENOENT';
+        const error: any = new Error("ENOENT");
+        error.code = "ENOENT";
         throw error;
       });
 
       const { plugin } = new TestSetupBuilder().build();
 
-      expect(() => (plugin as any).parseCloudFormationTemplate('/path/to/template.json'))
-        .toThrow('CloudFormation template not found at /path/to/template.json');
+      expect(() => (plugin as any).parseCloudFormationTemplate("/path/to/template.json")).toThrow(
+        "CloudFormation template not found at /path/to/template.json"
+      );
     });
 
     it("should throw meaningful error for invalid JSON", () => {
-      fsMock.readFileSync.mockReturnValue('{ invalid json }');
+      fsMock.readFileSync.mockReturnValue("{ invalid json }");
 
       const { plugin } = new TestSetupBuilder().build();
 
-      expect(() => (plugin as any).parseCloudFormationTemplate('/path/to/template.json'))
-        .toThrow('Invalid JSON in CloudFormation template');
+      expect(() => (plugin as any).parseCloudFormationTemplate("/path/to/template.json")).toThrow(
+        "Invalid JSON in CloudFormation template"
+      );
     });
 
     it("should wrap unexpected errors", () => {
       fsMock.readFileSync.mockImplementation(() => {
-        throw new Error('Unexpected error');
+        throw new Error("Unexpected error");
       });
 
       const { plugin } = new TestSetupBuilder().build();
 
-      expect(() => (plugin as any).parseCloudFormationTemplate('/path/to/template.json'))
-        .toThrow('Failed to parse CloudFormation template: Unexpected error');
+      expect(() => (plugin as any).parseCloudFormationTemplate("/path/to/template.json")).toThrow(
+        "Failed to parse CloudFormation template: Unexpected error"
+      );
     });
   });
 
   describe("Function Validation Logic", () => {
     it("should correctly identify functions with and without extension", () => {
       const template = createCloudFormationTemplate([
-        { name: 'Function1', hasLayers: true, layers: ['arn:test'] },
-        { name: 'Function2', hasLayers: false }
+        { name: "Function1", hasLayers: true, layers: ["arn:test"] },
+        { name: "Function2", hasLayers: false },
       ]);
 
       const { plugin } = new TestSetupBuilder().build();
-      const result = (plugin as any).validateFunctionsInTemplate(template, 'arn:test');
+      const result = (plugin as any).validateFunctionsInTemplate(template, "arn:test");
 
       expect(result).toEqual({
         totalFunctions: 2,
-        functionsWithExtension: ['Function1LambdaFunction'],
-        functionsMissingExtension: ['Function2LambdaFunction']
+        functionsWithExtension: ["Function1LambdaFunction"],
+        functionsMissingExtension: ["Function2LambdaFunction"],
       });
     });
 
@@ -806,18 +845,18 @@ describe("CrashOverrideServerlessPlugin", () => {
       const template = {
         Resources: {
           SomeOtherResource: {
-            Type: 'AWS::S3::Bucket'
-          }
-        }
+            Type: "AWS::S3::Bucket",
+          },
+        },
       };
 
       const { plugin } = new TestSetupBuilder().build();
-      const result = (plugin as any).validateFunctionsInTemplate(template, 'arn:test');
+      const result = (plugin as any).validateFunctionsInTemplate(template, "arn:test");
 
       expect(result).toEqual({
         totalFunctions: 0,
         functionsWithExtension: [],
-        functionsMissingExtension: []
+        functionsMissingExtension: [],
       });
     });
 
@@ -825,22 +864,22 @@ describe("CrashOverrideServerlessPlugin", () => {
       const template = {
         Resources: {
           MyFunction: {
-            Type: 'AWS::Lambda::Function',
+            Type: "AWS::Lambda::Function",
             Properties: {
-              Handler: 'index.handler'
+              Handler: "index.handler",
               // No Layers property
-            }
-          }
-        }
+            },
+          },
+        },
       };
 
       const { plugin } = new TestSetupBuilder().build();
-      const result = (plugin as any).validateFunctionsInTemplate(template, 'arn:test');
+      const result = (plugin as any).validateFunctionsInTemplate(template, "arn:test");
 
       expect(result).toEqual({
         totalFunctions: 1,
         functionsWithExtension: [],
-        functionsMissingExtension: ['MyFunction']
+        functionsMissingExtension: ["MyFunction"],
       });
     });
 
@@ -848,35 +887,35 @@ describe("CrashOverrideServerlessPlugin", () => {
       const template = {};
 
       const { plugin } = new TestSetupBuilder().build();
-      const result = (plugin as any).validateFunctionsInTemplate(template, 'arn:test');
+      const result = (plugin as any).validateFunctionsInTemplate(template, "arn:test");
 
       expect(result).toEqual({
         totalFunctions: 0,
         functionsWithExtension: [],
-        functionsMissingExtension: []
+        functionsMissingExtension: [],
       });
     });
 
     it("should check multiple functions correctly", () => {
-      const arn = 'arn:aws:lambda:us-east-1:123:layer:dust:1';
+      const arn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
       const template = {
         Resources: {
           Func1: {
-            Type: 'AWS::Lambda::Function',
-            Properties: { Layers: [arn] }
+            Type: "AWS::Lambda::Function",
+            Properties: { Layers: [arn] },
           },
           Func2: {
-            Type: 'AWS::Lambda::Function',
-            Properties: { Layers: ['other-arn'] }
+            Type: "AWS::Lambda::Function",
+            Properties: { Layers: ["other-arn"] },
           },
           Func3: {
-            Type: 'AWS::Lambda::Function',
-            Properties: { Layers: [arn, 'other-arn'] }
+            Type: "AWS::Lambda::Function",
+            Properties: { Layers: [arn, "other-arn"] },
           },
           NotAFunction: {
-            Type: 'AWS::S3::Bucket'
-          }
-        }
+            Type: "AWS::S3::Bucket",
+          },
+        },
       };
 
       const { plugin } = new TestSetupBuilder().build();
@@ -884,8 +923,8 @@ describe("CrashOverrideServerlessPlugin", () => {
 
       expect(result).toEqual({
         totalFunctions: 3,
-        functionsWithExtension: ['Func1', 'Func3'],
-        functionsMissingExtension: ['Func2']
+        functionsWithExtension: ["Func1", "Func3"],
+        functionsMissingExtension: ["Func2"],
       });
     });
   });
@@ -894,24 +933,25 @@ describe("CrashOverrideServerlessPlugin", () => {
     it("should build comprehensive status message", () => {
       const result = {
         totalFunctions: 3,
-        functionsWithExtension: ['Function1', 'Function2'],
-        functionsMissingExtension: ['Function3']
+        functionsWithExtension: ["Function1", "Function2"],
+        functionsMissingExtension: ["Function3"],
       };
 
       const { plugin } = new TestSetupBuilder().build();
       const message = (plugin as any).buildStatusMessage(result);
 
-      expect(message).toContain('Layer check status:');
-      expect(message).toContain(' Functions with Dust Extension (2/3):');
-      expect(message).toContain('- Function1');
-      expect(message).toContain('- Function2');
-      expect(message).toContain(' Functions MISSING Dust Extension (1/3):');
-      expect(message).toContain('- Function3');
+      expect(message).toContain("Layer check status:");
+      expect(message).toContain(" Functions with Dust Extension (2/3):");
+      expect(message).toContain("- Function1");
+      expect(message).toContain("- Function2");
+      expect(message).toContain(" Functions MISSING Dust Extension (1/3):");
+      expect(message).toContain("- Function3");
     });
   });
 
   describe("Layer Check Validation", () => {
-    const dustExtensionArn = "arn:aws:lambda:us-east-1:224111541501:layer:test-crashoverride-dust-extension:8";
+    const dustExtensionArn =
+      "arn:aws:lambda:us-east-1:224111541501:layer:test-crashoverride-dust-extension:8";
 
     beforeEach(() => {
       httpsMock.mockDustExtensionArn(dustExtensionArn);
@@ -919,15 +959,15 @@ describe("CrashOverrideServerlessPlugin", () => {
 
     it("should pass validation when all functions have Dust extension", async () => {
       const template = createCloudFormationTemplate([
-        { name: 'Handler', hasLayers: true, layers: [dustExtensionArn] },
-        { name: 'Worker', hasLayers: true, layers: [dustExtensionArn] },
+        { name: "Handler", hasLayers: true, layers: [dustExtensionArn] },
+        { name: "Worker", hasLayers: true, layers: [dustExtensionArn] },
       ]);
 
       const { plugin } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
-          handler: { handler: 'handler.handler' },
-          worker: { handler: 'worker.handler' }
+          handler: { handler: "handler.handler" },
+          worker: { handler: "worker.handler" },
         })
         .build();
 
@@ -944,17 +984,17 @@ describe("CrashOverrideServerlessPlugin", () => {
 
     it("should throw an error when layerCheck=true and functions missing extension", async () => {
       const template = createCloudFormationTemplate([
-        { name: 'Handler', hasLayers: true, layers: [dustExtensionArn] },
-        { name: 'Worker', hasLayers: false },
-        { name: 'Processor', hasLayers: false },
+        { name: "Handler", hasLayers: true, layers: [dustExtensionArn] },
+        { name: "Worker", hasLayers: false },
+        { name: "Processor", hasLayers: false },
       ]);
 
       const { plugin } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
-          handler: { handler: 'handler.handler' },
-          worker: { handler: 'worker.handler' },
-          processor: { handler: 'processor.handler' }
+          handler: { handler: "handler.handler" },
+          worker: { handler: "worker.handler" },
+          processor: { handler: "processor.handler" },
         })
         .build();
 
@@ -974,15 +1014,15 @@ describe("CrashOverrideServerlessPlugin", () => {
 
     it("should warn but not throw when layerCheck=false and functions missing extension", async () => {
       const template = createCloudFormationTemplate([
-        { name: 'Handler', hasLayers: true, layers: [dustExtensionArn] },
-        { name: 'Worker', hasLayers: false },
+        { name: "Handler", hasLayers: true, layers: [dustExtensionArn] },
+        { name: "Worker", hasLayers: false },
       ]);
 
       const { plugin } = new TestSetupBuilder()
-        .withLayerCheck(false)  // layerCheck disabled
+        .withLayerCheck(false) // layerCheck disabled
         .withFunctions({
-          handler: { handler: 'handler.handler' },
-          worker: { handler: 'worker.handler' }
+          handler: { handler: "handler.handler" },
+          worker: { handler: "worker.handler" },
         })
         .build();
 
@@ -1007,15 +1047,15 @@ describe("CrashOverrideServerlessPlugin", () => {
               Handler: "handler.handler",
               Runtime: "nodejs18.x",
               // No Layers property at all
-            }
-          }
-        }
+            },
+          },
+        },
       };
 
       const { plugin, mockLog } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
-          handler: { handler: 'handler.handler' }
+          handler: { handler: "handler.handler" },
         })
         .build();
 
@@ -1039,24 +1079,24 @@ describe("CrashOverrideServerlessPlugin", () => {
           // Only non-Lambda resources
           IamRole: {
             Type: "AWS::IAM::Role",
-            Properties: {}
-          }
-        }
+            Properties: {},
+          },
+        },
       };
 
       const { plugin } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
-          handler: { handler: 'handler.handler' }  // Function in service config
+          handler: { handler: "handler.handler" }, // Function in service config
         })
         .build();
 
-      fsMock.mockCloudFormationTemplate(template);  // But no functions in CloudFormation
+      fsMock.mockCloudFormationTemplate(template); // But no functions in CloudFormation
 
       // Execute hooks
       executeProviderConfigHook(plugin);
       executeDeploymentHook(plugin);
-      await executeAwsPackageHook(plugin);  // Will set dustExtensionArn
+      await executeAwsPackageHook(plugin); // Will set dustExtensionArn
 
       // Should not throw when no Lambda functions found in template
       expect(() => executeValidationHook(plugin)).not.toThrow();
@@ -1066,7 +1106,7 @@ describe("CrashOverrideServerlessPlugin", () => {
       const { plugin, mockLog } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
-          handler: { handler: 'handler.handler' }
+          handler: { handler: "handler.handler" },
         })
         .build();
 
@@ -1087,7 +1127,7 @@ describe("CrashOverrideServerlessPlugin", () => {
       const { plugin, mockLog } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
-          handler: { handler: 'handler.handler' }
+          handler: { handler: "handler.handler" },
         })
         .build();
 
@@ -1108,7 +1148,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     it("should throw error when layerCheck=true and no Dust extension ARN available", async () => {
       const { plugin } = new TestSetupBuilder()
         .withLayerCheck(true)
-        .withFunctions({})  // No functions, so no ARN will be fetched
+        .withFunctions({}) // No functions, so no ARN will be fetched
         .build();
 
       // Execute hooks - no functions means no ARN is fetched
@@ -1126,8 +1166,8 @@ describe("CrashOverrideServerlessPlugin", () => {
 
     it("should skip validation when layerCheck=false and no Dust extension ARN available", async () => {
       const { plugin } = new TestSetupBuilder()
-        .withLayerCheck(false)  // layerCheck disabled
-        .withFunctions({})  // No functions, so no ARN will be fetched
+        .withLayerCheck(false) // layerCheck disabled
+        .withFunctions({}) // No functions, so no ARN will be fetched
         .build();
 
       // Execute hooks - no functions means no ARN is fetched
@@ -1144,9 +1184,7 @@ describe("CrashOverrideServerlessPlugin", () => {
 
   describe("Package Processing", () => {
     it("should handle missing package zip file gracefully", async () => {
-      const { plugin } = new TestSetupBuilder()
-        .withChalkAvailable()
-        .build();
+      const { plugin } = new TestSetupBuilder().withChalkAvailable().build();
 
       fsMock.existsSync.mockReturnValue(false);
 
@@ -1164,10 +1202,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     });
 
     it("should handle chalk injection errors gracefully", async () => {
-      const { plugin } = new TestSetupBuilder()
-        .withChalkAvailable()
-        .withPackageZipExists()
-        .build();
+      const { plugin } = new TestSetupBuilder().withChalkAvailable().withPackageZipExists().build();
 
       // Override the mock after builder sets it up to simulate injection failure
       childProcessMock.execSync.mockImplementation((command: string) => {
@@ -1188,9 +1223,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     });
 
     it("should handle provider config not being available", () => {
-      const { plugin } = new TestSetupBuilder()
-        .withNoProvider()
-        .build();
+      const { plugin } = new TestSetupBuilder().withNoProvider().build();
 
       executeProviderConfigHook(plugin);
 
@@ -1220,52 +1253,50 @@ describe("CrashOverrideServerlessPlugin", () => {
     });
   });
 
-describe("validateLayerCount", () => {
-  describe.each([
-    {
-      description: "all functions under limit",
-      functions: {
-        func1: { layers: ["layer1", "layer2"] },
-        func2: { layers: [] },
+  describe("validateLayerCount", () => {
+    describe.each([
+      {
+        description: "all functions under limit",
+        functions: {
+          func1: { layers: ["layer1", "layer2"] },
+          func2: { layers: [] },
+        },
+        maxLayers: 15,
+        expectedValid: true,
+        expectedErrors: [],
       },
-      maxLayers: 15,
-      expectedValid: true,
-      expectedErrors: [],
-    },
-    {
-      description: "one function at limit",
-      functions: {
-        func1: { layers: Array(15).fill("layer") },
+      {
+        description: "one function at limit",
+        functions: {
+          func1: { layers: Array(15).fill("layer") },
+        },
+        maxLayers: 15,
+        expectedValid: false,
+        expectedErrors: ["Function func1 has 15 layers/extensions (max: 15)"],
       },
-      maxLayers: 15,
-      expectedValid: false,
-      expectedErrors: ["Function func1 has 15 layers/extensions (max: 15)"],
-    },
-    {
-      description: "multiple functions over limit",
-      functions: {
-        func1: { layers: Array(16).fill("layer") },
-        func2: { layers: Array(20).fill("layer") },
+      {
+        description: "multiple functions over limit",
+        functions: {
+          func1: { layers: Array(16).fill("layer") },
+          func2: { layers: Array(20).fill("layer") },
+        },
+        maxLayers: 15,
+        expectedValid: false,
+        expectedErrors: [
+          "Function func1 has 16 layers/extensions (max: 15)",
+          "Function func2 has 20 layers/extensions (max: 15)",
+        ],
       },
-      maxLayers: 15,
-      expectedValid: false,
-      expectedErrors: [
-        "Function func1 has 16 layers/extensions (max: 15)",
-        "Function func2 has 20 layers/extensions (max: 15)",
-      ],
-    },
-    {
-      description: "function with no layers property",
-      functions: {
-        func1: { handler: "handler.main" },
+      {
+        description: "function with no layers property",
+        functions: {
+          func1: { handler: "handler.main" },
+        },
+        maxLayers: 15,
+        expectedValid: true,
+        expectedErrors: [],
       },
-      maxLayers: 15,
-      expectedValid: true,
-      expectedErrors: [],
-    },
-  ])(
-    "$description",
-    ({ functions, maxLayers, expectedValid, expectedErrors }) => {
+    ])("$description", ({ functions, maxLayers, expectedValid, expectedErrors }) => {
       const { plugin } = new TestSetupBuilder().build();
 
       // Access private method for unit testing
@@ -1273,225 +1304,315 @@ describe("validateLayerCount", () => {
 
       expect(result.valid).toBe(expectedValid);
       expect(result.errors).toEqual(expectedErrors);
-    }
-  );
-});
-
-describe("addDustLambdaExtension", () => {
-  it("should add extension ARN to all functions and return true", () => {
-    const functions = {
-      func1: { layers: ["existing-layer"] },
-      func2: { layers: [] },
-      func3: {},
-    };
-
-    const extensionArn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
-    const { plugin } = new TestSetupBuilder().build();
-
-    // Access private method for unit testing
-    const result = (plugin as any).addDustLambdaExtension(functions, extensionArn);
-
-    expect(result).toBe(true);
-    expect(functions.func1.layers).toContain(extensionArn);
-    expect(functions.func1.layers).toContain("existing-layer"); // does not squash
-    expect(functions.func2.layers).toContain(extensionArn);
-    expect(functions.func3.layers).toContain(extensionArn); // handles missing key
+    });
   });
 
-  it("should handle empty functions object", () => {
-    const functions = {};
-    const extensionArn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
-    const { plugin } = new TestSetupBuilder().build();
+  describe("addDustLambdaExtension", () => {
+    it("should add extension ARN to all functions and return success with details", () => {
+      const functions = {
+        func1: { layers: ["existing-layer"] },
+        func2: { layers: [] },
+        func3: {},
+      };
 
-    const result = (plugin as any).addDustLambdaExtension(functions, extensionArn);
+      const extensionArn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
+      const { plugin } = new TestSetupBuilder().build();
 
-    expect(result).toBe(true); // no-ops are a successful result
-    expect(Object.keys(functions)).toHaveLength(0);
+      // Access private method for unit testing
+      const result = (plugin as any).addDustLambdaExtension(functions, extensionArn);
+
+      expect(result.success).toBe(true);
+      expect(result.added).toEqual(["func1", "func2", "func3"]);
+      expect(result.skipped).toEqual([]);
+      expect(functions.func1.layers).toContain(extensionArn);
+      expect(functions.func1.layers).toContain("existing-layer"); // does not squash
+      expect(functions.func2.layers).toContain(extensionArn);
+      expect(functions.func3.layers).toContain(extensionArn); // handles missing key
+    });
+
+    it("should handle empty functions object", () => {
+      const functions = {};
+      const extensionArn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
+      const { plugin } = new TestSetupBuilder().build();
+
+      const result = (plugin as any).addDustLambdaExtension(functions, extensionArn);
+
+      expect(result.success).toBe(true); // no-ops are a successful result
+      expect(result.added).toEqual([]);
+      expect(result.skipped).toEqual([]);
+      expect(Object.keys(functions)).toHaveLength(0);
+    });
+
+    it("should not duplicate Dust extension if already present with same base ARN", () => {
+      const existingArn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
+      const newArn = "arn:aws:lambda:us-east-1:123:layer:dust:2";
+      const functions = {
+        func1: { layers: [existingArn] },
+        func2: { layers: ["other-layer"] },
+        func3: {},
+      };
+      const { plugin } = new TestSetupBuilder().build();
+      const result = (plugin as any).addDustLambdaExtension(functions, newArn);
+
+      expect(result.success).toBe(true);
+      expect(result.added).toEqual(["func2", "func3"]);
+      expect(result.skipped).toEqual(["func1"]);
+      // func1 should still have only the original version
+      expect(functions.func1.layers).toEqual([existingArn]);
+      expect(functions.func1.layers).toHaveLength(1);
+      // func2 and func3 should have the new version added
+      expect(functions.func2.layers).toContain(newArn);
+      expect(functions.func3.layers).toContain(newArn);
+    });
+
+    it("should skip all functions if they already have the Dust extension", () => {
+      const existingArn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
+      const functions = {
+        func1: { layers: [existingArn] },
+        func2: { layers: [existingArn, "other-layer"] },
+      };
+      const { plugin } = new TestSetupBuilder().build();
+      const result = (plugin as any).addDustLambdaExtension(functions, existingArn);
+
+      expect(result.success).toBe(true);
+      expect(result.added).toEqual([]);
+      expect(result.skipped).toEqual(["func1", "func2"]);
+      // Layers should remain unchanged
+      expect(functions.func1.layers).toEqual([existingArn]);
+      expect(functions.func2.layers).toEqual([existingArn, "other-layer"]);
+    });
+
+    it("should add extension even if a different ARN is present", () => {
+      const otherExtension = "arn:aws:lambda:us-east-1:999:layer:other-extension:1";
+      const dustExtension = "arn:aws:lambda:us-east-1:123:layer:dust:1";
+      const functions = {
+        func1: { layers: [otherExtension] },
+      };
+      const { plugin } = new TestSetupBuilder().build();
+      const result = (plugin as any).addDustLambdaExtension(functions, dustExtension);
+
+      expect(result.success).toBe(true);
+      expect(result.added).toEqual(["func1"]);
+      expect(result.skipped).toEqual([]);
+      expect(functions.func1.layers).toContain(otherExtension);
+      expect(functions.func1.layers).toContain(dustExtension);
+      expect(functions.func1.layers).toHaveLength(2);
+    });
   });
-});
 
-describe("injectChalkBinary", () => {
-  beforeEach(() => {
-    // Reset mocks to avoid interference from TestSetupBuilder
-    childProcessMock.execSync.mockReset();
+  describe("getArnWithoutVersion", () => {
+    it("should remove version from a complete ARN", () => {
+      const { plugin } = new TestSetupBuilder().build();
+      const arn = "arn:aws:lambda:us-east-1:123456789012:layer:dust-extension:8";
+      const result = (plugin as any).getArnWithoutVersion(arn);
+      expect(result).toBe("arn:aws:lambda:us-east-1:123456789012:layer:dust-extension");
+    });
+
+    it("should handle ARN without version", () => {
+      const { plugin } = new TestSetupBuilder().build();
+      const arn = "arn:aws:lambda:us-east-1:123456789012:layer:dust-extension";
+      const result = (plugin as any).getArnWithoutVersion(arn);
+      expect(result).toBe("arn:aws:lambda:us-east-1:123456789012:layer:dust-extension");
+    });
+
+    it("should handle short ARN", () => {
+      const { plugin } = new TestSetupBuilder().build();
+      const arn = "arn:aws:lambda:region";
+      const result = (plugin as any).getArnWithoutVersion(arn);
+      expect(result).toBe("arn:aws:lambda:region");
+    });
   });
 
-  it("should return true when injection succeeds", () => {
-    // Build the plugin first
-    const { plugin } = new TestSetupBuilder().build();
+  describe("injectChalkBinary", () => {
+    beforeEach(() => {
+      // Reset mocks to avoid interference from TestSetupBuilder
+      childProcessMock.execSync.mockReset();
+    });
 
-    // Then set up the mock for our specific test
-    childProcessMock.execSync.mockReturnValue(Buffer.from("Success"));
+    it("should return true when injection succeeds", () => {
+      // Build the plugin first
+      const { plugin } = new TestSetupBuilder().build();
 
-    // Access private method for unit testing
-    const result = (plugin as any).injectChalkBinary("/path/to/package.zip");
+      // Then set up the mock for our specific test
+      childProcessMock.execSync.mockReturnValue(Buffer.from("Success"));
 
-    expect(result).toBe(true);
-    expect(childProcessMock.execSync).toHaveBeenCalledWith(
-      'chalk insert --inject-binary-into-zip "/path/to/package.zip"',
-      expect.any(Object)
+      // Access private method for unit testing
+      const result = (plugin as any).injectChalkBinary("/path/to/package.zip");
+
+      expect(result).toBe(true);
+      expect(childProcessMock.execSync).toHaveBeenCalledWith(
+        'chalk insert --inject-binary-into-zip "/path/to/package.zip"',
+        expect.any(Object)
+      );
+    });
+
+    it("should return false when injection fails", () => {
+      childProcessMock.execSync.mockImplementation(() => {
+        throw new Error("Injection failed");
+      });
+      const { plugin } = new TestSetupBuilder().build();
+
+      const result = (plugin as any).injectChalkBinary("/path/to/package.zip");
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("getCloudFormationTemplatePath", () => {
+    it("should return correct CloudFormation template path", () => {
+      const { plugin } = new TestSetupBuilder().withServicePath("/test/service/path").build();
+
+      const result = (plugin as any).getCloudFormationTemplatePath();
+
+      expect(result).toBe(
+        "/test/service/path/.serverless/cloudformation-template-update-stack.json"
+      );
+    });
+
+    it("should handle custom package path", () => {
+      const { plugin } = new TestSetupBuilder()
+        .withServicePath("/test/service")
+        .withPackagePath("/custom/package")
+        .build();
+
+      const result = (plugin as any).getCloudFormationTemplatePath();
+
+      expect(result).toBe("/custom/package/cloudformation-template-update-stack.json");
+    });
+  });
+
+  describe("performLayerValidation", () => {
+    describe.each([
+      {
+        description: "no extension ARN and layerCheck disabled",
+        extensionArn: null,
+        layerCheckEnabled: false,
+        expectedValid: true,
+        expectedError: undefined,
+      },
+      {
+        description: "no extension ARN and layerCheck enabled",
+        extensionArn: null,
+        layerCheckEnabled: true,
+        expectedValid: false,
+        expectedError: "Cannot perform layer check: No Dust extension ARN available",
+      },
+      {
+        description: "all functions have extension",
+        extensionArn: "arn:test:extension",
+        layerCheckEnabled: true,
+        setupMocks: () => {
+          const template = createCloudFormationTemplate([
+            { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
+            { name: "Func2", hasLayers: true, layers: ["arn:test:extension"] },
+          ]);
+          fsMock.mockCloudFormationTemplate(template);
+        },
+        expectedValid: true,
+        expectedValidationResult: {
+          totalFunctions: 2,
+          functionsWithExtension: ["Func1LambdaFunction", "Func2LambdaFunction"],
+          functionsMissingExtension: [],
+        },
+      },
+      {
+        description: "functions missing extension with layerCheck enabled",
+        extensionArn: "arn:test:extension",
+        layerCheckEnabled: true,
+        setupMocks: () => {
+          const template = createCloudFormationTemplate([
+            { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
+            { name: "Func2", hasLayers: false },
+          ]);
+          fsMock.mockCloudFormationTemplate(template);
+        },
+        expectedValid: false,
+        expectedError:
+          "Layer check failed: 1 function(s) missing Dust Lambda Extension: Func2LambdaFunction",
+        expectedValidationResult: {
+          totalFunctions: 2,
+          functionsWithExtension: ["Func1LambdaFunction"],
+          functionsMissingExtension: ["Func2LambdaFunction"],
+        },
+      },
+      {
+        description: "functions missing extension with layerCheck disabled",
+        extensionArn: "arn:test:extension",
+        layerCheckEnabled: false,
+        setupMocks: () => {
+          const template = createCloudFormationTemplate([
+            { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
+            { name: "Func2", hasLayers: false },
+          ]);
+          fsMock.mockCloudFormationTemplate(template);
+        },
+        expectedValid: true,
+        expectedValidationResult: {
+          totalFunctions: 2,
+          functionsWithExtension: ["Func1LambdaFunction"],
+          functionsMissingExtension: ["Func2LambdaFunction"],
+        },
+      },
+      {
+        description: "CloudFormation template not found with layerCheck enabled",
+        extensionArn: "arn:test:extension",
+        layerCheckEnabled: true,
+        setupMocks: () => {
+          fsMock.mockCloudFormationTemplateNotFound();
+        },
+        expectedValid: false,
+        expectedError: "Layer check failed: CloudFormation template not found at",
+      },
+      {
+        description: "CloudFormation template not found with layerCheck disabled",
+        extensionArn: "arn:test:extension",
+        layerCheckEnabled: false,
+        setupMocks: () => {
+          fsMock.mockCloudFormationTemplateNotFound();
+        },
+        expectedValid: true,
+      },
+      {
+        description: "invalid JSON in template with layerCheck enabled",
+        extensionArn: "arn:test:extension",
+        layerCheckEnabled: true,
+        setupMocks: () => {
+          fsMock.readFileSync.mockReturnValue("{ invalid json }");
+        },
+        expectedValid: false,
+        expectedError: "Layer check failed: Invalid JSON in CloudFormation template",
+      },
+    ])(
+      "$description",
+      ({
+        extensionArn,
+        layerCheckEnabled,
+        setupMocks,
+        expectedValid,
+        expectedError,
+        expectedValidationResult,
+      }) => {
+        it("should validate correctly", () => {
+          if (setupMocks) {
+            setupMocks();
+          }
+
+          const { plugin } = new TestSetupBuilder().build();
+
+          // Access private method for unit testing
+          const result = (plugin as any).performLayerValidation(extensionArn, layerCheckEnabled);
+
+          expect(result.valid).toBe(expectedValid);
+          if (expectedError) {
+            expect(result.error).toContain(expectedError);
+          } else {
+            expect(result.error).toBeUndefined();
+          }
+          if (expectedValidationResult) {
+            expect(result.validationResult).toEqual(expectedValidationResult);
+          }
+        });
+      }
     );
   });
-
-  it("should return false when injection fails", () => {
-    childProcessMock.execSync.mockImplementation(() => {
-      throw new Error("Injection failed");
-    });
-    const { plugin } = new TestSetupBuilder().build();
-
-    const result = (plugin as any).injectChalkBinary("/path/to/package.zip");
-
-    expect(result).toBe(false);
-  });
-});
-
-describe("getCloudFormationTemplatePath", () => {
-  it("should return correct CloudFormation template path", () => {
-    const { plugin } = new TestSetupBuilder()
-      .withServicePath("/test/service/path")
-      .build();
-
-    const result = (plugin as any).getCloudFormationTemplatePath();
-
-    expect(result).toBe("/test/service/path/.serverless/cloudformation-template-update-stack.json");
-  });
-
-  it("should handle custom package path", () => {
-    const { plugin } = new TestSetupBuilder()
-      .withServicePath("/test/service")
-      .withPackagePath("/custom/package")
-      .build();
-
-    const result = (plugin as any).getCloudFormationTemplatePath();
-
-    expect(result).toBe("/custom/package/cloudformation-template-update-stack.json");
-  });
-});
-
-describe("performLayerValidation", () => {
-  describe.each([
-    {
-      description: "no extension ARN and layerCheck disabled",
-      extensionArn: null,
-      layerCheckEnabled: false,
-      expectedValid: true,
-      expectedError: undefined,
-    },
-    {
-      description: "no extension ARN and layerCheck enabled",
-      extensionArn: null,
-      layerCheckEnabled: true,
-      expectedValid: false,
-      expectedError: "Cannot perform layer check: No Dust extension ARN available",
-    },
-    {
-      description: "all functions have extension",
-      extensionArn: "arn:test:extension",
-      layerCheckEnabled: true,
-      setupMocks: () => {
-        const template = createCloudFormationTemplate([
-          { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
-          { name: "Func2", hasLayers: true, layers: ["arn:test:extension"] },
-        ]);
-        fsMock.mockCloudFormationTemplate(template);
-      },
-      expectedValid: true,
-      expectedValidationResult: {
-        totalFunctions: 2,
-        functionsWithExtension: ["Func1LambdaFunction", "Func2LambdaFunction"],
-        functionsMissingExtension: [],
-      },
-    },
-    {
-      description: "functions missing extension with layerCheck enabled",
-      extensionArn: "arn:test:extension",
-      layerCheckEnabled: true,
-      setupMocks: () => {
-        const template = createCloudFormationTemplate([
-          { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
-          { name: "Func2", hasLayers: false },
-        ]);
-        fsMock.mockCloudFormationTemplate(template);
-      },
-      expectedValid: false,
-      expectedError: "Layer check failed: 1 function(s) missing Dust Lambda Extension: Func2LambdaFunction",
-      expectedValidationResult: {
-        totalFunctions: 2,
-        functionsWithExtension: ["Func1LambdaFunction"],
-        functionsMissingExtension: ["Func2LambdaFunction"],
-      },
-    },
-    {
-      description: "functions missing extension with layerCheck disabled",
-      extensionArn: "arn:test:extension",
-      layerCheckEnabled: false,
-      setupMocks: () => {
-        const template = createCloudFormationTemplate([
-          { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
-          { name: "Func2", hasLayers: false },
-        ]);
-        fsMock.mockCloudFormationTemplate(template);
-      },
-      expectedValid: true,
-      expectedValidationResult: {
-        totalFunctions: 2,
-        functionsWithExtension: ["Func1LambdaFunction"],
-        functionsMissingExtension: ["Func2LambdaFunction"],
-      },
-    },
-    {
-      description: "CloudFormation template not found with layerCheck enabled",
-      extensionArn: "arn:test:extension",
-      layerCheckEnabled: true,
-      setupMocks: () => {
-        fsMock.mockCloudFormationTemplateNotFound();
-      },
-      expectedValid: false,
-      expectedError: "Layer check failed: CloudFormation template not found at",
-    },
-    {
-      description: "CloudFormation template not found with layerCheck disabled",
-      extensionArn: "arn:test:extension",
-      layerCheckEnabled: false,
-      setupMocks: () => {
-        fsMock.mockCloudFormationTemplateNotFound();
-      },
-      expectedValid: true,
-    },
-    {
-      description: "invalid JSON in template with layerCheck enabled",
-      extensionArn: "arn:test:extension",
-      layerCheckEnabled: true,
-      setupMocks: () => {
-        fsMock.readFileSync.mockReturnValue("{ invalid json }");
-      },
-      expectedValid: false,
-      expectedError: "Layer check failed: Invalid JSON in CloudFormation template",
-    },
-  ])(
-    "$description",
-    ({ extensionArn, layerCheckEnabled, setupMocks, expectedValid, expectedError, expectedValidationResult }) => {
-      it("should validate correctly", () => {
-        if (setupMocks) {
-          setupMocks();
-        }
-
-        const { plugin } = new TestSetupBuilder().build();
-
-        // Access private method for unit testing
-        const result = (plugin as any).performLayerValidation(extensionArn, layerCheckEnabled);
-
-        expect(result.valid).toBe(expectedValid);
-        if (expectedError) {
-          expect(result.error).toContain(expectedError);
-        } else {
-          expect(result.error).toBeUndefined();
-        }
-        if (expectedValidationResult) {
-          expect(result.validationResult).toEqual(expectedValidationResult);
-        }
-      });
-    }
-  );
-});
 });
