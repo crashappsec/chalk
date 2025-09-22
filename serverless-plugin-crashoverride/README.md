@@ -128,19 +128,16 @@ custom:
 The Crash Override plugin hooks into the Serverless Framework lifecycle at four key points:
 
 1. **`after:package:setupProviderConfiguration`**:
-
    - Reads and stores provider configuration (region, memory size)
    - Prepares configuration for subsequent operations
 
 2. **`after:package:createDeploymentArtifacts`**:
-
    - Performs pre-flight checks
    - Validates memory configuration against minimum requirements
    - Checks for `chalk` binary availability
    - Logs validation status
 
 3. **`before:package:compileFunctions`**:
-
    - Adds Dust Lambda Extension to all functions (while validating layer limits)
    - Fetches region-specific extension ARNs
    - Injects chalkmarks into the deployment package (if chalk is available)
