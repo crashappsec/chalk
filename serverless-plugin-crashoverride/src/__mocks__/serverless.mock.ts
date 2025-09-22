@@ -15,10 +15,10 @@ import type Serverless from "serverless";
  * Used to simulate user-facing errors (configuration errors, validation failures, etc.)
  */
 export class ServerlessError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = "ServerlessError";
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = "ServerlessError";
+  }
 }
 
 /**
@@ -48,53 +48,51 @@ export class ServerlessError extends Error {
  * });
  * ```
  */
-export function createMockServerless(
-    options: { service?: any; config?: any } = {},
-): Serverless {
-    const mockServerless: Serverless = {
-        service: {
-            service: "test-service",
-            provider: {
-                name: "aws",
-                runtime: "nodejs18.x",
-                region: "us-east-1",
-                memorySize: 1024,
-                stage: "dev",
-                ...options.service?.provider,
-            } as any,
-            custom: options.service?.custom || {},
-            functions: options.service?.functions || {},
-            layers: options.service?.layers || {},
-            resources: options.service?.resources || {},
-            ...options.service,
-        } as any,
+export function createMockServerless(options: { service?: any; config?: any } = {}): Serverless {
+  const mockServerless: Serverless = {
+    service: {
+      service: "test-service",
+      provider: {
+        name: "aws",
+        runtime: "nodejs18.x",
+        region: "us-east-1",
+        memorySize: 1024,
+        stage: "dev",
+        ...options.service?.provider,
+      } as any,
+      custom: options.service?.custom || {},
+      functions: options.service?.functions || {},
+      layers: options.service?.layers || {},
+      resources: options.service?.resources || {},
+      ...options.service,
+    } as any,
 
-        config: {
-            servicePath: "/test/service/path",
-            ...options.config,
-        } as any,
+    config: {
+      servicePath: "/test/service/path",
+      ...options.config,
+    } as any,
 
-        classes: {
-            Error: ServerlessError,
-        } as any,
+    classes: {
+      Error: ServerlessError,
+    } as any,
 
-        // https://github.com/DefinitelyTyped/DefinitelyTyped/blob/3ac9530120bcb4553e5598afbda76ade3f3162cd/types/serverless/plugins/aws/provider/awsProvider.d.ts#L809-L825
-        getProvider: jest.fn(() => {
-            // Return a mock AWS provider instance
-            return {
-                naming: {},
-                getCredentials: jest.fn(),
-                getProviderName: jest.fn(() => "aws"),
-                getRegion: jest.fn(() => "us-east-1"),
-                getServerlessDeploymentBucketName: jest.fn(),
-                getStage: jest.fn(() => "dev"),
-                getAccountId: jest.fn(),
-                request: jest.fn(),
-            };
-        }),
-    } as unknown as Serverless;
+    // https://github.com/DefinitelyTyped/DefinitelyTyped/blob/3ac9530120bcb4553e5598afbda76ade3f3162cd/types/serverless/plugins/aws/provider/awsProvider.d.ts#L809-L825
+    getProvider: jest.fn(() => {
+      // Return a mock AWS provider instance
+      return {
+        naming: {},
+        getCredentials: jest.fn(),
+        getProviderName: jest.fn(() => "aws"),
+        getRegion: jest.fn(() => "us-east-1"),
+        getServerlessDeploymentBucketName: jest.fn(),
+        getStage: jest.fn(() => "dev"),
+        getAccountId: jest.fn(),
+        request: jest.fn(),
+      };
+    }),
+  } as unknown as Serverless;
 
-    return mockServerless;
+  return mockServerless;
 }
 
 /**
@@ -119,15 +117,15 @@ export function createMockServerless(
  * ```
  */
 export function createMockLogger() {
-    return {
-        error: jest.fn(),
-        warning: jest.fn(),
-        notice: jest.fn(),
-        success: jest.fn(),
-        info: jest.fn(),
-        debug: jest.fn(),
-        verbose: jest.fn(),
-    };
+  return {
+    error: jest.fn(),
+    warning: jest.fn(),
+    notice: jest.fn(),
+    success: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+    verbose: jest.fn(),
+  };
 }
 
 /**
@@ -142,8 +140,8 @@ export function createMockLogger() {
  * ```
  */
 export function createMockOptions(): any {
-    return {
-        stage: "dev",
-        region: "us-east-1",
-    };
+  return {
+    stage: "dev",
+    region: "us-east-1",
+  };
 }
