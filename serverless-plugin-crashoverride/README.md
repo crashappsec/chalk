@@ -1,4 +1,4 @@
-# serverless-plugin-crashoverride
+# @crashoverride/serverless-plugin
 
 A Serverless Framework plugin for Crash Override that enhances AWS Lambda deployments with runtime security features, chalkmark injection, and deployment validation.
 
@@ -17,14 +17,14 @@ This plugin integrates with the Serverless Framework to provide:
 Install the plugin in your Serverless Framework project:
 
 ```bash
-npm install serverless-plugin-crashoverride
+npm install @crashoverride/serverless-plugin
 ```
 
 Add the plugin to your `serverless.yml`:
 
 ```yaml
 plugins:
-  - serverless-plugin-crashoverride
+  - @crashoverride/serverless-plugin
 
 custom:
   crashoverride:

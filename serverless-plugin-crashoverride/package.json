@@ -1,5 +1,5 @@
 {
-  "name": "serverless-plugin-crashoverride",
+  "name": "@crashoverride/serverless-plugin",
   "version": "1.0.0",
   "description": "A Serverless Framework plugin",
   "type": "module",
