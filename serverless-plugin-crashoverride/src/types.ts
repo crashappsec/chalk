@@ -10,6 +10,7 @@ export type CrashOverrideConfig = {
     chalkCheck: boolean;
     layerCheck: boolean;
     arnUrlPrefix?: string;
+    arnVersion?: number;  // Optional version pinning for Dust Extension (e.g., 1, 7, 22)
 };
 
 export type CustomServerlessConfig = {
