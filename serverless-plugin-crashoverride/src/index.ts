@@ -207,7 +207,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
         });
     }
 
-    private checkMemoryConfiguration(): void {
+    private checkMemoryConfiguration(): boolean {
         // Ensure provider configuration has been fetched
         if (!this.providerConfig) {
             throw new this.serverless.classes.Error(
@@ -216,44 +216,15 @@ class CrashOverrideServerlessPlugin implements Plugin {
         }
 
         const providerMemorySize = this.providerConfig.memorySize;
-
-        // Check if memory size is below minimum
-        if (providerMemorySize < this.config.memoryCheckSize) {
-            if (this.config.memoryCheck) {
-                // When memoryCheck is true, fail the build
-                const errorMessage = `Memory check failed: memorySize (${providerMemorySize}MB) is less than minimum required (${this.config.memoryCheckSize}MB)`;
-                this.log_error(errorMessage);
-                throw new this.serverless.classes.Error(errorMessage);
-            } else {
-                // When memoryCheck is false, just warn
-                this.log_warning(
-                    `Memory size (${providerMemorySize}MB) is below recommended minimum (${this.config.memoryCheckSize}). Set custom.crashoverride.memoryCheck: true to enforce this requirement`,
-                );
-            }
-        } else if (this.config.memoryCheck) {
-            // log success when check is enabled and passes
-            this.log_info(
-                `Memory check passed: ${providerMemorySize}MB >= ${this.config.memoryCheckSize}MB`,
-            );
-        }
+        return providerMemorySize >= this.config.memoryCheckSize;
     }
 
     private chalkBinaryAvailable(): boolean {
-        this.log_info(`Checking for chalk binary...`);
-
         try {
             execSync("which chalk");
-            this.log_success(`Chalk binary found`);
             return true;
         } catch {
-            if (this.config.chalkCheck) {
-                const errorMessage = `Chalk check failed: chalk binary not found in PATH. Please add and try again.`;
-                this.log_error(errorMessage);
-                throw new this.serverless.classes.Error(errorMessage);
-            } else {
-                this.log_info(`Chalk binary not found in PATH`);
-                return false;
-            }
+            return false;
         }
     }
 
@@ -269,21 +240,48 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
         // Only check memory configuration if provider config was successfully fetched
         if (this.providerConfig) {
-            // Check memory configuration (fail fast if needed)
-            this.checkMemoryConfiguration();
+            const memoryCheckPassed = this.checkMemoryConfiguration();
+
+            if (!memoryCheckPassed) {
+                if (this.config.memoryCheck) {
+                    // When memoryCheck is true, fail the build
+                    const errorMessage = `Memory check failed: memorySize (${this.providerConfig.memorySize}MB) is less than minimum required (${this.config.memoryCheckSize}MB)`;
+                    this.log_error(errorMessage);
+                    throw new this.serverless.classes.Error(errorMessage);
+                } else {
+                    // When memoryCheck is false, just warn
+                    this.log_warning(
+                        `Memory size (${this.providerConfig.memorySize}MB) is below recommended minimum (${this.config.memoryCheckSize}). Set custom.crashoverride.memoryCheck: true to enforce this requirement`,
+                    );
+                }
+            } else if (this.config.memoryCheck) {
+                // log success when check is enabled and passes
+                this.log_info(
+                    `Memory check passed: ${this.providerConfig.memorySize}MB >= ${this.config.memoryCheckSize}MB`,
+                );
+            }
         }
 
         // Check chalk availability once and store the result
+        this.log_info(`Checking for chalk binary...`);
         this.isChalkAvailable = this.chalkBinaryAvailable();
 
         if (this.isChalkAvailable) {
+            this.log_success(`Chalk binary found`);
             this.log_info(
                 `Chalk binary found and will be used to add chalkmarks`,
             );
         } else {
-            this.log_warning(
-                `Chalk binary not available. Continuing without chalkmarks`,
-            );
+            if (this.config.chalkCheck) {
+                const errorMessage = `Chalk check failed: chalk binary not found in PATH. Please add and try again.`;
+                this.log_error(errorMessage);
+                throw new this.serverless.classes.Error(errorMessage);
+            } else {
+                this.log_info(`Chalk binary not found in PATH`);
+                this.log_warning(
+                    `Chalk binary not available. Continuing without chalkmarks`,
+                );
+            }
         }
     }
 
@@ -305,94 +303,131 @@ class CrashOverrideServerlessPlugin implements Plugin {
         return null;
     }
 
-    private injectChalkBinary(): void {
-        if (!this.isChalkAvailable) {
-            this.log_warning(
-                `Chalk binary not available, skipping chalkmark injection`,
-            );
-            return;
-        }
-
-        const zipPath = this.getPackageZipPath();
-        if (!zipPath) {
-            this.log_error(`Could not locate package zip file`);
-            return;
-        }
-
+    private injectChalkBinary(zipPath: string): boolean {
         try {
-            this.log_info(`Injecting chalkmarks into ${chalk.gray(zipPath)}`);
             execSync(`chalk insert --inject-binary-into-zip "${zipPath}"`, {
                 stdio: "pipe",
                 encoding: "utf8",
             });
-            this.log_success(`Successfully injected chalkmarks into package`);
+            return true;
         } catch (error: any) {
-            this.log_error(
-                `Failed to inject chalkmarks: ${chalk.bold(error.message)}`,
-            );
+            return false;
         }
     }
 
-    private async addDustLambdaExtension(): Promise<void> {
-        if (this.providerConfig === null) {
-            const errorMessage = `Cannot ascertain service's region from Provider configuration`
-            this.log_error(errorMessage)
-            throw new Error(errorMessage);
-        }
+    private validateLayerCount(functions: Record<string, any>, maxLayers: number = 15): { valid: boolean; errors: string[] } {
+        const errors: string[] = [];
 
-        const extensionArn = await this.fetchDustExtensionArn(this.providerConfig.region)
-        this.dustExtensionArn = extensionArn; // Store for later validation
-        this.log_info(`Dust Extension ARN for ${this.providerConfig.region} :: ${extensionArn}`)
-        const MAX_LAYERS_AND_EXTENSIONS = 15; // AWS Lambda limit: 5 layers + 10 extensions
-
-        this.log_notice(`Adding Dust Lambda Extension to all functions`);
-
-        const functions = this.serverless.service.functions || {};
-        // Validate all functions first before modifying any
         for (const [functionName, func] of Object.entries(functions)) {
-            if (!func) return;
+            if (!func) continue;
 
             const awsFunc = func as Aws.AwsFunction;
             const currentLayers = awsFunc.layers || [];
 
-            if (currentLayers.length >= MAX_LAYERS_AND_EXTENSIONS) {
-                const error = `Cannot add Dust Lambda Extension to function ${chalk.bold(functionName)}: would exceed maximum layer/extension limit of ${MAX_LAYERS_AND_EXTENSIONS} (currently has ${currentLayers.length})`;
-                this.log_error(error);
-                throw new this.serverless.classes.Error(error);
+            if (currentLayers.length >= maxLayers) {
+                errors.push(`Function ${functionName} has ${currentLayers.length} layers/extensions (max: ${maxLayers})`);
             }
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors
         };
+    }
 
-        // Add extension to all functions
-        for (const [functionName, func] of Object.entries(functions)) {
-            if (!func) return;
+    private addDustLambdaExtension(functions: Record<string, any>, extensionArn: string): boolean {
+        try {
+            // Add extension to all functions
+            for (const func of Object.values(functions)) {
+                if (!func) continue;
 
-            const awsFunc = func as Aws.AwsFunction;
+                const awsFunc = func as Aws.AwsFunction;
 
-            if (!awsFunc.layers) {
-                awsFunc.layers = [];
+                if (!awsFunc.layers) {
+                    awsFunc.layers = [];
+                }
+                awsFunc.layers = [...(awsFunc.layers ?? []), extensionArn];
             }
-            awsFunc.layers = [...(awsFunc.layers ?? []), extensionArn];
-            this.log_info(
-                `Added Dust Lambda Extension to function: ${chalk.bold(functionName)} (${chalk.gray(`${awsFunc.layers.length}/${MAX_LAYERS_AND_EXTENSIONS} layers/extensions`)})`,
-            );
-        };
 
-        const functionCount = Object.keys(functions).length;
-        if (functionCount > 0) {
-            this.log_success(
-                `Successfully added Dust Lambda Extension to ${chalk.bold(functionCount)} function(s)`,
-            );
-        } else {
-            this.log_warning(
-                `No functions found in service - no extensions added`,
-            );
+            return true;
+        } catch (error) {
+            return false;
         }
     }
 
     private async mutateServerlessService(): Promise<void> {
         this.log_notice(`Dust Plugin: Processing packaged functions`);
-        await this.addDustLambdaExtension();
-        this.injectChalkBinary();
+
+        // Check provider configuration
+        if (this.providerConfig === null) {
+            const errorMessage = `Cannot ascertain service's region from Provider configuration`;
+            this.log_error(errorMessage);
+            throw new Error(errorMessage);
+        }
+
+        // Get functions from service
+        const functions = this.serverless.service.functions || {};
+        const functionCount = Object.keys(functions).length;
+
+        // Handle Dust Lambda Extension
+        if (functionCount === 0) {
+            this.log_warning(`No functions found in service - no extensions added`);
+        } else {
+            // Validate layer counts before proceeding
+            const MAX_LAYERS_AND_EXTENSIONS = 15;
+            const validation = this.validateLayerCount(functions, MAX_LAYERS_AND_EXTENSIONS);
+
+            if (!validation.valid) {
+                const errorMessage = `Cannot add Dust Lambda Extension: ${validation.errors.join(', ')}`;
+                this.log_error(errorMessage);
+                throw new this.serverless.classes.Error(errorMessage);
+            }
+
+            // Fetch extension ARN
+            const extensionArn = await this.fetchDustExtensionArn(this.providerConfig.region);
+            this.dustExtensionArn = extensionArn; // Store for later validation
+            this.log_info(`Dust Extension ARN for ${this.providerConfig.region} :: ${extensionArn}`);
+
+            this.log_notice(`Adding Dust Lambda Extension to all functions`);
+
+            // Add extension to functions
+            const success = this.addDustLambdaExtension(functions, extensionArn);
+
+            if (success) {
+                // Log individual function updates
+                for (const [functionName, func] of Object.entries(functions)) {
+                    if (!func) continue;
+                    const awsFunc = func as Aws.AwsFunction;
+                    this.log_info(
+                        `Added Dust Lambda Extension to function: ${chalk.bold(functionName)} (${chalk.gray(`${awsFunc.layers?.length || 0}/${MAX_LAYERS_AND_EXTENSIONS} layers/extensions`)})`
+                    );
+                }
+                this.log_success(`Successfully added Dust Lambda Extension to ${chalk.bold(functionCount)} function(s)`);
+            } else {
+                const errorMessage = `Failed to add Dust Lambda Extension to functions`;
+                this.log_error(errorMessage);
+                throw new this.serverless.classes.Error(errorMessage);
+            }
+        }
+
+        // Handle chalk binary injection
+        if (!this.isChalkAvailable) {
+            this.log_warning(`Chalk binary not available, skipping chalkmark injection`);
+        } else {
+            const zipPath = this.getPackageZipPath();
+            if (!zipPath) {
+                this.log_error(`Could not locate package zip file`);
+            } else {
+                this.log_info(`Injecting chalkmarks into ${chalk.gray(zipPath)}`);
+                const injected = this.injectChalkBinary(zipPath);
+
+                if (injected) {
+                    this.log_success(`Successfully injected chalkmarks into package`);
+                } else {
+                    this.log_error(`Failed to inject chalkmarks into package`);
+                }
+            }
+        }
     }
 
     private parseCloudFormationTemplate(templatePath: string): CloudFormationTemplate {
@@ -450,30 +485,84 @@ class CrashOverrideServerlessPlugin implements Plugin {
         ].join('\n');
     }
 
-    private validatePackaging(): void {
-        if (!this.dustExtensionArn) {
-            // fail closed if ARN is missing and layerCheck is true
-            if(this.config.layerCheck) {
-                const errMsg = `Cannot perform layer check: No Dust extension ARN available`
-                this.log_error(errMsg)
-                throw new Error(errMsg)
-            // otherwise log and fail open
-            } else {
-                this.log_info(`Layer check skipped: No Dust extension ARN available`);
-                return;
-            }
-        }
-
-        const templatePath = path.join(
+    private getCloudFormationTemplatePath(): string {
+        return path.join(
             this.getServerlessPackagingLocation(),
             "cloudformation-template-update-stack.json"
         );
+    }
+
+    private performLayerValidation(
+        extensionArn: string | null,
+        layerCheckEnabled: boolean
+    ): { valid: boolean; error?: string; validationResult?: FunctionValidationResult; templatePath?: string } {
+        // Check if extension ARN is available
+        if (!extensionArn) {
+            if (layerCheckEnabled) {
+                return {
+                    valid: false,
+                    error: "Cannot perform layer check: No Dust extension ARN available"
+                };
+            }
+            return { valid: true }; // Skip validation when not enforced
+        }
+
+        const templatePath = this.getCloudFormationTemplatePath();
 
         try {
             const template = this.parseCloudFormationTemplate(templatePath);
-            const validationResult = this.validateFunctionsInTemplate(template, this.dustExtensionArn);
+            const validationResult = this.validateFunctionsInTemplate(template, extensionArn);
 
-            // Handle results
+            // Check if there are functions missing the extension
+            if (validationResult.functionsMissingExtension.length > 0 && layerCheckEnabled) {
+                return {
+                    valid: false,
+                    error: `Layer check failed: ${validationResult.functionsMissingExtension.length} function(s) missing Dust Lambda Extension: ${validationResult.functionsMissingExtension.join(', ')}`,
+                    validationResult,
+                    templatePath
+                };
+            }
+
+            return {
+                valid: true,
+                validationResult,
+                templatePath
+            };
+        } catch (error: any) {
+            if (layerCheckEnabled) {
+                // Format error message based on error type
+                let errorMessage = `Layer check failed: `;
+                if (error.message.includes('CloudFormation template not found')) {
+                    errorMessage += error.message;
+                } else if (error.message.includes('Invalid JSON')) {
+                    errorMessage += error.message;
+                } else {
+                    errorMessage += `Failed to validate CloudFormation template: ${error.message}`;
+                }
+                return { valid: false, error: errorMessage };
+            }
+            return { valid: true }; // Skip validation on error when not enforced
+        }
+    }
+
+    private validatePackaging(): void {
+        const result = this.performLayerValidation(this.dustExtensionArn, this.config.layerCheck);
+
+        // Handle validation results
+        if (!result.valid && result.error) {
+            this.log_error(result.error);
+            throw new this.serverless.classes.Error(result.error);
+        }
+
+        // Log based on validation results
+        if (!this.dustExtensionArn && !this.config.layerCheck) {
+            this.log_info(`Layer check skipped: No Dust extension ARN available`);
+            return;
+        }
+
+        if (result.validationResult) {
+            const { validationResult } = result;
+
             if (validationResult.totalFunctions === 0) {
                 this.log_info(`Layer check: No Lambda functions found in CloudFormation template`);
                 return;
@@ -482,39 +571,20 @@ class CrashOverrideServerlessPlugin implements Plugin {
             this.log_info(`Layer check: Found ${validationResult.totalFunctions} Lambda function(s) in CloudFormation template`);
 
             if (validationResult.functionsMissingExtension.length === 0) {
-                // All functions have the extension
                 this.log_success(
                     `Layer check passed: All ${validationResult.totalFunctions} function(s) have Dust Lambda Extension`
                 );
             } else {
-                // Build and log status message
                 const statusMessage = this.buildStatusMessage(validationResult);
+                this.log_warning(statusMessage);
 
-                if (this.config.layerCheck) {
-                    // When layerCheck is true, fail the build
-                    const errorMessage = `Layer check failed: ${validationResult.functionsMissingExtension.length} function(s) missing Dust Lambda Extension: ${validationResult.functionsMissingExtension.join(', ')}`;
-                    this.log_warning(statusMessage);
-                    this.log_error(errorMessage);
-                    throw new this.serverless.classes.Error(errorMessage);
-                } else {
-                    // When layerCheck is false, just warn
-                    this.log_warning(statusMessage);
+                if (!this.config.layerCheck) {
                     this.log_warning(
                         `${validationResult.functionsMissingExtension.length} function(s) missing Dust Lambda Extension. ` +
                         `Set custom.crashoverride.layerCheck: true to enforce this requirement`
                     );
                 }
             }
-        } catch (error: any) {
-            // Re-throw if it's already a ServerlessError
-            if (error.name === 'ServerlessError') {
-                throw error;
-            }
-
-            // Handle all other errors
-            const errorMessage = `Layer check failed: ${error.message}`;
-            this.log_error(errorMessage);
-            throw new Error(errorMessage);
         }
     }
 }

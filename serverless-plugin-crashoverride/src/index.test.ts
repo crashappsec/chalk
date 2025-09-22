@@ -11,7 +11,6 @@ import {
   executeAwsPackageHook,
   executeValidationHook,
   TestSetupBuilder,
-  assertions,
   createCloudFormationTemplate,
 } from "./__tests__/test-helpers";
 
@@ -63,12 +62,7 @@ describe("CrashOverrideServerlessPlugin", () => {
         configurable: true,
       });
 
-      const { plugin, mockLog } = new TestSetupBuilder().build();
-
-      // Verify warning was logged
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("Crash Override plugin is not supported on Windows")
-      );
+      const { plugin } = new TestSetupBuilder().build();
 
       // Verify no hooks were registered
       expect(plugin.hooks).toEqual({});
@@ -87,12 +81,7 @@ describe("CrashOverrideServerlessPlugin", () => {
         configurable: true,
       });
 
-      const { plugin, mockLog } = new TestSetupBuilder().build();
-
-      // Verify no Windows warning was logged
-      expect(mockLog.warning).not.toHaveBeenCalledWith(
-        expect.stringContaining("Windows")
-      );
+      const { plugin } = new TestSetupBuilder().build();
 
       // Verify hooks were registered
       expect(Object.keys(plugin.hooks).length).toBeGreaterThan(0);
@@ -122,43 +111,36 @@ describe("CrashOverrideServerlessPlugin", () => {
         expect(plugin.hooks["before:package:compileFunctions"]).toBeDefined();
       });
 
-      it("should successfully log chalk binary was found", () => {
-        const { plugin, mockLog } = new TestSetupBuilder()
+      it("should detect chalk binary when available", () => {
+        const { plugin } = new TestSetupBuilder()
           .withChalkAvailable()
           .withPackageZipExists()
           .build();
 
         executeDeploymentHook(plugin);
 
-        expect(mockLog.notice).toHaveBeenCalledWith(
-          expect.stringContaining("Initializing package process")
-        );
-        expect(mockLog.success).toHaveBeenCalledWith(
-          expect.stringContaining("Chalk binary found")
-        );
+        // Verify chalk availability was detected and stored
+        expect((plugin as any).isChalkAvailable).toBe(true);
       });
 
       it("should read provider configuration correctly", () => {
-        const { plugin, mockLog } = new TestSetupBuilder()
+        const { plugin } = new TestSetupBuilder()
           .withProviderMemory(1234)
           .withProviderRegion("us-west-2")
           .build();
 
         executeProviderConfigHook(plugin);
 
-        expect(mockLog.info).toHaveBeenCalledWith(
-          expect.stringContaining(`provider=aws`)
-        );
-        expect(mockLog.info).toHaveBeenCalledWith(
-          expect.stringContaining(`region=us-west-2`)
-        );
-        expect(mockLog.info).toHaveBeenCalledWith(
-          expect.stringContaining(`memorySize=1234`)
-        );
+        // Verify provider config was stored correctly
+        const providerConfig = (plugin as any).providerConfig;
+        expect(providerConfig).toBeDefined();
+        expect(providerConfig.provider).toBe("aws");
+        expect(providerConfig.region).toBe("us-west-2");
+        expect(providerConfig.memorySize).toBe(1234);
       });
 
         it("should prioritize serverless.yml config over environment variables", () => {
-          const { mockLog } = new TestSetupBuilder()
+          const { plugin } = new TestSetupBuilder()
             .withEnvironmentVar("CO_MEMORY_CHECK", "false")
             .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
             .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "false")
@@ -169,23 +151,30 @@ describe("CrashOverrideServerlessPlugin", () => {
             })
             .build();
 
-                assertions.expectConfigValues(mockLog, true, 512, true);
+          // Verify serverless.yml config takes precedence
+          expect(plugin.config.memoryCheck).toBe(true);
+          expect(plugin.config.memoryCheckSize).toBe(512);
+          expect(plugin.config.chalkCheck).toBe(true);
         });
 
         it("should use environment variables when serverless.yml config is not provided", () => {
-          const { mockLog } = new TestSetupBuilder()
+          const { plugin } = new TestSetupBuilder()
             .withEnvironmentVar("CO_MEMORY_CHECK", "true")
             .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
             .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "true")
             .build();
 
-          assertions.expectConfigValues(mockLog, true, 1024, true);
+          expect(plugin.config.memoryCheck).toBe(true);
+          expect(plugin.config.memoryCheckSize).toBe(1024);
+          expect(plugin.config.chalkCheck).toBe(true);
         });
 
         it("should use default values when no configuration is provided", () => {
-          const { mockLog } = new TestSetupBuilder().build();
+          const { plugin } = new TestSetupBuilder().build();
 
-          assertions.expectConfigValues(mockLog, false, 256, false);
+          expect(plugin.config.memoryCheck).toBe(false);
+          expect(plugin.config.memoryCheckSize).toBe(256);
+          expect(plugin.config.chalkCheck).toBe(false);
         });
 
         it("should handle invalid memoryCheckSize in environment variable", () => {
@@ -197,7 +186,7 @@ describe("CrashOverrideServerlessPlugin", () => {
         });
 
         it("should merge configurations with correct precedence", () => {
-          const { mockLog } = new TestSetupBuilder()
+          const { plugin } = new TestSetupBuilder()
             .withEnvironmentVar("CO_MEMORY_CHECK", "true")
             .withEnvironmentVar("CO_MEMORY_CHECK_SIZE_MB", "1024")
             .withCustomConfig({
@@ -206,301 +195,340 @@ describe("CrashOverrideServerlessPlugin", () => {
             })
             .build();
 
-          assertions.expectConfigValues(mockLog, true, 512, true);
+          expect(plugin.config.memoryCheck).toBe(true); // from env
+          expect(plugin.config.memoryCheckSize).toBe(512); // from serverless.yml
+          expect(plugin.config.chalkCheck).toBe(true); // from serverless.yml
         });
 
     it("should handle boolean string values in environment variables correctly", () => {
-      const { mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withEnvironmentVar("CO_MEMORY_CHECK", "TRUE")
         .withEnvironmentVar("CO_CHALK_CHECK_ENABLED", "FALSE")
         .build();
 
-      assertions.expectConfigValues(mockLog, true, 256, false);
+      expect(plugin.config.memoryCheck).toBe(true);
+      expect(plugin.config.memoryCheckSize).toBe(256); // default
+      expect(plugin.config.chalkCheck).toBe(false);
     });
     });
   });
 
   describe("Memory Check Validation", () => {
-    describe("Memory check validation failure", () => {
-      it("should fail when memoryCheck=true and memoryCheckSize is greater than provider memorySize", () => {
+    describe.each([
+      { memoryCheck: true, providerMemory: 1024, requiredMemory: 512, shouldThrow: false, description: "passes when memory is sufficient" },
+      { memoryCheck: true, providerMemory: 512, requiredMemory: 512, shouldThrow: false, description: "passes when memory equals requirement" },
+      { memoryCheck: true, providerMemory: 256, requiredMemory: 512, shouldThrow: true, description: "throws when memory is insufficient" },
+      { memoryCheck: false, providerMemory: 256, requiredMemory: 512, shouldThrow: false, description: "warns but doesn't throw when check is disabled" },
+    ])('$description', ({ memoryCheck, providerMemory, requiredMemory, shouldThrow }) => {
+      it(`memoryCheck=${memoryCheck}, provider=${providerMemory}MB, required=${requiredMemory}MB`, () => {
         const { plugin } = new TestSetupBuilder()
-          .withMemoryCheck(true, 2048)
-          .withProviderMemory(1024)
+          .withMemoryCheck(memoryCheck, requiredMemory)
+          .withProviderMemory(providerMemory)
           .build();
 
         executeProviderConfigHook(plugin);
 
-        expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
-        expect(() => executeDeploymentHook(plugin)).toThrow(
-          "Memory check failed: memorySize (1024MB) is less than minimum required (2048MB)"
-        );
-      });
-
-      it("should compare configured memory with memoryCheckSize", () => {
-        const { plugin, mockLog } = new TestSetupBuilder()
-          .withMemoryCheck(true, 512)
-          .withProviderMemory(1024)
-          .build();
-
-        executeProviderConfigHook(plugin);
-        executeDeploymentHook(plugin);
-
-        expect(mockLog.info).toHaveBeenCalledWith(
-          expect.stringContaining(`Memory check passed: 1024MB >= 512MB`)
-        );
-      });
-
-      it("should throw error when memoryCheckSize is larger than provider memorySize", () => {
-        const { plugin, mockLog } = new TestSetupBuilder()
-          .withCustomConfig({
-            memoryCheck: true,
-            memoryCheckSize: 2048,
-            chalkCheck: false,
-          })
-          .withProviderMemory(1024)
-          .build();
-
-        executeProviderConfigHook(plugin);
-
-        expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
-        expect(mockLog.error).toHaveBeenCalledWith(
-          expect.stringContaining("Memory check failed")
-        );
+        if (shouldThrow) {
+          expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
+          expect(() => executeDeploymentHook(plugin)).toThrow(
+            `Memory check failed: memorySize (${providerMemory}MB) is less than minimum required (${requiredMemory}MB)`
+          );
+        } else {
+          expect(() => executeDeploymentHook(plugin)).not.toThrow();
+        }
       });
     });
 
-    it("should only warn when memoryCheck=false and memory is insufficient", () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
-        .withMemoryCheck(false, 2048)
+    it("should return correct boolean from checkMemoryConfiguration", () => {
+      const { plugin } = new TestSetupBuilder()
+        .withMemoryCheck(true, 512)
         .withProviderMemory(1024)
         .build();
 
-      expect(() => executeProviderConfigHook(plugin)).not.toThrow();
-      expect(() => executeDeploymentHook(plugin)).not.toThrow();
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `Memory size (1024MB) is below recommended minimum (2048). Set custom.crashoverride.memoryCheck: true to enforce this requirement`
-      ));
+      executeProviderConfigHook(plugin);
+
+      // Access private method for unit testing
+      const result = (plugin as any).checkMemoryConfiguration();
+      expect(result).toBe(true);
+    });
+
+    it("should throw if provider config not initialized", () => {
+      const { plugin } = new TestSetupBuilder()
+        .withMemoryCheck(true, 512)
+        .build();
+
+      // Don't execute provider config hook
+      // Access private method for unit testing
+      expect(() => (plugin as any).checkMemoryConfiguration()).toThrow(
+        "Provider configuration not initialized"
+      );
     });
   });
 
   describe("Chalk Binary Validation", () => {
-    it("should fail when chalkCheck=true and chalk is not available", () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
-        .withChalkNotAvailable()
-        .withCustomConfig({
+    describe.each([
+      { chalkCheck: true, chalkAvailable: true, shouldThrow: false, description: "passes when chalk available and required" },
+      { chalkCheck: true, chalkAvailable: false, shouldThrow: true, description: "throws when chalk required but not available" },
+      { chalkCheck: false, chalkAvailable: true, shouldThrow: false, description: "passes when chalk available but not required" },
+      { chalkCheck: false, chalkAvailable: false, shouldThrow: false, description: "passes when chalk not available and not required" },
+    ])('$description', ({ chalkCheck, chalkAvailable, shouldThrow }) => {
+      it(`chalkCheck=${chalkCheck}, available=${chalkAvailable}`, () => {
+        const builder = new TestSetupBuilder()
+          .withCustomConfig({
             memoryCheck: false,
             memoryCheckSize: 256,
-            chalkCheck: true,
-        })
-        .build();
+            chalkCheck: chalkCheck,
+          });
 
-      expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
-      expect(() => executeDeploymentHook(plugin)).toThrow("Chalk check failed: chalk binary not found in PATH");
-      expect(mockLog.error).toHaveBeenCalledWith(
-        expect.stringContaining("Chalk check failed")
-      );
+        if (chalkAvailable) {
+          builder.withChalkAvailable();
+        } else {
+          builder.withChalkNotAvailable();
+        }
+
+        const { plugin } = builder.build();
+
+        if (shouldThrow) {
+          expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
+          expect(() => executeDeploymentHook(plugin)).toThrow(
+            "Chalk check failed: chalk binary not found in PATH"
+          );
+        } else {
+          expect(() => executeDeploymentHook(plugin)).not.toThrow();
+        }
+
+        // After deployment hook, verify isChalkAvailable state
+        if (!shouldThrow) {
+          executeDeploymentHook(plugin);
+          expect((plugin as any).isChalkAvailable).toBe(chalkAvailable);
+        }
+      });
     });
 
-    it("should succeed when chalkCheck=true and chalk is available", () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
+    it("should correctly detect chalk availability", () => {
+      const { plugin } = new TestSetupBuilder()
         .withChalkAvailable()
-        .withCustomConfig({
-            memoryCheck: false,
-            memoryCheckSize: 256,
-            chalkCheck: true,
-        })
         .build();
 
-      expect(() => executeDeploymentHook(plugin)).not.toThrow();
-      expect(mockLog.success).toHaveBeenCalledWith(
-        expect.stringContaining("Chalk binary found")
-      );
+      // Access private method for unit testing
+      const result = (plugin as any).chalkBinaryAvailable();
+      expect(result).toBe(true);
     });
 
-    it("should continue without error when chalkCheck=false and chalk is not available", () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
+    it("should correctly detect chalk unavailability", () => {
+      const { plugin } = new TestSetupBuilder()
         .withChalkNotAvailable()
-        .withCustomConfig({
-          memoryCheck: false,
-          memoryCheckSize: 256,
-          chalkCheck: false,
-        })
         .build();
 
-      expect(() => executeDeploymentHook(plugin)).not.toThrow();
-      expect(mockLog.info).toHaveBeenCalledWith(
-        expect.stringContaining("Chalk binary not found in PATH")
-      );
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("Chalk binary not available. Continuing without chalkmarks")
-      );
-    });
-
-    it("should inject chalk binary when available", async () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
-        .withChalkAvailable()
-        .withPackageZipExists()
-        .withServiceName("test-service")
-        .build();
-
-      executeProviderConfigHook(plugin);
-      executeDeploymentHook(plugin);
-      await executeAwsPackageHook(plugin);
-
-      expect(childProcessMock.execSync).toHaveBeenCalledWith(
-        expect.stringContaining("chalk insert --inject-binary-into-zip"),
-        expect.any(Object)
-      );
-      expect(mockLog.success).toHaveBeenCalledWith(
-        expect.stringContaining("Successfully injected chalkmarks")
-      );
-    });
-
-    it("should warn its skipping injection when chalk is not available", async () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
-        .withChalkNotAvailable()
-        .withPackageZipExists()
-        .build();
-
-      executeProviderConfigHook(plugin);
-      executeDeploymentHook(plugin);
-      await executeAwsPackageHook(plugin);
-
-      expect(childProcessMock.execSync).not.toHaveBeenCalledWith(
-        expect.stringContaining("chalk insert"),
-        expect.any(Object)
-      );
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("skipping chalkmark injection")
-      );
+      // Access private method for unit testing
+      const result = (plugin as any).chalkBinaryAvailable();
+      expect(result).toBe(false);
     });
   });
 
+  describe("Chalk Binary Injection", () => {
+    describe.each([
+      {
+        description: "chalk available and package exists",
+        chalkAvailable: true,
+        packageExists: true,
+        shouldInject: true,
+      },
+      {
+        description: "chalk not available",
+        chalkAvailable: false,
+        packageExists: true,
+        shouldInject: false,
+      },
+      {
+        description: "package does not exist",
+        chalkAvailable: true,
+        packageExists: false,
+        shouldInject: false,
+      },
+    ])(
+      "injection behavior - $description",
+      ({ chalkAvailable, packageExists, shouldInject }) => {
+        it("should handle injection correctly", async () => {
+          const builder = new TestSetupBuilder().withServiceName("test-service");
+
+          if (chalkAvailable) {
+            builder.withChalkAvailable();
+          } else {
+            builder.withChalkNotAvailable();
+          }
+
+          if (packageExists) {
+            builder.withPackageZipExists();
+          } else {
+            fsMock.existsSync.mockReturnValue(false);
+          }
+
+          const { plugin } = builder.build();
+
+          executeProviderConfigHook(plugin);
+          executeDeploymentHook(plugin);
+          await executeAwsPackageHook(plugin);
+
+          if (shouldInject) {
+            // Verify chalk injection was attempted with the correct path
+            expect(childProcessMock.execSync).toHaveBeenCalledWith(
+              expect.stringContaining("chalk insert --inject-binary-into-zip"),
+              expect.any(Object)
+            );
+          } else {
+            // Verify chalk injection was not attempted
+            expect(childProcessMock.execSync).not.toHaveBeenCalledWith(
+              expect.stringContaining("chalk insert"),
+              expect.any(Object)
+            );
+          }
+        });
+      }
+    );
+  });
+
   describe("Lambda Extension Management", () => {
-    it("should add Dust Lambda Extension to all functions", async () => {
-      const sampleFunctions = {
+    describe.each([
+      {
+        description: "single function with no layers",
+        functions: {
           function1: {
-              handler: "handler.function1",
-              runtime: "nodejs18.x",
-              memorySize: 512,
-              timeout: 30,
-              layers: [],
+            handler: "handler.function1",
+            runtime: "nodejs18.x",
+            layers: [],
           },
-          function2: {
-              handler: "handler.function2",
-              runtime: "nodejs18.x",
-              memorySize: 1024,
-              timeout: 60,
-              layers: ["arn:aws:lambda:us-east-1:123456789012:layer:existing-layer"],
+        },
+        expectedLayerCounts: { function1: 1 },
+        shouldAddExtension: true,
+      },
+      {
+        description: "multiple functions with existing layers",
+        functions: {
+          function1: {
+            handler: "handler.function1",
+            runtime: "nodejs18.x",
+            layers: ["arn:aws:lambda:us-east-1:123:layer:existing"],
           },
-          function3: {
-              handler: "handler.function3",
-              runtime: "nodejs18.x",
-              memorySize: 256,
-              timeout: 15,
-          },
-      }
-      const { plugin, mockServerless, mockLog } = new TestSetupBuilder()
-        .withFunctions(sampleFunctions)
-        .build();
-
-      executeProviderConfigHook(plugin);
-      await executeAwsPackageHook(plugin);
-
-      const extensionArn = "arn:aws:lambda:us-east-1:123456789012:layer:test-crashoverride-dust-extension:8";
-      const expectedCount = Object.keys(sampleFunctions).length;
-      let count = 0;
-
-      Object.keys(mockServerless.service.functions || {}).forEach((funcName) => {
-        const func = mockServerless.service.functions[funcName] as any;
-        if (func.layers && func.layers.includes(extensionArn)) {
-          count++;
-        }
-      });
-
-      expect(count).toBe(expectedCount);
-      expect(mockLog.success).toHaveBeenCalledWith(
-        expect.stringContaining(`Successfully added Dust Lambda Extension to 3 function(s)`)
-      );
-    });
-
-    it("should fail when adding extension would exceed 15 layers limit", async () => {
-        const maxLayers = {
-            maxedFunction: {
-                handler: "handler.maxed",
-                runtime: "nodejs18.x",
-                layers: [
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer1",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer2",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer3",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer4",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer5",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer6",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer7",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer8",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer9",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer10",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer11",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer12",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer13",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer14",
-                    "arn:aws:lambda:us-east-1:123456789012:layer:layer15",
-                ],
-            },
-        }
-      const { plugin, mockLog } = new TestSetupBuilder()
-        .withFunctions(maxLayers)
-        .build();
-
-      executeProviderConfigHook(plugin);
-      await expect(executeAwsPackageHook(plugin)).rejects.toThrow(ServerlessError);
-
-      // Check the error message in the mock logs
-      try {
-        executeProviderConfigHook(plugin);
-        await executeAwsPackageHook(plugin);
-      } catch (e: any) {
-        expect(e.message).toContain("would exceed maximum layer/extension limit");
-      }
-
-      expect(mockLog.error).toHaveBeenCalledWith(
-        expect.stringContaining("Cannot add Dust Lambda Extension")
-      );
-    });
-
-    it("should handle functions with existing layers", async () => {
-      const { plugin, mockServerless } = new TestSetupBuilder()
-        .withFunctions({
           function2: {
             handler: "handler.function2",
             runtime: "nodejs18.x",
-            memorySize: 1024,
-            timeout: 60,
-            layers: ["arn:aws:lambda:us-east-1:123456789012:layer:existing-layer"],
+            layers: [],
+          },
+        },
+        expectedLayerCounts: { function1: 2, function2: 1 },
+        shouldAddExtension: true,
+      },
+      {
+        description: "function with no layers property",
+        functions: {
+          function1: {
+            handler: "handler.function1",
+            runtime: "nodejs18.x",
+          },
+        },
+        expectedLayerCounts: { function1: 1 },
+        shouldAddExtension: true,
+      },
+    ])(
+      "adding extension - $description",
+      ({ functions, expectedLayerCounts, shouldAddExtension }) => {
+        it("should add Dust Lambda Extension correctly", async () => {
+          const { plugin, mockServerless } = new TestSetupBuilder()
+            .withFunctions(functions)
+            .build();
+
+          executeProviderConfigHook(plugin);
+          await executeAwsPackageHook(plugin);
+
+          const extensionArn = "arn:aws:lambda:us-east-1:123456789012:layer:test-crashoverride-dust-extension:8";
+
+          if (shouldAddExtension) {
+            // Verify all functions have the correct number of layers
+            for (const [funcName, expectedCount] of Object.entries(expectedLayerCounts)) {
+              const func = mockServerless.service.functions[funcName] as any;
+              expect(func.layers).toHaveLength(expectedCount);
+              expect(func.layers).toContain(extensionArn);
+            }
+
+            // Verify the extension ARN was stored
+            expect((plugin as any).dustExtensionArn).toBe(extensionArn);
           }
-        })
-        .build();
+        });
+      }
+    );
 
-      executeProviderConfigHook(plugin);
-      await executeAwsPackageHook(plugin);
+    describe.each([
+      {
+        description: "function at 15 layer limit",
+        functions: {
+          maxedFunction: {
+            handler: "handler.maxed",
+            runtime: "nodejs18.x",
+            layers: Array(15).fill(0).map((_, i) =>
+              `arn:aws:lambda:us-east-1:123456789012:layer:layer${i+1}`
+            ),
+          },
+        },
+        shouldThrow: true,
+        errorMatch: "Cannot add Dust Lambda Extension",
+      },
+      {
+        description: "function with 14 layers (just under limit)",
+        functions: {
+          almostMaxed: {
+            handler: "handler.almost",
+            runtime: "nodejs18.x",
+            layers: Array(14).fill(0).map((_, i) =>
+              `arn:aws:lambda:us-east-1:123456789012:layer:layer${i+1}`
+            ),
+          },
+        },
+        shouldThrow: false,
+        expectedLayerCount: 15,
+      },
+    ])(
+      "layer limit validation - $description",
+      ({ functions, shouldThrow, errorMatch, expectedLayerCount }) => {
+        it("should validate layer limits correctly", async () => {
+          const { plugin, mockServerless } = new TestSetupBuilder()
+            .withFunctions(functions)
+            .build();
 
-      const func = mockServerless.service.functions["function2"] as any;
-      expect(func.layers).toHaveLength(2);
-      expect(func.layers).toContain("arn:aws:lambda:us-east-1:123456789012:layer:test-crashoverride-dust-extension:8");
-      expect(func.layers).toContain("arn:aws:lambda:us-east-1:123456789012:layer:existing-layer");
-    });
+          executeProviderConfigHook(plugin);
+
+          if (shouldThrow) {
+            await expect(executeAwsPackageHook(plugin)).rejects.toThrow(errorMatch);
+            // Verify no functions were modified when validation fails
+            for (const func of Object.values(mockServerless.service.functions || {})) {
+              const awsFunc = func as any;
+              expect(awsFunc.layers).not.toContain(
+                "arn:aws:lambda:us-east-1:123456789012:layer:test-crashoverride-dust-extension:8"
+              );
+            }
+          } else {
+            await expect(executeAwsPackageHook(plugin)).resolves.not.toThrow();
+            // Verify function has expected layer count
+            const funcName = Object.keys(functions)[0];
+            const func = mockServerless.service.functions[funcName] as any;
+            expect(func.layers).toHaveLength(expectedLayerCount);
+          }
+        });
+      }
+    );
 
     it("should handle service with no functions", async () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin, mockServerless } = new TestSetupBuilder()
         .withFunctions({})
         .build();
 
       executeProviderConfigHook(plugin);
       await expect(executeAwsPackageHook(plugin)).resolves.not.toThrow();
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("No functions found in service")
-      );
+
+      // Verify no functions were modified
+      expect(Object.keys(mockServerless.service.functions || {}).length).toBe(0);
+      // Verify no extension ARN was set when there are no functions
+      expect((plugin as any).dustExtensionArn).toBeNull();
     });
   });
 
@@ -840,7 +868,7 @@ describe("CrashOverrideServerlessPlugin", () => {
         { name: 'Worker', hasLayers: true, layers: [dustExtensionArn] },
       ]);
 
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
           handler: { handler: 'handler.handler' },
@@ -855,12 +883,8 @@ describe("CrashOverrideServerlessPlugin", () => {
       executeDeploymentHook(plugin);
       await executeAwsPackageHook(plugin);
 
-      // Should not throw
+      // Should not throw when all functions have the extension
       expect(() => executeValidationHook(plugin)).not.toThrow();
-
-      expect(mockLog.success).toHaveBeenCalledWith(
-        expect.stringContaining("Layer check passed: All 2 function(s) have Dust Lambda Extension")
-      );
     });
 
     it("should throw an error when layerCheck=true and functions missing extension", async () => {
@@ -870,7 +894,7 @@ describe("CrashOverrideServerlessPlugin", () => {
         { name: 'Processor', hasLayers: false },
       ]);
 
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
           handler: { handler: 'handler.handler' },
@@ -886,26 +910,10 @@ describe("CrashOverrideServerlessPlugin", () => {
       executeDeploymentHook(plugin);
       await executeAwsPackageHook(plugin);
 
-      // Should throw with comprehensive error
+      // Should throw with specific error about missing extensions
+      expect(() => executeValidationHook(plugin)).toThrow(ServerlessError);
       expect(() => executeValidationHook(plugin)).toThrow(
         "Layer check failed: 2 function(s) missing Dust Lambda Extension: WorkerLambdaFunction, ProcessorLambdaFunction"
-      );
-
-      // Should log comprehensive status
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining(" Functions with Dust Extension (1/3)")
-      );
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining(" Functions MISSING Dust Extension (2/3)")
-      );
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("HandlerLambdaFunction")
-      );
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("WorkerLambdaFunction")
-      );
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("ProcessorLambdaFunction")
       );
     });
 
@@ -915,7 +923,7 @@ describe("CrashOverrideServerlessPlugin", () => {
         { name: 'Worker', hasLayers: false },
       ]);
 
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withLayerCheck(false)  // layerCheck disabled
         .withFunctions({
           handler: { handler: 'handler.handler' },
@@ -930,19 +938,8 @@ describe("CrashOverrideServerlessPlugin", () => {
       executeDeploymentHook(plugin);
       await executeAwsPackageHook(plugin);
 
-      // Should not throw
+      // Should not throw when layerCheck is disabled
       expect(() => executeValidationHook(plugin)).not.toThrow();
-
-      // Should log warning with status
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("Functions with Dust Extension (1/2)")
-      );
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("Functions MISSING Dust Extension (1/2)")
-      );
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("1 function(s) missing Dust Lambda Extension. Set custom.crashoverride.layerCheck: true to enforce this requirement")
-      );
     });
 
     it("should handle functions with no Layers property", async () => {
@@ -992,7 +989,7 @@ describe("CrashOverrideServerlessPlugin", () => {
         }
       };
 
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({
           handler: { handler: 'handler.handler' }  // Function in service config
@@ -1006,12 +1003,8 @@ describe("CrashOverrideServerlessPlugin", () => {
       executeDeploymentHook(plugin);
       await executeAwsPackageHook(plugin);  // Will set dustExtensionArn
 
-      // Should not throw
+      // Should not throw when no Lambda functions found in template
       expect(() => executeValidationHook(plugin)).not.toThrow();
-
-      expect(mockLog.info).toHaveBeenCalledWith(
-        expect.stringContaining("Layer check: No Lambda functions found in CloudFormation template")
-      );
     });
 
     it("should handle missing CloudFormation template file", async () => {
@@ -1058,7 +1051,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     });
 
     it("should throw error when layerCheck=true and no Dust extension ARN available", async () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withLayerCheck(true)
         .withFunctions({})  // No functions, so no ARN will be fetched
         .build();
@@ -1067,18 +1060,17 @@ describe("CrashOverrideServerlessPlugin", () => {
       executeProviderConfigHook(plugin);
       executeDeploymentHook(plugin);
 
-      // Should throw error when layerCheck is enforced
-      expect(() => executeValidationHook(plugin)).toThrow(
-        "Cannot perform layer check: No Dust extension ARN available"
-      );
+      // Verify ARN was not set
+      expect((plugin as any).dustExtensionArn).toBeNull();
 
-      expect(mockLog.error).toHaveBeenCalledWith(
+      // Should throw error when layerCheck is enforced but no ARN available
+      expect(() => executeValidationHook(plugin)).toThrow(
         "Cannot perform layer check: No Dust extension ARN available"
       );
     });
 
     it("should skip validation when layerCheck=false and no Dust extension ARN available", async () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withLayerCheck(false)  // layerCheck disabled
         .withFunctions({})  // No functions, so no ARN will be fetched
         .build();
@@ -1087,18 +1079,17 @@ describe("CrashOverrideServerlessPlugin", () => {
       executeProviderConfigHook(plugin);
       executeDeploymentHook(plugin);
 
-      // Should not throw and should skip validation
+      // Should not throw when layerCheck is disabled
       expect(() => executeValidationHook(plugin)).not.toThrow();
 
-      expect(mockLog.info).toHaveBeenCalledWith(
-        "Layer check skipped: No Dust extension ARN available"
-      );
+      // Verify ARN was not set
+      expect((plugin as any).dustExtensionArn).toBeNull();
     });
   });
 
   describe("Package Processing", () => {
     it("should handle missing package zip file gracefully", async () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withChalkAvailable()
         .build();
 
@@ -1106,25 +1097,26 @@ describe("CrashOverrideServerlessPlugin", () => {
 
       executeProviderConfigHook(plugin);
       executeDeploymentHook(plugin);
-      await executeAwsPackageHook(plugin);
 
-      expect(mockLog.warning).toHaveBeenCalledWith(
-        expect.stringContaining("Package zip file not found")
-      );
-      expect(mockLog.error).toHaveBeenCalledWith(
-        expect.stringContaining("Could not locate package zip file")
+      // Should not throw, but should not attempt injection
+      await expect(executeAwsPackageHook(plugin)).resolves.not.toThrow();
+
+      // Verify injection was not attempted when zip doesn't exist
+      expect(childProcessMock.execSync).not.toHaveBeenCalledWith(
+        expect.stringContaining("chalk insert"),
+        expect.any(Object)
       );
     });
 
     it("should handle chalk injection errors gracefully", async () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withChalkAvailable()
         .withPackageZipExists()
         .build();
 
       // Override the mock after builder sets it up to simulate injection failure
       childProcessMock.execSync.mockImplementation((command: string) => {
-        if (command === "command -v chalk") {
+        if (command === "which chalk") {
           return Buffer.from("/usr/local/bin/chalk");
         }
         if (command.includes("chalk insert")) {
@@ -1135,23 +1127,20 @@ describe("CrashOverrideServerlessPlugin", () => {
 
       executeProviderConfigHook(plugin);
       executeDeploymentHook(plugin);
-      await executeAwsPackageHook(plugin);
 
-      expect(mockLog.error).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to inject chalkmarks")
-      );
+      // Should not throw even when injection fails
+      await expect(executeAwsPackageHook(plugin)).resolves.not.toThrow();
     });
 
     it("should handle provider config not being available", () => {
-      const { plugin, mockLog } = new TestSetupBuilder()
+      const { plugin } = new TestSetupBuilder()
         .withNoProvider()
         .build();
 
       executeProviderConfigHook(plugin);
 
-      expect(mockLog.error).toHaveBeenCalledWith(
-        expect.stringContaining("No provider configuration found")
-      );
+      // Verify provider config was not set
+      expect((plugin as any).providerConfig).toBeNull();
     });
 
     it("should use correct service path for package location", async () => {
@@ -1175,4 +1164,279 @@ describe("CrashOverrideServerlessPlugin", () => {
       );
     });
   });
+
+describe("validateLayerCount", () => {
+  describe.each([
+    {
+      description: "all functions under limit",
+      functions: {
+        func1: { layers: ["layer1", "layer2"] },
+        func2: { layers: [] },
+      },
+      maxLayers: 15,
+      expectedValid: true,
+      expectedErrors: [],
+    },
+    {
+      description: "one function at limit",
+      functions: {
+        func1: { layers: Array(15).fill("layer") },
+      },
+      maxLayers: 15,
+      expectedValid: false,
+      expectedErrors: ["Function func1 has 15 layers/extensions (max: 15)"],
+    },
+    {
+      description: "multiple functions over limit",
+      functions: {
+        func1: { layers: Array(16).fill("layer") },
+        func2: { layers: Array(20).fill("layer") },
+      },
+      maxLayers: 15,
+      expectedValid: false,
+      expectedErrors: [
+        "Function func1 has 16 layers/extensions (max: 15)",
+        "Function func2 has 20 layers/extensions (max: 15)",
+      ],
+    },
+    {
+      description: "function with no layers property",
+      functions: {
+        func1: { handler: "handler.main" },
+      },
+      maxLayers: 15,
+      expectedValid: true,
+      expectedErrors: [],
+    },
+  ])(
+    "$description",
+    ({ functions, maxLayers, expectedValid, expectedErrors }) => {
+      const { plugin } = new TestSetupBuilder().build();
+
+      // Access private method for unit testing
+      const result = (plugin as any).validateLayerCount(functions, maxLayers);
+
+      expect(result.valid).toBe(expectedValid);
+      expect(result.errors).toEqual(expectedErrors);
+    }
+  );
+});
+
+describe("addDustLambdaExtension", () => {
+  it("should add extension ARN to all functions and return true", () => {
+    const functions = {
+      func1: { layers: ["existing-layer"] },
+      func2: { layers: [] },
+      func3: {},
+    };
+
+    const extensionArn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
+    const { plugin } = new TestSetupBuilder().build();
+
+    // Access private method for unit testing
+    const result = (plugin as any).addDustLambdaExtension(functions, extensionArn);
+
+    expect(result).toBe(true);
+    expect(functions.func1.layers).toContain(extensionArn);
+    expect(functions.func1.layers).toContain("existing-layer"); // does not squash
+    expect(functions.func2.layers).toContain(extensionArn);
+    expect(functions.func3.layers).toContain(extensionArn); // handles missing key
+  });
+
+  it("should handle empty functions object", () => {
+    const functions = {};
+    const extensionArn = "arn:aws:lambda:us-east-1:123:layer:dust:1";
+    const { plugin } = new TestSetupBuilder().build();
+
+    const result = (plugin as any).addDustLambdaExtension(functions, extensionArn);
+
+    expect(result).toBe(true); // no-ops are a successful result
+    expect(Object.keys(functions)).toHaveLength(0);
+  });
+});
+
+describe("injectChalkBinary", () => {
+  beforeEach(() => {
+    // Reset mocks to avoid interference from TestSetupBuilder
+    childProcessMock.execSync.mockReset();
+  });
+
+  it("should return true when injection succeeds", () => {
+    // Build the plugin first
+    const { plugin } = new TestSetupBuilder().build();
+
+    // Then set up the mock for our specific test
+    childProcessMock.execSync.mockReturnValue(Buffer.from("Success"));
+
+    // Access private method for unit testing
+    const result = (plugin as any).injectChalkBinary("/path/to/package.zip");
+
+    expect(result).toBe(true);
+    expect(childProcessMock.execSync).toHaveBeenCalledWith(
+      'chalk insert --inject-binary-into-zip "/path/to/package.zip"',
+      expect.any(Object)
+    );
+  });
+
+  it("should return false when injection fails", () => {
+    childProcessMock.execSync.mockImplementation(() => {
+      throw new Error("Injection failed");
+    });
+    const { plugin } = new TestSetupBuilder().build();
+
+    const result = (plugin as any).injectChalkBinary("/path/to/package.zip");
+
+    expect(result).toBe(false);
+  });
+});
+
+describe("getCloudFormationTemplatePath", () => {
+  it("should return correct CloudFormation template path", () => {
+    const { plugin } = new TestSetupBuilder()
+      .withServicePath("/test/service/path")
+      .build();
+
+    const result = (plugin as any).getCloudFormationTemplatePath();
+
+    expect(result).toBe("/test/service/path/.serverless/cloudformation-template-update-stack.json");
+  });
+
+  it("should handle custom package path", () => {
+    const { plugin } = new TestSetupBuilder()
+      .withServicePath("/test/service")
+      .withPackagePath("/custom/package")
+      .build();
+
+    const result = (plugin as any).getCloudFormationTemplatePath();
+
+    expect(result).toBe("/custom/package/cloudformation-template-update-stack.json");
+  });
+});
+
+describe("performLayerValidation", () => {
+  describe.each([
+    {
+      description: "no extension ARN and layerCheck disabled",
+      extensionArn: null,
+      layerCheckEnabled: false,
+      expectedValid: true,
+      expectedError: undefined,
+    },
+    {
+      description: "no extension ARN and layerCheck enabled",
+      extensionArn: null,
+      layerCheckEnabled: true,
+      expectedValid: false,
+      expectedError: "Cannot perform layer check: No Dust extension ARN available",
+    },
+    {
+      description: "all functions have extension",
+      extensionArn: "arn:test:extension",
+      layerCheckEnabled: true,
+      setupMocks: () => {
+        const template = createCloudFormationTemplate([
+          { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
+          { name: "Func2", hasLayers: true, layers: ["arn:test:extension"] },
+        ]);
+        fsMock.mockCloudFormationTemplate(template);
+      },
+      expectedValid: true,
+      expectedValidationResult: {
+        totalFunctions: 2,
+        functionsWithExtension: ["Func1LambdaFunction", "Func2LambdaFunction"],
+        functionsMissingExtension: [],
+      },
+    },
+    {
+      description: "functions missing extension with layerCheck enabled",
+      extensionArn: "arn:test:extension",
+      layerCheckEnabled: true,
+      setupMocks: () => {
+        const template = createCloudFormationTemplate([
+          { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
+          { name: "Func2", hasLayers: false },
+        ]);
+        fsMock.mockCloudFormationTemplate(template);
+      },
+      expectedValid: false,
+      expectedError: "Layer check failed: 1 function(s) missing Dust Lambda Extension: Func2LambdaFunction",
+      expectedValidationResult: {
+        totalFunctions: 2,
+        functionsWithExtension: ["Func1LambdaFunction"],
+        functionsMissingExtension: ["Func2LambdaFunction"],
+      },
+    },
+    {
+      description: "functions missing extension with layerCheck disabled",
+      extensionArn: "arn:test:extension",
+      layerCheckEnabled: false,
+      setupMocks: () => {
+        const template = createCloudFormationTemplate([
+          { name: "Func1", hasLayers: true, layers: ["arn:test:extension"] },
+          { name: "Func2", hasLayers: false },
+        ]);
+        fsMock.mockCloudFormationTemplate(template);
+      },
+      expectedValid: true,
+      expectedValidationResult: {
+        totalFunctions: 2,
+        functionsWithExtension: ["Func1LambdaFunction"],
+        functionsMissingExtension: ["Func2LambdaFunction"],
+      },
+    },
+    {
+      description: "CloudFormation template not found with layerCheck enabled",
+      extensionArn: "arn:test:extension",
+      layerCheckEnabled: true,
+      setupMocks: () => {
+        fsMock.mockCloudFormationTemplateNotFound();
+      },
+      expectedValid: false,
+      expectedError: "Layer check failed: CloudFormation template not found at",
+    },
+    {
+      description: "CloudFormation template not found with layerCheck disabled",
+      extensionArn: "arn:test:extension",
+      layerCheckEnabled: false,
+      setupMocks: () => {
+        fsMock.mockCloudFormationTemplateNotFound();
+      },
+      expectedValid: true,
+    },
+    {
+      description: "invalid JSON in template with layerCheck enabled",
+      extensionArn: "arn:test:extension",
+      layerCheckEnabled: true,
+      setupMocks: () => {
+        fsMock.readFileSync.mockReturnValue("{ invalid json }");
+      },
+      expectedValid: false,
+      expectedError: "Layer check failed: Invalid JSON in CloudFormation template",
+    },
+  ])(
+    "$description",
+    ({ extensionArn, layerCheckEnabled, setupMocks, expectedValid, expectedError, expectedValidationResult }) => {
+      it("should validate correctly", () => {
+        if (setupMocks) {
+          setupMocks();
+        }
+
+        const { plugin } = new TestSetupBuilder().build();
+
+        // Access private method for unit testing
+        const result = (plugin as any).performLayerValidation(extensionArn, layerCheckEnabled);
+
+        expect(result.valid).toBe(expectedValid);
+        if (expectedError) {
+          expect(result.error).toContain(expectedError);
+        } else {
+          expect(result.error).toBeUndefined();
+        }
+        if (expectedValidationResult) {
+          expect(result.validationResult).toEqual(expectedValidationResult);
+        }
+      });
+    }
+  );
+});
 });
