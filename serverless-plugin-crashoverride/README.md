@@ -31,6 +31,7 @@ custom:
     memoryCheck: true # Optional: enforce minimum memory requirements
     chalkCheck: true # Optional: enforce chalk binary availability
     layerCheck: true # Optional: validate Dust Extension ARN in CloudFormation
+    arnVersion: 7 # Optional: pin Dust Extension to specific version
 ```
 
 ### Requirements
@@ -59,6 +60,7 @@ table and usage examples below.
 | `chalkCheck`      | `CO_CHALK_CHECK_ENABLED`  | boolean | `false`                             | When `true`, requires the chalk binary to be available in `$PATH`. Build fails if `chalk` is not found. When `false`, continues without chalkmark injection if `chalk` is unavailable.                               |
 | `layerCheck`      | `CO_LAYER_CHECK`          | boolean | `false`                             | When `true`, validates that all Lambda functions in the CloudFormation template include the Dust Extension. Build fails if any function is missing the extension. When `false`, only warns about missing extensions. |
 | `arnUrlPrefix`    | `CO_ARN_URL_PREFIX`       | string  | `https://dl.crashoverride.run/dust` | Base URL for fetching Dust Lambda Extension ARNs. Used to construct region-specific ARN endpoints.                                                                                                                   |
+| `arnVersion`      | `CO_ARN_VERSION`          | number  | (latest version)                    | Optional version number to pin the Dust Extension to a specific version (e.g., 1, 7, 22). When not specified, uses the latest version available.                                                                     |
 
 ### Example Configurations
 
@@ -78,6 +80,7 @@ custom:
     memoryCheckSize: 512 # Require at least 512MB
     chalkCheck: false # Allow deployment without chalk binary
     layerCheck: true # Enforce Dust Extension presence in CloudFormation
+    arnVersion: 22 # Pin to specific Dust Extension version (optional)
 
 functions:
   myFunction:
@@ -105,6 +108,7 @@ export CO_MEMORY_CHECK=false
 export CO_MEMORY_CHECK_SIZE_MB=512
 export CO_CHALK_CHECK_ENABLED=true
 export CO_LAYER_CHECK=true
+export CO_ARN_VERSION=7  # Pin to version 7
 
 # Deploy with environment configuration
 serverless deploy
