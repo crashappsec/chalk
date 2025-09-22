@@ -43,15 +43,13 @@ export const readFileSync = jest.fn();
  * // Now existsSync('/test/service/path/.serverless/test-service.zip') returns true
  * ```
  */
-export function mockPackageZipExists(
-    servicePath: string = "/test/service/path",
-) {
-    existsSync.mockImplementation((path: string) => {
-        if (path === `${servicePath}/.serverless/test-service.zip`) {
-            return true;
-        }
-        return false;
-    });
+export function mockPackageZipExists(servicePath: string = "/test/service/path") {
+  existsSync.mockImplementation((path: string) => {
+    if (path === `${servicePath}/.serverless/test-service.zip`) {
+      return true;
+    }
+    return false;
+  });
 }
 
 /**
@@ -79,18 +77,15 @@ export function mockPackageZipExists(
  * ```
  */
 export function mockCloudFormationTemplate(
-    template: any,
-    servicePath: string = "/test/service/path",
+  template: any,
+  servicePath: string = "/test/service/path"
 ) {
-    readFileSync.mockImplementation((path: string) => {
-        if (
-            path ===
-            `${servicePath}/.serverless/cloudformation-template-update-stack.json`
-        ) {
-            return JSON.stringify(template);
-        }
-        throw new Error(`ENOENT: no such file or directory, open '${path}'`);
-    });
+  readFileSync.mockImplementation((path: string) => {
+    if (path === `${servicePath}/.serverless/cloudformation-template-update-stack.json`) {
+      return JSON.stringify(template);
+    }
+    throw new Error(`ENOENT: no such file or directory, open '${path}'`);
+  });
 }
 
 /**
@@ -106,17 +101,17 @@ export function mockCloudFormationTemplate(
  * ```
  */
 export function mockCloudFormationTemplateNotFound(
-    error?: Error,
-    servicePath: string = "/test/service/path",
+  error?: Error,
+  servicePath: string = "/test/service/path"
 ) {
-    const defaultError = new Error(
-        `ENOENT: no such file or directory, open '${servicePath}/.serverless/cloudformation-template-update-stack.json'`,
-    );
-    (defaultError as any).code = "ENOENT";
+  const defaultError = new Error(
+    `ENOENT: no such file or directory, open '${servicePath}/.serverless/cloudformation-template-update-stack.json'`
+  );
+  (defaultError as any).code = "ENOENT";
 
-    readFileSync.mockImplementation(() => {
-        throw error || defaultError;
-    });
+  readFileSync.mockImplementation(() => {
+    throw error || defaultError;
+  });
 }
 
 /**
@@ -130,6 +125,6 @@ export function mockCloudFormationTemplateNotFound(
  * ```
  */
 export function resetMocks() {
-    existsSync.mockReset();
-    readFileSync.mockReset();
+  existsSync.mockReset();
+  readFileSync.mockReset();
 }

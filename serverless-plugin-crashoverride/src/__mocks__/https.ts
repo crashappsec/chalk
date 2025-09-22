@@ -26,22 +26,19 @@
 import { EventEmitter } from "events";
 
 interface MockRequestOptions {
-    on: (
-        event: string,
-        callback: (error?: Error) => void,
-    ) => MockRequestOptions;
+  on: (event: string, callback: (error?: Error) => void) => MockRequestOptions;
 }
 
 /**
  * Mock implementation of Node.js IncomingMessage for HTTP responses.
  */
 class MockIncomingMessage extends EventEmitter {
-    statusCode: number;
+  statusCode: number;
 
-    constructor(statusCode: number = 200) {
-        super();
-        this.statusCode = statusCode;
-    }
+  constructor(statusCode: number = 200) {
+    super();
+    this.statusCode = statusCode;
+  }
 }
 
 // Store custom ARN if set
@@ -60,41 +57,36 @@ let customArn: string | null = null;
  * @returns Mock request object with error handling
  */
 export const get = jest.fn(
-    (
-        url: string,
-        callback: (res: MockIncomingMessage) => void,
-    ): MockRequestOptions => {
-        // Extract region and version from URL pattern:
-        // - https://dl.crashoverride.run/test/dust/{region}/extension.arn
-        // - https://dl.crashoverride.run/test/dust/{region}/extension-v{version}.arn
-        const regionMatch = url.match(
-            /\/dust\/([^/]+)\/extension(?:-v(\d+))?\.arn/,
-        );
-        const region = regionMatch ? regionMatch[1] : "us-east-1";
-        const version = regionMatch?.[2] || "8"; // Default to version 8 if not specified
+  (url: string, callback: (res: MockIncomingMessage) => void): MockRequestOptions => {
+    // Extract region and version from URL pattern:
+    // - https://dl.crashoverride.run/test/dust/{region}/extension.arn
+    // - https://dl.crashoverride.run/test/dust/{region}/extension-v{version}.arn
+    const regionMatch = url.match(/\/dust\/([^/]+)\/extension(?:-v(\d+))?\.arn/);
+    const region = regionMatch ? regionMatch[1] : "us-east-1";
+    const version = regionMatch?.[2] || "8"; // Default to version 8 if not specified
 
-        const mockResponse = new MockIncomingMessage(200);
+    const mockResponse = new MockIncomingMessage(200);
 
-        // Simulate async response
-        setImmediate(() => {
-            callback(mockResponse);
+    // Simulate async response
+    setImmediate(() => {
+      callback(mockResponse);
 
-            // Emit the ARN data - use custom ARN if set, otherwise generate based on region and version
-            const arn =
-                customArn ||
-                `arn:aws:lambda:${region}:123456789012:layer:test-crashoverride-dust-extension:${version}`;
-            mockResponse.emit("data", arn);
-            mockResponse.emit("end");
-        });
+      // Emit the ARN data - use custom ARN if set, otherwise generate based on region and version
+      const arn =
+        customArn ||
+        `arn:aws:lambda:${region}:123456789012:layer:test-crashoverride-dust-extension:${version}`;
+      mockResponse.emit("data", arn);
+      mockResponse.emit("end");
+    });
 
-        // Return a mock request object
-        return {
-            on: jest.fn((): MockRequestOptions => {
-                // Mock error handler - by default no errors
-                return { on: jest.fn() } as MockRequestOptions;
-            }),
-        } as MockRequestOptions;
-    },
+    // Return a mock request object
+    return {
+      on: jest.fn((): MockRequestOptions => {
+        // Mock error handler - by default no errors
+        return { on: jest.fn() } as MockRequestOptions;
+      }),
+    } as MockRequestOptions;
+  }
 );
 
 /**
@@ -112,7 +104,7 @@ export const get = jest.fn(
  * ```
  */
 export function mockDustExtensionArn(arn: string): void {
-    customArn = arn;
+  customArn = arn;
 }
 
 /**
@@ -125,8 +117,8 @@ export function mockDustExtensionArn(arn: string): void {
  * ```
  */
 export function resetMock(): void {
-    customArn = null;
-    get.mockClear();
+  customArn = null;
+  get.mockClear();
 }
 
 export default { get };
