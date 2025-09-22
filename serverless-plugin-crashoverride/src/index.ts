@@ -18,23 +18,21 @@ import type {
 class CrashOverrideServerlessPlugin implements Plugin {
   hooks: Plugin.Hooks;
   readonly config: Readonly<CrashOverrideConfig>;
-  private readonly log: Plugin.Logging["log"];
+  readonly provider: AwsProvider;
   private isChalkAvailable: boolean = false;
   private providerConfig: ProviderConfig | null = null;
   private dustExtensionArn: string | null = null;
-  public readonly provider: AwsProvider;
 
   constructor(
-    public readonly serverless: Serverless,
-    public readonly options: Serverless.Options = {},
-    { log }: Plugin.Logging
+    readonly serverless: Serverless,
+    readonly options: Serverless.Options = {},
+    private readonly utils: Plugin.Logging
   ) {
-    this.log = log;
     this.provider = serverless.getProvider("aws");
 
     // Check if running on Windows and short-circuit if so
     if (process.platform === "win32") {
-      this.log.warning(
+      this.utils.log.warning(
         chalk.yellow(
           "Crash Override plugin is not supported on Windows. Skipping plugin initialization."
         )
@@ -49,10 +47,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
       return;
     }
 
-    // Initialize config with the following precedence:
-    //   1. serverless.yml custom.crashoverride values
-    //   2. Environment variables
-    //   3. Default values
     this.config = this.initializeConfig();
 
     this.hooks = {
@@ -65,23 +59,23 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
   // Helper logging methods
   private log_error(message: string): void {
-    this.log.error(chalk.red(`${message}`));
+    this.utils.log.error(chalk.red(`${message}`));
   }
 
   private log_warning(message: string): void {
-    this.log.warning(chalk.yellow(`${message}`));
+    this.utils.log.warning(chalk.yellow(`${message}`));
   }
 
   private log_notice(message: string): void {
-    this.log.notice(chalk.cyan(`${message}`));
+    this.utils.log.notice(chalk.cyan(`${message}`));
   }
 
   private log_success(message: string): void {
-    this.log.success(chalk.green(`${message}`));
+    this.utils.log.success(chalk.green(`${message}`));
   }
 
   private log_info(message: string): void {
-    this.log.info(chalk.gray(`${message}`));
+    this.utils.log.info(chalk.gray(`${message}`));
   }
 
   private initializeConfig(): Readonly<CrashOverrideConfig> {
