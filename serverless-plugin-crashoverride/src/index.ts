@@ -306,12 +306,12 @@ class CrashOverrideServerlessPlugin implements Plugin {
                 encoding: "utf8",
             });
             return true;
-        } catch (error: any) {
+        } catch (error) {
             return false;
         }
     }
 
-    private validateLayerCount(functions: Record<string, any>, maxLayers: number = 15): { valid: boolean; errors: string[] } {
+    private validateLayerCount(functions: Record<string, Aws.AwsFunction>, maxLayers: number = 15): { valid: boolean; errors: string[] } {
         const errors: string[] = [];
 
         for (const [functionName, func] of Object.entries(functions)) {
@@ -331,7 +331,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
         };
     }
 
-    private addDustLambdaExtension(functions: Record<string, any>, extensionArn: string): boolean {
+    private addDustLambdaExtension(functions: Record<string, Aws.AwsFunction>, extensionArn: string): boolean {
         try {
             // Add extension to all functions
             for (const func of Object.values(functions)) {
@@ -430,14 +430,17 @@ class CrashOverrideServerlessPlugin implements Plugin {
         try {
             const templateContent = fs.readFileSync(templatePath, 'utf-8');
             return JSON.parse(templateContent);
-        } catch (error: any) {
-            if (error.code === 'ENOENT') {
-                throw new Error(`CloudFormation template not found at ${templatePath}`);
+        } catch (error) {
+            if (error instanceof Error) {
+                if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+                    throw new Error(`CloudFormation template not found at ${templatePath}`);
+                }
+                if (error instanceof SyntaxError) {
+                    throw new Error(`Invalid JSON in CloudFormation template`);
+                }
+                throw new Error(`Failed to parse CloudFormation template: ${error.message}`);
             }
-            if (error instanceof SyntaxError) {
-                throw new Error(`Invalid JSON in CloudFormation template`);
-            }
-            throw new Error(`Failed to parse CloudFormation template: ${error.message}`);
+            throw new Error(`Failed to parse CloudFormation template: ${String(error)}`);
         }
     }
 
@@ -524,16 +527,20 @@ class CrashOverrideServerlessPlugin implements Plugin {
                 validationResult,
                 templatePath
             };
-        } catch (error: any) {
+        } catch (error) {
             if (layerCheckEnabled) {
                 // Format error message based on error type
                 let errorMessage = `Layer check failed: `;
-                if (error.message.includes('CloudFormation template not found')) {
-                    errorMessage += error.message;
-                } else if (error.message.includes('Invalid JSON')) {
-                    errorMessage += error.message;
+                if (error instanceof Error) {
+                    if (error.message.includes('CloudFormation template not found')) {
+                        errorMessage += error.message;
+                    } else if (error.message.includes('Invalid JSON')) {
+                        errorMessage += error.message;
+                    } else {
+                        errorMessage += `Failed to validate CloudFormation template: ${error.message}`;
+                    }
                 } else {
-                    errorMessage += `Failed to validate CloudFormation template: ${error.message}`;
+                    errorMessage += `Failed to validate CloudFormation template: ${String(error)}`;
                 }
                 return { valid: false, error: errorMessage };
             }
