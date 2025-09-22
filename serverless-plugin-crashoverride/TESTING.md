@@ -42,78 +42,6 @@ available in the [test-helpers.ts](./src/__tests__/test-helpers.ts) module and f
 **IMPORTANT:** To write valide tests be sure to execute your hooks in the correct order. Refer to the
 [Serverless Framework docs]() for more detail or, refer to this [helpful cheatsheet](https://gist.github.com/HyperBrain/50d38027a8f57778d5b0f135d80ea406).
 
-Below is a complete example that demonstrates why and how to use lifecycle hooks in tests:
-
-```typescript
-// ./src/example.test.ts
-import {
-  // Serverless Framework mock builder
-  TestSetupBuilder,
-  // hook helpers
-  executeProviderConfigHook,
-  executeDeploymentHook,
-  executeAwsPackageHook,
-} from "./__tests__/test-helpers";
-
-describe("CrashOverride Plugin Memory Validation", () => {
-  it("should enforce memory requirements when enabled", async () => {
-    // Step 1: Build a plugin instance with specific configuration
-    const { plugin, mockLog } = new TestSetupBuilder()
-      .withMemoryCheck(true, 512) // Require 512MB minimum
-      .withProviderMemory(256) // But provider only has 256MB
-      .withChalkAvailable() // Mock chalk as installed
-      .build();
-
-    // Step 2: Execute lifecycle hooks manually
-    // This simulates what Serverless Framework does automatically
-
-    // First, setup provider configuration
-    executeProviderConfigHook(plugin);
-    // Without this, plugin.providerConfig would be null
-
-    // Next, run pre-flight checks (memory validation happens here)
-    expect(() => {
-      executeDeploymentHook(plugin);
-    }).toThrow(
-      "Memory check failed: memorySize (256MB) is less than minimum required (512MB)",
-    );
-
-    // The test stops here because memory check failed
-    // In a success scenario, we'd continue to:
-    // await executeAwsPackageHook(plugin);
-  });
-
-  it("should successfully deploy when memory is sufficient", async () => {
-    const { plugin, mockLog, mockServerless } = new TestSetupBuilder()
-      .withMemoryCheck(true, 256) // Require 256MB minimum
-      .withProviderMemory(512) // Provider has 512MB
-      .withFunctions({
-        // Add a test function
-        myFunc: {
-          handler: "index.handler",
-          layers: [],
-        },
-      })
-      .build();
-
-    // Execute all hooks in order - simulating full deployment
-    executeProviderConfigHook(plugin); // 1. Read provider config
-    executeDeploymentHook(plugin); // 2. Validate requirements
-    await executeAwsPackageHook(plugin); // 3. Add extensions (note how it is async)
-
-    // Verify the function was modified with Dust extension
-    const func = mockServerless.service.functions["myFunc"];
-    expect(func.layers).toHaveLength(1);
-    expect(func.layers[0]).toContain("layer:test-crashoverride-dust-extension");
-
-    // Verify success was logged
-    expect(mockLog.success).toHaveBeenCalledWith(
-      expect.stringContaining("Successfully added Dust Lambda Extension"),
-    );
-  });
-});
-```
-
 ## Available Test Utilities
 
 ### Mocks
@@ -122,7 +50,7 @@ All mocks are in `src/__mocks__/` with detailed documentation in their source fi
 
 - **`child_process.ts`** - Simulates chalk binary detection and injection
 - **`fs.ts`** - Simulates file system operations for package detection
-- **`https.ts`** - Simulates ARN fetching from remote endpoints
+- **`fetch.ts`** - Simulates ARN fetching from remote endpoints using the Fetch API
 - **`serverless.mock.ts`** - Creates mock Serverless Framework instances
 
 ### Test Helpers (`src/__tests__/test-helpers.ts`)
@@ -139,52 +67,6 @@ Execute plugin lifecycle hooks in tests. See complete usage example above along 
 executeProviderConfigHook(plugin); // Setup provider config
 executeDeploymentHook(plugin); // Run pre-flight checks
 await executeAwsPackageHook(plugin); // Mutate service (async!)
-```
-
-## Common Testing Patterns
-
-### Testing Configuration Precedence
-
-```typescript
-it("should prioritize serverless.yml over environment variables", () => {
-  const { mockLog } = new TestSetupBuilder()
-    .withEnvironmentVar("CO_MEMORY_CHECK", "false")
-    .withCustomConfig({ memoryCheck: true })
-    .build();
-
-  assertions.expectConfigValues(mockLog, true, 256, false);
-});
-```
-
-### Testing Error Conditions
-
-```typescript
-it("should throw when memory check fails", () => {
-  const { plugin } = new TestSetupBuilder()
-    .withMemoryCheck(true, 2048)
-    .withProviderMemory(1024)
-    .build();
-
-  executeProviderConfigHook(plugin);
-  expect(() => executeDeploymentHook(plugin)).toThrow(ServerlessError);
-});
-```
-
-### Testing Lambda Layer Limits
-
-```typescript
-it("should fail when exceeding 15 layers", async () => {
-  const { plugin } = new TestSetupBuilder()
-    .withFunctions({
-      func: {
-        layers: new Array(15).fill(0).map((_, i) => `layer-${i}`),
-      },
-    })
-    .build();
-
-  executeProviderConfigHook(plugin);
-  await expect(executeAwsPackageHook(plugin)).rejects.toThrow();
-});
 ```
 
 ## Best Practices
