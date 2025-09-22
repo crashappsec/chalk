@@ -1,7 +1,7 @@
 import { ServerlessError } from "./__mocks__/serverless.mock";
 import * as childProcessMock from "./__mocks__/child_process";
 import * as fsMock from "./__mocks__/fs";
-import * as httpsMock from "./__mocks__/https";
+import * as fetchMock from "./__mocks__/fetch";
 import * as path from "path";
 import {
   executeProviderConfigHook,
@@ -14,7 +14,9 @@ import {
 
 jest.mock("child_process", () => require("./__mocks__/child_process"));
 jest.mock("fs", () => require("./__mocks__/fs"));
-jest.mock("https", () => require("./__mocks__/https"));
+
+// Mock fetch globally for tests
+global.fetch = fetchMock.fetch;
 // sidestep ANSI color codes
 jest.mock("chalk", () => {
   const mockChalk = {
@@ -39,7 +41,7 @@ describe("CrashOverrideServerlessPlugin", () => {
     jest.clearAllMocks();
     childProcessMock.resetMocks();
     fsMock.resetMocks();
-    httpsMock.resetMock();
+    fetchMock.resetMock();
 
     originalEnv = { ...process.env };
     originalPlatform = process.platform;
@@ -954,7 +956,7 @@ describe("CrashOverrideServerlessPlugin", () => {
       "arn:aws:lambda:us-east-1:224111541501:layer:test-crashoverride-dust-extension:8";
 
     beforeEach(() => {
-      httpsMock.mockDustExtensionArn(dustExtensionArn);
+      fetchMock.mockDustExtensionArn(dustExtensionArn);
     });
 
     it("should pass validation when all functions have Dust extension", async () => {
