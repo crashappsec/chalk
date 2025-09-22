@@ -91,6 +91,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
             chalkCheck: false,
             layerCheck: false,
             arnUrlPrefix: "https://dl.crashoverride.run/dust"
+            // arnVersion is optional, undefined by default (uses latest version)
         };
 
         // Environment variables (medium precedence)
@@ -120,6 +121,16 @@ class CrashOverrideServerlessPlugin implements Plugin {
         if (process.env["CO_ARN_URL_PREFIX"] !== undefined) {
             envConfig.arnUrlPrefix = process.env["CO_ARN_URL_PREFIX"];
         }
+        if (process.env["CO_ARN_VERSION"] !== undefined) {
+            const arnVersion = Number.parseInt(process.env["CO_ARN_VERSION"]);
+            if (Number.isSafeInteger(arnVersion) && arnVersion > 0) {
+                envConfig.arnVersion = arnVersion;
+            } else {
+                throw new this.serverless.classes.Error(
+                    `Received invalid arnVersion value: ${process.env["CO_ARN_VERSION"]}. Must be a positive integer.`,
+                );
+            }
+        }
 
         // Serverless config (highest precedence)
         const customConfig: CustomServerlessConfig | undefined = this.serverless.service.custom
@@ -135,7 +146,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
         // Log the final configuration
         this.log_info(
-            `CrashOverride config initialized:\n\tmemoryCheck=${finalConfig.memoryCheck}\n\tmemoryCheckSize=${finalConfig.memoryCheckSize}\n\tchalkCheck=${finalConfig.chalkCheck}`,
+            `CrashOverride config initialized:\n\tmemoryCheck=${finalConfig.memoryCheck}\n\tmemoryCheckSize=${finalConfig.memoryCheckSize}\n\tchalkCheck=${finalConfig.chalkCheck}\n\tlayerCheck=${finalConfig.layerCheck}${finalConfig.arnVersion ? `\n\tarnVersion=${finalConfig.arnVersion}` : ''}`,
         );
 
         return Object.freeze(finalConfig);
@@ -177,13 +188,17 @@ class CrashOverrideServerlessPlugin implements Plugin {
     private async fetchDustExtensionArn(region: string): Promise<string> {
         const urlPrefix = this.config.arnUrlPrefix
         return new Promise((resolve, reject) => {
-            const url = `${urlPrefix}/${region}/extension.arn`;
+            // Construct URL with version if specified, otherwise use latest
+            const url = this.config.arnVersion
+                ? `${urlPrefix}/${region}/extension-v${this.config.arnVersion}.arn`
+                : `${urlPrefix}/${region}/extension.arn`;
 
             https.get(url, (res) => {
                 let data = "";
 
                 if (res.statusCode !== 200) {
-                    this.log_warning(`Failed to fetch Dust extension ARN for region ${region}: HTTP ${res.statusCode}`);
+                    const versionInfo = this.config.arnVersion ? ` (v${this.config.arnVersion})` : '';
+                    this.log_warning(`Failed to fetch Dust extension ARN for region ${region}${versionInfo}: HTTP ${res.statusCode}`);
                     reject(new Error(`HTTP ${res.statusCode}`));
                     return;
                 }
@@ -197,7 +212,8 @@ class CrashOverrideServerlessPlugin implements Plugin {
                     resolve(arn);
                 });
             }).on("error", (error) => {
-                this.log_warning(`Failed to fetch Dust extension ARN for region ${region}: ${error.message}`);
+                const versionInfo = this.config.arnVersion ? ` (v${this.config.arnVersion})` : '';
+                this.log_warning(`Failed to fetch Dust extension ARN for region ${region}${versionInfo}: ${error.message}`);
                 reject(error);
             });
         });
@@ -382,7 +398,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
             // Fetch extension ARN
             const extensionArn = await this.fetchDustExtensionArn(this.providerConfig.region);
             this.dustExtensionArn = extensionArn; // Store for later validation
-            this.log_info(`Dust Extension ARN for ${this.providerConfig.region} :: ${extensionArn}`);
+            this.log_info(`Dust Extension ARN for ${this.providerConfig.region}${this.config.arnVersion ? ` (v${this.config.arnVersion})` : ''} :: ${extensionArn}`);
 
             this.log_notice(`Adding Dust Lambda Extension to all functions`);
 

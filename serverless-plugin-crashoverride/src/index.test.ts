@@ -210,6 +210,61 @@ describe("CrashOverrideServerlessPlugin", () => {
       expect(plugin.config.memoryCheckSize).toBe(256); // default
       expect(plugin.config.chalkCheck).toBe(false);
     });
+
+    it("should handle ARN version configuration from environment variable", () => {
+      const { plugin } = new TestSetupBuilder()
+        .withEnvironmentVar("CO_ARN_VERSION", "7")
+        .build();
+
+      expect(plugin.config.arnVersion).toBe(7);
+    });
+
+    it("should handle ARN version configuration from serverless.yml", () => {
+      const { plugin } = new TestSetupBuilder()
+        .withCustomConfig({
+          arnVersion: 22,
+        })
+        .build();
+
+      expect(plugin.config.arnVersion).toBe(22);
+    });
+
+    it("should prioritize serverless.yml ARN version over environment variable", () => {
+      const { plugin } = new TestSetupBuilder()
+        .withEnvironmentVar("CO_ARN_VERSION", "7")
+        .withCustomConfig({
+          arnVersion: 22,
+        })
+        .build();
+
+      expect(plugin.config.arnVersion).toBe(22); // serverless.yml takes precedence
+    });
+
+    it("should throw error for invalid ARN version in environment variable", () => {
+      expect(() => {
+        new TestSetupBuilder()
+          .withEnvironmentVar("CO_ARN_VERSION", "invalid")
+          .build();
+      }).toThrow("Received invalid arnVersion value: invalid");
+
+      expect(() => {
+        new TestSetupBuilder()
+          .withEnvironmentVar("CO_ARN_VERSION", "-1")
+          .build();
+      }).toThrow("Received invalid arnVersion value: -1");
+
+      expect(() => {
+        new TestSetupBuilder()
+          .withEnvironmentVar("CO_ARN_VERSION", "0")
+          .build();
+      }).toThrow("Received invalid arnVersion value: 0");
+    });
+
+    it("should use undefined ARN version by default", () => {
+      const { plugin } = new TestSetupBuilder().build();
+
+      expect(plugin.config.arnVersion).toBeUndefined();
+    });
     });
   });
 

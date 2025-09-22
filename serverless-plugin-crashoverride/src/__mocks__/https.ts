@@ -64,9 +64,14 @@ export const get = jest.fn(
         url: string,
         callback: (res: MockIncomingMessage) => void,
     ): MockRequestOptions => {
-        // Extract region from URL pattern: https://dl.crashoverride.run/test/dust/{region}/extension.arn
-        const regionMatch = url.match(/\/dust\/([^/]+)\/extension\.arn/);
+        // Extract region and version from URL pattern:
+        // - https://dl.crashoverride.run/test/dust/{region}/extension.arn
+        // - https://dl.crashoverride.run/test/dust/{region}/extension-v{version}.arn
+        const regionMatch = url.match(
+            /\/dust\/([^/]+)\/extension(?:-v(\d+))?\.arn/,
+        );
         const region = regionMatch ? regionMatch[1] : "us-east-1";
+        const version = regionMatch?.[2] || "8"; // Default to version 8 if not specified
 
         const mockResponse = new MockIncomingMessage(200);
 
@@ -74,10 +79,10 @@ export const get = jest.fn(
         setImmediate(() => {
             callback(mockResponse);
 
-            // Emit the ARN data - use custom ARN if set, otherwise generate based on region
+            // Emit the ARN data - use custom ARN if set, otherwise generate based on region and version
             const arn =
                 customArn ||
-                `arn:aws:lambda:${region}:123456789012:layer:test-crashoverride-dust-extension:8`;
+                `arn:aws:lambda:${region}:123456789012:layer:test-crashoverride-dust-extension:${version}`;
             mockResponse.emit("data", arn);
             mockResponse.emit("end");
         });
