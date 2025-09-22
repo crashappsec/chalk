@@ -1,37 +1,46 @@
-// Custom plugin-specific configuration interfaces
-export interface PluginConfig {
+// Custom plugin-specific configuration types
+export type PluginConfig = {
     enabled?: boolean;
     options?: Record<string, unknown>;
-}
+};
 
-export interface CrashOverrideConfig {
+export type CrashOverrideConfig = {
     memoryCheck: boolean;
     memoryCheckSize: number;
     chalkCheck: boolean;
     layerCheck: boolean;
     arnUrlPrefix?: string;
-}
+};
 
-export interface CustomServerlessConfig {
+export type CustomServerlessConfig = {
     crashoverride?: CrashOverrideConfig;
     [key: string]: PluginConfig | unknown;
-}
+};
 
-export interface ProviderConfig {
+export type ProviderConfig = {
     provider: string;
     region: string;
     memorySize: number;
-}
+};
 
-export interface FunctionValidationResult {
+export type FunctionValidationResult = {
     totalFunctions: number;
     functionsWithExtension: string[];
     functionsMissingExtension: string[];
-}
+};
 
-export interface CloudFormationTemplate {
+export type CloudFormationResource = {
+    Type: string;
+    Properties?: {
+        Layers?: string[];
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+};
+
+export type CloudFormationTemplate = {
     AWSTemplateFormatVersion?: string;
     Description?: string;
-    Resources?: Record<string, any>;
-    [key: string]: any;
+    Resources?: Record<string, CloudFormationResource>;
+    [key: string]: unknown;
 }
