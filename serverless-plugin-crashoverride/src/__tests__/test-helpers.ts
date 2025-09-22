@@ -11,9 +11,9 @@
 
 import CrashOverrideServerlessPlugin from "../index";
 import {
-    createMockServerless,
-    createMockLogger,
-    createMockOptions,
+  createMockServerless,
+  createMockLogger,
+  createMockOptions,
 } from "../__mocks__/serverless.mock";
 import * as childProcessMock from "../__mocks__/child_process";
 import * as fsMock from "../__mocks__/fs";
@@ -36,40 +36,36 @@ import type { CrashOverrideConfig } from "../types";
  * ```
  */
 export function createPlugin(
-    serverlessOverrides?: any,
-    envVars?: Record<string, string>,
+  serverlessOverrides?: any,
+  envVars?: Record<string, string>
 ): {
-    plugin: CrashOverrideServerlessPlugin;
-    mockServerless: Serverless;
-    mockLog: ReturnType<typeof createMockLogger>;
-    mockOptions: any;
+  plugin: CrashOverrideServerlessPlugin;
+  mockServerless: Serverless;
+  mockLog: ReturnType<typeof createMockLogger>;
+  mockOptions: any;
 } {
-    if (envVars) {
-        Object.entries(envVars).forEach(([key, value]) => {
-            process.env[key] = value;
-        });
-    }
+  if (envVars) {
+    Object.entries(envVars).forEach(([key, value]) => {
+      process.env[key] = value;
+    });
+  }
 
-    const mockServerless = createMockServerless(serverlessOverrides);
-    const mockOptions = createMockOptions();
-    const mockLog = createMockLogger();
+  const mockServerless = createMockServerless(serverlessOverrides);
+  const mockOptions = createMockOptions();
+  const mockLog = createMockLogger();
 
-    const plugin = new CrashOverrideServerlessPlugin(
-        mockServerless,
-        mockOptions,
-        {
-            log: mockLog,
-            writeText: jest.fn(),
-            progress: {
-                create: jest.fn(),
-                remove: jest.fn(),
-                update: jest.fn(),
-                get: jest.fn(),
-            },
-        } as any,
-    );
+  const plugin = new CrashOverrideServerlessPlugin(mockServerless, mockOptions, {
+    log: mockLog,
+    writeText: jest.fn(),
+    progress: {
+      create: jest.fn(),
+      remove: jest.fn(),
+      update: jest.fn(),
+      get: jest.fn(),
+    },
+  } as any);
 
-    return { plugin, mockServerless, mockLog, mockOptions };
+  return { plugin, mockServerless, mockLog, mockOptions };
 }
 
 /**
@@ -96,13 +92,11 @@ export function createPlugin(
  * executeDeploymentHook(plugin); // Can now use provider config
  * ```
  */
-export function executeProviderConfigHook(
-    plugin: CrashOverrideServerlessPlugin,
-): void {
-    const hook = plugin.hooks["after:package:setupProviderConfiguration"];
-    if (hook) {
-        hook();
-    }
+export function executeProviderConfigHook(plugin: CrashOverrideServerlessPlugin): void {
+  const hook = plugin.hooks["after:package:setupProviderConfiguration"];
+  if (hook) {
+    hook();
+  }
 }
 
 /**
@@ -130,13 +124,11 @@ export function executeProviderConfigHook(
  * // Will throw if chalkCheck=true and chalk binary is missing
  * ```
  */
-export function executeDeploymentHook(
-    plugin: CrashOverrideServerlessPlugin,
-): void {
-    const hook = plugin.hooks["after:package:createDeploymentArtifacts"];
-    if (hook) {
-        hook();
-    }
+export function executeDeploymentHook(plugin: CrashOverrideServerlessPlugin): void {
+  const hook = plugin.hooks["after:package:createDeploymentArtifacts"];
+  if (hook) {
+    hook();
+  }
 }
 
 /**
@@ -168,13 +160,11 @@ export function executeDeploymentHook(
  * // Functions now have Dust Extension added to their layers
  * ```
  */
-export async function executeAwsPackageHook(
-    plugin: CrashOverrideServerlessPlugin,
-): Promise<void> {
-    const hook = plugin.hooks["before:package:compileFunctions"];
-    if (hook) {
-        await hook();
-    }
+export async function executeAwsPackageHook(plugin: CrashOverrideServerlessPlugin): Promise<void> {
+  const hook = plugin.hooks["before:package:compileFunctions"];
+  if (hook) {
+    await hook();
+  }
 }
 
 /**
@@ -196,13 +186,11 @@ export async function executeAwsPackageHook(
  * executeValidationHook(plugin);      // Validate CloudFormation template
  * ```
  */
-export function executeValidationHook(
-    plugin: CrashOverrideServerlessPlugin,
-): void {
-    const hook = plugin.hooks["after:package:finalize"];
-    if (hook) {
-        hook();
-    }
+export function executeValidationHook(plugin: CrashOverrideServerlessPlugin): void {
+  const hook = plugin.hooks["after:package:finalize"];
+  if (hook) {
+    hook();
+  }
 }
 
 /**
@@ -224,297 +212,291 @@ export function executeValidationHook(
  * ```
  */
 export class TestSetupBuilder {
-    private serverlessOverrides: any = {};
-    private envVars: Record<string, string> = {};
-    private chalkAvailable: boolean = false;
-    private packageZipExists: boolean = false;
+  private serverlessOverrides: any = {};
+  private envVars: Record<string, string> = {};
+  private chalkAvailable: boolean = false;
+  private packageZipExists: boolean = false;
 
-    /**
-     * Configures memory check validation settings.
-     *
-     * @param enabled - Whether to enforce memory checks (fail vs warn)
-     * @param size - Minimum required memory size in MB (default: 256)
-     * @returns this for method chaining
-     */
-    withMemoryCheck(enabled: boolean, size: number = 256): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        if (!this.serverlessOverrides.service.custom) {
-            this.serverlessOverrides.service.custom = {};
-        }
-        if (!this.serverlessOverrides.service.custom.crashoverride) {
-            this.serverlessOverrides.service.custom.crashoverride = {};
-        }
-        this.serverlessOverrides.service.custom.crashoverride.memoryCheck =
-            enabled;
-        this.serverlessOverrides.service.custom.crashoverride.memoryCheckSize =
-            size;
-        return this;
+  /**
+   * Configures memory check validation settings.
+   *
+   * @param enabled - Whether to enforce memory checks (fail vs warn)
+   * @param size - Minimum required memory size in MB (default: 256)
+   * @returns this for method chaining
+   */
+  withMemoryCheck(enabled: boolean, size: number = 256): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    if (!this.serverlessOverrides.service.custom) {
+      this.serverlessOverrides.service.custom = {};
+    }
+    if (!this.serverlessOverrides.service.custom.crashoverride) {
+      this.serverlessOverrides.service.custom.crashoverride = {};
+    }
+    this.serverlessOverrides.service.custom.crashoverride.memoryCheck = enabled;
+    this.serverlessOverrides.service.custom.crashoverride.memoryCheckSize = size;
+    return this;
+  }
+
+  /**
+   * Configures chalk binary requirement.
+   *
+   * @param enabled - Whether to enforce chalk binary presence (fail vs warn)
+   * @returns this for method chaining
+   */
+  withChalkCheck(enabled: boolean): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    if (!this.serverlessOverrides.service.custom) {
+      this.serverlessOverrides.service.custom = {};
+    }
+    if (!this.serverlessOverrides.service.custom.crashoverride) {
+      this.serverlessOverrides.service.custom.crashoverride = {};
+    }
+    this.serverlessOverrides.service.custom.crashoverride.chalkCheck = enabled;
+    return this;
+  }
+
+  /**
+   * Configures layer check validation.
+   *
+   * @param enabled - Whether to enforce Dust extension presence in CloudFormation (fail open vs. fail closed)
+   * @returns this for method chaining
+   */
+  withLayerCheck(enabled: boolean): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    if (!this.serverlessOverrides.service.custom) {
+      this.serverlessOverrides.service.custom = {};
+    }
+    if (!this.serverlessOverrides.service.custom.crashoverride) {
+      this.serverlessOverrides.service.custom.crashoverride = {};
+    }
+    this.serverlessOverrides.service.custom.crashoverride.layerCheck = enabled;
+    return this;
+  }
+
+  /**
+   * Sets the provider-level memory size configuration.
+   *
+   * @param size - Memory size in MB for Lambda functions
+   * @returns this for method chaining
+   */
+  withProviderMemory(size: number): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    if (!this.serverlessOverrides.service.provider) {
+      this.serverlessOverrides.service.provider = {};
+    }
+    this.serverlessOverrides.service.provider.memorySize = size;
+    return this;
+  }
+
+  /**
+   * Sets the AWS region for the provider.
+   *
+   * @param region - AWS region (e.g., 'us-east-1', 'eu-west-1')
+   * @returns this for method chaining
+   */
+  withProviderRegion(region: string): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    if (!this.serverlessOverrides.service.provider) {
+      this.serverlessOverrides.service.provider = {};
+    }
+    this.serverlessOverrides.service.provider.region = region;
+    return this;
+  }
+
+  /**
+   * Adds Lambda function definitions to the service.
+   *
+   * @param functions - Object containing function configurations with layers
+   * @returns this for method chaining
+   *
+   * @example
+   * ```typescript
+   * .withFunctions({
+   *   myFunction: {
+   *     handler: 'handler.main',
+   *     layers: ['arn:aws:lambda:us-east-1:123:layer:existing']
+   *   }
+   * })
+   * ```
+   */
+  withFunctions(functions: any): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    // Deep copy to avoid mutation
+    this.serverlessOverrides.service.functions = JSON.parse(JSON.stringify(functions));
+    return this;
+  }
+
+  /**
+   * Sets the Serverless service name.
+   *
+   * @param name - The service name (used for package naming)
+   * @returns this for method chaining
+   */
+  withServiceName(name: string): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    this.serverlessOverrides.service.service = name;
+    return this;
+  }
+
+  /**
+   * Sets the service directory path.
+   *
+   * @param path - Absolute path to the service directory
+   * @returns this for method chaining
+   */
+  withServicePath(path: string): this {
+    if (!this.serverlessOverrides.config) {
+      this.serverlessOverrides.config = {};
+    }
+    this.serverlessOverrides.config.servicePath = path;
+    return this;
+  }
+
+  /**
+   * Sets the package path configuration.
+   *
+   * @param path - Package directory path (absolute or relative)
+   * @returns this for method chaining
+   */
+  withPackagePath(path: string): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    if (!this.serverlessOverrides.service.package) {
+      this.serverlessOverrides.service.package = {};
+    }
+    this.serverlessOverrides.service.package.path = path;
+    return this;
+  }
+
+  /**
+   * Sets an environment variable for the test.
+   *
+   * @param key - Environment variable name (e.g., 'CO_MEMORY_CHECK')
+   * @param value - Environment variable value
+   * @returns this for method chaining
+   */
+  withEnvironmentVar(key: string, value: string): this {
+    this.envVars[key] = value;
+    return this;
+  }
+
+  /**
+   * Mocks chalk binary as available in the system PATH.
+   * Automatically sets up the child_process mock to simulate chalk presence.
+   *
+   * @returns this for method chaining
+   */
+  withChalkAvailable(): this {
+    this.chalkAvailable = true;
+    return this;
+  }
+
+  /**
+   * Mocks chalk binary as NOT available in the system PATH.
+   * Automatically sets up the child_process mock to simulate chalk absence.
+   *
+   * @returns this for method chaining
+   */
+  withChalkNotAvailable(): this {
+    this.chalkAvailable = false;
+    return this;
+  }
+
+  /**
+   * Mocks the deployment package zip file as existing.
+   * Automatically sets up the fs mock to return true for the package path.
+   *
+   * @param servicePath - Optional custom service path
+   * @returns this for method chaining
+   */
+  withPackageZipExists(servicePath?: string): this {
+    this.packageZipExists = true;
+    if (servicePath) {
+      this.withServicePath(servicePath);
+    }
+    return this;
+  }
+
+  /**
+   * Sets custom CrashOverride plugin configuration.
+   *
+   * @param config - Partial configuration to merge with defaults
+   * @returns this for method chaining
+   *
+   * @example
+   * ```typescript
+   * .withCustomConfig({
+   *   memoryCheck: true,
+   *   memoryCheckSize: 512,
+   *   chalkCheck: false
+   * })
+   * ```
+   */
+  withCustomConfig(config: Partial<CrashOverrideConfig>): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    if (!this.serverlessOverrides.service.custom) {
+      this.serverlessOverrides.service.custom = {};
+    }
+    this.serverlessOverrides.service.custom.crashoverride = config;
+    return this;
+  }
+
+  /**
+   * Removes provider configuration to test error handling.
+   *
+   * @returns this for method chaining
+   */
+  withNoProvider(): this {
+    if (!this.serverlessOverrides.service) {
+      this.serverlessOverrides.service = {};
+    }
+    this.serverlessOverrides.service.provider = undefined;
+    return this;
+  }
+
+  /**
+   * Builds and returns the configured plugin instance with mocks.
+   * This method applies all configurations and sets up the appropriate mocks.
+   *
+   * @returns Object containing plugin, mockServerless, mockLog, and mockOptions
+   */
+  build(): {
+    plugin: CrashOverrideServerlessPlugin;
+    mockServerless: Serverless;
+    mockLog: ReturnType<typeof createMockLogger>;
+    mockOptions: any;
+  } {
+    // Setup mocks based on configuration
+    if (this.chalkAvailable) {
+      childProcessMock.mockChalkAvailable();
+    } else {
+      childProcessMock.mockChalkNotAvailable();
     }
 
-    /**
-     * Configures chalk binary requirement.
-     *
-     * @param enabled - Whether to enforce chalk binary presence (fail vs warn)
-     * @returns this for method chaining
-     */
-    withChalkCheck(enabled: boolean): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        if (!this.serverlessOverrides.service.custom) {
-            this.serverlessOverrides.service.custom = {};
-        }
-        if (!this.serverlessOverrides.service.custom.crashoverride) {
-            this.serverlessOverrides.service.custom.crashoverride = {};
-        }
-        this.serverlessOverrides.service.custom.crashoverride.chalkCheck =
-            enabled;
-        return this;
+    if (this.packageZipExists) {
+      const servicePath = this.serverlessOverrides.config?.servicePath;
+      fsMock.mockPackageZipExists(servicePath);
     }
 
-    /**
-     * Configures layer check validation.
-     *
-     * @param enabled - Whether to enforce Dust extension presence in CloudFormation (fail open vs. fail closed)
-     * @returns this for method chaining
-     */
-    withLayerCheck(enabled: boolean): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        if (!this.serverlessOverrides.service.custom) {
-            this.serverlessOverrides.service.custom = {};
-        }
-        if (!this.serverlessOverrides.service.custom.crashoverride) {
-            this.serverlessOverrides.service.custom.crashoverride = {};
-        }
-        this.serverlessOverrides.service.custom.crashoverride.layerCheck =
-            enabled;
-        return this;
-    }
-
-    /**
-     * Sets the provider-level memory size configuration.
-     *
-     * @param size - Memory size in MB for Lambda functions
-     * @returns this for method chaining
-     */
-    withProviderMemory(size: number): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        if (!this.serverlessOverrides.service.provider) {
-            this.serverlessOverrides.service.provider = {};
-        }
-        this.serverlessOverrides.service.provider.memorySize = size;
-        return this;
-    }
-
-    /**
-     * Sets the AWS region for the provider.
-     *
-     * @param region - AWS region (e.g., 'us-east-1', 'eu-west-1')
-     * @returns this for method chaining
-     */
-    withProviderRegion(region: string): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        if (!this.serverlessOverrides.service.provider) {
-            this.serverlessOverrides.service.provider = {};
-        }
-        this.serverlessOverrides.service.provider.region = region;
-        return this;
-    }
-
-    /**
-     * Adds Lambda function definitions to the service.
-     *
-     * @param functions - Object containing function configurations with layers
-     * @returns this for method chaining
-     *
-     * @example
-     * ```typescript
-     * .withFunctions({
-     *   myFunction: {
-     *     handler: 'handler.main',
-     *     layers: ['arn:aws:lambda:us-east-1:123:layer:existing']
-     *   }
-     * })
-     * ```
-     */
-    withFunctions(functions: any): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        // Deep copy to avoid mutation
-        this.serverlessOverrides.service.functions = JSON.parse(
-            JSON.stringify(functions),
-        );
-        return this;
-    }
-
-    /**
-     * Sets the Serverless service name.
-     *
-     * @param name - The service name (used for package naming)
-     * @returns this for method chaining
-     */
-    withServiceName(name: string): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        this.serverlessOverrides.service.service = name;
-        return this;
-    }
-
-    /**
-     * Sets the service directory path.
-     *
-     * @param path - Absolute path to the service directory
-     * @returns this for method chaining
-     */
-    withServicePath(path: string): this {
-        if (!this.serverlessOverrides.config) {
-            this.serverlessOverrides.config = {};
-        }
-        this.serverlessOverrides.config.servicePath = path;
-        return this;
-    }
-
-    /**
-     * Sets the package path configuration.
-     *
-     * @param path - Package directory path (absolute or relative)
-     * @returns this for method chaining
-     */
-    withPackagePath(path: string): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        if (!this.serverlessOverrides.service.package) {
-            this.serverlessOverrides.service.package = {};
-        }
-        this.serverlessOverrides.service.package.path = path;
-        return this;
-    }
-
-    /**
-     * Sets an environment variable for the test.
-     *
-     * @param key - Environment variable name (e.g., 'CO_MEMORY_CHECK')
-     * @param value - Environment variable value
-     * @returns this for method chaining
-     */
-    withEnvironmentVar(key: string, value: string): this {
-        this.envVars[key] = value;
-        return this;
-    }
-
-    /**
-     * Mocks chalk binary as available in the system PATH.
-     * Automatically sets up the child_process mock to simulate chalk presence.
-     *
-     * @returns this for method chaining
-     */
-    withChalkAvailable(): this {
-        this.chalkAvailable = true;
-        return this;
-    }
-
-    /**
-     * Mocks chalk binary as NOT available in the system PATH.
-     * Automatically sets up the child_process mock to simulate chalk absence.
-     *
-     * @returns this for method chaining
-     */
-    withChalkNotAvailable(): this {
-        this.chalkAvailable = false;
-        return this;
-    }
-
-    /**
-     * Mocks the deployment package zip file as existing.
-     * Automatically sets up the fs mock to return true for the package path.
-     *
-     * @param servicePath - Optional custom service path
-     * @returns this for method chaining
-     */
-    withPackageZipExists(servicePath?: string): this {
-        this.packageZipExists = true;
-        if (servicePath) {
-            this.withServicePath(servicePath);
-        }
-        return this;
-    }
-
-    /**
-     * Sets custom CrashOverride plugin configuration.
-     *
-     * @param config - Partial configuration to merge with defaults
-     * @returns this for method chaining
-     *
-     * @example
-     * ```typescript
-     * .withCustomConfig({
-     *   memoryCheck: true,
-     *   memoryCheckSize: 512,
-     *   chalkCheck: false
-     * })
-     * ```
-     */
-    withCustomConfig(config: Partial<CrashOverrideConfig>): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        if (!this.serverlessOverrides.service.custom) {
-            this.serverlessOverrides.service.custom = {};
-        }
-        this.serverlessOverrides.service.custom.crashoverride = config;
-        return this;
-    }
-
-    /**
-     * Removes provider configuration to test error handling.
-     *
-     * @returns this for method chaining
-     */
-    withNoProvider(): this {
-        if (!this.serverlessOverrides.service) {
-            this.serverlessOverrides.service = {};
-        }
-        this.serverlessOverrides.service.provider = undefined;
-        return this;
-    }
-
-    /**
-     * Builds and returns the configured plugin instance with mocks.
-     * This method applies all configurations and sets up the appropriate mocks.
-     *
-     * @returns Object containing plugin, mockServerless, mockLog, and mockOptions
-     */
-    build(): {
-        plugin: CrashOverrideServerlessPlugin;
-        mockServerless: Serverless;
-        mockLog: ReturnType<typeof createMockLogger>;
-        mockOptions: any;
-    } {
-        // Setup mocks based on configuration
-        if (this.chalkAvailable) {
-            childProcessMock.mockChalkAvailable();
-        } else {
-            childProcessMock.mockChalkNotAvailable();
-        }
-
-        if (this.packageZipExists) {
-            const servicePath = this.serverlessOverrides.config?.servicePath;
-            fsMock.mockPackageZipExists(servicePath);
-        }
-
-        return createPlugin(this.serverlessOverrides, this.envVars);
-    }
+    return createPlugin(this.serverlessOverrides, this.envVars);
+  }
 }
 
 /**
@@ -532,58 +514,58 @@ export class TestSetupBuilder {
  * ```
  */
 export function createCloudFormationTemplate(
-    functions: Array<{
-        name: string;
-        hasLayers?: boolean;
-        layers?: string[];
-    }> = [],
+  functions: Array<{
+    name: string;
+    hasLayers?: boolean;
+    layers?: string[];
+  }> = []
 ): any {
-    const resources: any = {};
+  const resources: any = {};
 
-    // Add Lambda functions
-    functions.forEach((func) => {
-        const functionResource: any = {
-            Type: "AWS::Lambda::Function",
-            Properties: {
-                Code: {
-                    S3Bucket: "test-bucket",
-                    S3Key: "test-key",
-                },
-                Handler: "handler.handler",
-                Runtime: "nodejs18.x",
-                FunctionName: `test-service-dev-${func.name}`,
-                MemorySize: 1024,
-                Timeout: 6,
-            },
-        };
-
-        if (func.hasLayers && func.layers) {
-            functionResource.Properties.Layers = func.layers;
-        }
-
-        resources[`${func.name}LambdaFunction`] = functionResource;
-    });
-
-    // Add other resources (IAM role, etc.)
-    resources.IamRoleLambdaExecution = {
-        Type: "AWS::IAM::Role",
-        Properties: {
-            AssumeRolePolicyDocument: {
-                Version: "2012-10-17",
-                Statement: [
-                    {
-                        Effect: "Allow",
-                        Principal: { Service: ["lambda.amazonaws.com"] },
-                        Action: ["sts:AssumeRole"],
-                    },
-                ],
-            },
+  // Add Lambda functions
+  functions.forEach((func) => {
+    const functionResource: any = {
+      Type: "AWS::Lambda::Function",
+      Properties: {
+        Code: {
+          S3Bucket: "test-bucket",
+          S3Key: "test-key",
         },
+        Handler: "handler.handler",
+        Runtime: "nodejs18.x",
+        FunctionName: `test-service-dev-${func.name}`,
+        MemorySize: 1024,
+        Timeout: 6,
+      },
     };
 
-    return {
-        AWSTemplateFormatVersion: "2010-09-09",
-        Description: "Test CloudFormation template",
-        Resources: resources,
-    };
+    if (func.hasLayers && func.layers) {
+      functionResource.Properties.Layers = func.layers;
+    }
+
+    resources[`${func.name}LambdaFunction`] = functionResource;
+  });
+
+  // Add other resources (IAM role, etc.)
+  resources.IamRoleLambdaExecution = {
+    Type: "AWS::IAM::Role",
+    Properties: {
+      AssumeRolePolicyDocument: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: { Service: ["lambda.amazonaws.com"] },
+            Action: ["sts:AssumeRole"],
+          },
+        ],
+      },
+    },
+  };
+
+  return {
+    AWSTemplateFormatVersion: "2010-09-09",
+    Description: "Test CloudFormation template",
+    Resources: resources,
+  };
 }

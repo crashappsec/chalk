@@ -33,15 +33,15 @@ export const execSync = jest.fn();
  * ```
  */
 export function mockChalkAvailable() {
-    execSync.mockImplementation((command: string) => {
-        if (command === "which chalk") {
-            return Buffer.from("/usr/local/bin/chalk");
-        }
-        if (command.includes("chalk insert")) {
-            return Buffer.from("Successfully injected chalk");
-        }
-        throw new Error(`Unexpected command: ${command}. Update your mocks`);
-    });
+  execSync.mockImplementation((command: string) => {
+    if (command === "which chalk") {
+      return Buffer.from("/usr/local/bin/chalk");
+    }
+    if (command.includes("chalk insert")) {
+      return Buffer.from("Successfully injected chalk");
+    }
+    throw new Error(`Unexpected command: ${command}. Update your mocks`);
+  });
 }
 
 /**
@@ -64,12 +64,12 @@ export function mockChalkAvailable() {
  * ```
  */
 export function mockChalkNotAvailable() {
-    execSync.mockImplementation((command: string) => {
-        if (command === "which chalk") {
-            throw new Error("command not found: chalk");
-        }
-        throw new Error(`Unexpected command: ${command}. Update your mocks`);
-    });
+  execSync.mockImplementation((command: string) => {
+    if (command === "which chalk") {
+      throw new Error("command not found: chalk");
+    }
+    throw new Error(`Unexpected command: ${command}. Update your mocks`);
+  });
 }
 
 /**
@@ -83,5 +83,5 @@ export function mockChalkNotAvailable() {
  * ```
  */
 export function resetMocks() {
-    execSync.mockReset();
+  execSync.mockReset();
 }
