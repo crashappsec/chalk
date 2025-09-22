@@ -18,13 +18,13 @@
   "author": "Crash Override",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
-    "@tsconfig/node18": "^18.2.4",
+    "@tsconfig/node22": "^22.0.2",
     "@tsconfig/strictest": "^2.0.5",
     "@types/jest": "^29.5.0",
-    "@types/node": "^20.0.0",
+    "@types/node": "^22.0.0",
     "@types/serverless": "^3.12.27",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
@@ -34,7 +34,7 @@
     "jest": "^29.0.0",
     "prettier": "^3.0.0",
     "ts-jest": "^29.0.0",
-    "typescript": "~5.4.0"
+    "typescript": "^5.7.0"
   },
   "dependencies": {
     "chalk": "^4.1.2"
