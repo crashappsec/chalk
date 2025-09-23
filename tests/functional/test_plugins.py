@@ -114,6 +114,7 @@ def test_github(
         "GITHUB_SERVER_URL": "https://github.com",
         "GITHUB_REPOSITORY": "octocat/Hello-World",
         "GITHUB_RUN_ID": "1658821493",
+        "GITHUB_CHECK_RUN_ID": "51064362862",
         "GITHUB_RUN_ATTEMPT": "5",
         "GITHUB_API_URL": server_imds,
         "GITHUB_ACTOR": "octocat",
@@ -128,18 +129,19 @@ def test_github(
     insert = chalk.insert(bin_path, env=env)
     assert insert.report.contains(
         {
-            "BUILD_ID": "1658821493",
+            "BUILD_ID": "51064362862",
             "BUILD_UNIQUE_ID": str,
             "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
             "BUILD_TRIGGER": "tag",
             "BUILD_CONTACT": ["octocat"],
-            "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493/attempts/5",
+            "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493/job/51064362862",
             "BUILD_API_URI": server_imds,
             "BUILD_ORIGIN_ID": "123",
             "BUILD_ORIGIN_KEY": "abc",
             "BUILD_ORIGIN_OWNER_ID": "456",
             "BUILD_ORIGIN_OWNER_KEY": "xyz",
             "BUILD_ORIGIN_URI": "https://github.com/octocat/Hello-World",
+            "BUILD_ATTEMPT": "5",
         }
     )
     insert2 = chalk.insert(bin_path, env=env)
@@ -148,18 +150,19 @@ def test_github(
     env = chalk.run(command="env", env=env)
     assert env.report.contains(
         {
-            "_BUILD_ID": "1658821493",
+            "_BUILD_ID": "51064362862",
             "_BUILD_UNIQUE_ID": str,
             "_BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
             "_BUILD_TRIGGER": "tag",
             "_BUILD_CONTACT": ["octocat"],
-            "_BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493/attempts/5",
+            "_BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493/job/51064362862",
             "_BUILD_API_URI": server_imds,
             "_BUILD_ORIGIN_ID": "123",
             "_BUILD_ORIGIN_KEY": "abc",
             "_BUILD_ORIGIN_OWNER_ID": "456",
             "_BUILD_ORIGIN_OWNER_KEY": "xyz",
             "_BUILD_ORIGIN_URI": "https://github.com/octocat/Hello-World",
+            "_BUILD_ATTEMPT": "5",
         }
     )
 

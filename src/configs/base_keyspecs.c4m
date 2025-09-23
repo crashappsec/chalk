@@ -1341,6 +1341,19 @@ key's documentation for more detail).
 """
 }
 
+keyspec BUILD_ATTEMPT {
+    kind:                ChalkTimeHost
+    type:                string
+    standard:            true
+    since:               "0.6.1"
+    shortdoc:            "CI job build attempt"
+    doc:                 """
+If present, build attempt of the specific CI job.
+Only provided by some CI integrations:
+* GitHub
+"""
+}
+
 keyspec BUILD_COMMIT_ID {
   kind:     ChalkTimeHost
   type:     string
@@ -1512,6 +1525,19 @@ for that endpoint.
 This field is generally expected to be supplied by the user, and can
 use the same substitutions allowed for the `CHALK_PTR` field (see that
 key's documentation for more detail).
+"""
+}
+
+keyspec _BUILD_ATTEMPT {
+    kind:                RunTimeHost
+    type:                string
+    standard:            true
+    since:               "0.6.1"
+    shortdoc:            "CI job build attempt"
+    doc:                 """
+If present, build attempt of the specific CI job.
+Only provided by some CI integrations:
+* GitHub
 """
 }
 

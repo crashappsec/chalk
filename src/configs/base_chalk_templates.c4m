@@ -77,6 +77,7 @@ or vice versa.
   key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
+  key.BUILD_ATTEMPT.use                       = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -186,6 +187,8 @@ mark_template mark_large {
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
+  key.BUILD_UNIQUE_ID.use                     = true
+  key.BUILD_ATTEMPT.use                       = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -292,6 +295,8 @@ use the mark template named `reproducable`.
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.BUILD_ID.use                            = true
+  key.BUILD_UNIQUE_ID.use                     = true
+  key.BUILD_ATTEMPT.use                       = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -373,6 +378,8 @@ the time and the nonce removed.
   key.PACKAGE_URI.use                         = true
   key.CODE_OWNERS.use                         = true
   key.BUILD_ID.use                            = true
+  key.BUILD_UNIQUE_ID.use                     = true
+  key.BUILD_ATTEMPT.use                       = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
