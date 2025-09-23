@@ -48,7 +48,7 @@ repos:
     hooks:
       - id: prettier
         name: Prettier (serverless-plugin-crashoverride)
-        files: ^serverless-plugin-crashoverride/.*\.(ts|js|json|md)$
+        files: ^serverless-plugin-crashoverride/.*\.(ts|js|json)$
         args: ['--write', '--config', 'serverless-plugin-crashoverride/.prettierrc']
   ## serverless-plugin-crashoverride final
 
