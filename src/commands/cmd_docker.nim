@@ -51,11 +51,11 @@ proc runCmdDocker*(args: seq[string]) =
     case ctx.extractDockerCommand()
     of DockerCmd.build:
       info("Running docker build.")
-      setCommandName("build")
+      setFullCommandName("build")
       exitCode = ctx.dockerBuild()
     of DockerCmd.push:
       info("Running docker push.")
-      setCommandName("push")
+      setFullCommandName("push")
       exitCode = ctx.dockerPush()
     else:
       ctx.dockerPassThrough()
