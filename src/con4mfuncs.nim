@@ -31,7 +31,7 @@ import "."/[
 ]
 
 proc getChalkCommand(args: seq[Box], unused: ConfigState): Option[Box] =
-  return some(pack(getCommandName()))
+  return some(pack(getBaseCommandName()))
 
 proc getArgvLocal(args: seq[Box], unused: ConfigState): Option[Box] =
   return some(pack(getArgs()))

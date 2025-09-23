@@ -1,5 +1,14 @@
 # Chalk Release Notes
 
+## On the `main` branch
+
+### Fixes
+
+- Custom reports `use_when` now matches based on the base command name.
+  For example `use_when = ["extract"]` will send report for all `extract`
+  sub-commands like `extract.containers`.
+  ([#590](https://github.com/crashappsec/chalk/pull/590))
+
 ## 0.6.0
 
 **September 9, 2025**

@@ -80,7 +80,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
   # If we call twice and we're on a platform where we don't
   # have a codec for this type of executable, avoid dupe errors.
   once:
-    var cmd    = getCommandName()
+    var cmd    = getFullCommandName()
 
     # /proc/self/exe is a symlink hence have to use absolute path of the exe
     var myPath = getMyAppPath()
@@ -92,7 +92,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
       # path contains ~ but uid does not have home directory
       discard
 
-    setCommandName("extract")
+    setFullCommandName("extract")
 
     # This can stay here, but won't show if the log level is set in the
     # config file, since this function runs before the config files load.
@@ -133,7 +133,7 @@ proc getSelfExtraction*(): Option[ChalkObj] =
         selfChalk = i
         break
 
-      setCommandName(cmd)
+      setFullCommandName(cmd)
 
       if selfChalk == nil:
         canSelfInject = false

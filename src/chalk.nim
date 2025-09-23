@@ -43,13 +43,13 @@ when isMainModule:
     warn("No working codec is available for the native executable type")
 
   if passedHelpFlag:
-    runChalkHelp(getCommandName()) # no return; in cmd_help.nim
+    runChalkHelp(getFullCommandName()) # no return; in cmd_help.nim
 
   setupAutocomplete()      # autocomplete.nim
   setupDefaultLogConfigs() # src/sinks.nim
   loadAttestation()        # attestation.nim
 
-  case getCommandName()    # config.nim
+  case getFullCommandName()    # config.nim
   of "extract":            runCmdExtract(attrGet[seq[string]]("artifact_search_path"))
   of "extract.containers": runCmdExtractContainers()
   of "extract.images":     runCmdExtractImages()
@@ -71,7 +71,7 @@ when isMainModule:
   of "__.onbuild":         runCmdOnBuild() # in cmd_internal
   of "__.prep_postexec":   runCmdPrepPostExec() # in cmd_internal
   else:
-    runChalkHelp(getCommandName()) # noreturn, will not show config.
+    runChalkHelp(getFullCommandName()) # noreturn, will not show config.
 
   showConfigValues()
   quitChalk()

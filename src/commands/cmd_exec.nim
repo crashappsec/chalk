@@ -197,7 +197,7 @@ proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
   trace("heartbeat: using nice " & $niceValue)
   discard nice(cint(niceValue))
 
-  setCommandName("heartbeat")
+  setFullCommandName("heartbeat")
   setRlimit(limit)
 
   while true:
@@ -297,7 +297,7 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   discard nice(cint(niceValue))
 
   try:
-    setCommandName("postexec")
+    setFullCommandName("postexec")
     initCollection()
     if detach:
       detachFromParent()

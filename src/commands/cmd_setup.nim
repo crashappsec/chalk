@@ -19,7 +19,7 @@ import ".."/[
 ]
 
 proc runCmdSetup*() =
-  setCommandName("setup")
+  setFullCommandName("setup")
   initCollection()
 
   let selfChalk = getSelfExtraction().getOrElse(nil)

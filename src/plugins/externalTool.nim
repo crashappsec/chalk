@@ -147,7 +147,7 @@ proc toolBase(path: string): ChalkDict =
 
   # tools should only run during insert operations
   # note this is a subset of chalkable operations
-  if getCommandName() notin @["build", "insert"]:
+  if getBaseCommandName() notin @["build", "insert"]:
     return result
 
   for k in getChalkSubsections("tool"):
@@ -209,7 +209,7 @@ proc toolGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
   result = ChalkDict()
   if obj.fsRef != "":
     result.merge(toolBase(obj.fsRef))
-  elif getCommandName() == "build":
+  elif getBaseCommandName() == "build":
     for c in getContextDirectories():
       result.merge(toolBase(getToolPath(c)))
       # only care about first context

@@ -26,11 +26,11 @@ proc runChalkSubScan*(location:     seq[string],
                       ): CollectionCtx =
   let
     oldRecursive = attrGet[bool]("recursive")
-    oldCmd       = getCommandName()
+    oldCmd       = getFullCommandName()
     oldArgs      = getArgs()
     logLevel     = getLogLevel()
 
-  setCommandName(cmd)
+  setFullCommandName(cmd)
   setArgs(location)
   trace("Running subscan. Command name is temporarily: " & cmd)
   trace("Subscan location: " & $(location))
@@ -63,7 +63,7 @@ proc runChalkSubScan*(location:     seq[string],
     if savedLogLevel.isSome():
       setLogLevel(savedLogLevel.get())
 
-    setCommandName(oldCmd, msg = "restoring from " & cmd & " to")
+    setFullCommandName(oldCmd, msg = "restoring from " & cmd & " to")
     setArgs(oldArgs)
     trace("subscan: found " & $len(result.allChalks) & " artifacts")
     trace("Subscan done. Restored command name to: " & oldCmd)
