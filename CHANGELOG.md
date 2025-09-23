@@ -2,6 +2,26 @@
 
 ## On the `main` branch
 
+### New Features
+
+- Support GitHub's new
+  [`{{ job.check_run_id }}`](https://github.com/orgs/community/discussions/8945#discussioncomment-14374985):
+  - `BUILD_ID` now references job id instead of workflow ID
+  - `BUILD_URI` is now complete URI which includes both:
+    - workflow id
+    - job id (was not available before)
+
+    For example:
+
+    ```
+    https://github.com/crashappsec/chalk/actions/runs/1234/job/6789
+    ```
+
+  - As the `BUILD_URI` wont include build attempt anymore,
+    new `BUILD_ATTEMPT` key is introduced.
+
+  ([#591](https://github.com/crashappsec/chalk/pull/591))
+
 ### Fixes
 
 - Custom reports `use_when` now matches based on the base command name.

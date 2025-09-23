@@ -84,3 +84,9 @@ proc startsWithAnyOf*(s: string, suffixes: openArray[string]): bool =
     if s.startsWith(i):
       return true
   return false
+
+proc coalesce*(data: varargs[string]): string =
+  for s in data:
+    if s != "":
+      return s
+  return ""
