@@ -13,6 +13,7 @@ on:
       - "!tests/functional/server/**"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
+      - Dockerfile
   pull_request_target:
     branches:
       - main
@@ -29,6 +30,7 @@ on:
       - "!tests/functional/server/**"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
+      - Dockerfile
   workflow_dispatch:
 
 permissions:

@@ -15,7 +15,10 @@ services:
     build:
       context: .
       target: deps
+      args:
+        BASE: ${BASE:-alpine}
     command: nimble ${CHALK_BUILD:-release}
+    init: true
     working_dir: $PWD
     volumes:
       - $PWD:$PWD

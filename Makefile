@@ -70,12 +70,7 @@ version:
 
 .PHONY: clean
 clean:
-	-rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop nimble.paths
-
-.PHONY: chalk-docs
-chalk-docs: $(BINARY)
-	rm -rf $@
-	$(DOCKER) ./$(BINARY) docgen
+	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop nimble.paths
 
 watch: $(SOURCES)
 	echo $^ | tr ' ' '\n' | entr $(MAKE)
@@ -93,20 +88,8 @@ nimble.paths:
 nimutils con4m: nimble.paths
 	$(MAKE) -s ../$@/.git
 	echo '--path:"$(abspath ../$@)"' >> $^
-	ln -s ../$@ $@
-	touch $@
-
-# ----------------------------------------------------------------------------
-# TOOL MAKEFILES
-
-TOOLS=server
-
-.PHONY: $(TOOLS)
-$(TOOLS):
-	make -C $@
-
-$(addsuffix /%,$(TOOLS)):
-	make -C $(@D) $*
+	$(DOCKER) ln -s ../$@ $@
+	$(DOCKER) touch $@
 
 # ----------------------------------------------------------------------------
 # TESTS
@@ -188,9 +171,6 @@ src/utils/pingttl: src/utils/pingttl.nim
 
 # ----------------------------------------------------------------------------
 # MISC
-
-.PHONY: sqlite
-sqlite: server/sqlite
 
 .PHONY: lint-dust
 lint-dust:
