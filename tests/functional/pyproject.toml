@@ -9,12 +9,12 @@ package-mode = false
 [tool.poetry.dependencies]
 boto3 = "^1.35.74"
 cryptography = ">= 43.0.1"
-fastapi = "^0.115.6"
+fastapi = "^0.117.1"
 filelock = "^3.12.3"
 flaky = "^3.8.1"
 more-itertools = "^10.3.0"
 ndg-httpsclient = "^0.5.1"
-pydantic = "^2.10.6"
+pydantic = "^2.11.9"
 pytest = "^8.3.4"
 pytest-dependency = "^0.6.0"
 pytest-profiling = "^1.7.0"
@@ -26,7 +26,7 @@ python-dateutil = "^2.8.2"
 requests = "^2.32.3"
 sqlalchemy = "^2.0.15"
 structlog = "^25.1.0"
-uvicorn = "^0.34.0"
+uvicorn = "^0.37.0"
 httpx = "^0.28.1"
 certifi = "^2025.4.26"
 
@@ -35,14 +35,14 @@ mypy = {version = "^1.14.1", optional = true}
 neovim = {version = "^0.3.1", optional = true}
 
 [tool.poetry.group.dev.dependencies]
-black = "^25.1.0"
+black = "^25.9.0"
 flake8 = "^7.1.1"
 flake8-bugbear = "^24.12.12"
 flake8-comprehensions = "^3.10.0"
 flake8-print = "^5.0.0"
 isort = "^6.0.0"
-pdbpp = "^0.10.3"
-pep8-naming = "^0.14.1"
+pdbpp = "^0.11.7"
+pep8-naming = "^0.15.1"
 ptpython = "^3.0.22"
 
 [build-system]

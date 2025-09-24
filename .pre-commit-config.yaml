@@ -4,7 +4,7 @@ ci:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-merge-conflict
       - id: check-added-large-files
@@ -13,7 +13,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/psf/black
-    rev: 25.1.0 # sync:black:tests/functional/poetry.lock
+    rev: 25.9.0 # sync:black:tests/functional/poetry.lock
     hooks:
       - id: black
 
@@ -61,7 +61,7 @@ repos:
   #     )$
 
   - repo: https://github.com/tcort/markdown-link-check
-    rev: v3.13.6
+    rev: v3.13.7
     hooks:
       - id: markdown-link-check
         args:
@@ -71,7 +71,7 @@ repos:
 
   # Shellcheck for shell script linting
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.9.0.6
+    rev: v0.11.0.1
     hooks:
       - id: shellcheck
         name: Lint shell scripts
@@ -79,7 +79,7 @@ repos:
 
   # Shell script formatting with shfmt
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.7.0-1
+    rev: v3.12.0-2
     hooks:
       - id: shfmt
         name: Format shell scripts
