@@ -13,7 +13,9 @@ on:
       - "!tests/functional/server/**"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
-  pull_request:
+  pull_request_target:
+    branches:
+      - main
     types:
       - opened
       - synchronize
@@ -48,8 +50,7 @@ jobs:
         github.event_name == 'pull_request' &&
         !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
       ) || (
-        github.event_name == 'push' &&
-        endsWith(github.repository, 'chalk')
+        github.event_name == 'push'
       ) || (
         github.event_name == 'workflow_dispatch'
       ) || (
