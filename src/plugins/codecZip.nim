@@ -107,7 +107,9 @@ proc extractChalkMark(chalk: ChalkObj) =
       chalk.marked  = false
 
 proc subscan(chalk: ChalkObj) =
-  let cache = ZipCache(chalk.cache)
+  let
+    cache = ZipCache(chalk.cache)
+    cmd   = getBaseCommandName()
   if isSubscribedKey("EMBEDDED_CHALK"):
     let extractCtx = runChalkSubScan(@[cache.origD], "extract")
     if extractCtx.report.kind == MkSeq:
@@ -117,8 +119,8 @@ proc subscan(chalk: ChalkObj) =
                "itself chalked.")
           chalk.extract = ChalkDict()
         chalk.extract.setIfNeeded("EMBEDDED_CHALK", extractCtx.report)
-  if getCommandName() != "extract":
-    let collectionCtx = runChalkSubScan(@[cache.origD], getCommandName(), baseChalk = chalk)
+  if cmd != "extract":
+    let collectionCtx = runChalkSubScan(@[cache.origD], cmd, baseChalk = chalk)
     cache.embeddedChalk = some(collectionCtx.report)
 
 proc zipScan(self: Plugin, loc: string): Option[ChalkObj] {.cdecl.} =

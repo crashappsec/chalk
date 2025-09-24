@@ -135,6 +135,7 @@ plugin ci_github {
     enabled:         true
     pre_run_keys:    ["BUILD_ID",
                       "BUILD_UNIQUE_ID",
+                      "BUILD_ATTEMPT",
                       "BUILD_COMMIT_ID",
                       "BUILD_URI",
                       "BUILD_API_URI",
@@ -147,6 +148,7 @@ plugin ci_github {
                       "BUILD_ORIGIN_URI"]
     post_run_keys:   ["_BUILD_ID",
                       "_BUILD_UNIQUE_ID",
+                      "_BUILD_ATTEMPT",
                       "_BUILD_COMMIT_ID",
                       "_BUILD_URI",
                       "_BUILD_API_URI",

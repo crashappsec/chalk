@@ -122,12 +122,12 @@ proc saveKeyToSelf(key: AttestationKey): bool =
   selfChalk.extract["$CHALK_ENCRYPTED_PRIVATE_KEY"] = pack(key.privateKey)
   selfChalk.extract["$CHALK_PUBLIC_KEY"]            = pack(key.publicKey)
 
-  let savedCommandName = getCommandName()
-  setCommandName("setup")
+  let savedCommandName = getFullCommandName()
+  setFullCommandName("setup")
   try:
     result = selfChalk.writeSelfConfig()
   finally:
-    setCommandName(savedCommandName)
+    setFullCommandName(savedCommandName)
 
 proc setupAttestation*() =
   info("Ensuring cosign is present to setup attestation.")

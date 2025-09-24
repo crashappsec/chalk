@@ -1,5 +1,38 @@
 # Chalk Release Notes
 
+## On the `main` branch
+
+## 0.6.1
+
+**September 23, 2025**
+
+### New Features
+
+- Support GitHub's new
+  [`{{ job.check_run_id }}`](https://github.com/orgs/community/discussions/8945#discussioncomment-14374985):
+  - `BUILD_ID` now references job id instead of workflow ID
+  - `BUILD_URI` is now complete URI which includes both:
+    - workflow id
+    - job id (was not available before)
+
+    For example:
+
+    ```
+    https://github.com/crashappsec/chalk/actions/runs/1234/job/6789
+    ```
+
+  - As the `BUILD_URI` wont include build attempt anymore,
+    new `BUILD_ATTEMPT` key is introduced.
+
+  ([#591](https://github.com/crashappsec/chalk/pull/591))
+
+### Fixes
+
+- Custom reports `use_when` now matches based on the base command name.
+  For example `use_when = ["extract"]` will send report for all `extract`
+  sub-commands like `extract.containers`.
+  ([#590](https://github.com/crashappsec/chalk/pull/590))
+
 ## 0.6.0
 
 **September 9, 2025**

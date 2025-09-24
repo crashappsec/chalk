@@ -399,7 +399,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
 
             info(path & ": Chalk mark extracted")
 
-        if getCommandName() in ["insert", "docker"]:
+        if getBaseCommandName() in ["insert", "docker"]:
           obj.persistInternalValues()
 
         yield obj
@@ -409,7 +409,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
           obj.collectRunTimeArtifactInfo()
 
   if not inSubscan():
-    if getCommandName() != "extract":
+    if getBaseCommandName() != "extract":
       for item in iterInfo.otherPaths:
         error(item & ": No such file or directory.")
     else:

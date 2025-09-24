@@ -29,7 +29,7 @@ proc coreExtractFiles(path: seq[string]) =
   var numExtracts = 0
   for item in artifacts(path):
     numExtracts += 1
-  if not inSubscan() and numExtracts == 0 and getCommandName() == "extract":
+  if not inSubscan() and numExtracts == 0 and getBaseCommandName() == "extract":
     warn("No chalk marks extracted")
 
 proc coreExtractImages() =

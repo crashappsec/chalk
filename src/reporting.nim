@@ -126,7 +126,7 @@ proc doEmbeddedReport(): Box =
 
 proc doCustomReporting() =
   for topic in getChalkSubsections("custom_report"):
-    trace("Generating custom report " & topic)
+    trace(topic & ": checking custom report")
     let spec = "custom_report." & topic
     let enabledOpt = attrGetOpt[bool](spec & ".enabled")
     if enabledOpt.isNone() or not enabledOpt.get(): continue
@@ -135,8 +135,11 @@ proc doCustomReporting() =
 
     discard registerTopic(topic)
 
-    let useWhen = attrGet[seq[string]](spec & ".use_when")
-    if getCommandName() notin useWhen and "*" notin useWhen:
+    let
+      commandName = getBaseCommandName()
+      useWhen     = attrGet[seq[string]](spec & ".use_when")
+    if commandName notin useWhen and "*" notin useWhen:
+      trace(spec & ": skipping as " & commandName & " not in " & $useWhen)
       continue
     if topic == "audit" and not attrGet[bool]("publish_audit"):
       continue
@@ -150,6 +153,7 @@ proc doCustomReporting() =
       if not unpack[bool](res):
         warn("Report '" & topic & "' sink config is invalid. Skipping.")
 
+    trace(topic & ": generating custom report")
     safePublish(topic, buildHostReport(templateToUse))
 
 proc doReporting*(topic="report", clearState = false) {.exportc, cdecl.} =

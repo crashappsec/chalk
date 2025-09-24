@@ -98,6 +98,7 @@ report and subtract from it.
   key.VCS_MISSING_FILES.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
+  key.BUILD_ATTEMPT.use                       = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -110,6 +111,7 @@ report and subtract from it.
   key.BUILD_ORIGIN_URI.use                    = true
   key._BUILD_ID.use                           = true
   key._BUILD_UNIQUE_ID.use                    = true
+  key._BUILD_ATTEMPT.use                      = true
   key._BUILD_COMMIT_ID.use                    = true
   key._BUILD_URI.use                          = true
   key._BUILD_API_URI.use                      = true
@@ -737,6 +739,7 @@ doc: """
   key.VCS_MISSING_FILES.use                   = true
   key._BUILD_ID.use                           = true
   key._BUILD_UNIQUE_ID.use                    = true
+  key._BUILD_ATTEMPT.use                      = true
   key._BUILD_COMMIT_ID.use                    = true
   key._BUILD_URI.use                          = true
   key._BUILD_API_URI.use                      = true
@@ -749,6 +752,7 @@ doc: """
   key._BUILD_ORIGIN_URI.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
+  key.BUILD_ATTEMPT.use                       = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -1259,6 +1263,7 @@ container.
   key.VCS_MISSING_FILES.use                   = true
   key._BUILD_ID.use                           = true
   key._BUILD_UNIQUE_ID.use                    = true
+  key._BUILD_ATTEMPT.use                      = true
   key._BUILD_COMMIT_ID.use                    = true
   key._BUILD_URI.use                          = true
   key._BUILD_API_URI.use                      = true
@@ -1271,6 +1276,7 @@ container.
   key._BUILD_ORIGIN_URI.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
+  key.BUILD_ATTEMPT.use                       = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
@@ -1766,6 +1772,7 @@ and keep the run-time key.
   key.VCS_MISSING_FILES.use                   = true
   key._BUILD_ID.use                           = true
   key._BUILD_UNIQUE_ID.use                    = true
+  key._BUILD_ATTEMPT.use                      = true
   key._BUILD_COMMIT_ID.use                    = true
   key._BUILD_URI.use                          = true
   key._BUILD_API_URI.use                      = true
@@ -1778,6 +1785,7 @@ and keep the run-time key.
   key._BUILD_ORIGIN_URI.use                   = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
+  key.BUILD_ATTEMPT.use                       = true
   key.BUILD_COMMIT_ID.use                     = true
   key.BUILD_URI.use                           = true
   key.BUILD_API_URI.use                       = true
