@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "serverless": "^3.0.0"
+  },
+  "scripts": {
+    "package": "serverless package --verbose",
+    "deploy": "serverless deploy --stage prod --verbose",
+    "invoke": "serverless invoke -f handler --stage prod",
+    "logs": "serverless logs -f handler --stage prod",
+    "remove": "serverless remove --stage prod",
+    "test": "serverless package --stage test --region us-east-1 2>&1 | tee output.log"
+  }
+}

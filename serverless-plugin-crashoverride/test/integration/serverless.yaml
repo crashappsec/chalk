@@ -1,0 +1,22 @@
+---
+service: test-service
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  memorySize: 1024
+
+custom:
+  crashoverride:
+    chalkCheck: true
+
+functions:
+  testFunction:
+    handler: handler.hello
+
+plugins:
+  - ../../../serverless-plugin-crashoverride
+
+package:
+  patterns:
+    - '!node_modules/**'
