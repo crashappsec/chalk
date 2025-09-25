@@ -20,6 +20,7 @@ import "."/[
   commands,
   config,
   confload,
+  n00b/init,
   norecurse,
   run_management,
   sinks,
@@ -30,6 +31,7 @@ import "."/[
 ]
 
 when isMainModule:
+  setupN00b()
   setupSignalHandlers()    # utils/terminal.nim
   setupTerminal()          # utils/terminal.nim
   ioSetup()                # sinks.nim

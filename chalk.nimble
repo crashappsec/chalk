@@ -1,4 +1,4 @@
-import std/[cmdline, strformat, strscans, strutils, os]
+import std/[cmdline, strscans, os]
 
 when fileExists("src/config_version.nim"):
   from src/config_version import getChalkVersion
