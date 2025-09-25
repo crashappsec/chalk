@@ -6,16 +6,16 @@
 
 ```bash
 # Install dependencies
-npm install
+yarn install
 
 # Run all tests
-npm test
+yarn test
 
 # Run tests in watch mode for development
-npm run test:watch
+yarn test:watch
 
 # Run specific test file
-npm test -- src/index.test.ts
+yarn test src/index.test.ts
 ```
 
 ## Testing Architecture

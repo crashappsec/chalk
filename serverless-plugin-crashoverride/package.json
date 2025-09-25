@@ -13,7 +13,7 @@
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
-    "prepare": "npm run build"
+    "prepare": "yarn build"
   },
   "author": "Crash Override",
   "license": "MIT",

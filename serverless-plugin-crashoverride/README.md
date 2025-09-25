@@ -16,14 +16,14 @@ This plugin integrates with the Serverless Framework to provide:
 Install the plugin in your Serverless Framework project:
 
 ```bash
-npm install @crashoverride/serverless-plugin
+yarn add @crashoverride/serverless-plugin
 ```
 
 Add the plugin to your `serverless.yml`:
 
 ```yaml
 plugins:
-  - @crashoverride/serverless-plugin
+  - @crashappsec/serverless-plugin
 
 custom:
   crashoverride:
@@ -146,13 +146,13 @@ The Crash Override plugin hooks into the Serverless Framework lifecycle at four 
 ```bash
 git clone https://github.com/crashappsec/chalk
 cd ./chalk/serverless-plugin-crashoverride
-npm install
+yarn install
 ```
 
 2. Start development with TypeScript watch mode:
 
 ```bash
-npm run dev
+yarn dev
 ```
 
 ### Testing
