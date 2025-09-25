@@ -27,6 +27,7 @@ repos:
           - ts
           - json
 
+  # TODO(@mbaltrusitis): switch to yarn and utilize this in below
   - repo: https://github.com/crashappsec/pre-commit-sync
     rev: 0.1.0.a3
     hooks:
