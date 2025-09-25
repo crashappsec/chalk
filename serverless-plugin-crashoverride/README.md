@@ -1,4 +1,4 @@
-# @crashoverride/serverless-plugin
+# @crashappsec/serverless-plugin
 
 A Serverless Framework plugin for Crash Override that enhances AWS Lambda deployments with runtime security features, chalkmark injection, and deployment validation.
 
