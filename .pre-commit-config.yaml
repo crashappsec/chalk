@@ -23,6 +23,9 @@ repos:
       - id: prettier
         types:
           - markdown
+          - javascript
+          - ts
+          - json
 
   - repo: https://github.com/crashappsec/pre-commit-sync
     rev: 0.1.0.a3
@@ -43,13 +46,6 @@ repos:
           - '@typescript-eslint/parser@6.18.1'
           - '@typescript-eslint/eslint-plugin@6.18.1'
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
-    hooks:
-      - id: prettier
-        name: Prettier (serverless-plugin-crashoverride)
-        files: ^serverless-plugin-crashoverride/.*\.(ts|js|json)$
-        args: ['--write', '--config', 'serverless-plugin-crashoverride/.prettierrc']
   ## serverless-plugin-crashoverride final
 
   # - repo: local
