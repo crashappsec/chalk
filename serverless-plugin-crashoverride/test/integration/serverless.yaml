@@ -4,7 +4,6 @@ service: test-service
 provider:
   name: aws
   runtime: nodejs18.x
-  memorySize: 1024
 
 custom:
   crashoverride:

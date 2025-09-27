@@ -1,0 +1,198 @@
+---
+name: lint-serverless-plugin
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - serverless-plugin-crashoverride/**
+      - .github/workflows/lint-serverless-plugin.yml
+      - .pre-commit-config.yaml
+      - "!serverless-plugin-crashoverride/node_modules/**"
+      - "!serverless-plugin-crashoverride/dist/**"
+      - "!serverless-plugin-crashoverride/coverage/**"
+      - "!serverless-plugin-crashoverride/**.md"
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - serverless-plugin-crashoverride/**
+      - .github/workflows/lint-serverless-plugin.yml
+      - .pre-commit-config.yaml
+      - "!serverless-plugin-crashoverride/node_modules/**"
+      - "!serverless-plugin-crashoverride/dist/**"
+      - "!serverless-plugin-crashoverride/coverage/**"
+      - "!serverless-plugin-crashoverride/**.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-22.04
+
+    if: |
+      !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-pre-commit-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # 4.0.2
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: serverless-plugin-crashoverride/yarn.lock
+
+      - name: Enable yarn via corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: |
+          cd serverless-plugin-crashoverride
+          yarn install --frozen-lockfile
+
+      - name: Setup Python for pre-commit
+        uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d # 5.1.0
+        with:
+          python-version: '3.x'
+
+      - name: Run pre-commit hooks for serverless plugin
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # 3.0.1
+        with:
+          extra_args: --files serverless-plugin-crashoverride/**
+
+  typescript-build:
+    runs-on: ubuntu-22.04
+
+    if: |
+      !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+
+    concurrency:
+      group: ${{ github.workflow }}-typescript-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # 4.0.2
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: serverless-plugin-crashoverride/yarn.lock
+
+      - name: Enable yarn via corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: |
+          cd serverless-plugin-crashoverride
+          yarn install --frozen-lockfile
+
+      - name: Build TypeScript
+        run: |
+          cd serverless-plugin-crashoverride
+          yarn build
+
+      - name: Check for TypeScript Errors
+        run: |
+          cd serverless-plugin-crashoverride
+          npx tsc --noEmit
+
+  tests:
+    runs-on: ubuntu-22.04
+
+    if: |
+      !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+
+    concurrency:
+      group: ${{ github.workflow }}-tests-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # 4.0.2
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: serverless-plugin-crashoverride/yarn.lock
+
+      - name: Enable yarn via corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: |
+          cd serverless-plugin-crashoverride
+          yarn install --frozen-lockfile
+
+      - name: Run tests
+        run: |
+          cd serverless-plugin-crashoverride
+          yarn test
+
+  integration-tests:
+    runs-on: ubuntu-22.04
+
+    if: |
+      !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+
+    concurrency:
+      group: ${{ github.workflow }}-integration-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # 4.0.2
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: serverless-plugin-crashoverride/test/integration/yarn.lock
+
+      - name: Enable yarn via corepack
+        run: corepack enable
+
+      - name: Install integration test Dependencies
+        run: |
+          cd serverless-plugin-crashoverride/test/integration
+          yarn install --frozen-lockfile
+
+      - name: Run integration test
+        run: |
+          cd serverless-plugin-crashoverride/test/integration
+          yarn test
+
+  required-checks:
+    runs-on: ubuntu-22.04
+    if: always()
+    needs: [pre-commit, typescript-build, tests, integration-tests]
+
+    steps:
+      - name: Check all jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more required jobs failed or were cancelled"
+            exit 1
+          fi
+          echo "All required jobs passed"
