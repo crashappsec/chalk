@@ -17,6 +17,7 @@ chalk-tmp
 chalk-*.tmp
 *.o
 *.json
+!.eslintrc.json
 *.jsonl
 !.github/**.json
 *.pyc
