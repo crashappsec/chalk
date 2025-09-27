@@ -168,32 +168,6 @@ export async function executeAwsPackageHook(plugin: CrashOverrideServerlessPlugi
 }
 
 /**
- * Executes the packaging validation lifecycle hook.
- *
- * **Lifecycle Hook:** `after:package:finalize`
- *
- * **Purpose:** Validates that the Dust Lambda Extension was successfully added
- * to all Lambda functions in the CloudFormation template. This hook runs after
- * packaging is complete.
- *
- * @param plugin - The plugin instance to execute the hook on
- *
- * @example
- * ```typescript
- * executeProviderConfigHook(plugin);  // Setup provider config
- * executeDeploymentHook(plugin);      // Run pre-flight checks
- * await executeAwsPackageHook(plugin); // Mutate service
- * executeValidationHook(plugin);      // Validate CloudFormation template
- * ```
- */
-export function executeValidationHook(plugin: CrashOverrideServerlessPlugin): void {
-  const hook = plugin.hooks["after:package:finalize"];
-  if (hook) {
-    hook();
-  }
-}
-
-/**
  * Fluent builder for creating complex test scenarios.
  *
  * Provides a chainable API for configuring plugin instances with specific
@@ -256,26 +230,6 @@ export class TestSetupBuilder {
       this.serverlessOverrides.service.custom.crashoverride = {};
     }
     this.serverlessOverrides.service.custom.crashoverride.chalkCheck = enabled;
-    return this;
-  }
-
-  /**
-   * Configures layer check validation.
-   *
-   * @param enabled - Whether to enforce Dust extension presence in CloudFormation (fail open vs. fail closed)
-   * @returns this for method chaining
-   */
-  withLayerCheck(enabled: boolean): this {
-    if (!this.serverlessOverrides.service) {
-      this.serverlessOverrides.service = {};
-    }
-    if (!this.serverlessOverrides.service.custom) {
-      this.serverlessOverrides.service.custom = {};
-    }
-    if (!this.serverlessOverrides.service.custom.crashoverride) {
-      this.serverlessOverrides.service.custom.crashoverride = {};
-    }
-    this.serverlessOverrides.service.custom.crashoverride.layerCheck = enabled;
     return this;
   }
 
@@ -497,75 +451,4 @@ export class TestSetupBuilder {
 
     return createPlugin(this.serverlessOverrides, this.envVars);
   }
-}
-
-/**
- * Creates a mock CloudFormation template with configurable Lambda functions.
- *
- * @param functions - Array of function configurations
- * @returns CloudFormation template object
- *
- * @example
- * ```typescript
- * const template = createCloudFormationTemplate([
- *   { name: 'Function1', hasLayers: true, layers: ['arn:aws:lambda:us-east-1:123:layer:dust:1'] },
- *   { name: 'Function2', hasLayers: false }
- * ]);
- * ```
- */
-export function createCloudFormationTemplate(
-  functions: Array<{
-    name: string;
-    hasLayers?: boolean;
-    layers?: string[];
-  }> = []
-): any {
-  const resources: any = {};
-
-  // Add Lambda functions
-  functions.forEach((func) => {
-    const functionResource: any = {
-      Type: "AWS::Lambda::Function",
-      Properties: {
-        Code: {
-          S3Bucket: "test-bucket",
-          S3Key: "test-key",
-        },
-        Handler: "handler.handler",
-        Runtime: "nodejs18.x",
-        FunctionName: `test-service-dev-${func.name}`,
-        MemorySize: 1024,
-        Timeout: 6,
-      },
-    };
-
-    if (func.hasLayers && func.layers) {
-      functionResource.Properties.Layers = func.layers;
-    }
-
-    resources[`${func.name}LambdaFunction`] = functionResource;
-  });
-
-  // Add other resources (IAM role, etc.)
-  resources.IamRoleLambdaExecution = {
-    Type: "AWS::IAM::Role",
-    Properties: {
-      AssumeRolePolicyDocument: {
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Effect: "Allow",
-            Principal: { Service: ["lambda.amazonaws.com"] },
-            Action: ["sts:AssumeRole"],
-          },
-        ],
-      },
-    },
-  };
-
-  return {
-    AWSTemplateFormatVersion: "2010-09-09",
-    Description: "Test CloudFormation template",
-    Resources: resources,
-  };
 }
