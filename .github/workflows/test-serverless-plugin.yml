@@ -1,5 +1,5 @@
 ---
-name: lint-serverless-plugin
+name: test-serverless-plugin
 
 on:
   push:
