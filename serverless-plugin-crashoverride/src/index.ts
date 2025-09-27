@@ -10,8 +10,6 @@ import type {
   CustomServerlessConfig,
   CrashOverrideConfig,
   ProviderConfig,
-  FunctionValidationResult,
-  CloudFormationTemplate,
   RuntimeAwsFunction,
 } from "./types";
 
@@ -42,7 +40,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
         memoryCheck: false,
         memoryCheckSize: 256,
         chalkCheck: false,
-        layerCheck: false,
       };
       return;
     }
@@ -53,7 +50,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
       "after:package:setupProviderConfiguration": this.fetchProviderConfig.bind(this),
       "after:package:createDeploymentArtifacts": this.preFlightChecks.bind(this),
       "before:package:compileFunctions": this.mutateServerlessService.bind(this),
-      "after:package:finalize": this.validatePackaging.bind(this),
     };
   }
 
@@ -84,7 +80,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
       memoryCheck: false,
       memoryCheckSize: 256,
       chalkCheck: false,
-      layerCheck: false,
       arnUrlPrefix: "https://dl.crashoverride.run/dust",
       // arnVersion is optional, undefined by default (uses latest version)
     };
@@ -108,9 +103,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
     }
     if (process.env["CO_CHALK_CHECK_ENABLED"] !== undefined) {
       envConfig.chalkCheck = process.env["CO_CHALK_CHECK_ENABLED"].toLowerCase() === "true";
-    }
-    if (process.env["CO_LAYER_CHECK"] !== undefined) {
-      envConfig.layerCheck = process.env["CO_LAYER_CHECK"].toLowerCase() === "true";
     }
     if (process.env["CO_ARN_URL_PREFIX"] !== undefined) {
       envConfig.arnUrlPrefix = process.env["CO_ARN_URL_PREFIX"];
@@ -141,9 +133,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
     this.log_info(
       `CrashOverride config initialized:\n\tmemoryCheck=${
         finalConfig.memoryCheck
-      }\n\tmemoryCheckSize=${finalConfig.memoryCheckSize}\n\tchalkCheck=${
-        finalConfig.chalkCheck
-      }\n\tlayerCheck=${finalConfig.layerCheck}${
+      }\n\tmemoryCheckSize=${finalConfig.memoryCheckSize}\n\tchalkCheck=${finalConfig.chalkCheck}${
         finalConfig.arnVersion ? `\n\tarnVersion=${finalConfig.arnVersion}` : ""
       }`
     );
@@ -492,182 +482,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
           this.log_success(`Successfully injected chalkmarks into package`);
         } else {
           this.log_error(`Failed to inject chalkmarks into package`);
-        }
-      }
-    }
-  }
-
-  private parseCloudFormationTemplate(templatePath: string): CloudFormationTemplate {
-    try {
-      const templateContent = fs.readFileSync(templatePath, "utf-8");
-      return JSON.parse(templateContent);
-    } catch (error) {
-      if (error instanceof Error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          throw new Error(`CloudFormation template not found at ${templatePath}`);
-        }
-        if (error instanceof SyntaxError) {
-          throw new Error(`Invalid JSON in CloudFormation template`);
-        }
-        throw new Error(`Failed to parse CloudFormation template: ${error.message}`);
-      }
-      throw new Error(`Failed to parse CloudFormation template: ${String(error)}`);
-    }
-  }
-
-  private validateFunctionsInTemplate(
-    template: CloudFormationTemplate,
-    expectedArn: string
-  ): FunctionValidationResult {
-    const resources = template.Resources || {};
-    const functionsWithExtension: string[] = [];
-    const functionsMissingExtension: string[] = [];
-    let totalFunctions = 0;
-
-    for (const [resourceName, resource] of Object.entries(resources)) {
-      if (resource.Type === "AWS::Lambda::Function") {
-        totalFunctions++;
-        const layers = resource.Properties?.Layers || [];
-        const hasExtension = layers.includes(expectedArn);
-
-        if (hasExtension) {
-          functionsWithExtension.push(resourceName);
-        } else {
-          functionsMissingExtension.push(resourceName);
-        }
-      }
-    }
-
-    return {
-      totalFunctions,
-      functionsWithExtension,
-      functionsMissingExtension,
-    };
-  }
-
-  private buildStatusMessage(result: FunctionValidationResult): string {
-    return [
-      `Layer check status:`,
-      `  Functions with Dust Extension (${result.functionsWithExtension.length}/${result.totalFunctions}):`,
-      ...result.functionsWithExtension.map((f) => `    - ${f}`),
-      `  Functions MISSING Dust Extension (${result.functionsMissingExtension.length}/${result.totalFunctions}):`,
-      ...result.functionsMissingExtension.map((f) => `    - ${f}`),
-    ].join("\n");
-  }
-
-  private getCloudFormationTemplatePath(): string {
-    return path.join(
-      this.getServerlessPackagingLocation(),
-      "cloudformation-template-update-stack.json"
-    );
-  }
-
-  private performLayerValidation(
-    extensionArn: string | null,
-    layerCheckEnabled: boolean
-  ): {
-    valid: boolean;
-    error?: string;
-    validationResult?: FunctionValidationResult;
-    templatePath?: string;
-  } {
-    // Check if extension ARN is available
-    if (!extensionArn) {
-      if (layerCheckEnabled) {
-        return {
-          valid: false,
-          error: "Cannot perform layer check: No Dust extension ARN available",
-        };
-      }
-      return { valid: true }; // Skip validation when not enforced
-    }
-
-    const templatePath = this.getCloudFormationTemplatePath();
-
-    try {
-      const template = this.parseCloudFormationTemplate(templatePath);
-      const validationResult = this.validateFunctionsInTemplate(template, extensionArn);
-
-      // Check if there are functions missing the extension
-      if (validationResult.functionsMissingExtension.length > 0 && layerCheckEnabled) {
-        return {
-          valid: false,
-          error: `Layer check failed: ${
-            validationResult.functionsMissingExtension.length
-          } function(s) missing Dust Lambda Extension: ${validationResult.functionsMissingExtension.join(
-            ", "
-          )}`,
-          validationResult,
-          templatePath,
-        };
-      }
-
-      return {
-        valid: true,
-        validationResult,
-        templatePath,
-      };
-    } catch (error) {
-      if (layerCheckEnabled) {
-        // Format error message based on error type
-        let errorMessage = `Layer check failed: `;
-        if (error instanceof Error) {
-          if (error.message.includes("CloudFormation template not found")) {
-            errorMessage += error.message;
-          } else if (error.message.includes("Invalid JSON")) {
-            errorMessage += error.message;
-          } else {
-            errorMessage += `Failed to validate CloudFormation template: ${error.message}`;
-          }
-        } else {
-          errorMessage += `Failed to validate CloudFormation template: ${String(error)}`;
-        }
-        return { valid: false, error: errorMessage };
-      }
-      return { valid: true }; // Skip validation on error when not enforced
-    }
-  }
-
-  private validatePackaging(): void {
-    const result = this.performLayerValidation(this.dustExtensionArn, this.config.layerCheck);
-
-    // Handle validation results
-    if (!result.valid && result.error) {
-      this.log_error(result.error);
-      throw new this.serverless.classes.Error(result.error);
-    }
-
-    // Log based on validation results
-    if (!this.dustExtensionArn && !this.config.layerCheck) {
-      this.log_info(`Layer check skipped: No Dust extension ARN available`);
-      return;
-    }
-
-    if (result.validationResult) {
-      const { validationResult } = result;
-
-      if (validationResult.totalFunctions === 0) {
-        this.log_info(`Layer check: No Lambda functions found in CloudFormation template`);
-        return;
-      }
-
-      this.log_info(
-        `Layer check: Found ${validationResult.totalFunctions} Lambda function(s) in CloudFormation template`
-      );
-
-      if (validationResult.functionsMissingExtension.length === 0) {
-        this.log_success(
-          `Layer check passed: All ${validationResult.totalFunctions} function(s) have Dust Lambda Extension`
-        );
-      } else {
-        const statusMessage = this.buildStatusMessage(validationResult);
-        this.log_warning(statusMessage);
-
-        if (!this.config.layerCheck) {
-          this.log_warning(
-            `${validationResult.functionsMissingExtension.length} function(s) missing Dust Lambda Extension. ` +
-              `Set custom.crashoverride.layerCheck: true to enforce this requirement`
-          );
         }
       }
     }
