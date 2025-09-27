@@ -526,9 +526,6 @@ describe("CrashOverrideServerlessPlugin", () => {
               expect(func.layers).toHaveLength(expectedCount);
               expect(func.layers).toContain(extensionArn);
             }
-
-            // Verify the extension ARN was stored
-            expect((plugin as any).dustExtensionArn).toBe(extensionArn);
           }
         });
       }
@@ -601,8 +598,6 @@ describe("CrashOverrideServerlessPlugin", () => {
 
       // Verify no functions were modified
       expect(Object.keys(mockServerless.service.functions || {}).length).toBe(0);
-      // Verify no extension ARN was set when there are no functions
-      expect((plugin as any).dustExtensionArn).toBeNull();
     });
   });
 

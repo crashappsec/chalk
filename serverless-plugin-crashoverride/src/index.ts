@@ -19,7 +19,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
   readonly provider: AwsProvider;
   private isChalkAvailable: boolean = false;
   private providerConfig: ProviderConfig | null = null;
-  private dustExtensionArn: string | null = null;
 
   constructor(
     readonly serverless: Serverless,
@@ -408,7 +407,6 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
       // Fetch extension ARN
       const extensionArn = await this.fetchDustExtensionArn(this.providerConfig.region);
-      this.dustExtensionArn = extensionArn; // Store for later validation
       this.log_info(
         `Dust Extension ARN for ${this.providerConfig.region}${
           this.config.arnVersion ? ` (v${this.config.arnVersion})` : ""
