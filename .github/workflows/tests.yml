@@ -14,13 +14,7 @@ on:
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
       - Dockerfile
-  pull_request_target:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
+  pull_request:
     paths:
       - src/**
       - tests/functional/**

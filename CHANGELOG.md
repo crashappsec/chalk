@@ -1,6 +1,13 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.6.2
+
+**September 30, 2025**
+
+### Fixes
+
+- Chalk can segfault parsing some some git object files.
+  ([#598](https://github.com/crashappsec/chalk/pull/598))
 
 ## 0.6.1
 
