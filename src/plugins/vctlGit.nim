@@ -439,11 +439,12 @@ proc loadObject(info: RepoInfo, refId: string): Table[string, string] =
       let line = l.strip()
       if line == "":
         break
-      let
-        parts = line.split(maxsplit = 1)
-        key   = parts[0].strip()
-        value = parts[1].strip()
-      result[key] = value
+      let parts = line.split(maxsplit = 1)
+      if len(parts) == 2:
+        let
+          key   = parts[0].strip()
+          value = parts[1].strip()
+        result[key] = value
 
     # git commits have a field indicating that commit is signed
     # however git tags simply append the gpg signature to the
