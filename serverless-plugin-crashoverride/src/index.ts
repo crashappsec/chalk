@@ -28,11 +28,16 @@ class CrashOverrideServerlessPlugin implements Plugin {
   ) {
     this.provider = serverless.getProvider("aws");
 
-    // Check if running on Windows and short-circuit if so
-    if (process.platform === "win32") {
+    // Check if running on supported UNIX-like platform and short-circuit if not
+    const supportedPlatforms = ["linux", "darwin", "freebsd", "openbsd", "sunos", "aix"];
+    if (!supportedPlatforms.includes(process.platform)) {
       this.utils.log.warning(
         chalk.yellow(
-          "Crash Override plugin is not supported on Windows. Skipping plugin initialization."
+          `Crash Override plugin is not supported on ${
+            process.platform
+          }. Only UNIX-like platforms (${supportedPlatforms.join(
+            ", "
+          )}) are supported. Skipping plugin initialization.`
         )
       );
       this.hooks = {}; // do not register any hooks
