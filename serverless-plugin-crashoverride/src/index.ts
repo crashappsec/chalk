@@ -136,13 +136,12 @@ class CrashOverrideServerlessPlugin implements Plugin {
     }
 
     // Parse memorySize to ensure it's a number
-    let memorySize = 1024; // Serverless Framework AWS Lambda default
-    if (provider.memorySize !== undefined) {
-      memorySize =
-        typeof provider.memorySize === "string"
+    const memorySize =
+      provider.memorySize === undefined
+        ? 1024
+        : typeof provider.memorySize === "string"
           ? parseInt(provider.memorySize, 10)
           : provider.memorySize;
-    }
 
     // Persist provider configuration
     this.providerConfig = {
@@ -188,14 +187,11 @@ class CrashOverrideServerlessPlugin implements Plugin {
     }
   }
 
-  private checkMemoryConfiguration(): boolean {
-    // Ensure provider configuration has been fetched
-    if (!this.providerConfig) {
-      throw new this.serverless.classes.Error("Provider configuration not initialized");
-    }
-
-    const providerMemorySize = this.providerConfig.memorySize;
-    return providerMemorySize >= this.config.memoryCheckSize;
+  private checkMemoryConfiguration(
+    providerConfigMemorySize: number,
+    configMemorySize: number
+  ): boolean {
+    return providerConfigMemorySize >= configMemorySize;
   }
 
   private chalkBinaryAvailable(): boolean {
@@ -219,7 +215,10 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
     // Only check memory configuration if provider config was successfully fetched
     if (this.providerConfig) {
-      const memoryCheckPassed = this.checkMemoryConfiguration();
+      const memoryCheckPassed = this.checkMemoryConfiguration(
+        this.providerConfig.memorySize,
+        this.config.memoryCheckSize
+      );
 
       if (!memoryCheckPassed) {
         if (this.config.memoryCheck) {
