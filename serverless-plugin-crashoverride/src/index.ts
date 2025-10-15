@@ -12,6 +12,7 @@ import type {
   ProviderConfig,
   RuntimeAwsFunction,
 } from "./types";
+import { parseEnvConfig, EnvParseError } from "./utils";
 
 class CrashOverrideServerlessPlugin implements Plugin {
   hooks: Plugin.Hooks;
@@ -89,38 +90,14 @@ class CrashOverrideServerlessPlugin implements Plugin {
       // arnVersion is optional, undefined by default (uses latest version)
     };
 
-    // Environment variables (medium precedence)
-    const envConfig: Partial<CrashOverrideConfig> = {};
-    if (process.env["CO_MEMORY_CHECK"] !== undefined) {
-      envConfig.memoryCheck = process.env["CO_MEMORY_CHECK"].toLowerCase() === "true";
-    }
-    if (process.env["CO_MEMORY_CHECK_SIZE_MB"] !== undefined) {
-      const memorySize: number = (envConfig.memoryCheckSize = Number.parseInt(
-        process.env["CO_MEMORY_CHECK_SIZE_MB"]
-      ));
-      if (Number.isSafeInteger(memorySize)) {
-        envConfig.memoryCheckSize = memorySize;
-      } else {
-        throw new this.serverless.classes.Error(
-          `Received invalid memoryCheckSize value of: ${memorySize}`
-        );
+    let envConfig: Partial<CrashOverrideConfig>;
+    try {
+      envConfig = parseEnvConfig();
+    } catch (error) {
+      if (error instanceof EnvParseError) {
+        throw new this.serverless.classes.Error(error.message);
       }
-    }
-    if (process.env["CO_CHALK_CHECK_ENABLED"] !== undefined) {
-      envConfig.chalkCheck = process.env["CO_CHALK_CHECK_ENABLED"].toLowerCase() === "true";
-    }
-    if (process.env["CO_ARN_URL_PREFIX"] !== undefined) {
-      envConfig.arnUrlPrefix = process.env["CO_ARN_URL_PREFIX"];
-    }
-    if (process.env["CO_ARN_VERSION"] !== undefined) {
-      const arnVersion = Number.parseInt(process.env["CO_ARN_VERSION"]);
-      if (Number.isSafeInteger(arnVersion) && arnVersion > 0) {
-        envConfig.arnVersion = arnVersion;
-      } else {
-        throw new this.serverless.classes.Error(
-          `Received invalid arnVersion value: ${process.env["CO_ARN_VERSION"]}. Must be a positive integer.`
-        );
-      }
+      throw error;
     }
 
     // Serverless config (highest precedence)

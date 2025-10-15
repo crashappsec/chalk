@@ -235,15 +235,15 @@ describe("CrashOverrideServerlessPlugin", () => {
       it("should throw error for invalid ARN version in environment variable", () => {
         expect(() => {
           new TestSetupBuilder().withEnvironmentVar("CO_ARN_VERSION", "invalid").build();
-        }).toThrow("Received invalid arnVersion value: invalid");
+        }).toThrow("Received invalid CO_ARN_VERSION value: invalid");
 
         expect(() => {
           new TestSetupBuilder().withEnvironmentVar("CO_ARN_VERSION", "-1").build();
-        }).toThrow("Received invalid arnVersion value: -1");
+        }).toThrow("Received invalid CO_ARN_VERSION value: -1");
 
         expect(() => {
           new TestSetupBuilder().withEnvironmentVar("CO_ARN_VERSION", "0").build();
-        }).toThrow("Received invalid arnVersion value: 0");
+        }).toThrow("Received invalid CO_ARN_VERSION value: 0");
       });
 
       it("should use undefined ARN version by default", () => {
@@ -310,21 +310,17 @@ describe("CrashOverrideServerlessPlugin", () => {
         .withProviderMemory(1024)
         .build();
 
-      executeProviderConfigHook(plugin);
-
-      // Access private method for unit testing
-      const result = (plugin as any).checkMemoryConfiguration();
+      // Access private method for unit testing with correct parameters
+      const result = (plugin as any).checkMemoryConfiguration(1024, 512);
       expect(result).toBe(true);
     });
 
-    it("should throw if provider config not initialized", () => {
-      const { plugin } = new TestSetupBuilder().withMemoryCheck(true, 512).build();
+    it("should return false when memory is insufficient", () => {
+      const { plugin } = new TestSetupBuilder().build();
 
-      // Don't execute provider config hook
-      // Access private method for unit testing
-      expect(() => (plugin as any).checkMemoryConfiguration()).toThrow(
-        "Provider configuration not initialized"
-      );
+      // Access private method for unit testing with correct parameters
+      const result = (plugin as any).checkMemoryConfiguration(256, 512);
+      expect(result).toBe(false);
     });
   });
 
