@@ -320,7 +320,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
   }
 
   private addDustLambdaExtension(
-    functions: { [key: string]: RuntimeAwsFunction },
+    functions: Record<string, RuntimeAwsFunction>,
     extensionArn: string
   ): { success: boolean; skipped: string[]; added: string[] } {
     const skippedFunctions: string[] = [];
