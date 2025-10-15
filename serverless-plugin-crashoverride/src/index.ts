@@ -52,9 +52,9 @@ class CrashOverrideServerlessPlugin implements Plugin {
     this.config = this.initializeConfig();
 
     this.hooks = {
-      "after:package:setupProviderConfiguration": this.fetchProviderConfig.bind(this),
-      "after:package:createDeploymentArtifacts": this.preFlightChecks.bind(this),
-      "before:package:compileFunctions": this.mutateServerlessService.bind(this),
+      "after:package:setupProviderConfiguration": this.handleSetupProviderConfiguration.bind(this),
+      "after:package:createDeploymentArtifacts": this.handleCreateDeploymentArtifacts.bind(this),
+      "before:package:compileFunctions": this.handleCompileFunctions.bind(this),
     };
   }
 
@@ -136,17 +136,17 @@ class CrashOverrideServerlessPlugin implements Plugin {
 
     // Log the final configuration
     this.log_info(
-      `CrashOverride config initialized:\n\tmemoryCheck=${
-        finalConfig.memoryCheck
-      }\n\tmemoryCheckSize=${finalConfig.memoryCheckSize}\n\tchalkCheck=${finalConfig.chalkCheck}${
-        finalConfig.arnVersion ? `\n\tarnVersion=${finalConfig.arnVersion}` : ""
-      }`
+      `CrashOverride config initialized:
+        memoryCheck=${finalConfig.memoryCheck}
+        memoryCheckSize=${finalConfig.memoryCheckSize}
+        chalkCheck=${finalConfig.chalkCheck}
+        arnVersion=${finalConfig.arnVersion ?? "latest"}`
     );
 
     return Object.freeze(finalConfig);
   }
 
-  private fetchProviderConfig(): void {
+  private handleSetupProviderConfiguration(): void {
     if (this.providerConfig != null) {
       // early exit if config has already been fetched
       return;
@@ -237,7 +237,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
     );
   }
 
-  private preFlightChecks(): void {
+  private handleCreateDeploymentArtifacts(): void {
     this.log_notice(`Dust Plugin: Initializing package process`);
 
     // Only check memory configuration if provider config was successfully fetched
@@ -381,7 +381,7 @@ class CrashOverrideServerlessPlugin implements Plugin {
     }
   }
 
-  private async mutateServerlessService(): Promise<void> {
+  private async handleCompileFunctions(): Promise<void> {
     this.log_notice(`Dust Plugin: Processing packaged functions`);
 
     // Check provider configuration
