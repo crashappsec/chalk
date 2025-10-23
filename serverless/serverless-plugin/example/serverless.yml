@@ -1,0 +1,31 @@
+service: serverless-framework-dummy-deployment
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 30
+
+functions:
+  handler:
+    handler: handler.handler
+    description: "Dummy Lambda function for testing Serverless Framework deployment"
+    layers:
+      - arn:aws:lambda:us-east-1:177933569100:layer:AWS-Parameters-and-Secrets-Lambda-Extension:20
+    events:
+      - httpApi:
+          path: /
+          method: get
+      - httpApi:
+          path: /
+          method: post
+
+package:
+  patterns:
+    - "!node_modules/**"
+    - "!.serverless/**"
+
+plugins:
+  - "../dist"

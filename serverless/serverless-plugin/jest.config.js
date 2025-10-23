@@ -9,7 +9,7 @@ export default {
     "^.+\\.ts$": [
       "ts-jest",
       {
-        useESM: true,
+        useESM: false,
       },
     ],
   },

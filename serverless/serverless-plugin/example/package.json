@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "serverless": "4"
+  },
+  "scripts": {
+    "package": "serverless package --verbose"
+  }
+}

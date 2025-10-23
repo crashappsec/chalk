@@ -18,6 +18,8 @@ chalk-*.tmp
 *.o
 *.json
 *.jsonl
+!package.json
+!tsconfig.json
 !.github/**.json
 *.pyc
 *.lck
@@ -28,8 +30,7 @@ chalk-*.tmp
 dist
 build
 *.spec
-server/app/server
-server/app/server-static
+.serverless
 *.tar.gz
 *.db
 *.sqlite

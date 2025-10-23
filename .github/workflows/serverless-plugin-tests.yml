@@ -12,8 +12,9 @@ on:
   workflow_dispatch:
 
 permissions:
+  id-token: write
   contents: read
-  packages: write
+  packages: read
 
 jobs:
   unit-tests:
@@ -30,6 +31,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
 
+      - name: Setup chalk
+        uses: crashappsec/setup-chalk-action@main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: serverless/serverless-plugin/yarn.lock
+
       - name: Cache node_modules
         uses: actions/cache@v4
         with:
@@ -44,7 +55,7 @@ jobs:
         run: |
           yarn
 
-      - name: Package
+      - name: Run tests
         working-directory: serverless/serverless-plugin
         run: |
           yarn test
@@ -73,6 +84,25 @@ jobs:
       - name: Setup chalk
         uses: crashappsec/setup-chalk-action@main
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GithubOIDCChalkTests
+          aws-region: us-east-1
+          role-session-name: "ServerlessTests"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: serverless/serverless-plugin/yarn.lock
+
+      - name: Prep dist
+        working-directory: serverless/serverless-plugin
+        run: |
+          yarn && yarn build
+
       - name: Install serverless
         working-directory: serverless/serverless-plugin/example
         run: |
@@ -80,5 +110,7 @@ jobs:
 
       - name: Package
         working-directory: serverless/serverless-plugin/example
+        env:
+          SERVERLESS_LICENSE_KEY: ${{ secrets.SERVERLESS_LICENSE_KEY }}
         run: |
           yarn package

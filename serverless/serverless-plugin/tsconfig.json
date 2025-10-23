@@ -1,5 +1,5 @@
 {
-  "extends": ["@tsconfig/node22/tsconfig.json", "@tsconfig/strictest/tsconfig.json"],
+  "extends": ["@tsconfig/node20/tsconfig.json", "@tsconfig/strictest/tsconfig.json"],
   "compilerOptions": {
     // Project-specific paths
     "outDir": "./dist",
@@ -17,7 +17,7 @@
     "noUnusedParameters": true,
     "noImplicitOverride": true,
 
-    "module": "esnext",
+    "module": "commonjs",
     "moduleResolution": "node",
 
     // Keep existing JSON and synthetic imports support
