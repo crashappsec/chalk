@@ -5,10 +5,10 @@ on:
     branches:
       - main
     paths:
-      - dust-lambda-extension/unit/**
+      - serverless/dust/unit/**
   pull_request:
     paths:
-      - dust-lambda-extension/unit/**
+      - serverless/dust/unit/**
       - .github/workflows/dust-tests.yml
   workflow_dispatch:
 
@@ -63,7 +63,7 @@ jobs:
           docker buildx bake tests server --load
 
       - name: Run tests without chalk
-        working-directory: dust-lambda-extension
+        working-directory: serverless/dust
         run: |
           make test
 
@@ -74,7 +74,7 @@ jobs:
           chmod +x chalk
 
       - name: Run tests with chalk
-        working-directory: dust-lambda-extension
+        working-directory: serverless/dust
         run: |
           make test
 
@@ -84,7 +84,7 @@ jobs:
           ./chalk --log-level=none extract chalk | tee /dev/stderr | jq '.[0]._CHALKS[0]' | tee chalk.json
 
       - name: Run tests with chalk mark
-        working-directory: dust-lambda-extension
+        working-directory: serverless/dust
         run: |
           make test
 
