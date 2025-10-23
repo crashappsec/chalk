@@ -1,0 +1,84 @@
+name: serverless-plugin
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - serverless/serverless-plugin/**
+  pull_request:
+    paths:
+      - serverless/serverless-plugin/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-22.04
+
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-dust-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/node_modules
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-modules-
+
+      - name: Install deps
+        working-directory: serverless/serverless-plugin
+        run: |
+          yarn
+
+      - name: Package
+        working-directory: serverless/serverless-plugin
+        run: |
+          yarn test
+
+  integration-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        serverless:
+          - 3
+          - 4
+
+    runs-on: ubuntu-22.04
+
+    concurrency:
+      # only allow one job per PR running
+      # older pending jobs will be cancelled not to waste CI minutes
+      # cannot use github.job here https://github.com/community/community/discussions/13496
+      group: ${{ github.workflow }}-dust-${{ matrix.serverless }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Setup chalk
+        uses: crashappsec/setup-chalk-action@main
+
+      - name: Install serverless
+        working-directory: serverless/serverless-plugin/example
+        run: |
+          yarn add serverless@${{ matrix.serverless }}
+
+      - name: Package
+        working-directory: serverless/serverless-plugin/example
+        run: |
+          yarn package
