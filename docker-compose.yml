@@ -24,6 +24,7 @@ services:
       - $PWD:$PWD
       - $PWD/../nimutils:$PWD/../nimutils
       - $PWD/../con4m:$PWD/../con4m
+      - $PWD/../n00b:$PWD/../n00b
     environment:
       DEBUG: ${DEBUG:-}
       CHALK_PASSWORD: ${CHALK_PASSWORD:-}
