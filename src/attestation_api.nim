@@ -16,6 +16,7 @@ import "."/[
   run_management,
   selfextract,
   types,
+  utils/files,
   utils/json,
   utils/semver,
 ]
@@ -336,26 +337,11 @@ proc signByHash*(chalk: ChalkObj, mdHash : string): ChalkDict =
       "No hash available for this artifact at time of signing."
     )
   let
-    log  = attrGet[bool]("use_transparency_log")
-    args = @["sign-blob",
-             "--tlog-upload=" & $log,
-             "--yes",
-             "--key=chalk.key",
-             "-"]
-    blob = artHash & mdHash
+    blob      = artHash & mdHash
+    log       = attrGet[bool]("use_transparency_log")
   info("cosign: signing file " & chalk.name)
-  trace("signing blob: " & blob)
-  trace("cosign " & args.join(" "))
   cosignKey.withCosignKey:
-    let
-      cosign    = getCosignLocation()
-      allOutput = runCmdGetEverything(cosign, args, blob & "\n")
-      signature = allOutput.getStdout().strip()
-    if signature == "":
-      raise newException(
-        ValueError,
-        "Cosign error: " & allOutput.getStderr()
-      )
+    let signature = cosignKey.signBlob(blob & "\n", tlog = log)
     result["SIGNING"]             = pack(true)
     result["SIGNATURE"]           = pack(signature)
     result["INJECTOR_PUBLIC_KEY"] = pack(cosignKey.publicKey)
@@ -398,7 +384,7 @@ proc verifyByHash*(chalk: ChalkObj, mdHash: string): ValidateResult =
     key    = chalk.getCosignKey()
 
   info("cosign: verifying file " & chalk.name)
-  trace("verifying blob: " & blob)
+  trace("verifying blob: '" & blob & "'")
   trace("cosign " & args.join(" "))
 
   key.withCosignKey:

@@ -1,5 +1,15 @@
 # Chalk Release Notes
 
+## 0.6.3
+
+**October 24, 2025**
+
+### Fixes
+
+- Fixes signing compatibility with cosign 3.x which requires the use of
+  `--bundle` in `cosign sign-blob` command.
+  ([#603](https://github.com/crashappsec/chalk/pull/603))
+
 ## 0.6.2
 
 **September 30, 2025**
