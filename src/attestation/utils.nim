@@ -14,6 +14,7 @@ import ".."/[
   config,
   types,
   utils/files,
+  utils/json,
   utils/semver,
 ]
 
@@ -131,24 +132,65 @@ template withCosignKey*(key: AttestationKey, code: untyped) =
     else:
       code
 
+proc signBlob*(self: AttestationKey, blob: string, tlog: bool): string =
+  let
+    cosign    = getCosignLocation()
+    # in cosign 3 bundle is required
+    useBundle = getCosignVersion() >= parseVersion("3")
+  var
+    bundle = ""
+    args   = @["sign-blob",
+               "--tlog-upload=" & $tlog,
+               "--yes",
+               "--key=chalk.key",
+               "-"]
+  if useBundle:
+    let (stream, path) = getNewTempFile(suffix = "bundle.json")
+    stream.close() # release fd so that cosign can write to it
+    bundle = path
+    args.add("--bundle=" & path)
+
+  trace("signing blob: '" & blob & "'")
+  trace("cosign " & args.join(" "))
+  let
+    cmd = runCmdGetEverything(cosign, args, blob)
+    err = cmd.getStderr()
+
+  if cmd.getExit() != 0:
+    raise newException(ValueError, err)
+
+  if not useBundle:
+    result = cmd.getStdout().strip()
+  else:
+    let bundleData = tryToLoadFile(bundle)
+    if bundleData == "":
+      raise newException(
+        ValueError,
+        "Cosign error: empty signed bundle file"
+      )
+    let bundleJson = parseJson(bundleData)
+    if bundleJson.kind != JObject:
+      raise newException(
+        ValueError,
+        "Cosign error: bundle is not a json object"
+      )
+    trace(bundleJson.pretty())
+    result = bundleJson{"messageSignature"}{"signature"}.getStr()
+
+  if result == "":
+    raise newException(ValueError, "empty signature. stderr: " & err)
+  trace("cosign signature: " & result)
+
 proc isValid*(self: AttestationKey): bool =
   self.withCosignKey:
     let
       cosign   = getCosignLocation()
       toSign   = "Test string for signing"
-      signArgs = @["sign-blob",
-                   "--tlog-upload=false",
-                   "--yes",
-                   "--key=chalk.key",
-                   "-"]
-
-    let
-      cmd = runCmdGetEverything(cosign, signArgs, toSign)
-      err = cmd.getStderr()
-      sig = cmd.getStdout()
-
-    if cmd.getExit() != 0 or sig == "":
-      error("Could not sign; either password is wrong, or key is invalid: " & sig & " " & err)
+    var sig    = ""
+    try:
+      sig = self.signBlob(toSign, tlog = false)
+    except:
+      error("Could not sign; either password is wrong, or key is invalid: " & getCurrentExceptionMsg())
       return false
 
     info("Test sign successful.")

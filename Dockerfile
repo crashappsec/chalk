@@ -1,7 +1,7 @@
 ARG BASE=alpine
 ARG NIM_VERSION=2.2.4
 
-FROM ghcr.io/sigstore/cosign/cosign:v2.2.3 AS cosign
+FROM ghcr.io/sigstore/cosign/cosign:v3.0.2 AS cosign
 
 # -------------------------------------------------------------------
 
