@@ -21,13 +21,9 @@ function_next_line = false # like -fn
 keep_padding       = false # like -kp
 never_split        = false # like -ns
 
-[*.{nim,c4m,c42spec,hcl,md,yml,yaml}]
+[*.{nim,c4m,c42spec,hcl,md,yml,yaml,ts}]
 indent_style = space
 indent_size = 2
-
-[*.sh,dust]
-indent_style = space
-indent_size = 4
 
 [Makefile]
 end_of_line = lf

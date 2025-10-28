@@ -1,0 +1,29 @@
+{
+  "extends": ["@tsconfig/node20/tsconfig.json", "@tsconfig/strictest/tsconfig.json"],
+  "compilerOptions": {
+    // Project-specific paths
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    // Enable source maps and declarations for npm package
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": true,
+
+    // Additional strict checks beyond strictest base
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+
+    "module": "commonjs",
+    "moduleResolution": "node",
+
+    // Keep existing JSON and synthetic imports support
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+}

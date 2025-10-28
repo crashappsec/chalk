@@ -1,0 +1,54 @@
+{
+  "name": "@crashappsec/serverless-dust",
+  "version": "0.0.1",
+  "description": "Dust Serverless Framework plugin",
+  "homepage": "https://github.com/crashappsec/chalk/tree/main/serverless/serverless-plugin",
+  "bugs": {
+    "url": "https://github.com/crashappsec/chalk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/crashappsec/chalk.git"
+  },
+  "license": "GPL-3.0",
+  "author": "Crash Override",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src",
+    "publish": "yarn build && npm publish --access public"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2"
+  },
+  "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "@tsconfig/node20": "^20.0.0",
+    "@tsconfig/strictest": "^2.0.5",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "@types/serverless": "^3.12.27",
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.0.0",
+    "jest": "^30.2.0",
+    "npm": "^11.6.2",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "serverless": ">=3.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
