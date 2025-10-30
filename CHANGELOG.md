@@ -1,5 +1,16 @@
 # Chalk Release Notes
 
+## On the `main` branch
+
+### New Features
+
+- New builds fields describing the workflow used for the build:
+  - `BUILD_WORKFLOW_NAME`
+  - `BUILD_WORKFLOW_PATH`
+  - `BUILD_WORKFLOW_HASH`
+
+  ([#605](https://github.com/crashappsec/chalk/pull/605)
+
 ## 0.6.3
 
 **October 24, 2025**

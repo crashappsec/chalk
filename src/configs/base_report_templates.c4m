@@ -109,6 +109,9 @@ report and subtract from it.
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.BUILD_ORIGIN_URI.use                    = true
+  key.BUILD_WORKFLOW_NAME.use                 = true
+  key.BUILD_WORKFLOW_PATH.use                 = true
+  key.BUILD_WORKFLOW_HASH.use                 = true
   key._BUILD_ID.use                           = true
   key._BUILD_UNIQUE_ID.use                    = true
   key._BUILD_ATTEMPT.use                      = true
@@ -122,6 +125,9 @@ report and subtract from it.
   key._BUILD_ORIGIN_OWNER_ID.use              = true
   key._BUILD_ORIGIN_OWNER_KEY.use             = true
   key._BUILD_ORIGIN_URI.use                   = true
+  key._BUILD_WORKFLOW_NAME.use                 = true
+  key._BUILD_WORKFLOW_PATH.use                 = true
+  key._BUILD_WORKFLOW_HASH.use                 = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -750,6 +756,9 @@ doc: """
   key._BUILD_ORIGIN_OWNER_ID.use              = true
   key._BUILD_ORIGIN_OWNER_KEY.use             = true
   key._BUILD_ORIGIN_URI.use                   = true
+  key._BUILD_WORKFLOW_NAME.use                 = true
+  key._BUILD_WORKFLOW_PATH.use                 = true
+  key._BUILD_WORKFLOW_HASH.use                 = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_ATTEMPT.use                       = true
@@ -763,6 +772,9 @@ doc: """
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.BUILD_ORIGIN_URI.use                    = true
+  key.BUILD_WORKFLOW_NAME.use                 = true
+  key.BUILD_WORKFLOW_PATH.use                 = true
+  key.BUILD_WORKFLOW_HASH.use                 = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -1274,6 +1286,9 @@ container.
   key._BUILD_ORIGIN_OWNER_ID.use              = true
   key._BUILD_ORIGIN_OWNER_KEY.use             = true
   key._BUILD_ORIGIN_URI.use                   = true
+  key._BUILD_WORKFLOW_NAME.use                 = true
+  key._BUILD_WORKFLOW_PATH.use                 = true
+  key._BUILD_WORKFLOW_HASH.use                 = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_ATTEMPT.use                       = true
@@ -1287,6 +1302,9 @@ container.
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.BUILD_ORIGIN_URI.use                    = true
+  key.BUILD_WORKFLOW_NAME.use                 = true
+  key.BUILD_WORKFLOW_PATH.use                 = true
+  key.BUILD_WORKFLOW_HASH.use                 = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
@@ -1783,6 +1801,9 @@ and keep the run-time key.
   key._BUILD_ORIGIN_OWNER_ID.use              = true
   key._BUILD_ORIGIN_OWNER_KEY.use             = true
   key._BUILD_ORIGIN_URI.use                   = true
+  key._BUILD_WORKFLOW_NAME.use                 = true
+  key._BUILD_WORKFLOW_PATH.use                 = true
+  key._BUILD_WORKFLOW_HASH.use                 = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_ATTEMPT.use                       = true
@@ -1796,6 +1817,9 @@ and keep the run-time key.
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.BUILD_ORIGIN_URI.use                    = true
+  key.BUILD_WORKFLOW_NAME.use                 = true
+  key.BUILD_WORKFLOW_PATH.use                 = true
+  key.BUILD_WORKFLOW_HASH.use                 = true
   key.CHALK_RAND.use                          = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true
