@@ -21,17 +21,19 @@ proc getGitlabMetadata(self: Plugin, prefix = ""): ChalkDict =
 
   # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
   let
-    CI                  = getEnv("CI")
-    GITLAB_CI           = getEnv("GITLAB_CI")
-    GITLAB_COMMIT_SHA   = getEnv("CI_COMMIT_SHA")
-    GITLAB_JOB_URL      = getEnv("CI_JOB_URL")
-    GITLAB_JOB_ID       = getEnv("CI_JOB_ID")
-    GITLAB_API_URL      = getEnv("CI_API_V4_URL")
-    GITLAB_PROJECT_URL  = getEnv("CI_PROJECT_URL")
-    GITLAB_PROJECT_ID   = getEnv("CI_PROJECT_ID")
-    GITLAB_NAMESPACE_ID = getEnv("CI_PROJECT_NAMESPACE_ID")
-    GITLAB_USER         = getEnv("GITLAB_USER_LOGIN")
-    GITLAB_EVENT_NAME   = getEnv("CI_PIPELINE_SOURCE")
+    CI                      = getEnv("CI")
+    GITLAB_CI               = getEnv("GITLAB_CI")
+    GITLAB_COMMIT_SHA       = getEnv("CI_COMMIT_SHA")
+    GITLAB_JOB_URL          = getEnv("CI_JOB_URL")
+    GITLAB_JOB_ID           = getEnv("CI_JOB_ID")
+    GITLAB_API_URL          = getEnv("CI_API_V4_URL")
+    GITLAB_PROJECT_URL      = getEnv("CI_PROJECT_URL")
+    GITLAB_PROJECT_ID       = getEnv("CI_PROJECT_ID")
+    GITLAB_NAMESPACE_ID     = getEnv("CI_PROJECT_NAMESPACE_ID")
+    GITLAB_USER             = getEnv("GITLAB_USER_LOGIN")
+    GITLAB_EVENT_NAME       = getEnv("CI_PIPELINE_SOURCE")
+    GITLAB_CI_CONFIG_PATH   = getEnv("CI_CONFIG_PATH")
+    GITLAB_CI_PIPELINE_NAME = getEnv("CI_PIPELINE_NAME")
 
   # probably not running in gitlab CI
   if CI == "" and GITLAB_CI == "": return
@@ -43,6 +45,8 @@ proc getGitlabMetadata(self: Plugin, prefix = ""): ChalkDict =
   result.setIfNeeded(prefix & "BUILD_ORIGIN_ID",       GITLAB_PROJECT_ID)
   result.setIfNeeded(prefix & "BUILD_ORIGIN_OWNER_ID", GITLAB_NAMESPACE_ID)
   result.setIfNeeded(prefix & "BUILD_ORIGIN_URI",      GITLAB_PROJECT_URL)
+  result.setIfNeeded(prefix & "BUILD_WORKFLOW_NAME",   GITLAB_CI_PIPELINE_NAME)
+  result.setIfNeeded(prefix & "BUILD_WORKFLOW_PATH",   GITLAB_CI_CONFIG_PATH)
 
   # https://docs.gitlab.com/ci/jobs/job_rules/#ci_pipeline_source-predefined-variable
   result.setIfNeeded(prefix & "BUILD_TRIGGER", GITLAB_EVENT_NAME)

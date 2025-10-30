@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.6.3"
+chalk_version :=   "0.6.4-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -1376,6 +1376,39 @@ Any recorded build trigger found at chalk time.
 """
 }
 
+keyspec BUILD_WORKFLOW_NAME {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.4"
+    shortdoc:         "Build pipeline/workflow name"
+    doc:              """
+Name (if any) of the build pipeline/workflow.
+"""
+}
+
+keyspec BUILD_WORKFLOW_PATH {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.4"
+    shortdoc:         "Build pipeline/workflow path"
+    doc:              """
+Path (if any) to the build pipeline/workflow file.
+"""
+}
+
+keyspec BUILD_WORKFLOW_HASH {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.4"
+    shortdoc:         "Build pipeline/workflow file hash"
+    doc:              """
+Hash (if any) of build pipeline/workflow file.
+"""
+}
+
 keyspec BUILD_CONTACT {
     kind:             ChalkTimeHost
     type:             list[string]
@@ -1560,6 +1593,39 @@ keyspec _BUILD_TRIGGER {
     shortdoc: "Any recorded build trigger found at chalk time."
     doc:              """
 Any recorded build trigger found at chalk time.
+"""
+}
+
+keyspec _BUILD_WORKFLOW_NAME {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.4"
+    shortdoc:         "Build pipeline/workflow name"
+    doc:              """
+Name (if any) of the build pipeline/workflow.
+"""
+}
+
+keyspec _BUILD_WORKFLOW_PATH {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.4"
+    shortdoc:         "Build pipeline/workflow path"
+    doc:              """
+Path (if any) to the build pipeline/workflow file.
+"""
+}
+
+keyspec _BUILD_WORKFLOW_HASH {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.4"
+    shortdoc:         "Build pipeline/workflow file hash"
+    doc:              """
+Hash (if any) of build pipeline/workflow file.
 """
 }
 

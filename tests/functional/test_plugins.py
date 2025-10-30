@@ -120,6 +120,9 @@ def test_github(
         "GITHUB_ACTOR": "octocat",
         "GITHUB_REPOSITORY_ID": "123",
         "GITHUB_REPOSITORY_OWNER_ID": "456",
+        "GITHUB_WORKFLOW": "build",
+        "GITHUB_WORKFLOW_REF": ".github/workflows/build.yml",
+        "GITHUB_WORKFLOW_SHA": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
         # there are a bunch of variations of these
         # but for now at least we test basic flow
         "GITHUB_EVENT_NAME": "push",
@@ -142,6 +145,9 @@ def test_github(
             "BUILD_ORIGIN_OWNER_KEY": "xyz",
             "BUILD_ORIGIN_URI": "https://github.com/octocat/Hello-World",
             "BUILD_ATTEMPT": "5",
+            "BUILD_WORKFLOW_NAME": "build",
+            "BUILD_WORKFLOW_PATH": ".github/workflows/build.yml",
+            "BUILD_WORKFLOW_HASH": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
         }
     )
     insert2 = chalk.insert(bin_path, env=env)
@@ -163,6 +169,9 @@ def test_github(
             "_BUILD_ORIGIN_OWNER_KEY": "xyz",
             "_BUILD_ORIGIN_URI": "https://github.com/octocat/Hello-World",
             "_BUILD_ATTEMPT": "5",
+            "_BUILD_WORKFLOW_NAME": "build",
+            "_BUILD_WORKFLOW_PATH": ".github/workflows/build.yml",
+            "_BUILD_WORKFLOW_HASH": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
         }
     )
 
@@ -185,6 +194,8 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "CI_PIPELINE_SOURCE": "push",
             "CI_PROJECT_ID": "123",
             "CI_PROJECT_NAMESPACE_ID": "456",
+            "CI_CONFIG_PATH": "ci/.gitlab-ci.yml",
+            "CI_PIPELINE_NAME": "build",
         },
     )
     assert insert.report.contains(
@@ -198,6 +209,8 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "BUILD_ORIGIN_ID": "123",
             "BUILD_ORIGIN_OWNER_ID": "456",
             "BUILD_ORIGIN_URI": "https://gitlab.com/gitlab-org/gitlab",
+            "BUILD_WORKFLOW_NAME": "build",
+            "BUILD_WORKFLOW_PATH": "ci/.gitlab-ci.yml",
         }
     )
 

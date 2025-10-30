@@ -145,7 +145,10 @@ plugin ci_github {
                       "BUILD_ORIGIN_OWNER_ID",
                       "BUILD_ORIGIN_KEY",
                       "BUILD_ORIGIN_OWNER_KEY",
-                      "BUILD_ORIGIN_URI"]
+                      "BUILD_ORIGIN_URI",
+                      "BUILD_WORKFLOW_NAME",
+                      "BUILD_WORKFLOW_PATH",
+                      "BUILD_WORKFLOW_HASH"]
     post_run_keys:   ["_BUILD_ID",
                       "_BUILD_UNIQUE_ID",
                       "_BUILD_ATTEMPT",
@@ -158,7 +161,10 @@ plugin ci_github {
                       "_BUILD_ORIGIN_OWNER_ID",
                       "_BUILD_ORIGIN_KEY",
                       "_BUILD_ORIGIN_OWNER_KEY",
-                      "_BUILD_ORIGIN_URI"]
+                      "_BUILD_ORIGIN_URI",
+                      "_BUILD_WORKFLOW_NAME",
+                      "_BUILD_WORKFLOW_PATH",
+                      "_BUILD_WORKFLOW_HASH"]
     doc: """
 Collects information about associated build jobs in github actions.
 
@@ -191,7 +197,9 @@ plugin ci_gitlab {
                       "BUILD_CONTACT",
                       "BUILD_ORIGIN_ID",
                       "BUILD_ORIGIN_OWNER_ID",
-                      "BUILD_ORIGIN_URI"]
+                      "BUILD_ORIGIN_URI",
+                      "BUILD_WORKFLOW_NAME",
+                      "BUILD_WORKFLOW_PATH"]
     post_run_keys:   ["_BUILD_ID",
                       "_BUILD_COMMIT_ID",
                       "_BUILD_URI",
@@ -200,7 +208,9 @@ plugin ci_gitlab {
                       "_BUILD_CONTACT",
                       "_BUILD_ORIGIN_ID",
                       "_BUILD_ORIGIN_OWNER_ID",
-                      "_BUILD_ORIGIN_URI"]
+                      "_BUILD_ORIGIN_URI",
+                      "_BUILD_WORKFLOW_NAME",
+                      "_BUILD_WORKFLOW_PATH"]
     doc: """
 Collects information about associated build jobs in Gitlab.
 
