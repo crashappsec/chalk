@@ -1933,7 +1933,7 @@ field, and is encoded in the same way the `CHALK_ID` key is.
 keyspec SIGNATURE {
     kind:             ChalkTimeArtifact
     never_early:      true
-    type:             dict[string, string]
+    type:             string
     standard:         true
     system:           true
     since:            "0.1.0"
