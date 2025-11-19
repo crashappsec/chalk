@@ -1,15 +1,18 @@
 ARG BASE=alpine
 ARG NIM_VERSION=2.2.4
 
+FROM nimlang/nim:$NIM_VERSION-$BASE-regular AS nim
 FROM ghcr.io/sigstore/cosign/cosign:v3.0.2 AS cosign
 
 # -------------------------------------------------------------------
 
-FROM ghcr.io/crashappsec/nim:alpine-$NIM_VERSION AS alpine
+FROM alpine:edge AS alpine
 
 RUN apk add --no-cache \
     bash \
     curl \
+    gcc \
+    git \
     make \
     musl-dev \
     openssl \
@@ -20,11 +23,12 @@ RUN ln -s $(which gcc) /usr/bin/musl-gcc
 
 # -------------------------------------------------------------------
 
-FROM ghcr.io/crashappsec/nim:ubuntu-$NIM_VERSION AS ubuntu
+FROM ubuntu AS ubuntu
 
 RUN apt-get update -y && \
     apt-get install -y \
         curl \
+        git \
         make \
         musl-tools \
         strace \
@@ -34,6 +38,9 @@ RUN apt-get update -y && \
 # -------------------------------------------------------------------
 
 FROM $BASE AS deps
+
+COPY --from=nim /nim /nim
+ENV PATH=$HOME/.nimble/bin:/nim/bin:$PATH
 
 # XXX this is needed for the github worker
 # https://github.com/actions/runner/issues/2033
