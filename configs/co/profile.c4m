@@ -28,7 +28,7 @@ keyspec _X_CHALK_PROFILE_KEY {
 }
 keyspec _X_CHALK_PROFILE_CONFIG {
   kind:  RunTimeHost
-  type:  `x
+  type:  dict[string, `x]
   value: parse_json(profile_config)
 }
 
