@@ -58,6 +58,7 @@ proc getGithubMetadata(self: Plugin, prefix=""): ChalkDict =
     GITHUB_API_URL             = getEnv("GITHUB_API_URL")
     GITHUB_ACTOR               = getEnv("GITHUB_ACTOR")
     GITHUB_EVENT_NAME          = getEnv("GITHUB_EVENT_NAME")
+    GITHUB_REF                 = getEnv("GITHUB_REF")
     GITHUB_REF_TYPE            = getEnv("GITHUB_REF_TYPE")
     GITHUB_WORKFLOW            = getEnv("GITHUB_WORKFLOW")
     GITHUB_WORKFLOW_REF        = getEnv("GITHUB_WORKFLOW_REF")
@@ -76,6 +77,7 @@ proc getGithubMetadata(self: Plugin, prefix=""): ChalkDict =
   result.setIfNeeded(prefix & "BUILD_WORKFLOW_NAME",   GITHUB_WORKFLOW)
   result.setIfNeeded(prefix & "BUILD_WORKFLOW_PATH",   GITHUB_WORKFLOW_REF)
   result.setIfNeeded(prefix & "BUILD_WORKFLOW_HASH",   GITHUB_WORKFLOW_SHA)
+  result.setIfNeeded(prefix & "BUILD_REF",             GITHUB_REF)
 
   if RUNNER_TEMP != "":
     # RUNNER_TEMP is automatically cleaned up by GitHub at the end of the job execution

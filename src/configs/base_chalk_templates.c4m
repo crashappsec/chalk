@@ -88,6 +88,7 @@ or vice versa.
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.BUILD_ORIGIN_URI.use                    = true
+  key.BUILD_REF.use                           = true
   key.BUILD_WORKFLOW_NAME.use                 = true
   key.BUILD_WORKFLOW_PATH.use                 = true
   key.BUILD_WORKFLOW_HASH.use                 = true
@@ -202,6 +203,7 @@ mark_template mark_large {
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.BUILD_ORIGIN_URI.use                    = true
+  key.BUILD_REF.use                           = true
   key.BUILD_WORKFLOW_NAME.use                 = true
   key.BUILD_WORKFLOW_PATH.use                 = true
   key.BUILD_WORKFLOW_HASH.use                 = true
@@ -313,6 +315,7 @@ use the mark template named `reproducable`.
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.BUILD_ORIGIN_URI.use                    = true
+  key.BUILD_REF.use                           = true
   key.BUILD_WORKFLOW_NAME.use                 = true
   key.BUILD_WORKFLOW_PATH.use                 = true
   key.BUILD_WORKFLOW_HASH.use                 = true
@@ -399,6 +402,7 @@ the time and the nonce removed.
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_OWNER_KEY.use              = true
   key.BUILD_ORIGIN_URI.use                    = true
+  key.BUILD_REF.use                           = true
   key.BUILD_WORKFLOW_NAME.use                 = true
   key.BUILD_WORKFLOW_PATH.use                 = true
   key.BUILD_WORKFLOW_HASH.use                 = true

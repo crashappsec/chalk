@@ -1277,6 +1277,21 @@ For GitLab this is not used.
 """
 }
 
+keyspec BUILD_REF {
+    kind:             ChalkTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.4"
+    shortdoc:         "Git ref of the build"
+    doc:              """
+Raw git ref used for the build.
+Note this might not match `BRANCH`.
+For example for pull/merge requests `BRANCH` can be normalized
+to the source branch name whereas the ref will be the raw git ref
+of the upstream server like `refs/pull/<id>/merge`.
+"""
+}
+
 keyspec BUILD_ID {
     kind:             ChalkTimeHost
     type:             string
@@ -1494,6 +1509,21 @@ key for easier CI/CD API interactions.
 
 For GitHub this corresponds to repos user/org GraphQL node_id.
 For GitLab this is not used.
+"""
+}
+
+keyspec _BUILD_REF {
+    kind:             RunTimeHost
+    type:             string
+    standard:         true
+    since:            "0.6.4"
+    shortdoc:         "Git ref of the build"
+    doc:              """
+Raw git ref used for the build.
+Note this might not match `BRANCH`.
+For example for pull/merge requests `BRANCH` can be normalized
+to the source branch name whereas the ref will be the raw git ref
+of the upstream server like `refs/pull/<id>/merge`.
 """
 }
 

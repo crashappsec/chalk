@@ -219,9 +219,10 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._BUILD_ORIGIN_OWNER_ID.use              = true
   ~key._BUILD_ORIGIN_OWNER_KEY.use             = true
   ~key._BUILD_ORIGIN_URI.use                   = true
-  ~key._BUILD_WORKFLOW_NAME.use                 = true
-  ~key._BUILD_WORKFLOW_PATH.use                 = true
-  ~key._BUILD_WORKFLOW_HASH.use                 = true
+  ~key._BUILD_REF.use                          = true
+  ~key._BUILD_WORKFLOW_NAME.use                = true
+  ~key._BUILD_WORKFLOW_PATH.use                = true
+  ~key._BUILD_WORKFLOW_HASH.use                = true
   ~key.BUILD_ID.use                            = true
   ~key.BUILD_UNIQUE_ID.use                     = true
   ~key.BUILD_COMMIT_ID.use                     = true
@@ -234,6 +235,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.BUILD_ORIGIN_OWNER_ID.use               = true
   ~key.BUILD_ORIGIN_OWNER_KEY.use              = true
   ~key.BUILD_ORIGIN_URI.use                    = true
+  ~key.BUILD_REF.use                           = true
   ~key.BUILD_WORKFLOW_NAME.use                 = true
   ~key.BUILD_WORKFLOW_PATH.use                 = true
   ~key.BUILD_WORKFLOW_HASH.use                 = true

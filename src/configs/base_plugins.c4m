@@ -146,6 +146,7 @@ plugin ci_github {
                       "BUILD_ORIGIN_KEY",
                       "BUILD_ORIGIN_OWNER_KEY",
                       "BUILD_ORIGIN_URI",
+                      "BUILD_REF",
                       "BUILD_WORKFLOW_NAME",
                       "BUILD_WORKFLOW_PATH",
                       "BUILD_WORKFLOW_HASH"]
@@ -162,6 +163,7 @@ plugin ci_github {
                       "_BUILD_ORIGIN_KEY",
                       "_BUILD_ORIGIN_OWNER_KEY",
                       "_BUILD_ORIGIN_URI",
+                      "_BUILD_REF",
                       "_BUILD_WORKFLOW_NAME",
                       "_BUILD_WORKFLOW_PATH",
                       "_BUILD_WORKFLOW_HASH"]
@@ -198,6 +200,7 @@ plugin ci_gitlab {
                       "BUILD_ORIGIN_ID",
                       "BUILD_ORIGIN_OWNER_ID",
                       "BUILD_ORIGIN_URI",
+                      "BUILD_REF",
                       "BUILD_WORKFLOW_NAME",
                       "BUILD_WORKFLOW_PATH"]
     post_run_keys:   ["_BUILD_ID",
@@ -209,6 +212,7 @@ plugin ci_gitlab {
                       "_BUILD_ORIGIN_ID",
                       "_BUILD_ORIGIN_OWNER_ID",
                       "_BUILD_ORIGIN_URI",
+                      "_BUILD_REF",
                       "_BUILD_WORKFLOW_NAME",
                       "_BUILD_WORKFLOW_PATH"]
     doc: """

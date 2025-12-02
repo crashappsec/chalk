@@ -111,6 +111,7 @@ def test_github(
         # https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
         "CI": "true",
         "GITHUB_SHA": "ffac537e6cbbf934b08745a378932722df287a53",
+        "GITHUB_REF": "refs/pull/5/merge",
         "GITHUB_SERVER_URL": "https://github.com",
         "GITHUB_REPOSITORY": "octocat/Hello-World",
         "GITHUB_RUN_ID": "1658821493",
@@ -138,6 +139,7 @@ def test_github(
             "BUILD_TRIGGER": "tag",
             "BUILD_CONTACT": ["octocat"],
             "BUILD_URI": "https://github.com/octocat/Hello-World/actions/runs/1658821493/job/51064362862",
+            "BUILD_REF": "refs/pull/5/merge",
             "BUILD_API_URI": server_imds,
             "BUILD_ORIGIN_ID": "123",
             "BUILD_ORIGIN_KEY": "abc",
@@ -186,6 +188,7 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "CI": "true",
             "GITLAB_CI": "true",
             "CI_COMMIT_SHA": "ffac537e6cbbf934b08745a378932722df287a53",
+            "CI_MERGE_REQUEST_REF_PATH": "refs/merge-requests/5/head",
             "CI_JOB_URL": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
             "CI_JOB_ID": "4999820578",
             "CI_API_V4_URL": "https://gitlab.com/api/v4",
@@ -202,6 +205,7 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
         {
             "BUILD_ID": "4999820578",
             "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_REF": "refs/merge-requests/5/head",
             "BUILD_TRIGGER": "push",
             "BUILD_CONTACT": ["user"],
             "BUILD_URI": "https://gitlab.com/gitlab-org/gitlab/-/jobs/4999820578",
