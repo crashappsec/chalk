@@ -11,6 +11,13 @@
 
   ([#605](https://github.com/crashappsec/chalk/pull/605)
 
+- New build field to describe the raw git ref of the build:
+  - `BUILD_REF`
+
+  For example for GitHub it might be `refs/pull/5/merge`.
+
+  ([#610](https://github.com/crashappsec/chalk/pull/610))
+
 ## 0.6.3
 
 **October 24, 2025**
