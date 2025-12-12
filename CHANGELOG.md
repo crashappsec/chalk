@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.6.4
+
+**December 12, 2025**
 
 ### New Features
 
@@ -17,6 +19,20 @@
   For example for GitHub it might be `refs/pull/5/merge`.
 
   ([#610](https://github.com/crashappsec/chalk/pull/610))
+
+### Fixes
+
+- Git origin keys are now sanitized to strip out any basic auth creds.
+  For example GitLab stores transient git basic auth directly
+  in git origin config field. For example:
+
+  ```
+  https://user:pass@gitlab.com/project/repo.git
+  ```
+
+  Chalk now removes these credentials for any reports.
+
+  ([#611](https://github.com/crashappsec/chalk/pull/611))
 
 ## 0.6.3
 

@@ -12,6 +12,7 @@ import std/[
   algorithm,
   nativesockets,
   sequtils,
+  uri,
 ]
 import pkg/[
   zippy,
@@ -681,6 +682,14 @@ proc loadHead(info: RepoInfo) =
   else:
     info.loadCommit(hf)
 
+proc sanitizeOrigin(origin: string): string =
+  if origin.startsWith("http://") or origin.startsWith("https://"):
+    var parsed = parseUri(origin)
+    parsed.username = ""
+    parsed.password = ""
+    return $parsed
+  return origin
+
 proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   # We are generally looking for the remote origin, because we expect
   # this is running from a checked-out copy of a repo.  It's
@@ -708,8 +717,9 @@ proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
             if sec == ghRemote and subsec == v:
               for (k, v) in kvpairs:
                 if k == ghUrl:
-                  self.origin = v
-                  return v
+                  let clean = sanitizeOrigin(v)
+                  self.origin = clean
+                  return clean
 
   var firstFound: string
   for (sec, subsec, kvpairs) in conf:
@@ -717,16 +727,18 @@ proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
       if subsec == ghOrigin:
         for (k, v) in kvpairs:
           if k == ghUrl:
-            self.origin = v
-            return v
+            let clean = sanitizeOrigin(v)
+            self.origin = clean
+            return clean
       elif firstFound == "":
         for (k, v) in kvpairs:
           if k == ghUrl:
             firstFound = v
             break
   if firstFound != "":
-    self.origin = firstFound
-    return firstFound
+    let clean = sanitizeOrigin(firstFound)
+    self.origin = clean
+    return clean
 
   self.origin = ghLocal
   return ghLocal

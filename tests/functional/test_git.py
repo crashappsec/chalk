@@ -15,13 +15,22 @@ from .utils.git import Git
 
 
 @pytest.mark.parametrize(
-    "remote, sign, symbolic_ref, annotate, empty",
+    "remote, expected_remote, sign, symbolic_ref, annotate, empty",
     [
-        ("git@github.com:crashappsec/chalk.git", False, False, True, False),
-        (None, False, False, True, False),
-        (None, False, False, False, False),
-        (None, False, False, True, True),
+        ("git@github.com:crashappsec/chalk.git", None, False, False, True, False),
+        (
+            "https://octocat:password@github.com/octocat/example.git",
+            "https://github.com/octocat/example.git",
+            False,
+            False,
+            False,
+            False,
+        ),
+        (None, None, False, False, True, False),
+        (None, None, False, False, False, False),
+        (None, None, False, False, True, True),
         pytest.param(
+            None,
             None,
             True,
             True,
@@ -41,6 +50,7 @@ def test_repo(
     chalk_copy: Chalk,
     copy_files: list[Path],
     remote: Optional[str],
+    expected_remote: Optional[str],
     sign: bool,
     annotate: bool,
     random_hex: str,
@@ -89,12 +99,12 @@ def test_repo(
         TAGGER=git.committer if (sign or annotate) else MISSING,
         DATE_TAGGED=Iso8601() if (sign or annotate) else MISSING,
         TAG_MESSAGE=(tag_message if (sign or annotate) and not empty else MISSING),
-        ORIGIN_URI=remote or "local",
+        ORIGIN_URI=expected_remote or remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
         VCS_MISSING_FILES=[dummy.name],
     )
     assert result.report.has(
-        _ORIGIN_URI=remote or "local",
+        _ORIGIN_URI=expected_remote or remote or "local",
     )
 
 
