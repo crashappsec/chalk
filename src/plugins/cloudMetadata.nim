@@ -412,9 +412,6 @@ proc getAwsMetadata(): ChalkDict =
   result.oneItem(token, "_AWS_BLOCK_DEVICE_MAPPING_ROOT",          awsMdUri & "block-device-mapping/root")
   result.oneItem(token, "_AWS_BLOCK_DEVICE_MAPPING_SWAP",          awsMdUri & "block-device-mapping/swap")
   result.oneItem(token, "_AWS_DEDICATED_HOST_ID",                  awsMdUri & "placement/host-id")
-  result.oneItem(token, "_AWS_EVENTS_MAINTENANCE_HISTORY",         awsMdUri & "events/maintenance/history")
-  result.oneItem(token, "_AWS_EVENTS_MAINTENANCE_SCHEDULED",       awsMdUri & "events/maintenance/scheduled")
-  result.oneItem(token, "_AWS_EVENTS_RECOMMENDATIONS_REBALANCE",   awsMdUri & "events/recommendations/rebalance")
   result.oneItem(token, "_AWS_HOSTNAME",                           awsMdUri & "hostname")
   result.oneItem(token, "_AWS_INSTANCE_ACTION",                    awsMdUri & "instance-action")
   result.oneItem(token, "_AWS_INSTANCE_ID",                        awsMdUri & "instance-id")
@@ -444,6 +441,9 @@ proc getAwsMetadata(): ChalkDict =
 
   result.listKey(token, "_AWS_SECURITY_GROUPS",                    awsMdUri & "security-groups")
 
+  result.jsonKey(token, "_AWS_EVENTS_MAINTENANCE_HISTORY",         awsMdUri & "events/maintenance/history")
+  result.jsonKey(token, "_AWS_EVENTS_MAINTENANCE_SCHEDULED",       awsMdUri & "events/maintenance/scheduled")
+  result.jsonKey(token, "_AWS_EVENTS_RECOMMENDATIONS_REBALANCE",   awsMdUri & "events/recommendations/rebalance")
   result.jsonKey(token, "_AWS_IAM_INFO",                           awsMdUri & "iam/info")
   result.jsonKey(token, "_AWS_IDENTITY_CREDENTIALS_EC2_INFO",      awsMdUri & "identity-credentials/ec2/info")
   result.jsonKey(token, AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS,   awsMdUri & "identity-credentials/ec2/security-credentials/ec2-instance")
