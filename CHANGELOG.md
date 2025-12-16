@@ -1,5 +1,23 @@
 # Chalk Release Notes
 
+## On the `main` branch
+
+### Breaking Changes
+
+- AWS cloud metadata keys were changed to a json types vs reporting
+  raw json string:
+  - `_AWS_EVENTS_MAINTENANCE_HISTORY`
+  - `_AWS_EVENTS_MAINTENANCE_SCHEDULED`
+  - `_AWS_EVENTS_RECOMMENDATIONS_REBALANCE`
+
+  ([#614](https://github.com/crashappsec/chalk/pull/614))
+
+### Fixes
+
+- All `TIMESTAMP` field specs have been updated to use `int` type.
+
+  ([#614](https://github.com/crashappsec/chalk/pull/614))
+
 ## 0.6.4
 
 **December 12, 2025**
@@ -11,7 +29,7 @@
   - `BUILD_WORKFLOW_PATH`
   - `BUILD_WORKFLOW_HASH`
 
-  ([#605](https://github.com/crashappsec/chalk/pull/605)
+  ([#605](https://github.com/crashappsec/chalk/pull/605))
 
 - New build field to describe the raw git ref of the build:
   - `BUILD_REF`
