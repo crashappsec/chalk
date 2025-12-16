@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.6.4"
+chalk_version :=   "0.6.5-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -701,7 +701,7 @@ For example `git rebase` adjusts dates.
 
 keyspec TIMESTAMP_AUTHORED {
     kind:             ChalkTimeArtifact
-    type:             string
+    type:             int
     standard:         true
     since:            "0.5.0"
     shortdoc:         "Unix timestamp of the author's commit"
@@ -738,7 +738,7 @@ For example `git rebase` adjusts dates.
 
 keyspec TIMESTAMP_COMMITTED {
     kind:             ChalkTimeArtifact
-    type:             string
+    type:             int
     standard:         true
     since:            "0.1.2"
     shortdoc:         "Unix timestamp of most recent commit"
@@ -829,7 +829,7 @@ Annotated tags are created with `git tag -a -m "comment"`.
 
 keyspec TIMESTAMP_TAGGED {
     kind:             ChalkTimeArtifact
-    type:             string
+    type:             int
     standard:         true
     since:            "0.5.0"
     shortdoc:         "Unix timestamp of most recent tag"
@@ -919,7 +919,7 @@ For example `git rebase` adjusts dates.
 
 keyspec _TIMESTAMP_AUTHORED {
     kind:             RunTimeHost
-    type:             string
+    type:             int
     standard:         true
     since:            "0.5.0"
     shortdoc:         "Unix timestamp of the author's commit"
@@ -956,7 +956,7 @@ For example `git rebase` adjusts dates.
 
 keyspec _TIMESTAMP_COMMITTED {
     kind:             RunTimeHost
-    type:             string
+    type:             int
     standard:         true
     since:            "0.5.0"
     shortdoc:         "Unix timestamp of most recent commit"
@@ -1047,7 +1047,7 @@ Annotated tags are created with `git tag -a -m "comment"`.
 
 keyspec _TIMESTAMP_TAGGED {
     kind:             RunTimeHost
-    type:             string
+    type:             int
     standard:         true
     since:            "0.5.0"
     shortdoc:         "Unix timestamp of most recent tag"
@@ -6303,7 +6303,7 @@ AWS where imdsv2 is available.
 
 keyspec _AWS_EVENTS_MAINTENANCE_HISTORY {
     kind:             RunTimeHost
-    type:             `x
+    type:             list[`x]
     standard:         true
     since:            "0.1.2"
     doc: """
@@ -6319,7 +6319,7 @@ AWS where imdsv2 is available.
 
 keyspec _AWS_EVENTS_MAINTENANCE_SCHEDULED {
     kind:             RunTimeHost
-    type:             `x
+    type:             list[`x]
     standard:         true
     since:            "0.1.2"
     doc: """
@@ -6334,7 +6334,7 @@ AWS where imdsv2 is available.
 
 keyspec _AWS_EVENTS_RECOMMENDATIONS_REBALANCE {
     kind:             RunTimeHost
-    type:             string
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.2"
     doc: """
