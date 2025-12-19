@@ -63,6 +63,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+        with:
+          path: chalk
 
       # for tests to checkout dummy private repo
       - name: Get GitHub Token
@@ -91,26 +93,31 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
 
       - name: Prep PWD
+        working-directory: chalk
         run: |
           mkdir -p ../con4m
           mkdir -p ../nimutils
 
       - name: Bake Images
+        working-directory: chalk
         run: |
           docker buildx bake chalk server tests --load
 
       - name: Test pingttl
         if: inputs.chalk_url == ''
+        working-directory: chalk
         run: |
           make src/utils/pingttl
 
       - name: Compile Chalk
         if: inputs.chalk_url == ''
+        working-directory: chalk
         run: |
           make
 
       - name: Download Chalk
         if: inputs.chalk_url != ''
+        working-directory: chalk
         run: |
           curl -L "${{ inputs.chalk_url }}" > chalk
           chmod +x chalk
@@ -127,6 +134,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.org-token.outputs.token }}
           REGISTRY_PROXY_USERNAME: ${{ github.repository_owner }}
           REGISTRY_PROXY_PASSWORD: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
+        working-directory: chalk
         run: |
           make tests_parallel args=""
 
@@ -141,10 +149,12 @@ jobs:
           GITHUB_TOKEN: ${{ steps.org-token.outputs.token }}
           REGISTRY_PROXY_USERNAME: ${{ github.repository_owner }}
           REGISTRY_PROXY_PASSWORD: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
+        working-directory: chalk
         run: |
           make tests_parallel args="--slow"
 
       - name: Show service logs
         if: failure()
+        working-directory: chalk
         run: |
           docker compose logs | grep -v health
