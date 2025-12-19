@@ -51,3 +51,7 @@ con4m
 /*.c4m
 /ls
 profile_results.txt
+.gdb_history
+log
+.nimcache
+strace-*

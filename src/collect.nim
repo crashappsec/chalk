@@ -79,13 +79,15 @@ proc collectChalkTimeHostInfo*() =
   if hostCollectionSuspended():
     return
 
-  trace("Collecting chalk time artifact info")
+  trace("Collecting chalk-time host info")
   for plugin in getAllPlugins():
     let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_run_keys")
-    if chalkCollectionSuspendedFor(plugin.name):          continue
+    if chalkCollectionSuspendedFor(plugin.name):
+      trace(plugin.name & ": suspended")
+      continue
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
     try:
-      trace("Running plugin: " & plugin.name)
+      trace(plugin.name & ": running plugin")
       let dict = plugin.callGetChalkTimeHostInfo()
       if dict == nil or len(dict) == 0:
         continue
@@ -151,17 +153,21 @@ proc initCollection*(collectHost = true) =
 
 proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
   artifact.withErrorContext():
-    trace("Collecting run time artifact info " & artifact.name & " (" & artifact.myCodec.name & ")")
+    trace("Collecting run-time artifact info " & artifact.name & " (" & artifact.myCodec.name & ")")
     for plugin in getAllPlugins():
       let
         data       = artifact.collectedData
         subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys")
 
-      if chalkCollectionSuspendedFor(plugin.name):               continue
+      if chalkCollectionSuspendedFor(plugin.name):
+        trace(plugin.name & ": suspended")
+        continue
       if not plugin.hasSubscribedKey(subscribed, data):          continue
-      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != artifact.myCodec: continue
+      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin.name != artifact.myCodec.name:
+        trace(plugin.name & ": skipped as its not the chalk codec " & artifact.myCodec.name)
+        continue
 
-      trace("Running plugin: " & plugin.name)
+      trace(plugin.name & ": running plugin")
       try:
         let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
         if dict == nil or len(dict) == 0: continue
@@ -193,37 +199,41 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
 
     trace("Collecting chalk-time data for " & obj.name & " (" & obj.myCodec.name & ")")
     for plugin in getAllPlugins():
-      if chalkCollectionSuspendedFor(plugin.name): continue
-
-      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin != obj.myCodec:
+      if chalkCollectionSuspendedFor(plugin.name):
+        trace(plugin.name & ": suspended")
         continue
 
-      if plugin == obj.myCodec:
-        trace("Filling in codec info")
+      if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin.name != obj.myCodec.name:
+        trace(plugin.name & ": skipped as its not the chalk codec " & obj.myCodec.name)
+        continue
+
+      if plugin.name == obj.myCodec.name:
+        trace(plugin.name & ": filling in codec info")
         if "CHALK_ID" notin data:
-          data["CHALK_ID"]      = pack(obj.callGetChalkId())
+          data["CHALK_ID"] = pack(obj.callGetChalkId())
         data.setIfNeeded("HASH", obj.callGetUnchalkedHash())
         data.setIfNeeded("PRE_CHALK_HASH", obj.callGetPrechalkingHash())
         if obj.fsRef != "":
           data.setIfNeeded("PATH_WHEN_CHALKED", resolvePath(obj.fsRef))
 
       elif len(obj.resourceType * plugin.resourceTypes) == 0:
-        trace(plugin.name & ": Skipping for " & $obj.resourceType & " notin " & $plugin.resourceTypes)
+        trace(plugin.name & ": skipping for " & $obj.resourceType & " notin " & $plugin.resourceTypes)
         continue
 
       let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".pre_chalk_keys")
       if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem:
-        trace(plugin.name & ": Skipping plugin; its metadata wouldn't be used.")
+        trace(plugin.name & ": skipping plugin; its metadata wouldn't be used.")
         continue
 
       if plugin.getChalkTimeArtifactInfo == nil:
+        trace(plugin.name & ": skipping plugin; no chalk time artifact info collection")
         continue
 
-      trace("Running plugin: " & plugin.name)
+      trace(plugin.name & ": running plugin")
       try:
         let dict = plugin.callGetChalkTimeArtifactInfo(obj)
         if dict == nil or len(dict) == 0:
-          trace(plugin.name & ": Plugin produced no keys to use.")
+          trace(plugin.name & ": plugin produced no keys to use.")
           continue
 
         for k, v in dict:
@@ -239,7 +249,7 @@ proc collectChalkTimeArtifactInfo*(obj: ChalkObj, override = false) =
               plugin.isSystem or
               override:
             obj.collectedData[k] = v
-        trace(plugin.name & ": Plugin called.")
+        trace(plugin.name & ": plugin called.")
       except:
         error("When collecting chalk-time artifact data, plugin implementation " &
               plugin.name & " threw an exception it didn't handle (artifact = " &
@@ -250,13 +260,15 @@ proc collectRunTimeHostInfo*() =
   if hostCollectionSuspended(): return
   ## Called from report generation in commands.nim, not the main
   ## artifact loop below.
-  trace("Collecting run time host info")
+  trace("Collecting run-time host info")
   for plugin in getAllPlugins():
     let subscribed = attrGet[seq[string]]("plugin." & plugin.name & ".post_run_keys")
-    if chalkCollectionSuspendedFor(plugin.name):          continue
+    if chalkCollectionSuspendedFor(plugin.name):
+      trace(plugin.name & ": suspended")
+      continue
     if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
 
-    trace("Running plugin: " & plugin.name)
+    trace(plugin.name & ": running plugin")
     try:
       let dict = plugin.callGetRunTimeHostInfo(getAllChalks())
       if dict == nil or len(dict) == 0: continue
