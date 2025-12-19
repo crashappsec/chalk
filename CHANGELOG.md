@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.6.5
+
+**December 18, 2025**
 
 ### Breaking Changes
 
@@ -17,6 +19,12 @@
 - All `TIMESTAMP` field specs have been updated to use `int` type.
 
   ([#614](https://github.com/crashappsec/chalk/pull/614))
+
+- When installing cosign, pinning to `2.2.3` to match `setup-chalk-action`.
+  `3.0.3` added more breaking changes which break signing.
+  The plan is to remove `cosign` dependency in the near future.
+
+  ([#615](https://github.com/crashappsec/chalk/pull/615))
 
 ## 0.6.4
 

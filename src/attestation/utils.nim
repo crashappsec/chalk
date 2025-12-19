@@ -29,6 +29,8 @@ template getOrDownloadCosignLocation(downloadCosign: bool) =
     cosignLoc = unpack[string](runCallback(cosignLoader, args).get())
     if cosignLoc == "":
       warn("Could not find or install cosign; cannot sign or verify.")
+    else:
+      trace("found cosign: " & cosignLoc)
 
 proc getCosignLocation*(downloadCosign = false): string =
   # a bit repetitive however it allows once blocks to be per download branch

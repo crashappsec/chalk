@@ -21,11 +21,11 @@ func install_cosign() {
   }
 
   install_name := "cosign-" + host_os + "-" + host_arch
-  install_url  := "https://github.com/sigstore/cosign/releases/latest/download/" + install_name
-  info("Downloading cosign.....")
+  install_url  := "https://github.com/sigstore/cosign/releases/download/v2.2.3/" + install_name
+  info("Downloading cosign from " + install_url + " .....")
   contents     := url_get(install_url)
 
-  trace("Downloaded cosign.")
+  trace("Downloaded cosign. Saving to /tmp/cosign")
   write_file("/tmp/cosign", contents)
   trace(run("chmod +x /tmp/cosign"))
 
