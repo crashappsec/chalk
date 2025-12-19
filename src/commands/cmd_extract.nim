@@ -9,7 +9,6 @@
 
 import ".."/[
   collect,
-  config,
   docker/scan,
   reporting,
   run_management,

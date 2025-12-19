@@ -474,7 +474,7 @@ proc getOptionalPluginNames*(c: ChalkObj): seq[string] =
   ## optional plugin is neither a system plugin or the chalk codec plugin
   result = newSeq[string]()
   for p in getAllPlugins():
-    if not p.isSystem and p != c.myCodec:
+    if not p.isSystem and p.name != c.myCodec.name:
       result.add(p.name)
 
 proc getOptionalPluginNames*(): seq[string] =

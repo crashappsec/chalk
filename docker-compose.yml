@@ -188,6 +188,7 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       IP: ${IP:-} # host IP for docker registry tests
       SSH_KEY: ${SSH_KEY:-}
+      STRACE: ${STRACE:-}
 
   # --------------------------------------------------------------------------
   # MISC DEPS

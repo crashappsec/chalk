@@ -62,10 +62,11 @@ proc processGitContext(ctx: DockerInvocation) =
 
 proc processDockerFile(ctx: DockerInvocation) =
   if ctx.dockerFileLoc == stdinIndicator:
-    let input           = stdin.readAll()
+    let input         = stdin.readAll()
     ctx.inDockerFile  = input
     ctx.originalStdIn = input
-    trace("docker: read Dockerfile from stdin")
+    trace("docker: read Dockerfile from stdin (" & $len(input) & ")")
+    trace(input)
 
   elif ctx.gitContext != nil:
     # ctx.dockerFileLoc is resolvedPath which is invalid
@@ -659,10 +660,13 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     return
 
   trace("docker: collecting post-build runtime data")
-  for _, chalk in chalksByPlatform:
-    chalk.withErrorContext():
-      chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
-      chalk.collectRunTimeArtifactInfo()
+  # we already scanned docker data above
+  # and docker codec only scans local images
+  withSuspendChalkCollectionFor(@["docker"]):
+    for _, chalk in chalksByPlatform:
+      chalk.withErrorContext():
+        chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
+        chalk.collectRunTimeArtifactInfo()
   collectRunTimeHostInfo()
 
   if wrapVirtual and result == 0:

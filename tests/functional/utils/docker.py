@@ -182,7 +182,7 @@ class Docker:
                         log_level=None,
                     ).split(":")[-1]
 
-                image_id = get_sha256(buildkit) or get_sha256(buildx)
+                image_id = get_sha256(buildx) or get_sha256(buildkit)
                 if not image_id and (
                     # this is a multi-platform build so image_id is expected to be missing
                     get_sha256("exporting_manifest_list")

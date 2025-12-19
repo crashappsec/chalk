@@ -6,10 +6,11 @@ import datetime
 import itertools
 import json
 import os
+import secrets
 from pathlib import Path
 from typing import Any, Literal, Optional, cast
 
-from ..conf import MAGIC
+from ..conf import MAGIC, TESTS
 from ..utils.bin import sha256
 from ..utils.dict import ANY, MISSING, ContainsDict, ContainsList, IfExists
 from ..utils.docker import Docker
@@ -373,7 +374,21 @@ class Chalk:
         inject_binary_into_zip: bool = False,
     ) -> ChalkProgram:
         params = params or []
-        cmd: list[str] = [str(self.binary)]
+        cmd: list[str] = []
+
+        if os.environ.get("STRACE") == "true":
+            suffix = secrets.token_hex(5)
+            strace = TESTS / f"strace-chalk-{command}-{suffix}.log"
+            cmd += [
+                "strace",
+                "-f",
+                "-s",
+                "1000",
+                "--output",
+                str(strace),
+            ]
+
+        cmd += [str(self.binary)]
 
         if command:
             cmd += [command]

@@ -39,12 +39,12 @@ proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =
       tmpTag     = chooseNewTag()
       envVars    = @[setEnv("DOCKER_BUILDKIT", "1")]
       probeFile  = """
-  FROM busybox
-  ARG BUILDPLATFORM
-  ARG TARGETPLATFORM
-  RUN echo "{\"BUILDPLATFORM\": \"$BUILDPLATFORM\", \"TARGETPLATFORM\": \"$TARGETPLATFORM\"}" > /platforms.json
-  CMD cat /platforms.json
-  """
+FROM busybox
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+RUN echo "{\"BUILDPLATFORM\": \"$BUILDPLATFORM\", \"TARGETPLATFORM\": \"$TARGETPLATFORM\"}" > /platforms.json
+CMD ["cat", "/platforms.json"]
+"""
 
     var data = ""
 
@@ -277,5 +277,6 @@ proc copyPerPlatform*(self: ChalkObj, platforms: seq[DockerPlatform]): TableRef[
   result = newTable[DockerPlatform, ChalkObj]()
   for platform in platforms:
     let copy = self.deepCopy()
+    copy.myCodec = self.myCodec
     copy.platform = platform
     result[platform] = copy
