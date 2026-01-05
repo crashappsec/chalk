@@ -13,7 +13,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 25.12.0 # sync:black:tests/functional/poetry.lock
+    rev: 25.9.0 # sync:black:tests/functional/poetry.lock
     hooks:
       - id: black
 
