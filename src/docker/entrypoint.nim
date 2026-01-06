@@ -179,7 +179,16 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
   if prepPostExec and runPostExec:
     if hasUser:
       toAdd.add("USER 0:0")
-    toAdd.add("""RUN ["/chalk", "--no-use-embedded-config", "--no-use-external-config", "__", "prep_postexec"]""")
+    var postExecCmd = %*(@[
+      "/chalk",
+      "--no-use-embedded-config",
+      "--no-use-external-config",
+    ])
+    if getLogLevel() == llTrace:
+      postExecCmd.add(%("--log-level=trace"))
+    postExecCmd.add(%("__"))
+    postExecCmd.add(%("prep_postexec"))
+    toAdd.add("RUN " & $postExecCmd)
     if hasUser:
       toAdd.add("USER " & user)
 
