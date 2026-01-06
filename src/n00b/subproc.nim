@@ -93,6 +93,9 @@ proc runCommand*(
   ## verbose: log cmd/args as trace logs
   ## timeout:
 
+  if cmd == "":
+    raise newException(ValueError, "cannot run empty command name")
+
   var pty = pty
   # if parent stdin is a TTY and stdin is proxied to a child process
   # run it with PTY as the subcommand might require PTY to succeed
