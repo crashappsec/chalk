@@ -23,6 +23,7 @@ all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
 other_report_ops     := ["build", "push", "heartbeat", "postexec"]
 tool_types           := ["sbom", "sast", "secret_scanner"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
+valid_log_formats    := ["auto", "plain", "json"]
 key_types            := ["Chalk-time Host", "Chalk-time Artifact",
                          "Run-time Artifact", "Run-time Host"]
 known_sink_filters   := ["log_level", "log_prefix", "pretty_json",
@@ -3318,6 +3319,20 @@ Everything else will go to `_OP_ERRORS`.
 Generally, we recommend setting this to `warn` for docker, and `error`
 for everything else, as docker only reports errors when there is a
 problem where it had to restart the operation without chalk.
+"""
+  }
+
+  field log_format {
+    type:     string
+    default:  "auto"
+    choice:   valid_log_formats
+    shortdoc: "Console Log Format"
+    doc: """
+Log format
+
+* `auto` picks plain when either color is enabled or chalk runs in interactive TTY
+* `plain` text chalk logs
+* `json` chalk logs
 """
   }
 
