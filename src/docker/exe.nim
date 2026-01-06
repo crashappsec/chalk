@@ -61,6 +61,8 @@ proc runDockerGetEverything*(args: seq[string],
 
 proc getBuildXVersion*(): Version =
   once:
+    if getDockerExeLocation() == "":
+      return buildXVersion
     if getEnv("DOCKER_BUILDKIT") == "0":
       if dockerInvocation != nil and dockerInvocation.cmd == build and dockerInvocation.foundBuildx:
         trace("docker: DOCKER_BUILDKIT is disabled but explicitly running with buildx")
@@ -80,6 +82,8 @@ proc getBuildXVersion*(): Version =
 
 proc getDockerClientVersion*(): Version =
   once:
+    if getDockerExeLocation() == "":
+      return dockerClientVersion
     # examples:
     # Docker version 1.13.0, build 49bf474
     # Docker version 23.0.0, build e92dd87
@@ -95,6 +99,8 @@ proc getDockerClientVersion*(): Version =
 
 proc getDockerServerVersion*(): Version =
   once:
+    if getDockerExeLocation() == "":
+      return dockerServerVersion
     let version = runDockerGetEverything(@["version"])
     if version.exitCode == 0:
       try:
@@ -114,6 +120,8 @@ proc hasBuildX*(): bool =
 var dockerInfo = ""
 proc getDockerInfo*(): string =
   once:
+    if getDockerExeLocation() == "":
+      return dockerInfo
     let output = runDockerGetEverything(@["info"])
     if output.exitCode != 0:
       error("docker: could not get docker info " & output.getStderr())
@@ -217,14 +225,15 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
 proc getBuildKitVersion*(ctx: DockerInvocation): Version =
   once:
     let info = ctx.getBuilderInfo().toLower()
-    try:
-      buildKitVersion = getVersionFromLineWhich(
-        info.splitLines(),
-        contains = "buildkit",
-      )
-      trace("docker: buildkit version: " & $(buildKitVersion))
-    except:
-      dumpExOnDebug()
+    if info != "":
+      try:
+        buildKitVersion = getVersionFromLineWhich(
+          info.splitLines(),
+          contains = "buildkit",
+        )
+        trace("docker: buildkit version: " & $(buildKitVersion))
+      except:
+        dumpExOnDebug()
   return buildKitVersion
 
 proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
