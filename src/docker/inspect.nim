@@ -25,9 +25,9 @@ proc inspectHistoryCommands*(name: string): seq[string] =
   let
     args   = @["history", name, "--format", "{{.CreatedBy}}", "--no-trunc"]
     output = runDockerGetEverything(args)
-    stdout = output.getStdout().strip()
-    stderr = output.getStderr().strip()
-  if output.getExit() != 0:
+    stdout = output.stdout.strip()
+    stderr = output.stderr.strip()
+  if output.exitCode != 0:
     raise newException(
       ValueError,
       "cannot get history for " & name & " due to: " &
@@ -50,9 +50,9 @@ proc inspectJson(name: string, what: string): JsonNode =
     args &= @["--format", "json"]
   let
     output = runDockerGetEverything(args)
-    stdout = output.getStdout().strip()
-    stderr = output.getStderr().strip()
-  if output.getExit() != 0:
+    stdout = output.stdout.strip()
+    stderr = output.stderr.strip()
+  if output.exitCode != 0:
     raise newException(
       ValueError,
       "cannot inspect " & what & " " & name & " due to: " &
@@ -105,10 +105,10 @@ iterator allIDs(what: string, cmd: string): string =
   ## utility function for getting all docker ids in local system (container or image)
   let
     output = runDockerGetEverything(@[cmd, "--no-trunc", "--format", "{{.ID}}"])
-    stdout = output.getStdout().strip()
-    stderr = output.getStderr().strip()
+    stdout = output.stdout.strip()
+    stderr = output.stderr.strip()
 
-  if output.getExit() != 0 or stdout == "":
+  if output.exitCode != 0 or stdout == "":
     error("docker: could not find any " & what & ": " & stdout & " " & stderr)
   else:
     for line in stdout.splitLines():

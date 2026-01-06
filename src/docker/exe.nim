@@ -10,6 +10,7 @@ import std/[
 ]
 import ".."/[
   types,
+  n00b/subproc,
   utils/exe,
   utils/json,
   utils/semver,
@@ -19,6 +20,8 @@ import ".."/[
 import "."/[
   ids,
 ]
+
+export subproc
 
 var
   dockerExeLocation   = ""
@@ -43,24 +46,20 @@ proc getDockerExeLocation*(): string =
 proc runDockerGetEverything*(args: seq[string],
                              stdin = "",
                              silent = true,
-                             raiseOnError = false): ExecOutput =
-  let
-    exe = getDockerExeLocation()
-    msg = exe & " " & args.join(" ")
-  if not silent:
-    trace("docker: " & msg)
-    if stdin != "":
-      trace("docker: stdin: \n" & stdin)
-  result = runCmdGetEverything(exe, args, stdin)
-  if not silent and result.exitCode > 0:
-    trace(strutils.strip(result.stderr & result.stdout))
-  if result.exitCode > 0 and raiseOnError:
-    error("docker: " & msg & "\n" & result.stderr)
-    raise newException(ValueError, msg & " - exited with non-zero " & $result.exitCode)
-  return result
+                             ): n00bProc =
+  result = runCommand(
+    getDockerExeLocation(),
+    args,
+    stdin   = stdin,
+    verbose = not silent,
+    capture = {StdOutFD, StdErrFD},
+    proxy   = {StdInFD},
+  )
 
 proc getBuildXVersion*(): Version =
   once:
+    if getDockerExeLocation() == "":
+      return buildXVersion
     if getEnv("DOCKER_BUILDKIT") == "0":
       if dockerInvocation != nil and dockerInvocation.cmd == build and dockerInvocation.foundBuildx:
         trace("docker: DOCKER_BUILDKIT is disabled but explicitly running with buildx")
@@ -80,6 +79,8 @@ proc getBuildXVersion*(): Version =
 
 proc getDockerClientVersion*(): Version =
   once:
+    if getDockerExeLocation() == "":
+      return dockerClientVersion
     # examples:
     # Docker version 1.13.0, build 49bf474
     # Docker version 23.0.0, build e92dd87
@@ -95,6 +96,8 @@ proc getDockerClientVersion*(): Version =
 
 proc getDockerServerVersion*(): Version =
   once:
+    if getDockerExeLocation() == "":
+      return dockerServerVersion
     let version = runDockerGetEverything(@["version"])
     if version.exitCode == 0:
       try:
@@ -114,11 +117,13 @@ proc hasBuildX*(): bool =
 var dockerInfo = ""
 proc getDockerInfo*(): string =
   once:
+    if getDockerExeLocation() == "":
+      return dockerInfo
     let output = runDockerGetEverything(@["info"])
     if output.exitCode != 0:
-      error("docker: could not get docker info " & output.getStderr())
+      error("docker: could not get docker info " & output.stderr)
     else:
-      dockerInfo = output.getStdout()
+      dockerInfo = output.stdout
   return dockerInfo
 
 proc getDockerInfoSubList*(key: string): seq[string] =
@@ -183,7 +188,7 @@ proc getContextName(): string =
       if output.exitCode == 0:
         try:
           let
-            data = output.getStdout.parseJson()
+            data = output.stdout.parseJson()
             name = data{"Name"}.getStr()
           if name != "":
             contextName = name
@@ -210,21 +215,22 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
         args.add(name)
       let output = runDockerGetEverything(args, silent = false)
       if output.exitCode != 0:
-        trace("docker: could not get buildx builder information: " & output.getStderr())
-      builderInfo = output.getStdout()
+        trace("docker: could not get buildx builder information: " & output.stderr)
+      builderInfo = output.stdout
   return builderInfo
 
 proc getBuildKitVersion*(ctx: DockerInvocation): Version =
   once:
     let info = ctx.getBuilderInfo().toLower()
-    try:
-      buildKitVersion = getVersionFromLineWhich(
-        info.splitLines(),
-        contains = "buildkit",
-      )
-      trace("docker: buildkit version: " & $(buildKitVersion))
-    except:
-      dumpExOnDebug()
+    if info != "":
+      try:
+        buildKitVersion = getVersionFromLineWhich(
+          info.splitLines(),
+          contains = "buildkit",
+        )
+        trace("docker: buildkit version: " & $(buildKitVersion))
+      except:
+        dumpExOnDebug()
   return buildKitVersion
 
 proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
@@ -253,7 +259,7 @@ proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
           "-version",
         ])
       if output.exitCode != 0:
-        trace("docker: could not get buildkint frontend versioni " & output.getStderr())
+        trace("docker: could not get buildkint frontend version " & output.stderr)
         frontendVersion = some(parseVersion("0"))
       else:
         let version = getVersionFromLine(output.stdout)
@@ -339,4 +345,4 @@ proc installBinFmt*() =
       "all",
     ])
     if output.exitCode != 0:
-      raise newException(ValueError, "could not install binfmt " & output.getStderr())
+      raise newException(ValueError, "could not install binfmt " & output.stderr)

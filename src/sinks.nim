@@ -28,7 +28,11 @@ proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
   return (msg, true)
 
 proc chalkJsonLogs(msg: string, info: StringTable): (string, bool) =
-  if getShowColor() or isInteractive:
+  case attrGet[string]("log_format")
+  of "auto":
+    if getShowColor() or isInteractive:
+      return (msg, true)
+  of "plain":
     return (msg, true)
   let data = %*{
     "msg": msg,

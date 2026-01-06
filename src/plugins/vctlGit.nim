@@ -19,6 +19,7 @@ import pkg/[
   zippy/inflate,
 ]
 import ".."/[
+  n00b/subproc,
   plugin_api,
   run_management,
   types,
@@ -627,9 +628,9 @@ proc refetchTags(info: RepoInfo) =
   for tag in toRefetch:
     args.add(tag.name & ":refs/tags/" & tag.name)
   trace("git " & args.join(" "))
-  let output = runCmdGetEverything(getGitExeLocation(), args)
-  if output.getExit() != 0:
-    trace("git: could not fetch latest tag from origin: " & output.getStderr())
+  let output = subproc.runCommand(getGitExeLocation(), args)
+  if output.exitCode != 0:
+    trace("git: could not fetch latest tag from origin: " & output.stderr)
     return
   let oldLatestTag = info.latestTag
   info.loadTags()

@@ -10,8 +10,9 @@ import std/[
   os,
 ]
 import ".."/[
-  docker/ids,
   config,
+  docker/ids,
+  n00b/subproc,
   types,
   utils/files,
   utils/json,
@@ -52,10 +53,10 @@ proc getCosignVersion*(): Version =
     if path == "":
       return cosignVersion
     let
-      cmd    = runCmdGetEverything(path, @["version"])
-      stdOut = cmd.getStdout()
+      cmd    = subproc.runCommand(path, @["version"])
+      stdOut = cmd.stdout
       lines  = stdOut.splitLines()
-    if cmd.getExit() != 0:
+    if cmd.exitCode != 0:
       warn("Could not find cosign version")
       return cosignVersion
     try:
@@ -264,8 +265,8 @@ proc mintCosignKey*(path: string): AttestationKey =
     raise newException(ValueError, paths.privateKey & ": already exists. Remove to generate new key.")
 
   withCosignPassword(password):
-    let results = runCmdGetEverything(getCosignLocation(), keyCmd)
-    if results.getExit() != 0:
+    let results = subproc.runCommand(getCosignLocation(), keyCmd)
+    if results.exitCode != 0:
       raise newException(ValueError, "Could not mint cosign key: " & getCurrentExceptionMsg())
 
     return getCosignKeyFromDisk(path, password = password)
