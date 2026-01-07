@@ -359,7 +359,16 @@ proc collectImage*(chalk: ChalkObj,
                    repos: seq[DockerImage] = @[]) =
   try:
     trace("docker: collecting image locally " & $name)
-    chalk.collectLocalImage(name.asRepoRef())
+    # pass the tagged name to repos as otherwise the tag can be dropped
+    # for example consider:
+    # * nginx:latest and nginx:24.04 point to the same digest
+    # * nginx:latest is pulled into local docker state
+    # * nginx:24.04 is the base image
+    # by inspecting local image it'll find ONLY nginx:latest as the tag
+    # hence only nginx:latest is going to be collected as the tag.
+    # By passing tagged name to the repos it allows to match both tags
+    # in the registry and report both tags
+    chalk.collectLocalImage(name.asRepoRef(), repos = @[name] & repos)
   except:
     trace("docker: collecting image falling back to manifest due to: " & getCurrentExceptionMsg())
     chalk.collectImageManifest(name, repos = repos)
