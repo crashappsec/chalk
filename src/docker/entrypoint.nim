@@ -170,9 +170,12 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
     # which will then execute existing CMD whether it is in shell or json form
     # only nuance is that if CMD is not directly defined in target
     # Dockerfile section, defining ENTRYPOINT resets CMD to null
-    # so to be safe we redefine CMD to the same value
     toAdd.add("ENTRYPOINT " & formatChalkExec())
-    toAdd.add("CMD " & $(cmd))
+    # by setting ENTRYPOINT, CMD can be reset so we redefine only
+    # if its missing in the target section
+    # otherwise docker produces a warning
+    if ctx.getTargetDockerSection().cmd == nil:
+      toAdd.add("CMD " & $(cmd))
     trace("docker: CMD wrapped with ENTRYPOINT.")
 
 
