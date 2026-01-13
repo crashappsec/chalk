@@ -338,15 +338,18 @@ template chalkCollectionSuspendedFor*(p: string): bool =
   chalkCollectionSuspendedByPlugin.getOrDefault(p, 0) != 0
 
 template withSuspendChalkCollectionFor*(plugins: seq[string], c: untyped) =
-  trace("plugins temporarily suspended: " & $plugins)
-  for p in plugins:
-    suspendChalkCollectionFor(p)
-  try:
+  if len(plugins) == 0:
     c
-  finally:
-    trace("plugins restored: " & $plugins)
+  else:
+    trace("plugins temporarily suspended: " & $plugins)
     for p in plugins:
-      restoreChalkCollectionFor(p)
+      suspendChalkCollectionFor(p)
+    try:
+      c
+    finally:
+      trace("plugins restored: " & $plugins)
+      for p in plugins:
+        restoreChalkCollectionFor(p)
 
 proc persistInternalValues*(chalk: ChalkObj) =
   if chalk.extract == nil:

@@ -166,7 +166,7 @@ proc doReporting*(topic="report", clearState = false) {.exportc, cdecl.} =
       skipCustom  = attrGet[bool]("skip_custom_reports")
     if skipCommand and skipCustom:
       return
-    trace("Collecting runtime host info.")
+    trace("Collecting run-time host info.")
     collectRunTimeHostInfo()
     trace("Generating command report.")
     let report = doCommandReport()

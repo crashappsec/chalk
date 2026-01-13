@@ -336,11 +336,6 @@ proc collectLocalImage*(chalk: ChalkObj,
   chalk.collectProvenance()
   chalk.collectSBOM()
 
-proc collectLocalImage*(chalk: ChalkObj) =
-  if chalk.imageId == "":
-    raise newException(ValueError, "docker: no image name/id to inspect")
-  chalk.collectLocalImage(chalk.imageId)
-
 proc collectImageManifest*(chalk: ChalkObj,
                            name: DockerImage,
                            repos: seq[DockerImage] = @[]) =
