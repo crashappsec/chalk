@@ -67,56 +67,62 @@ proc loadCosignKeyFromSelf(): AttestationKey =
   if "$CHALK_ENCRYPTED_PRIVATE_KEY" in extract:
     result.privateKey = unpack[string](extract["$CHALK_ENCRYPTED_PRIVATE_KEY"])
 
-proc loadAttestation*() =
-  # This should really only be called from chalk.nim.
-  # Beyond that, call canAttest()
+proc loadAttestation*(forceLoad = false, withPrivateKey = false) =
+  let
+    countOpt = selfChalkGetKey("$CHALK_LOAD_COUNT")
+    countBox = countOpt.getOrElse(pack(0))
+    count    = unpack[int](countBox)
 
-  once:
-    let
-      countOpt = selfChalkGetKey("$CHALK_LOAD_COUNT")
-      countBox = countOpt.getOrElse(pack(0))
-      count    = unpack[int](countBox)
+  if count == 0:
+    # Don't auto-load when compiling.
+    return
 
-    if count == 0:
-      # Don't auto-load when compiling.
-      return
+  let
+    cmd = getBaseCommandName()
+    loadPrivateKey = cmd in ["insert"] or withPrivateKey
+  if not forceLoad and cmd in [
+    "setup",
+    "help",
+    "load",
+    "dump",
+    "version",
+    "env",
+    "exec",
+    # docker calls this function explicitly when appropriate for its subcommands
+    # e.g. no need to init attestation for docker version
+    #      but we need it for docker build
+    "docker",
+  ]:
+    return
 
-    let
-      cmd = getBaseCommandName()
-      # TODO this will require private key for all
-      # docker commands which is not ideal
-      # but there is no easy mechanism to determine docker command here
-      withPrivateKey = cmd in ["insert", "docker"]
-    if cmd in ["setup", "help", "load", "dump", "version", "env", "exec"]:
-      return
-
+  if cosignKey == nil:
     cosignKey = loadCosignKeyFromSelf()
-    if cosignKey == nil or not cosignKey.canAttestVerify():
-      warn("Code signing not initialized. Run `chalk setup` to fix.")
-      # there is no key in self chalkmark
-      return
+  if cosignKey == nil or not cosignKey.canAttestVerify():
+    warn("Code signing not initialized. Run `chalk setup` to fix.")
+    # there is no key in self chalkmark
+    return
 
-    let provider = getProvider()
+  let provider = getProvider()
+  try:
+    provider.init(provider)
+  except:
+    error("Attestation key provider is misconfigured: " & getCurrentExceptionMsg())
+    return
+
+  if loadPrivateKey:
     try:
-      provider.init(provider)
+      cosignKey.password = provider.retrievePassword(provider, cosignKey)
     except:
-      error("Attestation key provider is misconfigured: " & getCurrentExceptionMsg())
+      error("Could not retrieve cosign private key password: " & getCurrentExceptionMsg())
       return
 
-    if withPrivateKey:
-      try:
-        cosignKey.password = provider.retrievePassword(provider, cosignKey)
-      except:
-        error("Could not retrieve cosign private key password: " & getCurrentExceptionMsg())
-        return
-
-      try:
-        if not cosignKey.isValid():
-          cosignKey = AttestationKey(nil)
-          return
-      except:
+    try:
+      if not cosignKey.isValid():
         cosignKey = AttestationKey(nil)
         return
+    except:
+      cosignKey = AttestationKey(nil)
+      return
 
 proc saveKeyToSelf(key: AttestationKey): bool =
   let selfChalk = getSelfExtraction().get()

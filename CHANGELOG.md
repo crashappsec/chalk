@@ -32,6 +32,9 @@
 - When chalk is running in `log_level: trace` honor that log-level
   for `prep_postexec` in the `Dockerfile`.
   ([#617](https://github.com/crashappsec/chalk/pull/617))
+- Only load attestation for `build` and `push` docker sub-commands.
+  Otherwise attestation is fully initialized even things like `docker version.`
+  ([#617](https://github.com/crashappsec/chalk/pull/617))
 
 ## 0.6.5
 
