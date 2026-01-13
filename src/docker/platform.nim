@@ -34,6 +34,7 @@ proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =
   ## to correctly guage default build platform.
   result = defaultPlatforms
 
+  trace("docker: probing for build platforms")
   once:
     let
       tmpTag     = chooseNewTag()
@@ -62,10 +63,11 @@ CMD ["cat", "/platforms.json"]
         return result
 
       data = probe.stdout
-      trace("docker: probing for build platforms: " & data)
+      trace("docker: probe for build platforms found: " & data)
 
     finally:
       discard runDockerGetEverything(@["rmi", tmpTag])
+      trace("docker: done probing for build platforms")
 
     if data == "":
       warn("docker: could not probe build platforms. Got empty output")

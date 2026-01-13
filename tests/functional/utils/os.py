@@ -136,11 +136,26 @@ class Program:
         reverse: bool = False,
         log_level: Optional[Literal["error", "debug"]] = "error",
         default: Optional[str] = None,
+        ignore_in_between: Optional[list[tuple[str, str]]] = None,
     ) -> str:
         lines = (text or self.text).splitlines()
         if reverse:
             lines = lines[::-1]
+        ignoring = False
+        in_between_end = ""
         for line in lines:
+            if not ignoring and ignore_in_between:
+                for start, end in ignore_in_between:
+                    if reverse:
+                        start, end = end, start
+                    if start in line:
+                        ignoring = True
+                        in_between_end = end
+            if ignoring:
+                if in_between_end in line:
+                    ignoring = False
+                else:
+                    continue
             if needle in line:
                 i = line.find(needle)
                 result = line[i:].replace(needle, "", 1).strip()
