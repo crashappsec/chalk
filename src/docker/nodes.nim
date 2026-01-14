@@ -38,7 +38,7 @@ proc getBuilderNodesInfo*(ctx: DockerInvocation): TableRef[string, string] =
       result[name] = ""
     result[name] &= line & "\n"
 
-proc containerNameForBuilderNode*(node: string): string =
+proc containerNameForBuilderNode(node: string): string =
   # ideally we can query the namespaces however they are not exposed
   # via docker info output and are only stored in the buildx config files
   # which we cant read until we know the namespaces
@@ -67,28 +67,61 @@ proc readBuilderNodeFile*(ctx: DockerInvocation, node: string, path: string): st
   nodeFiles[key] = result
 
 iterator iterBuilderNodesConfigs*(ctx: DockerInvocation): tuple[name: string, config: JsonNode] =
-  for name, _ in ctx.getBuilderNodesInfo():
-    try:
-      let
-        container  = containerNameForBuilderNode(name)
-        config     = inspectContainerJson(container){"Config"}
-        entrypoint = config{"Entrypoint"}
-        cmd        = config{"Cmd"}
-        args       = (entrypoint & cmd).getStrElems()
-      con4mRuntime.addStartGetOpts("buildkit.getopts", args = args).run()
-      let flags    = con4mRuntime.getFlags()
-      if "config" notin flags:
-        trace("docker: " & name & " builder node is not using custom configuration. using empty default config")
-        yield (name, newJObject())
+  for name, info in ctx.getBuilderNodesInfo():
+    var
+      fileFound   = false
+      tomlConfig  = ""
+      foundInInfo = false
+
+    # if the builder is configured with debug on,
+    # it shows the config content as part of the builder inspect command
+    # hence we attempt to extract it from it
+    # otherwise fallback to trying to read the config file from the builder container
+    for line in info.splitLines():
+      if not fileFound and line.toLower().startsWith("file#"):
+        fileFound = true
+        continue
+      if not fileFound:
+        continue
+      if line.strip().startsWith(">"):
+        tomlConfig &= line.strip().strip(chars={'>'}) & "\n"
       else:
+        fileFound = false
+    if tomlConfig != "":
+      try:
+        let jsonConfig = parsetoml.parseString(tomlConfig).toJson().fromTomlJson()
+        yield (name, jsonConfig)
+        foundInInfo = true
+      except:
+        trace(
+          "docker: could not load toml for buildx node " & name &
+          " from builder node info. attempting to load from container file. " &
+          "error was: " & getCurrentExceptionMsg()
+        )
+
+    if not foundInInfo:
+      try:
         let
-          configs  = unpack[seq[string]](flags["config"].getValue())
-          toml     = ctx.readBuilderNodeFile(name, configs[0])
-          config   = parsetoml.parseString(toml).toJson().fromTomlJson()
-        yield (name, config)
-    except:
-      trace("docker: could not load toml for buildx node " & name & " due to: " & getCurrentExceptionMsg())
-      continue
+          container  = containerNameForBuilderNode(name)
+          config     = inspectContainerJson(container){"Config"}
+          entrypoint = config{"Entrypoint"}
+          cmd        = config{"Cmd"}
+          args       = (entrypoint & cmd).getStrElems()
+        con4mRuntime.addStartGetOpts("buildkit.getopts", args = args).run()
+        let flags    = con4mRuntime.getFlags()
+        if "config" notin flags:
+          trace("docker: " & name & " builder node is not using custom configuration. using empty default config")
+          yield (name, newJObject())
+        else:
+          let
+            configs  = unpack[seq[string]](flags["config"].getValue())
+            path     = configs[0]
+            toml     = ctx.readBuilderNodeFile(name, path)
+            config   = parsetoml.parseString(toml).toJson().fromTomlJson()
+          yield (name, config)
+      except:
+        trace("docker: could not load toml for buildx node " & name & " due to: " & getCurrentExceptionMsg())
+        continue
 
 proc getBuilderNodesConfigs*(ctx: DockerInvocation): TableRef[string, JsonNode] =
   result = newTable[string, JsonNode]()
