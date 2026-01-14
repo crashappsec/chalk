@@ -39,6 +39,12 @@ if which gpg &> /dev/null; then
             | awk '{print $2}' \
             | cut -d/ -f2
     )
+    cat << EOF >> ~/.gnupg/gpg-agent.conf
+# so that git tests never ask for the password
+default-cache-ttl 86400
+max-cache-ttl 86400
+EOF
+    gpgconf --reload gpg-agent
 fi
 
 insecure_builder=insecure_builder
