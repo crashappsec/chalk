@@ -21,7 +21,8 @@ class Git:
     def __init__(self, path: Path, sign: bool = False):
         self.path = path
         self.sign = sign
-        self.run = functools.partial(run, cwd=self.path)
+        # gpg is flaky in CI hence more attempts
+        self.run = functools.partial(run, cwd=self.path, attempts=5)
 
     def init(
         self,

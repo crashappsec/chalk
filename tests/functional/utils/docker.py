@@ -180,6 +180,12 @@ class Docker:
                         reverse=True,
                         default="",
                         log_level=None,
+                        ignore_in_between=[
+                            (
+                                "docker: probing for build platforms",
+                                "docker: done probing for build platforms",
+                            )
+                        ],
                     ).split(":")[-1]
 
                 image_id = get_sha256(buildx) or get_sha256(buildkit)

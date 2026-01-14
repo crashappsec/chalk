@@ -1,3 +1,5 @@
+log_format = "plain"
+
 subscribe("report", "json_console_out")
 subscribe("fail",   "json_console_out")
 custom_report.github_group_chalk_time.enabled: false
@@ -24,7 +26,7 @@ report_template report_default {
 }
 
 if not env_exists("CHALK_USAGE_URL") {
-  crashoverride_usage_reporting_url: "https://chalk-test.crashoverride.run/v0.1/usage"
+  crashoverride_usage_reporting_url: "https://chalk.test.crashoverride.run/v0.1/usage"
 }
 
 # ignore any cloud metadata by default

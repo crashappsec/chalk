@@ -30,6 +30,7 @@ import "../docker"/[
   push,
 ]
 import ".."/[
+  attestation_api,
   commands/cmd_help,
   config,
   reporting,
@@ -50,10 +51,12 @@ proc runCmdDocker*(args: seq[string]) =
   ctx.withDockerFailsafe():
     case ctx.extractDockerCommand()
     of DockerCmd.build:
+      loadAttestation(forceLoad = true, withPrivateKey = true)
       info("Running docker build.")
       setFullCommandName("build")
       exitCode = ctx.dockerBuild()
     of DockerCmd.push:
+      loadAttestation(forceLoad = true, withPrivateKey = true)
       info("Running docker push.")
       setFullCommandName("push")
       exitCode = ctx.dockerPush()

@@ -50,6 +50,5 @@ proc dockerPush*(ctx: DockerInvocation): int =
 
     result = setExitCode(ctx.runMungedDockerInvocation())
 
-    chalk.collectLocalImage() # refetch repo tags/digests
     chalk.collectRunTimeArtifactInfo()
     collectRunTimeHostInfo()

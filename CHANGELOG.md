@@ -2,6 +2,40 @@
 
 ## On the `main` branch
 
+### New Features
+
+- `log_format` config which can be either:
+  - auto
+  - json
+  - plain
+
+  This allows to force for example plain logs even for non-interactive
+  chalk runs such as in chalk tests.
+  ([#617](https://github.com/crashappsec/chalk/pull/617))
+
+### Fixes
+
+- In chalk-wrapped `Dockerfile`, `CMD` is no longer repeated
+  which removes docker build warning in newest docker versions.
+  ([#617](https://github.com/crashappsec/chalk/pull/617))
+- Host metadata and non-docker plugin metadata is now collected
+  even for empty `chalk docker build` which might of not
+  produced any docker metadata to collect. This will include
+  metadata about the build such as `_BUILD_URI`.
+  ([#617](https://github.com/crashappsec/chalk/pull/617))
+- In some cases docker base image tag was omitted in `_REPO_TAGS`
+  from the base image metadata in `_COLLECTED_ARTIFACTS`.
+  ([#617](https://github.com/crashappsec/chalk/pull/617))
+- Even when `docker` is not available, chalk would attempt to
+  get docker versions for example during `chalk version`.
+  ([#617](https://github.com/crashappsec/chalk/pull/617))
+- When chalk is running in `log_level: trace` honor that log-level
+  for `prep_postexec` in the `Dockerfile`.
+  ([#617](https://github.com/crashappsec/chalk/pull/617))
+- Only load attestation for `build` and `push` docker sub-commands.
+  Otherwise attestation is fully initialized even things like `docker version.`
+  ([#617](https://github.com/crashappsec/chalk/pull/617))
+
 ## 0.6.5
 
 **December 18, 2025**

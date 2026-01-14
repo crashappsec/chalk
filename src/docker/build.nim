@@ -644,25 +644,30 @@ proc dockerBuild*(ctx: DockerInvocation): int =
 
   ctx.readIidFile()
   ctx.readMetadataFile()
+  var suspendPlugins = newSeq[string]()
 
   if ctx.iidFile == "":
     warn(
       "docker: build did not produce image for chalk to inspect. " &
       "Did you forget to use either --load or --push?"
     )
-    return
 
-  trace("docker: collecting built image metadata")
-  try:
-    ctx.collectAfterBuild(chalksByPlatform)
-  except:
-    warn("docker: " & getCurrentExceptionMsg())
-    return
+  else:
+    trace("docker: collecting built image metadata")
+    try:
+      ctx.collectAfterBuild(chalksByPlatform)
+      # if there is an iidFile we explicitly collect image metadata above
+      # from either from local or buildx
+      # hence we disable subsequent collection of docker codec below
+      # as docker codec is only capable of collecting local images
+      suspendPlugins.add("docker")
+    except:
+      warn("docker: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
+      return
 
   trace("docker: collecting post-build runtime data")
-  # we already scanned docker data above
-  # and docker codec only scans local images
-  withSuspendChalkCollectionFor(@["docker"]):
+  withSuspendChalkCollectionFor(suspendPlugins):
     for _, chalk in chalksByPlatform:
       chalk.withErrorContext():
         chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")

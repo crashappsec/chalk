@@ -1591,7 +1591,7 @@ def test_push_without_buildx(
         # this image doesnt have buildx installed
         "docker:19",
         entrypoint="/chalk",
-        params=["docker", "push", tag],
+        params=["--log-level=trace", "docker", "push", tag],
         volumes={
             Path("/var/run/docker.sock"): "/var/run/docker.sock",
             chalk.binary: "/chalk",

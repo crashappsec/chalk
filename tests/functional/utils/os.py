@@ -7,6 +7,7 @@ import json
 import os
 import pty
 import re
+import time
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from hashlib import sha256
@@ -136,11 +137,26 @@ class Program:
         reverse: bool = False,
         log_level: Optional[Literal["error", "debug"]] = "error",
         default: Optional[str] = None,
+        ignore_in_between: Optional[list[tuple[str, str]]] = None,
     ) -> str:
         lines = (text or self.text).splitlines()
         if reverse:
             lines = lines[::-1]
+        ignoring = False
+        in_between_end = ""
         for line in lines:
+            if not ignoring and ignore_in_between:
+                for start, end in ignore_in_between:
+                    if reverse:
+                        start, end = end, start
+                    if start in line:
+                        ignoring = True
+                        in_between_end = end
+            if ignoring:
+                if in_between_end in line:
+                    ignoring = False
+                else:
+                    continue
             if needle in line:
                 i = line.find(needle)
                 result = line[i:].replace(needle, "", 1).strip()
@@ -218,6 +234,8 @@ def run(
     timeout: Optional[int | float] = None,
     shell: bool = False,
     log_level: Literal["info", "debug"] = "info",
+    attempts: int = 1,
+    sleep_between_attempts: int = 1,
 ) -> Program:
     """
     Run cmd in a subprocess asyncronously.
@@ -286,63 +304,76 @@ def run(
     if tty:
         _, intty = pty.openpty()
 
-    try:
-        process = Popen(
-            cmd,
-            stdout=stdout,
-            stderr=stderr,
-            stdin=PIPE if stdin is not None else intty,
-            cwd=cwd,
-            env=env_vars,
-            shell=shell,
-        )
-
+    for attempt in range(1, attempts + 1):
         try:
-            out, err = process.communicate(stdin, timeout=timeout)
-        except TimeoutExpired:
-            after = datetime.datetime.now()
-            process.returncode = process.returncode or 124
-            if process.returncode is not None:
-                # if process did not exit yet, attempt to kill it
-                with suppress(Exception):
-                    process.kill()
-            out = b""
-            err = b"<timeout after {timeout} seconds>"
-
-    except FileNotFoundError as e:
-        after = datetime.datetime.now()
-        exit_code = 127
-        out = b""
-        err = str(e).encode()
-        binary = Path(bin_from_cmd(cmd)).resolve()
-        if binary.is_file():
-            log.error(
-                "Got exception about file not found even though it exists. "
-                "Perhaps a platform incompatibility of the binary?",
-                error=e,
-                binary=str(binary),
+            process = Popen(
+                cmd,
+                stdout=stdout,
+                stderr=stderr,
+                stdin=PIPE if stdin is not None else intty,
+                cwd=cwd,
+                env=env_vars,
+                shell=shell,
             )
 
-    else:
-        after = datetime.datetime.now()
-        exit_code = process.returncode
-        assert exit_code is not None
+            try:
+                out, err = process.communicate(stdin, timeout=timeout)
+            except TimeoutExpired:
+                after = datetime.datetime.now()
+                process.returncode = process.returncode or 124
+                if process.returncode is not None:
+                    # if process did not exit yet, attempt to kill it
+                    with suppress(Exception):
+                        process.kill()
+                out = b""
+                err = b"<timeout after {timeout} seconds>"
 
-    result = Program(
-        cmd=cmd,
-        exit_code=exit_code,
-        expected_exit_code=expected_exit_code,
-        stdout=out,
-        stderr=err,
-        stdin=stdin,
-        duration=after - before,
-        cwd=cwd,
-        shell=shell,
-        env=env_vars,
-        log_level=log_level,
-    )
+        except FileNotFoundError as e:
+            after = datetime.datetime.now()
+            exit_code = 127
+            out = b""
+            err = str(e).encode()
+            binary = Path(bin_from_cmd(cmd)).resolve()
+            if binary.is_file():
+                log.error(
+                    "Got exception about file not found even though it exists. "
+                    "Perhaps a platform incompatibility of the binary?",
+                    error=e,
+                    binary=str(binary),
+                )
 
-    if check:
-        result.check()
+        else:
+            after = datetime.datetime.now()
+            exit_code = process.returncode
+            assert exit_code is not None
 
-    return result
+        result = Program(
+            cmd=cmd,
+            exit_code=exit_code,
+            expected_exit_code=expected_exit_code,
+            stdout=out,
+            stderr=err,
+            stdin=stdin,
+            duration=after - before,
+            cwd=cwd,
+            shell=shell,
+            env=env_vars,
+            log_level=log_level,
+        )
+
+        if check:
+            try:
+                result.check()
+            except CalledProcessError as e:
+                if attempt == attempts:
+                    raise
+                log.error(
+                    "retrying failed run",
+                    error=e,
+                    sleep_between_attempts=sleep_between_attempts,
+                )
+                if sleep_between_attempts:
+                    time.sleep(sleep_between_attempts)
+                continue
+
+        return result
