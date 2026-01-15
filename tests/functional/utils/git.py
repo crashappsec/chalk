@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from .log import get_logger
-from .os import run, lock
+from .os import run, which
 
 
 logger = get_logger()
@@ -21,13 +21,11 @@ class Git:
     def __init__(self, path: Path, sign: bool = False):
         self.path = path
         self.sign = sign
-        # gpg is flaky in CI hence more attempts
-        self.run = functools.partial(run, cwd=self.path, attempts=5)
+        self.run = functools.partial(run, cwd=self.path)
 
     def init(
         self,
         *,
-        first_commit: bool = True,
         remote: Optional[str] = None,
         branch: str = "main",
     ):
@@ -43,12 +41,13 @@ class Git:
             self.config("commit.gpgsign", "true")
             self.config("tag.gpgsign", "true")
             self.config("user.signingkey", os.environ.get("GPG_KEY", ""))
+            self.config("gpg.program", which("gpg.sh"))
         if remote:
             self.run(["git", "remote", "add", "origin", remote])
         return self
 
     def clone(self, origin: str, ref: str = "main"):
-        self.init(first_commit=False, remote=origin)
+        self.init(remote=origin)
         self.fetch()
         self.checkout(ref)
         return self
@@ -60,7 +59,6 @@ class Git:
         self.run(["git", "add", "."])
         return self
 
-    @lock("git-op")
     def commit(self, message="dummy"):
         args = ["git", "commit", "--allow-empty"]
         if message == "":
@@ -69,7 +67,6 @@ class Git:
         self.run(args)
         return self
 
-    @lock("git-op")
     def tag(self, tag: str, message: Optional[str] = None):
         args = ["git", "tag", tag]
         if message is not None or self.sign:

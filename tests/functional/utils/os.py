@@ -377,3 +377,7 @@ def run(
                 continue
 
         return result
+
+
+def which(cmd: str) -> str:
+    return run(["which", cmd]).text

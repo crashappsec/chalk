@@ -3,6 +3,7 @@
 set -e
 
 FILEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH=$FILEDIR:$PATH
 
 if [ -z "${SSH_AUTH_SOCK:-}" ] && [ -n "${SSH_KEY}" ]; then
     eval "$(ssh-agent)"
@@ -11,7 +12,7 @@ fi
 
 if which gpg &> /dev/null; then
     email="chalk@tests.com"
-    passphrase="test"
+    export GPG_PASSWORD="test"
     export GPG_TTY=$(tty)
     if ! gpg -K $email &> /dev/null; then
         gpg \
@@ -19,14 +20,14 @@ if which gpg &> /dev/null; then
             --yes \
             --batch \
             --quick-generate-key \
-            --passphrase $passphrase \
+            --passphrase $GPG_PASSWORD \
             $email
     fi
     # start gpg agent with the passphrase so that its not prompted later
     echo | gpg \
         --yes \
         --batch \
-        --passphrase $passphrase \
+        --passphrase $GPG_PASSWORD \
         --pinentry-mode loopback \
         --clearsign \
         &> /dev/null
@@ -34,7 +35,7 @@ if which gpg &> /dev/null; then
         gpg \
             -K \
             --keyid-format=LONG \
-            chalk@tests.com \
+            $email \
             | grep sec \
             | awk '{print $2}' \
             | cut -d/ -f2
