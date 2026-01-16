@@ -10,6 +10,18 @@ _DOCKER_ARGS=
 _DOCKER=docker compose run --rm $(_DOCKER_ARGS) chalk
 DOCKER?=$(_DOCKER)
 
+export NDEV_CC=musl
+export NDEV_PROFILE=musl
+ifneq "$(DOCKER)" ""
+export NDEV_BUILD_IN_CONTAINER=yes
+endif
+
+ifeq "$(shell [ -t 0 ] && echo interactive)" "interactive"
+CRASHAPPSEC=git@github.com:crashappsec
+else
+CRASHAPPSEC=https://github.com/crashappsec
+endif
+
 SOURCES=$(wildcard *.nims)
 SOURCES+=$(wildcard *.nimble)
 SOURCES+=$(shell find src/ -name '*.nim')
@@ -21,7 +33,13 @@ SOURCES+=$(shell find ../con4m -name '*.nim' 2> /dev/null)
 SOURCES+=$(shell find ../con4m -name '*.c4m' 2> /dev/null)
 SOURCES+=$(shell find ../nimutils -name '*.nim' 2> /dev/null)
 SOURCES+=$(shell find ../nimutils -name '*.c' 2> /dev/null)
+SOURCES+=$(shell find ../n00b/include -name '*.h' 2> /dev/null)
 SOURCES+=src/docs/CHANGELOG.md
+SOURCES+=../n00b/dist/lib/libn00b.a
+SOURCES+=nimble.paths
+N00B_SOURCES=$(shell find ../n00b -name '*.c' 2> /dev/null)
+N00B_SOURCES=$(shell find ../n00b -name '*.nc' 2> /dev/null)
+N00B_SOURCES+=$(shell find ../n00b -name '*.h' 2> /dev/null)
 
 VERSION=$(shell cat src/configs/base_keyspecs.c4m \
           | grep -E "chalk_version\s+:=" | cut -d'"' -f2 | head -n1)
@@ -75,21 +93,29 @@ clean:
 watch: $(SOURCES)
 	echo $^ | tr ' ' '\n' | entr $(MAKE)
 
-# devmode for local deps
-# this allows to dev againt local versions of nimutils/con4m
-# this works for both docker/host builds
+../%/README.md:
+	git clone $(CRASHAPPSEC)/$*.git $(@D)
 
-../%/.git:
-	git clone git@github.com:crashappsec/$*.git
+../n00b/.build_profiles/musl: | ../n00b/README.md
+	cd ../n00b && ./bin/ndev profile new $(NDEV_PROFILE) --defaults
 
-nimble.paths:
+../n00b/dist/lib/libn00b.a: ../n00b/.build_profiles/musl $(N00B_SOURCES)
+	cd ../n00b && ./bin/ndev dist --build
+	touch $@
+
+../nimutils/README.md:
+	git clone $(CRASHAPPSEC)/nimutils.git $(@D)
+	git --git-dir=$(@D)/.git --work-tree=$(@D) checkout libn00b
+
+../con4m/README.md:
+	git clone $(CRASHAPPSEC)/con4m.git $(@D)
+	git --git-dir=$(@D)/.git --work-tree=$(@D) checkout dev
+
+nimble.paths: ../nimutils/README.md
+nimble.paths: ../con4m/README.md
 	echo --noNimblePath > $@
-
-nimutils con4m: nimble.paths
-	$(MAKE) -s ../$@/.git
-	echo '--path:"$(abspath ../$@)"' >> $^
-	$(DOCKER) ln -s ../$@ $@
-	$(DOCKER) touch $@
+	echo '--path:"$(abspath $(dir $(shell find ../nimutils -name nimutils.nim)))"' >> $@
+	echo '--path:"$(abspath $(dir $(shell find ../con4m -name con4m.nim)))"' >> $@
 
 # ----------------------------------------------------------------------------
 # TESTS

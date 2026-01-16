@@ -24,6 +24,8 @@ services:
       - $PWD:$PWD
       - $PWD/../nimutils:$PWD/../nimutils
       - $PWD/../con4m:$PWD/../con4m
+      - $PWD/../n00b:$PWD/../n00b
+      - ./nim.cfg:/root/.config/nim.cfg
     environment:
       DEBUG: ${DEBUG:-}
       CHALK_PASSWORD: ${CHALK_PASSWORD:-}

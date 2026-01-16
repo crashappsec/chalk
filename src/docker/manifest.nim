@@ -73,10 +73,10 @@ proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true)
   trace("docker: docker " & args.join(" "))
   let
     output = runDockerGetEverything(args)
-    stdout = output.getStdout()
-    stderr = output.getStderr()
+    stdout = output.stdout
+    stderr = output.stderr
     text   = stdout & stderr
-  if output.getExit() == 0:
+  if output.exitCode == 0:
     try:
       let value = parseAndDigestJson(stdout)
       if value.json.kind == JNull:
@@ -86,7 +86,7 @@ proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true)
     except:
       raise newException(ValueError, msg & " failed with: " & getCurrentExceptionMsg())
   elif not fallback:
-    raise newException(ValueError, msg & " exited with: " & $output.getExit())
+    raise newException(ValueError, msg & " exited with: " & $output.exitCode)
   # sample output:
   # ERROR: unexpected status from HEAD request to https://<registry>: 401 Unauthorized
   if "401 Unauthorized" notin stderr:
