@@ -12,7 +12,6 @@ from fastapi import (
     Header,
 )
 
-
 app = FastAPI()
 
 
