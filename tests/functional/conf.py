@@ -6,7 +6,6 @@ import os
 import shutil
 from pathlib import Path
 
-
 DOCKER_SSH_REPO = (
     os.environ.get("DOCKER_GIT_CONTEXT_SSH_REPO")
     or "crashappsec/chalk-docker-git-context"

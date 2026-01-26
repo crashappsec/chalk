@@ -17,7 +17,6 @@ from ..utils.docker import Docker
 from ..utils.log import get_logger
 from ..utils.os import CalledProcessError, Program, run
 
-
 ChalkCommand = Literal[
     "delete",
     "dump",

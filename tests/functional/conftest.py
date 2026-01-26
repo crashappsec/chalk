@@ -31,7 +31,6 @@ from .utils.log import get_logger
 from .utils.tmp import make_tmp_file
 from .utils.os import lock
 
-
 logger = get_logger()
 
 
