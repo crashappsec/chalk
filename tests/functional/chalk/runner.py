@@ -15,6 +15,7 @@ from ..utils.bin import sha256
 from ..utils.dict import ANY, MISSING, ContainsDict, ContainsList, IfExists
 from ..utils.docker import Docker
 from ..utils.log import get_logger
+from ..utils.git import GIT_NONINTERACTIVE_ENV
 from ..utils.os import CalledProcessError, Program, run
 
 
@@ -430,12 +431,13 @@ class Chalk:
             # TODO: add validation for docker image and container inspection
             cmd.append(target)
 
+        merged_env = {**GIT_NONINTERACTIVE_ENV, **(env or {})}
         result = ChalkProgram.from_program(
             run(
                 cmd,
                 expected_exit_code=int(not expected_success),
                 cwd=cwd,
-                env=env,
+                env=merged_env,
                 stdin=stdin,
                 tty=tty,
             )

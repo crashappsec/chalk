@@ -41,11 +41,27 @@ def pytest_addoption(parser):
     parser.addoption(
         "--logs", action="store_true", default=False, help="show live logs"
     )
+    parser.addoption(
+        "--cmd-logs",
+        action="store_true",
+        default=False,
+        help="show stdout/stderr from subprocess runs",
+    )
+    parser.addoption(
+        "--git-diff-logs",
+        action="store_true",
+        default=False,
+        help="show only git(n00b) diff lines from chalk runs",
+    )
 
 
 @pytest.hookimpl
 def pytest_configure(config):
     config.inicfg["log_cli"] = config.getoption("--logs")
+    if config.getoption("--git-diff-logs"):
+        os.environ["CHALK_TEST_GIT_DIFF_LOGS"] = "1"
+    if config.getoption("--logs") or config.getoption("--cmd-logs"):
+        os.environ["CHALK_TEST_CMD_LOGS"] = "1"
 
 
 @pytest.fixture(autouse=True)

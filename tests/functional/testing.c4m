@@ -7,6 +7,8 @@ custom_report.terminal_chalk_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 custom_report.terminal_other_op.use_when: ["extract", "delete", "exec", "env", "heartbeat", "postexec"]
 
+git.compare_with_n00b: true
+
 object_store_config server {
   enabled = env_exists("OBJECT_STORE")
   object_store = "presign"

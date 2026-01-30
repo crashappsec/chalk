@@ -20,13 +20,16 @@ import pkg/[
 ]
 import ".."/[
   n00b/subproc,
+  n00b/wrapping/env,
   plugin_api,
   run_management,
   types,
   utils/files,
   utils/git,
+  utils/n00b_git,
   utils/strings,
   utils/times,
+  chalkjson,
 ]
 
 const
@@ -744,6 +747,8 @@ proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   self.origin = ghLocal
   return ghLocal
 
+proc compareWithN00b(info: RepoInfo)
+
 
 proc findAndLoad(plugin: GitInfo, path: string) =
   trace("Looking for .git directory, from: " & path)
@@ -773,6 +778,7 @@ proc findAndLoad(plugin: GitInfo, path: string) =
 
   plugin.vcsDirs[vcsDir] = info
   plugin.repos[path] = vcsDir.parentDir()
+  info.compareWithN00b()
 
 # TODO ideally should be done via libgit
 # but for now easier to depend on git CLI
@@ -821,6 +827,74 @@ proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
       chalkDict.setIfNeeded(prefix & "TIMESTAMP_TAGGED",   info.latestTag.date.toUnixInMs())
     chalkDict.setIfNeeded(prefix & "TAG_SIGNED",           info.latestTag.signed)
     chalkDict.setIfNeeded(prefix & "TAG_MESSAGE",          info.latestTag.message)
+
+proc repoRootForN00b(info: RepoInfo): string =
+  let (head, tail) = info.vcsDir.splitPath()
+  if tail == ".git":
+    return head
+  return info.vcsDir
+
+proc filterSubscribed(dict: ChalkDict): ChalkDict =
+  result = ChalkDict()
+  for k, v in dict:
+    if isSubscribedKey(k):
+      result[k] = v
+
+proc compareWithN00b(info: RepoInfo) =
+  if not attrGet[bool]("git.compare_with_n00b"):
+    return
+
+  let repoRoot = info.repoRootForN00b()
+  if repoRoot == "":
+    return
+
+  let refetch = attrGet[bool]("git.refetch_lightweight_tags")
+  let prevRefetch = n00bGetEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS")
+  let prevAllow = n00bGetEnv("N00B_GIT_REFETCH_ALLOW_NETWORK")
+  n00bSetEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS", if refetch: "true" else: "false")
+  n00bSetEnv("N00B_GIT_REFETCH_ALLOW_NETWORK", if refetch: "true" else: "false")
+  defer:
+    if prevRefetch.isSome():
+      n00bSetEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS", prevRefetch.get())
+    else:
+      discard n00bRemoveEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS")
+    if prevAllow.isSome():
+      n00bSetEnv("N00B_GIT_REFETCH_ALLOW_NETWORK", prevAllow.get())
+    else:
+      discard n00bRemoveEnv("N00B_GIT_REFETCH_ALLOW_NETWORK")
+
+  var chalkDict = ChalkDict()
+  chalkDict.setVcsKeys(info)
+  let n00bDict = filterSubscribed(n00bGitCollect(repoRoot))
+
+  trace("git(chalk) repo=" & repoRoot & " " & chalkDict.toJson())
+  trace("git(n00b) repo=" & repoRoot & " " & n00bDict.toJson())
+  if len(chalkDict) == 0 and len(n00bDict) == 0:
+    return
+
+  var keys = initOrderedTable[string, bool]()
+  for k in chalkDict.keys():
+    keys[k] = true
+  for k in n00bDict.keys():
+    keys[k] = true
+
+  var diffCount = 0
+  for k in keys.keys():
+    let inChalk = k in chalkDict
+    let inN00b = k in n00bDict
+    if not inChalk:
+      diffCount.inc()
+      trace("git(n00b) diff repo=" & repoRoot & " key=" & k & " missing_in=chalk")
+    elif not inN00b:
+      diffCount.inc()
+      trace("git(n00b) diff repo=" & repoRoot & " key=" & k & " missing_in=n00b")
+    elif chalkDict[k] != n00bDict[k]:
+      diffCount.inc()
+      trace("git(n00b) diff repo=" & repoRoot & " key=" & k &
+            " chalk=" & $chalkDict[k] & " n00b=" & $n00bDict[k])
+
+  if diffCount == 0:
+    trace("git(n00b) diff repo=" & repoRoot & " no_differences")
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":
