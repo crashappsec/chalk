@@ -10,6 +10,9 @@ import std/[
   streams,
   posix
 ]
+import pkg/[
+  nimutils,
+]
 import "."/[
   fd_cache,
   tables,
@@ -114,15 +117,35 @@ proc readInt*[T](self: FileStringStream, where: int): T =
       self[where ..< where + sizeof(T)]
   result = cast[ref T](addr value[0])[]
 
-iterator chunks*(self: FileStringStream, s: HSlice[IntA, IntB], size: int): string =
+iterator chunkPairs*(self: FileStringStream,
+                     s:    HSlice[IntA, IntB],
+                     size: int,
+                     ): (HSlice[IntA, int], string) =
   for i in countup(int(s.a), int(s.b), size):
     let step = i .. min(i + size - 1, int(s.b))
-    yield self[step]
+    yield (step, self[step])
 
-iterator chunks*(self: FileStringStream, s: HSlice[SomeInteger, BackwardsIndex], size: int): string =
+iterator chunks*(self: FileStringStream,
+                 s:    HSlice[IntA, IntB],
+                 size: int,
+                 ): string =
+  for _, chunk in self.chunkPairs(s, size):
+    yield chunk
+
+iterator chunkPairs*(self: FileStringStream,
+                     s:    HSlice[IntA, BackwardsIndex],
+                     size: int,
+                     ): (HSlice[IntA, int], string) =
   let l = len(self)
-  for i in self.chunks(int(s.a) .. l - int(s.b), size):
-    yield i
+  for i, chunk in self.chunkPairs(int(s.a) .. l - int(s.b), size):
+    yield (i, chunk)
+
+iterator chunks*(self: FileStringStream,
+                 s:    HSlice[IntA, BackwardsIndex],
+                 size: int,
+                 ): string =
+  for _, chunk in self.chunkPairs(s, size):
+    yield chunk
 
 proc readAll*(self: FileStringStream): string =
   if self.loaded:
@@ -146,11 +169,27 @@ proc reset*(self: FileStringStream): FileStringStream =
     result.loaded = self.loaded
     result.data   = self.data
 
+proc sha256Hex*(self: FileStringStream): string =
+  var hash = initSha256()
+  for c in self.chunks(0 .. ^1, 4096):
+    hash.update(@c)
+  return hash.finalHex()
+
 proc newFileStringStream*(path: string): FileStringStream =
   let info = getFileInfo(path)
   result = FileStringStream(
     path:        path,
     size:        info.size,
+    overrides:   newTable[int, char](),
+    endOverride: (-1, ""),
+  )
+
+proc newLoadedFileStringStream*(data: string): FileStringStream =
+  result = FileStringStream(
+    loaded:      true,
+    path:        "",
+    data:        data,
+    size:        len(data),
     overrides:   newTable[int, char](),
     endOverride: (-1, ""),
   )

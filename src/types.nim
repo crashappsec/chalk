@@ -29,6 +29,7 @@ import pkg/[
 import "."/[
   con4mwrap,
   utils/chalkdict,
+  utils/file_string_stream,
   utils/json,
   utils/sets,
   utils/strings,
@@ -92,8 +93,8 @@ type
     repos*:                 OrderedTableRef[string, DockerImageRepo] ## all images where image was tagged/pushed
     imageId*:               string           ## Image ID if this is a docker image
     containerId*:           string           ## Container ID if this is a container
-    noAttestation*:         bool             ## Whether to skip attestation for chalkmark
-    noCosign*:              bool             ## When we know image is not in registry. skips validation
+    skipAttestation*:       bool             ## Whether to skip attestation for chalkmark
+    noAttestation*:         bool             ## When we know image is not in registry. skips validation
     signed*:                bool             ## True on the insert path once signed,
                                              ## and once we've seen an attestation otherwise
     resourceType*:          set[ResourceType]
@@ -376,6 +377,7 @@ type
     name*:             DockerImage # where manifest was fetched from
     digest*:           string
     mediaType*:        string
+    artifactType*:     string
     size*:             int
     json*:             JsonNode
     annotations*:      JsonNode
@@ -388,11 +390,12 @@ type
       platform*:       DockerPlatform
       config*:         DockerManifest
       layers*:         seq[DockerManifest]
+      subject*:        DockerManifest
     of config:
       image*:          DockerManifest
       configPlatform*: DockerPlatform
     of layer:
-      discard
+      fileStream*:     FileStringStream
 
   DockerGitContext* = ref object
     context*:      string
@@ -472,7 +475,7 @@ type
       discard
 
   ValidateResult* = enum
-    vOk, vSignedOk, vBadMd, vNoCosign, vBadSig, vNoHash, vNoPk
+    vOk, vSignedOk, vBadMd, vNoAttestation, vBadSig, vNoHash, vNoPk
 
 # # Compile-time only helper for generating one of the consts below.
 # proc commentC4mCode(s: string): string =
@@ -492,7 +495,6 @@ const
   sastConfName*       = "configs/sastconfig.c4m"
   secretsConfName*    = "configs/secretscannerconfig.c4m"
   ioConfName*         = "configs/ioconfig.c4m"
-  attestConfName*     = "configs/attestation.c4m"
   coConfName*         = "configs/crashoverride.c4m"
   defCfgFname*        = "configs/defaultconfig.c4m"  # Default embedded config.
   embeddedConfName*   = "[embedded config]"
@@ -515,7 +517,6 @@ const
   secretsConfig*      = staticRead(secretsConfName)
   ioConfig*           = staticRead(ioConfName)
   defaultConfig*      = staticRead(defCfgFname)
-  attestConfig*       = staticRead(attestConfName)
   coConfig*           = staticRead(coConfName)
   commitID*           = staticExec("git log -n1 --pretty=format:%H")
   archStr*            = staticExec("uname -m")

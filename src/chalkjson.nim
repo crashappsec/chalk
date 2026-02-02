@@ -517,7 +517,6 @@ proc getChalkMarkAsStr*(obj: ChalkObj, onlyCollected = false): string =
   if not result.startsWith("""{ "MAGIC" :"""):
     error("MAGIC not provided; mark is invalid.")
 
-
 proc computeMetadataHashAndId*(obj: ChalkObj, onlyCollected = false): ChalkDict =
   let
     toHash       = obj.getChalkMark(onlyCollected = onlyCollected).normalizeChalk()

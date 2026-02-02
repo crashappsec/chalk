@@ -51,7 +51,7 @@ WORKDIR /chalk
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 COPY *.nimble /chalk/
 
-RUN nimble install --depsOnly
+RUN nimble install --depsOnly --verbose
 
 # -------------------------------------------------------------------
 # build chalk binary to be copied into final release stage

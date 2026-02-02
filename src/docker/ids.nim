@@ -6,6 +6,7 @@
 ##
 
 import std/[
+  json,
   net,
   uri,
 ]
@@ -111,6 +112,14 @@ proc `==`*(self, other: DockerPlatform): bool =
   if isNil(self) or isNil(other):
     return isNil(self) == isNil(other)
   return $self.normalize() == $other.normalize()
+
+proc asJson*(self: DockerPlatform): JsonNode =
+  result = %*({
+    "os":           self.os,
+    "architecture": self.architecture,
+  })
+  if self.variant != "":
+    result["variant"] = %(self.variant)
 
 proc isKnown*(self: DockerPlatform): bool =
   return (
@@ -431,6 +440,12 @@ proc `$`*(self: DockerImage): string =
 
 proc exists*(self: DockerImage): bool =
   return self != ("", "", "")
+
+proc asOciAttestation*(self: DockerImage): DockerImage =
+  return self.withTag("sha256-" & self.digest).withDigest("")
+
+proc asCosignAttestation*(self: DockerImage): DockerImage =
+  return self.withTag("sha256-" & self.digest & ".att").withDigest("")
 
 proc asRepoTag*(items: seq[DockerImage]): seq[string] =
   result = @[]

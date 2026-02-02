@@ -124,7 +124,12 @@ proc findBaseImagePlatform*(ctx: DockerInvocation,
     if hasBuildX():
       try:
         trace("docker: attempting to fetch only platform image manifest for: " & $(baseSection.image))
-        let manifest = fetchOnlyImageManifest(baseSection.image)
+        let manifest = (
+          fetchListOrImageManifest(baseSection.image)
+          .allImages()
+          .filterKnownPlatforms()
+          .one()
+        )
         trace("docker: found image manifest. using " & $manifest.platform)
         return manifest.platform
       except KeyError:

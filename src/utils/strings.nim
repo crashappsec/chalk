@@ -90,3 +90,12 @@ proc coalesce*(data: varargs[string]): string =
     if s != "":
       return s
   return ""
+
+iterator chunkPairs*(self: string, chunk: int): (Slice[int], string) =
+  for i in countup(0, len(self) - 1, chunk):
+    let range = i..<min(i+chunk, len(self))
+    yield (range, self[range])
+
+iterator chunks*(self: string, chunk: int): string =
+  for (_, i) in self.chunkPairs(chunk):
+    yield i

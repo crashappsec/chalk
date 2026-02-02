@@ -1,9 +1,11 @@
 SHELL=bash
 BINARY=chalk
 CHALK_BUILD?=release
+CHALK_ARGS=
 
 ifeq "$(CHALK_BUILD)" "debug"
 export DEBUG=true
+CHALK_ARGS=--log-level=trace
 endif
 
 _DOCKER_ARGS=
@@ -38,7 +40,7 @@ $(BINARY): $(BINARY).bck
 	cp $^ $@
 # automatically run setup to configure cosign for easy local testing
 ifneq "$(CHALK_PASSWORD)" ""
-	./$@ setup
+	./$@ setup $(CHALK_ARGS)
 endif
 
 # as chalk load modifies existing binary,

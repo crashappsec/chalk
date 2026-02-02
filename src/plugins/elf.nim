@@ -891,11 +891,7 @@ proc getUnchalkedHash*(self: ElfFile): string =
     return data.hex()
   # there was an error parsing or unchalking elf
   # so we compute hash of the raw file
-  let fileData = self.fileData.reset()
-  var hash = initSha256()
-  for c in fileData.chunks(0 .. ^1, 4096):
-    hash.update(@c)
-  return hash.finalHex()
+  return self.fileData.reset().sha256Hex()
 
 proc newElfFileFromData*(fileData: FileStringStream): ElfFile =
   return ElfFile(

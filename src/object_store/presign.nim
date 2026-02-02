@@ -103,7 +103,7 @@ proc request(self:           ObjectStorePresign,
                                  retries            = 2,
                                  firstRetryDelayMs  = 100,
                                  maxRedirects       = 0,
-                                 raiseWhenAbove     = 400)
+                                 acceptStatusCodes  = [200..399])
   trace("object store: " & $httpMethod & " " & $url & " -> " & $signResponse.code)
 
   if signResponse.code notin [Http302, Http307]:
@@ -141,7 +141,7 @@ proc request(self:           ObjectStorePresign,
                              body              = body,
                              retries           = 2,
                              firstRetryDelayMs = 100,
-                             raiseWhenAbove    = 500)
+                             rejectStatusCodes = [500..599])
   trace("object store: " & $httpMethod & " @" & $uri.hostname & " (" & $len(body) & "bytes) -> " & $response.code)
 
   let updatedRef = deepCopy(keyRef)
