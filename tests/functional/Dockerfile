@@ -20,6 +20,7 @@ RUN apk add --no-cache \
     gdb \
     git \
     gpg \
+    jq \
     strace
 
 RUN if uname -m | grep -Ei "arm|aarch"; then \
@@ -40,6 +41,7 @@ RUN apt-get update -y && \
         gettext-base \
         git \
         gpg \
+        jq \
         libc6-dbg \
         strace \
         && \

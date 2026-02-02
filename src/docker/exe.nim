@@ -281,7 +281,7 @@ proc getDockerAuthConfig*(): JsonNode =
     try:
       let data = tryToLoadFile(path.resolvePath())
       if data != "":
-        dockerAuth = parseJson(data)
+        dockerAuth = parseJson(data).assertIs(JObject, "bad docker runner config type")
       else:
         trace("docker: no auth config file at " & path)
     except:

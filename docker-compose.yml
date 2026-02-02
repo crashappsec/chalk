@@ -151,6 +151,7 @@ services:
     volumes:
       - $PWD:$PWD
       - $HOME/.pdbrc.py:/root/.pdbrc.py
+      - $HOME/.docker/config.json:/root/.docker/config.json
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/docker/certs.d:/etc/docker/certs.d
       - /etc/buildkit:/etc/buildkit
@@ -186,6 +187,7 @@ services:
       DOCKER_GIT_CONTEXT_TOKEN_REPO: ${DOCKER_GIT_CONTEXT_TOKEN_REPO:-}
       GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      DOCKER_HUB_TOKEN: ${DOCKER_HUB_TOKEN:-}
       IP: ${IP:-} # host IP for docker registry tests
       SSH_KEY: ${SSH_KEY:-}
       STRACE: ${STRACE:-}

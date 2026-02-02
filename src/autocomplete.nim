@@ -166,9 +166,9 @@ proc autocompleteFileCheck*() =
       selfChalk = selfChalkOpt.get()
       autoCompleteChalk = newChalk(
         dst,
-        fsRef         = dst,
-        codec         = getPluginByName("source"),
-        noAttestation = true,
+        fsRef           = dst,
+        codec           = getPluginByName("source"),
+        skipAttestation = true,
       ).copyCollectedDataFrom(selfChalk)
     withSuspendChalkCollectionFor(autoCompleteChalk.getOptionalPluginNames()):
       initCollection()

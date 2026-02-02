@@ -6,14 +6,15 @@
 ##
 
 import std/[
+  json,
   net,
-  uri,
 ]
 import ".."/[
   run_management,
   types,
   utils/sets,
   utils/strings,
+  utils/uri,
 ]
 
 const
@@ -25,8 +26,16 @@ const
     "docker.io":       DEFAULT_REGISTRY,
     "index.docker.io": DEFAULT_REGISTRY,
   }.toTable()
+  REGISTRY_AUTH_NAMESPACES = {
+    DEFAULT_REGISTRY: {
+      # docker hub auth config is configured under https://index.docker.io/v1/
+      # even though v1 is never used, it is still honored by docker client
+      "/v1/": "",
+    }.toTable(),
+  }.toTable()
 
-proc normalizeRegistry*(self: string): string =
+proc normalizeRegistry(self: string): string =
+  # TODO what if port is present?
   return REGISTRY_MAPPING.getOrDefault(self, self)
 
 proc registryAliases*(self: string): HashSet[string] =
@@ -37,10 +46,14 @@ proc registryAliases*(self: string): HashSet[string] =
       result.incl(v)
 
 proc registry*(uri: Uri): string =
-  var registry = uri.hostname
-  if uri.port != "":
-    registry &= ":" & uri.port
-  return registry.normalizeRegistry()
+  return uri.withHostname(uri.hostname.normalizeRegistry()).address()
+
+proc authNamespace*(uri: Uri): string =
+  result = uri.path
+  let hostname = uri.hostname.normalizeRegistry()
+  if hostname in REGISTRY_AUTH_NAMESPACES:
+    result = REGISTRY_AUTH_NAMESPACES[hostname].getOrDefault(uri.path, uri.path)
+  result = result.strip(chars = {'/'})
 
 proc extractDockerHash*(value: string): string =
   # this function is also used to process container ids
@@ -51,6 +64,9 @@ proc extractDockerHash*(value: Box): Box =
   return pack(extractDockerHash(unpack[string](value)))
 
 # ----------------------------------------------------------------------------
+
+proc getSystemBuildPlatform*(): DockerPlatform =
+  return DockerPlatform(os: hostOS, architecture: hostCPU)
 
 proc normalize*(self: DockerPlatform): DockerPlatform =
   # https://github.com/containerd/containerd/blob/83031836b2cf55637d7abf847b17134c51b38e53/platforms/platforms.go
@@ -98,6 +114,8 @@ proc normalize*(items: seq[DockerPlatform]): seq[DockerPlatform] =
     result.add(i.normalize())
 
 proc `$`*(self: DockerPlatform): string =
+  if self == nil:
+    return "unknown"
   result = self.os & "/" & self.architecture
   if self.variant != "":
     result &= "/" & self.variant
@@ -112,6 +130,14 @@ proc `==`*(self, other: DockerPlatform): bool =
     return isNil(self) == isNil(other)
   return $self.normalize() == $other.normalize()
 
+proc asJson*(self: DockerPlatform): JsonNode =
+  result = %*({
+    "os":           self.os,
+    "architecture": self.architecture,
+  })
+  if self.variant != "":
+    result["variant"] = %(self.variant)
+
 proc isKnown*(self: DockerPlatform): bool =
   return (
     not isNil(self) and
@@ -120,6 +146,12 @@ proc isKnown*(self: DockerPlatform): bool =
     self.architecture != "" and
     self.architecture != "unknown"
   )
+
+proc known*(items: openArray[DockerPlatform]): seq[DockerPlatform] =
+  result = @[]
+  for i in items:
+    if i.isKnown():
+      result.add(i)
 
 proc parseDockerPlatform*(platform: string): DockerPlatform =
   let parts = platform.toLower().split('/', maxsplit = 2)
@@ -285,23 +317,6 @@ proc normalize(self: DockerImage): DockerImage =
     self.digest,
   )
 
-proc withRegistry*(self: DockerImage, registry: string): DockerImage =
-  if registry == "":
-    return self
-  # parseUri doesnt parse uri without any scheme
-  let
-    normalized = self.normalize()
-    parsed     = parseUri("https://" & registry)
-  var uri      = parseUri("https://" & normalized.repo)
-  uri.hostname = parsed.hostname
-  uri.port     = parsed.port
-  let repo = ($uri).removePrefix("https://")
-  result = (
-    repo,
-    self.tag,
-    self.digest,
-  )
-
 proc registry*(self: DockerImage): string =
   let parts = self.normalize().repo.split('/', maxsplit = 1)
   if len(parts) == 1:
@@ -322,6 +337,33 @@ proc name*(self: DockerImage): string =
 
 proc isDockerHub*(self: DockerImage): bool =
   return self.normalize().registry == DEFAULT_REGISTRY
+
+proc withRegistry*(self: DockerImage, registry: string): DockerImage =
+  if registry == "":
+    return self
+  # parseUri doesnt parse uri without any scheme
+  let
+    normalized = self.normalize()
+    parsed     = parseUri("https://" & registry)
+  var uri      = parseUri("https://" & normalized.repo)
+  uri.hostname = parsed.hostname
+  uri.port     = parsed.port
+  let repo = ($uri).removePrefix("https://")
+  result = (
+    repo,
+    self.tag,
+    self.digest,
+  )
+
+proc withProject*(self: DockerImage, project: string): DockerImage =
+  if project == "":
+    return self
+  let repo = self.registry & "/" & project.strip(chars = {'/'}) & "/" & self.name
+  result = (
+    repo.strip(chars = {'/'}),
+    self.tag,
+    self.digest,
+  )
 
 proc uri*(self:   DockerImage,
           scheme  = "",
@@ -431,6 +473,12 @@ proc `$`*(self: DockerImage): string =
 
 proc exists*(self: DockerImage): bool =
   return self != ("", "", "")
+
+proc asOciAttestation*(self: DockerImage): DockerImage =
+  return self.withTag("sha256-" & self.digest).withDigest("")
+
+proc asCosignAttestation*(self: DockerImage): DockerImage =
+  return self.withTag("sha256-" & self.digest & ".att").withDigest("")
 
 proc asRepoTag*(items: seq[DockerImage]): seq[string] =
   result = @[]

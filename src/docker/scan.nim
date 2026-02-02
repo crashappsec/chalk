@@ -21,82 +21,84 @@ import "."/[
   inspect,
 ]
 
-proc scanLocalImage*(item: string): Option[ChalkObj] =
-  let chalk = newChalk(name    = item,
-                       codec   = getPluginByName("docker"))
+proc scanImage(chalk:         ChalkObj,
+               name:          string,
+               image:         DockerImage,
+               fromManifest = true,
+               ): Option[ChalkObj] =
+  if name == "scratch":
+    return none(ChalkObj)
+  var chalk = chalk
   chalk.withErrorContext():
     try:
-      chalk.collectLocalImage(item)
+      chalk.collectImage(
+        image,
+        collectFromManifest  = fromManifest,
+        ifManySystemPlatform = true,
+      )
     except:
+      trace("docker: " & getCurrentExceptionMsg())
       return none(ChalkObj)
+    if ResourceContainer notin chalk.resourceType:
+      # if we already collected the same image before, return the same pointer
+      # so that we do not duplicate collected artifacts
+      for artifact in getAllChalks() & getAllArtifacts():
+        if artifact.collectedData.getOrDefault("_IMAGE_ID", pack("")) == chalk.collectedData["_IMAGE_ID"]:
+          artifact.collectedData.merge(chalk.collectedData)
+          chalk = artifact
     try:
       chalk.extractImage()
     except:
       warn("docker: could not extract chalk mark from image: " & getCurrentExceptionMsg())
-      addUnmarked(item)
-    return some(chalk)
+  if not chalk.isChalked():
+    addUnmarked(name)
+  return some(chalk)
 
-proc scanImage*(item: DockerImage, platform: DockerPlatform): Option[ChalkObj] =
-  if $item == "scratch":
-    return none(ChalkObj)
-  var chalk = newChalk(name     = $item,
+proc scanImage*(name:          string | DockerImage,
+                platform     = DockerPlatform(nil),
+                fromManifest = true,
+                ): Option[ChalkObj] =
+  let
+    image =
+      when name is string:
+        parseImage(name, defaultTag = "")
+      else:
+        name
+    name = $name
+  var chalk = newChalk(name     = name,
                        codec    = getPluginByName("docker"),
                        platform = platform)
-  chalk.withErrorContext():
-    try:
-      chalk.collectImage(item)
-    except:
-      return none(ChalkObj)
-    # if we already collected the same image before, return the same pointer
-    # so that we do not duplicate collected artifacts
-    for artifact in getAllChalks() & getAllArtifacts():
-      if artifact.collectedData.getOrDefault("_IMAGE_ID", pack("")) == chalk.collectedData["_IMAGE_ID"]:
-        artifact.collectedData.merge(chalk.collectedData)
-        chalk = artifact
-  chalk.withErrorContext():
-    try:
-      chalk.extractImage()
-    except:
-      warn("docker: could not extract chalk mark from image: " & getCurrentExceptionMsg())
-      addUnmarked($item)
-    return some(chalk)
+  return chalk.scanImage(name, image)
 
-proc scanLocalImageOrContainer*(item: string): Option[ChalkObj] =
-  let chalk = newChalk(name    = item,
-                       codec   = getPluginByName("docker"))
+proc scanImageOrContainer*(name: string): Option[ChalkObj] =
+  var
+    chalk        = newChalk(name    = name,
+                            codec   = getPluginByName("docker"))
+    image        = parseImage(name, defaultTag = "")
+    fromManifest = true
   chalk.withErrorContext():
-    var image = item
     try:
-      chalk.collectContainer(image)
-      image = chalk.imageId
+      chalk.collectContainer(name)
+      image = parseImage(chalk.imageId, defaultTag = "")
+      fromManifest = false
       try:
         chalk.extractContainer()
       except:
-        warn("docker: could not extract chalk mark from container " & item & ": " & getCurrentExceptionMsg())
         # will reattempt to extract from image
         # there are valid reason why container might not have chalk mark
         # such as it was a virtual insert
+        warn("docker: could not extract chalk mark from container " & name &
+             ": " & getCurrentExceptionMsg())
     except:
       trace("docker: " & getCurrentExceptionMsg())
-    try:
-      chalk.collectLocalImage(image)
-      try:
-        chalk.extractImage()
-      except:
-        warn("docker: could not extract chalk mark from image " & image & ": " & getCurrentExceptionMsg())
-    except:
-      trace("docker: " & getCurrentExceptionMsg())
-      return none(ChalkObj)
-    if not chalk.isChalked():
-      addUnmarked(item)
-    return some(chalk)
+  return chalk.scanImage(name, image, fromManifest = fromManifest)
 
 iterator scanAllContainers*(): ChalkObj =
   for id in allContainerIDs():
     trace("docker: found container with ID = " & id)
-    yield scanLocalImageOrContainer(id).get()
+    yield scanImageOrContainer(id).get()
 
 iterator scanAllImages*(): ChalkObj =
   for id in allImageIDs():
     trace("docker: found image with ID = " & id)
-    yield scanLocalImage(id).get()
+    yield scanImage(id).get()

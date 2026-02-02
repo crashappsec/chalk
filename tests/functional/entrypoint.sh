@@ -65,6 +65,11 @@ if ! docker buildx inspect $empty_builder &> /dev/null; then
         > /dev/null
 fi
 
+docker info
+docker buildx ls
+docker buildx inspect $insecure_builder
+docker buildx inspect $empty_builder
+
 if which "${1:-}" &> /dev/null; then
     exec "$@"
 else

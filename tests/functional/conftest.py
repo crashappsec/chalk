@@ -27,9 +27,10 @@ from .conf import (
     SERVER_IMDS,
     SERVER_STATIC,
 )
+from .utils.cosign import Cosign
 from .utils.log import get_logger
-from .utils.tmp import make_tmp_file
 from .utils.os import lock
+from .utils.tmp import make_tmp_file
 
 
 logger = get_logger()
@@ -246,3 +247,8 @@ def configs():
                 tmp_config.parent.mkdir(parents=True, exist_ok=True)
                 tmp_config.write_text(data)
         yield tmp
+
+
+@pytest.fixture(scope="session")
+def cosign():
+    yield Cosign()

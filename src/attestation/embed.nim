@@ -31,7 +31,7 @@ proc generateKeyCallback(this: AttestationKeyProvider): AttestationKey =
   if isatty(0) == 0:
     raise newException(ValueError, "Can only generate chalk keys in interactive shell")
   let self = Embed(this)
-  result = mintCosignKey(self.save_path.joinPath(self.filename))
+  result = mintAttestationKeyToDisk(self.save_path.joinPath(self.filename))
   echo()
   echo("------------------------------------------")
   echo("CHALK_PASSWORD=", result.password)
@@ -49,7 +49,7 @@ proc retrieveKeyCallback(this: AttestationKeyProvider): AttestationKey =
   for i in self.get_paths:
     let path = i.replace("$CHALK", dir).joinPath(self.filename)
     try:
-      result = getCosignKeyFromDisk(path, password = password)
+      result = getAttestationKeyFromDisk(path, password = password)
       info("Loaded existing attestation keys from: " & path)
       return
     except:

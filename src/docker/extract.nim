@@ -7,15 +7,13 @@
 
 ## extract chalkmark json from images/containers into chalk object
 
-import std/[
-  base64,
-]
 import ".."/[
   attestation/utils,
   chalkjson,
+  run_management,
   types,
-  utils/json,
   utils/files,
+  utils/json,
 ]
 import "."/[
   exe,
@@ -125,7 +123,7 @@ proc extractMarkFromLayer(self: ChalkObj): string =
           "Last layer for " & $image & " does not contain /chalk.json",
         )
       let lastLayer = manifest.layers[^1]
-      return lastLayer.asImage().layerGetFSFileString(
+      return lastLayer.asImage().layerGetFileString(
         name   = "chalk.json",
         accept = manifest.mediaType,
       )
@@ -133,107 +131,6 @@ proc extractMarkFromLayer(self: ChalkObj): string =
       err = getCurrentExceptionMsg()
       trace("docker: could not extract chalk mark from registry: " & err)
       continue
-  raise newException(ValueError, err)
-
-proc extractMarkFromInToto(self: ChalkObj, json: JsonNode): string =
-  let
-    sigs          = json{"signatures"}
-    payload       = parseJson(json{"payload"}.getStr().decode())
-    predicateKind = payload{"predicateType"}.getStr()
-    docPredicate  = payload{"predicate"}
-  if docPredicate.kind != JObject:
-    raise newException(
-      ValueError,
-      "Unsupported in-toto attestation " & predicateKind & ". " &
-      "Expecting predicate to be a JObject but it is " & $docPredicate.kind
-    )
-  let data        = docPredicate{"Data"}.getStr().strip()
-  if data == "":
-    raise newException(
-      ValueError,
-      "Unsupported in-toto attestation " & predicateKind & ". " &
-      "Predicate doest have any associated '.Data'."
-    )
-  let
-    attPredicate  = parseJson(data){"predicate"}
-    attributes    = attPredicate{"attributes"}
-  if attributes.kind != JArray or len(attributes) == 0:
-    raise newException(
-      ValueError,
-      "Unsupported in-toto attestation " & predicateKind & ". " &
-      "Predicate doest have any attributes."
-    )
-  let
-    attrs         = attributes.getElems()[0]
-    rawMark       = attrs{"evidence"}.getStr()
-  for subject in payload{"subject"}:
-    let digest = subject{"digest"}{"sha256"}.getStr()
-    var
-      matchesDigest = false
-      digests       = newSeq[string]()
-    for image in self.repos.manifests:
-      if digest.extractDockerHash() == image.digest:
-        matchesDigest = true
-        digests.add(image.digest)
-        break
-    if not matchesDigest:
-      raise newException(
-        ValueError,
-        "In-Toto attestation subject does not match any known image digest: " &
-        digest & " not in " & $digests
-      )
-  self.collectedData["_SIGNATURES"] = sigs.nimJsonToBox()
-  return rawMark
-
-proc extractMarkFromSigStoreCosign(self: ChalkObj): string =
-  var err = "no attestation found to extract chalk mark"
-  for image in self.repos.manifests:
-    let
-      spec   = image.asRepoDigest()
-      args   = @["download", "attestation", spec]
-      cosign = getCosignLocation()
-    info("cosign: downloading attestation for " & spec)
-    trace("cosign " & args.join(" "))
-    let
-      allOut = runCmdGetEverything(cosign, args)
-      res    = allOut.getStdout()
-      code   = allOut.getExit()
-    if code != 0:
-      err = allOut.getStderr().splitLines()[0]
-      continue
-    let json = parseJson(res)
-    return self.extractMarkFromInToto(json)
-  raise newException(ValueError, err)
-
-proc extractMarkFromSigStore(self: ChalkObj): string =
-  var err = "no attestation found to extract chalk mark"
-  for image in self.repos.manifests:
-    let
-      tag  = "sha256-" & image.digest & ".att"
-      spec = image.withTag(tag).withDigest("")
-    trace("docker: extract chalk mark from in-toto attestation for " & $spec)
-    let manifest = fetchOnlyImageManifest(spec, fetchConfig = false)
-    if manifest.kind != DockerManifestType.image:
-      raise newException(
-        ValueError,
-        "Attestation should be image manifest but is instead " & $manifest.kind,
-      )
-    if len(manifest.layers) != 1:
-      raise newException(
-        ValueError,
-        "Attestation manifest is expected to have at most one layer but " &
-        $spec & " has " & $len(manifest.layers),
-      )
-    let
-      layer     = manifest.layers[0]
-      predicate = layer.annotations{"predicateType"}.getStr()
-    if predicate != "https://cosign.sigstore.dev/attestation/v1":
-      raise newException(
-        ValueError,
-        "Unsupported attestation predicate: " & predicate,
-      )
-    let data = layer.asImage().layerGetJson(accept = layer.mediaType)
-    return self.extractMarkFromInToto(data.json)
   raise newException(ValueError, err)
 
 proc extractFrom(self: ChalkObj, mark: string, name: string) =
@@ -250,25 +147,17 @@ proc extractFrom(self: ChalkObj, mark: string, name: string) =
 
 proc extractImage*(self: ChalkObj) =
   if len(self.repos) > 0:
-    try:
-      self.extractFrom(self.extractMarkFromSigStore(), self.getImageName())
-      self.signed = true
-      info("docker: " & self.getImageName() & ": chalk mark successfully extracted from in-toto attestation from registry")
-      return
-    except:
-      trace("docker: " & self.getImageName() & ": could not extract chalk mark " &
-            "via in-toto attestation due to: " & getCurrentExceptionMsg())
-
-  if self.canVerifyBySigStore():
-    try:
-      self.extractFrom(self.extractMarkFromSigStoreCosign(), self.getImageName())
-      self.signed = true
-      info("docker: " & self.getImageName() & ": chalk mark successfully extracted from attestation.")
-      return
-    except:
-      self.noCosign = true
-      trace("docker: " & self.getImageName & ": could not extract chalk mark " &
-           "via attestation due to: " & getCurrentExceptionMsg())
+    for image in self.repos.manifests:
+      for (dsse, mark) in image.fetchDsseInTotoMark():
+        try:
+          self.extractFrom(mark, self.getImageName())
+          self.signed = true
+          self.collectedData.setIfNotEmpty("_SIGNATURES", %(@[dsse]))
+          info("docker: " & self.getImageName() & ": chalk mark successfully extracted from in-toto attestation from registry")
+          return
+        except:
+          trace("docker: " & self.getImageName() & ": could not extract chalk mark " &
+                "via in-toto attestation due to: " & getCurrentExceptionMsg())
 
   if len(self.repos) > 0:
     try:

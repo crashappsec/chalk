@@ -76,13 +76,14 @@ proc validateMetaData*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
 
   try:
     if obj.canVerifyByHash():
-      return obj.verifyByHash(computedHash)
+      result = obj.verifyByHash(computedHash)
     if obj.canVerifyBySigStore():
       let (isValid, _) = obj.verifyBySigStore()
-      return isValid
+      result = isValid
+    trace("signature validation: " & $result)
   except:
     error("could not successfully validate signature due to: " & getCurrentExceptionMsg())
-    return vNoCosign
+    return vNoAttestation
 
 # Even if you don't subscribe to TIMESTAMP_WHEN_CHALKED we collect it in case
 # you're subscribed to something that uses it in a substitution.
@@ -136,7 +137,7 @@ proc setValidated*(self: var ChalkDict, chalk: ChalkObj, valid: ValidateResult) 
   of vBadMd:
     self.setIfNeeded("_VALIDATED_METADATA", false)
     chalk.opFailed = true
-  of vNoPk, vNoCosign, vNoHash:
+  of vNoPk, vNoAttestation, vNoHash:
     self.setIfNeeded("_VALIDATED_METADATA", true)
     self.setIfNeeded("_VALIDATED_SIGNATURE", false)
   of vBadSig:
@@ -289,8 +290,14 @@ proc attestationGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
   if obj.willSignByHash():
     try:
       result.update(obj.signByHash(unpack[string](result["METADATA_HASH"])))
+      forceChalkKeys(["SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"])
     except:
       error("Cannot sign " & obj.name & ": " & getCurrentExceptionMsg())
+  if obj.willSignBySigStore():
+      # the artifact might not be attested but as sigstore attestations
+      # are done post-chalk-insertion, pubkey should be forced into
+      # chalkmark as its required to validate the signature
+      forceChalkKeys(["INJECTOR_PUBLIC_KEY"])
 
 proc attestationGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, insert: bool):
                                        ChalkDict {.cdecl.} =

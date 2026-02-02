@@ -6,8 +6,8 @@
 ##
 
 import std/[
+  base64,
   net,
-  os,
 ]
 import "."/[
   chalkjson,
@@ -16,9 +16,8 @@ import "."/[
   run_management,
   selfextract,
   types,
-  utils/files,
   utils/json,
-  utils/semver,
+  utils/times,
 ]
 import "./attestation"/[
   embed,
@@ -27,9 +26,11 @@ import "./attestation"/[
 ]
 import "./docker"/[
   ids,
+  manifest,
+  registry,
 ]
 
-export getCosignLocation, canVerifyByHash, canVerifyBySigStore # from utils
+export canVerifyByHash, canVerifyBySigStore # from utils
 
 proc writeSelfConfig(selfChalk: ChalkObj): bool {.importc, discardable.}
 
@@ -38,9 +39,9 @@ let keyProviders = {
   getProvider.name:    AttestationKeyProvider(getProvider),
 }.toTable()
 
-var cosignKey = AttestationKey(nil)
+var attestationKey = AttestationKey(nil)
 
-proc getCosignKey(chalk: ChalkObj): AttestationKey =
+proc getAttestationKey(chalk: ChalkObj): AttestationKey =
   let pubKey = unpack[string](chalk.extract["INJECTOR_PUBLIC_KEY"])
   return AttestationKey(publicKey: pubKey)
 
@@ -50,7 +51,7 @@ proc getProvider(): AttestationKeyProvider =
     raise newException(KeyError, "Unsupported attestation key provider: " & name)
   return keyProviders[name]
 
-proc loadCosignKeyFromSelf(): AttestationKey =
+proc loadAttestationKeyFromSelf(): AttestationKey =
   result = AttestationKey()
 
   let selfOpt = getSelfExtraction()
@@ -95,9 +96,9 @@ proc loadAttestation*(forceLoad = false, withPrivateKey = false) =
   ]:
     return
 
-  if cosignKey == nil:
-    cosignKey = loadCosignKeyFromSelf()
-  if cosignKey == nil or not cosignKey.canAttestVerify():
+  if attestationKey == nil:
+    attestationKey = loadAttestationKeyFromSelf()
+  if attestationKey == nil or not attestationKey.canAttestVerify():
     warn("Code signing not initialized. Run `chalk setup` to fix.")
     # there is no key in self chalkmark
     return
@@ -111,17 +112,17 @@ proc loadAttestation*(forceLoad = false, withPrivateKey = false) =
 
   if loadPrivateKey:
     try:
-      cosignKey.password = provider.retrievePassword(provider, cosignKey)
+      attestationKey.password = provider.retrievePassword(provider, attestationKey)
     except:
-      error("Could not retrieve cosign private key password: " & getCurrentExceptionMsg())
+      error("Could not retrieve attestation private key password: " & getCurrentExceptionMsg())
       return
 
     try:
-      if not cosignKey.isValid():
-        cosignKey = AttestationKey(nil)
+      if not attestationKey.isValid():
+        attestationKey = AttestationKey(nil)
         return
     except:
-      cosignKey = AttestationKey(nil)
+      attestationKey = AttestationKey(nil)
       return
 
 proc saveKeyToSelf(key: AttestationKey): bool =
@@ -137,13 +138,6 @@ proc saveKeyToSelf(key: AttestationKey): bool =
     setFullCommandName(savedCommandName)
 
 proc setupAttestation*() =
-  info("Ensuring cosign is present to setup attestation.")
-  try:
-    if getCosignLocation(downloadCosign = true) == "":
-      raise newException(ValueError, "Failed to get cosign binary")
-  except:
-    raise newException(ValueError, "Failed to get cosign binary: " & getCurrentExceptionMsg())
-
   let provider = getProvider()
   try:
     provider.init(provider)
@@ -155,9 +149,11 @@ proc setupAttestation*() =
   # retrieval/generation
   try:
     if provider.retrieveKey != nil:
-      cosignKey = provider.retrieveKey(provider)
-      if cosignKey == nil:
+      attestationKey = provider.retrieveKey(provider)
+      if attestationKey == nil:
         raise newException(ValueError, "no key returned")
+      if not attestationKey.isValid():
+        raise newException(ValueError, "retrieved key is not valid")
     else:
       raise newException(ValueError, "key retrieval not supported")
   except:
@@ -168,8 +164,8 @@ proc setupAttestation*() =
                         "failed to retrieve existing key due to: " & retrieveError)
     trace("Could not retrieve key. Will attempt to generate. error: " & retrieveError)
     try:
-      cosignKey = provider.generateKey(provider)
-      if cosignKey == nil:
+      attestationKey = provider.generateKey(provider)
+      if attestationKey == nil:
         raise newException(ValueError, "no key generated")
     except:
       let generateError = getCurrentExceptionMsg()
@@ -178,8 +174,9 @@ proc setupAttestation*() =
                          "failed to retrieve existing key due to: " & retrieveError & "; " &
                          "and failed to generate new key due to: " & generateError)
 
+  info("attestation: Configured attestation key. Saving it to chalk binary.")
   try:
-    if not cosignKey.saveKeyToSelf():
+    if not attestationKey.saveKeyToSelf():
       raise newException(ValueError, "Failed to store generated attestation key to chalk")
   except:
     raise newException(ValueError, "Failed to store generated attestation key to chalk: " & getCurrentExceptionMsg())
@@ -188,7 +185,7 @@ proc setupAttestation*() =
 # signing/validating logic
 
 proc willSign(): bool =
-  if not cosignKey.canAttest():
+  if not attestationKey.canAttest():
     return false
   # We sign artifacts if either condition is true.
   if isSubscribedKey("SIGNATURE") or attrGet[bool]("always_try_to_sign"):
@@ -200,137 +197,188 @@ proc willSignByHash*(chalk: ChalkObj): bool =
   # If there's no associated fs ref, it's either a container or
   # something we don't have permission to read; either way, it's not
   # getting signed in this flow.
-  return willSign() and not chalk.noAttestation and chalk.canVerifyByHash()
+  return willSign() and not chalk.skipAttestation and chalk.canVerifyByHash()
 
 proc willSignBySigStore*(chalk: ChalkObj): bool =
-  return willSign() and not chalk.noAttestation and chalk.canVerifyBySigStore()
+  return willSign() and not chalk.skipAttestation and chalk.canVerifyBySigStore()
 
-proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage): (ValidateResult, ChalkDict) =
-  let
-    spec   = image.asRepoDigest()
-    log    = attrGet[bool]("use_transparency_log")
-    cosign = getCosignLocation()
+proc verifyBySigStore(chalk:        ChalkObj,
+                      key:          AttestationKey,
+                      image:        DockerImage,
+                      fetchOci    = true,
+                      fetchCosign = true,
+                      ): (ValidateResult, ChalkDict) =
+  trace("attestation: verifying attestation for " & $image)
   var
-    dict   = ChalkDict()
-    args   = @["verify-attestation",
-               "--insecure-ignore-tlog=" & $(not log),
-               "--key=chalk.pub",
-               "--type=custom",
-               "--verbose"]
-    # https://github.com/sigstore/cosign/blob/main/CHANGELOG.md#v222
-  if not log and getCosignVersion() >= parseVersion("2.2.2"):
-    args.add("--private-infrastructure=true")
-  args.add(spec)
-  info("cosign: verifying attestation for " & spec)
-  trace("cosign " & args.join(" "))
-  let
-    allOut = runCmdGetEverything(cosign, args)
-    res    = allOut.getStdout()
-    err    = allOut.getStderr()
-    code   = allOut.getExit()
-  if code == 0:
+    dict      = ChalkDict()
+    foundSome = false
+  for (dsse, mark) in image.fetchDsseInTotoMark(fetchOci = fetchOci, fetchCosign = fetchCosign):
+    trace("dsse in-toto statement: " & dsse.pretty())
+    foundSome = true
+    dsse.assertIs(JObject, "bad dsse envelope type")
     let
-      blob = parseJson(res)
-      sigs = blob["signatures"]
-      att  = newJArray()
-    att.add(blob)
-    dict["_SIGNATURES"] = att.nimJsonToBox()
-    trace("in-toto signatures are: " & $sigs)
-    info(spec & ": Successfully validated signature.")
-    return (vSignedOk, dict)
-  else:
-    if "MANIFEST_UNKNOWN" in err or "manifest unknown" in err:
-      trace("cosign: no attestation at " & spec)
-      return (vNoHash, dict)
+      payload    = base64.decode(dsse{"payload"}.getStr())
+      signatures = dsse{"signatures"}.assertIs(JArray, "bad dsse envelope signatures type")
+    for i in signatures.items():
+      i.assertIs(JObject, "bad dsse signature type")
+      if key.verify(payload.dsse(dsse{"payloadType"}.getStr()), i{"sig"}.getStr()):
+        info($image & ": Successfully validated signature.")
+        dict.setIfNotEmpty("_SIGNATURES", %(@[dsse]))
+        break
+    let extract = extractOneChalkJson(mark, $image)
+    # the same key can be used for other chalkmarks
+    # so make sure we are validating signature for the same chalk
+    if extract.getOrDefault("METADATA_ID", pack("")) == chalk.collectedData["METADATA_ID"]:
+      return (vSignedOk, dict)
     else:
-      # note that we fail hard on any connection/auth errors
-      trace("Verification failed: " & allOut.getStderr())
-      warn(spec & ": Did not validate signature.")
-      return (vBadSig, dict)
+      trace("attestation: has valid signature however chalkmark has mismatching METADATA_ID")
+  if foundSome:
+    warn($image & ": did not validate any matching attestation statement signatures")
+    return (vBadSig, ChalkDict())
+  else:
+    trace("attestation: no dsse intoto statements to validate signature for " & $image)
+    return (vNoAttestation, ChalkDict())
 
 proc verifyBySigStore*(chalk: ChalkObj): (ValidateResult, ChalkDict) =
   ## Used both for validation, and for downloading just the signature
   ## after we've signed.
   var
-    key  = cosignKey
+    key  = attestationKey
     dict = ChalkDict()
-  if chalk.noCosign:
+  if chalk.noAttestation:
     return (vNoHash, dict)
   if not isChalkingOp():
     if "INJECTOR_PUBLIC_KEY" notin chalk.extract:
       warn(chalk.name & ": Bad chalk mark; missing INJECTOR_PUBLIC_KEY")
       return (vNoPk, dict)
-    key = chalk.getCosignKey()
+    key = chalk.getAttestationKey()
   if not key.canAttestVerify():
     warn(chalk.name & ": Signed but cannot validate; run `chalk setup` to fix")
-    return (vNoCosign, dict)
+    return (vNoAttestation, dict)
 
-  key.withCosignKey:
-    for image in chalk.repos.manifests:
-      let (valid, dict) = chalk.verifyBySigStore(key, image)
-      if valid == vNoHash:
-        continue
-      return (valid, dict)
+  for image in chalk.repos.manifests:
+    let (valid, dict) = chalk.verifyBySigStore(key, image)
+    if valid == vNoAttestation:
+      continue
+    return (valid, dict)
 
-  trace("cosign: " & chalk.name & ": no attestations were found to verify")
-  return (vNoHash, dict)
+  trace("attestation: " & chalk.name & ": no attestations were found to verify")
+  return (vNoAttestation, dict)
+
+proc signBySigStore*(chalk: ChalkObj,
+                     image: DockerImage,
+                     ): ChalkDict =
+  result = ChalkDict()
+
+  try:
+    let (verify, _) = chalk.verifyBySigStore(attestationKey, image, fetchCosign = false)
+    if verify == vSignedOk:
+      trace("attestation: " & $image & " is already attested by chalk. skipping")
+      return
+  except:
+    discard
+
+  var manifest: DockerManifest
+  let spec = image.asOciAttestation()
+  try:
+    manifest = spec.fetchListManifest(fetchManifests = true)
+    trace("attestation: adding to existing manifest list")
+  except RegistryResponseError:
+    manifest = DockerManifest(
+      name: spec,
+      kind: DockerManifestType.list,
+      mediaType: "application/vnd.oci.image.index.v1+json",
+      manifests: @[],
+    )
+    trace("attestation: creating new manifest list")
+
+  let
+    mark    = parseJson(chalk.getChalkMarkAsStr())
+    subject = image.fetchImageManifest(chalk.platform)
+    data    = %*({
+      # https://github.com/in-toto/attestation/blob/main/spec/predicates/scai.md#schema
+      "_type": "https://in-toto.io/Statement/v0.1",
+      "subject": [
+        {
+          "name": subject.name.repo,
+          "digest": {
+            "sha256": subject.digest.extractDockerHash(),
+          },
+          "config.digest": {
+            "sha256": subject.config.digest.extractDockerHash(),
+          },
+        },
+      ],
+      "predicateType": "https://in-toto.io/attestation/scai/v0.3",
+      "predicate": {
+        "attributes": [
+          {
+            "attribute": "CHALK",
+            "evidence": mark,
+          },
+        ],
+      },
+    })
+    payload     = $data
+    payloadType = "application/vnd.in-toto+json"
+    signature   = attestationKey.sign(dsse(payload, payloadType = payloadType))
+    dsse        = %*({
+      "payload":     base64.encode(payload),
+      "payloadType": payloadType,
+      "signatures":  [
+        {
+          "sig": signature,
+        }
+      ],
+    })
+    bundle      = %*({
+      # https://docs.sigstore.dev/about/bundle/
+      "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+      "verificationMaterial": {
+        "certificate": {
+          "rawBytes": attestationKey.asDer(),
+        },
+      },
+      "dsseEnvelope": dsse,
+    })
+  result.setIfNotEmpty("_SIGNATURES", %(@[dsse]))
+  manifest.add(
+    DockerManifest(
+      kind:         DockerManifestType.image,
+      mediaType:    "application/vnd.oci.image.manifest.v1+json",
+      artifactType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+      subject:      subject,
+      annotations:  %*({
+        "dev.sigstore.bundle.content":       "dsse-envelope",
+        "dev.sigstore.bundle.predicateType": "https://sigstore.dev/cosign/sign/v1",
+        "org.opencontainers.image.created":  startTime.utc.format(timesIso8601Format),
+      }),
+      config: DockerManifest(
+        kind:         DockerManifestType.config,
+        json:         newJObject(),
+        mediaType:    "application/vnd.oci.empty.v1+json",
+      ),
+      layers: @[
+        DockerManifest(
+          kind:       DockerManifestType.layer,
+          mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
+          json:       bundle,
+        ),
+      ],
+    ),
+  )
+  info("attestation: pushing attestation for " & $image & " to " & $spec)
+  manifest.put()
 
 proc signBySigStore*(chalk: ChalkObj): ChalkDict =
   result = ChalkDict()
-  cosignKey.withCosignKey:
-    for image in chalk.repos.manifests:
-      let
-        spec    = image.asRepoDigest()
-        mark    = chalk.getChalkMarkAsStr()
-        log     = attrGet[bool]("use_transparency_log")
-        cosign  = getCosignLocation()
-        args    = @["attest",
-                    "--tlog-upload=" & $log,
-                    "--yes",
-                    "--key=chalk.key",
-                    "--type=custom",
-                    "--predicate=-",
-                    spec]
-        toto    = """
-{
-  "_type": "https://in-toto.io/Statement/v1",
-  "subject": [
-    {
-      "name": """ & escapeJson(image.repo) & """,
-      "config.digest": { "sha256": """ & escapeJson(chalk.imageId) & """},
-      "digest": { "sha256": """ & escapeJson(image.digest) & """}
-    }
-  ],
-  "predicateType": "https://in-toto.io/attestation/scai/attribute-report/v0.2",
-  "predicate": {
-    "attributes": [
-      {
-        "attribute": "CHALK",
-        "evidence": """ & escapeJson(mark) & """
-      }
-    ]
-  }
-}
-"""
-      info("cosign: pushing attestation for " & spec)
-      trace("cosign " & args.join(" ") & "\n" & toto)
-      let
-        allOut = runCmdGetEverything(cosign, args, toto)
-        code   = allOut.getExit()
-      if code != 0:
-        raise newException(
-          ValueError,
-          "Cosign error: " & allOut.getStderr()
-        )
-      chalk.signed   = true
-      chalk.noCosign = false
-      try:
-        # fetch the _SIGNATURES from sig-store
-        # as attest command does not show signature back :facepalm:
-        let (_, dict) = chalk.verifyBySigStore(cosignKey, image)
-        result.merge(dict)
-      except:
-        error("cosign: failed to fetch signature: " & getCurrentExceptionMsg())
+  for image in chalk.repos.manifests:
+    try:
+      result.merge(chalk.signBySigStore(image))
+      chalk.signed        = true
+      chalk.noAttestation = false
+    except:
+      error("attestation: failed to sign attestation: " & getCurrentExceptionMsg())
 
 proc signByHash*(chalk: ChalkObj, mdHash : string): ChalkDict =
   ## sign chalkmark by artifact/metadata hash
@@ -342,17 +390,14 @@ proc signByHash*(chalk: ChalkObj, mdHash : string): ChalkDict =
       ValueError,
       "No hash available for this artifact at time of signing."
     )
-  let
-    blob      = artHash & mdHash
-    log       = attrGet[bool]("use_transparency_log")
-  info("cosign: signing file " & chalk.name)
-  cosignKey.withCosignKey:
-    let signature = cosignKey.signBlob(blob & "\n", tlog = log)
-    result["SIGNING"]             = pack(true)
-    result["SIGNATURE"]           = pack(signature)
-    result["INJECTOR_PUBLIC_KEY"] = pack(cosignKey.publicKey)
-    chalk.signed = true
-    forceChalkKeys(["SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"])
+  let blob = artHash & mdHash
+  info("attestation: signing file " & chalk.name)
+  let signature = attestationKey.sign(blob & "\n")
+  result["SIGNING"]             = pack(true)
+  result["SIGNATURE"]           = pack(signature)
+  result["INJECTOR_PUBLIC_KEY"] = pack(attestationKey.publicKey)
+  chalk.signed = true
+  forceChalkKeys(["SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"])
 
 proc verifyByHash*(chalk: ChalkObj, mdHash: string): ValidateResult =
   ## verify chalkmark signature by artifact/metadata hash
@@ -368,9 +413,9 @@ proc verifyByHash*(chalk: ChalkObj, mdHash: string): ValidateResult =
     error(chalk.name & ": Bad chalk mark; signed, but missing INJECTOR_PUBLIC_KEY")
     return vNoPk
 
-  if not cosignKey.canAttestVerify():
+  if not attestationKey.canAttestVerify():
     warn(chalk.name & ": Signed but cannot validate; run `chalk setup` to fix")
-    return vNoCosign
+    return vNoAttestation
 
   let artHash = chalk.callGetUnchalkedHash().get("")
   if artHash == "":
@@ -378,28 +423,15 @@ proc verifyByHash*(chalk: ChalkObj, mdHash: string): ValidateResult =
 
   let
     sig    = unpack[string](chalk.extract["SIGNATURE"])
-    noTlog = not attrGet[bool]("use_transparency_log")
-    args   = @["verify-blob",
-               "--insecure-ignore-tlog=" & $noTlog,
-               "--key=chalk.pub",
-               "--signature=" & sig,
-               "--insecure-ignore-sct=true",
-               "-"]
-    cosign = getCosignLocation()
     blob   = artHash & mdHash
-    key    = chalk.getCosignKey()
+    key    = chalk.getAttestationKey()
 
-  info("cosign: verifying file " & chalk.name)
+  info("attestation: verifying file " & chalk.name)
   trace("verifying blob: '" & blob & "'")
-  trace("cosign " & args.join(" "))
 
-  key.withCosignKey:
-    let allOutput = runCmdGetEverything(cosign, args, blob & "\n")
-
-    if allOutput.getExit() == 0:
-      info(chalk.name & ": Signature successfully validated.")
-      return vSignedOk
-    else:
-      info(chalk.name & ": Signature failed. Cosign reported: " &
-           allOutput.getStderr())
-      return vBadSig
+  if key.verify(blob & "\n", sig):
+    info(chalk.name & ": Signature successfully validated.")
+    return vSignedOk
+  else:
+    info(chalk.name & ": Signature failed")
+    return vBadSig

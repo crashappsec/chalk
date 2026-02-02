@@ -51,7 +51,7 @@ proc removeSuffix*(s: string, suffix: string | char): string =
   result = s
   result.removeSuffix(suffix)
 
-proc removePrefix*(s: string, prefix: string): string =
+proc removePrefix*(s: string, prefix: string | char): string =
   # similar to strutil except it returns result back
   # vs in-place removal in stdlib
   result = s
@@ -90,3 +90,32 @@ proc coalesce*(data: varargs[string]): string =
     if s != "":
       return s
   return ""
+
+iterator chunkPairs*(self: string, chunk: int): (Slice[int], string) =
+  for i in countup(0, len(self) - 1, chunk):
+    let range = i..<min(i+chunk, len(self))
+    yield (range, self[range])
+
+iterator chunks*(self: string, chunk: int): string =
+  for (_, i) in self.chunkPairs(chunk):
+    yield i
+
+iterator quotedWords*(self: string, seps: set[char] = Whitespace): string =
+  var
+    word    = ""
+    inQuote = false
+  for c in self:
+    if c == '"':
+      inQuote = not inQuote
+      continue
+    if inQuote:
+      word &= c
+      continue
+    if c in seps:
+      if word != "":
+        yield word
+        word = ""
+    else:
+      word &= c
+  if word != "":
+    yield word

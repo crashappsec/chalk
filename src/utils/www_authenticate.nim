@@ -87,7 +87,7 @@ proc elicitHeaders(self: AuthChallenge, headers = newHttpHeaders()): HttpHeaders
       raise newException(ValueError,
                          "Bearer auth realm URL did not return auth token: " &
                          tokenBody)
-    return newHttpHeaders({"Authorization": "Bearer " & token})
+    result = newHttpHeaders({"Authorization": "Bearer " & token})
 
 proc elicitHeaders*(challenges: seq[AuthChallenge], headers = newHttpHeaders()): HttpHeaders =
   result = newHttpHeaders()
@@ -97,13 +97,12 @@ proc elicitHeaders*(challenges: seq[AuthChallenge], headers = newHttpHeaders()):
     except:
       continue
 
-proc parseAuthChallenge(data: string): AuthChallenge =
-  let typeAndOptions = data.split(maxsplit = 1)
-  if len(typeAndOptions) != 2:
-    raise newException(ValueError, "invalid auth challenge: " & data)
-  let scheme  = typeAndOptions[0].toLower()
+proc parseAuthChallenge(data: seq[string]): AuthChallenge =
+  if len(data) < 2:
+    raise newException(ValueError, "invalid auth challenge: " & $data)
+  let scheme  = data[0].toLower()
   var allOptions = initOrderedTable[string, string]()
-  for option in typeAndOptions[1].split(","):
+  for option in data[1..^1]:
     if option.strip() == "":
       continue
     let keyValue = option.split("=", maxsplit = 1)
@@ -111,7 +110,7 @@ proc parseAuthChallenge(data: string): AuthChallenge =
       raise newException(ValueError, "invalid auth challenge option: " & option)
     let
       key   = keyValue[0].strip()
-      value = keyValue[1].strip().strip(chars = {'"'})
+      value = keyValue[1].strip()
     allOptions[key] = value
   case scheme:
   of "bearer":
@@ -124,19 +123,16 @@ proc parseAuthChallenges(data: string): seq[AuthChallenge] =
   # for example:
   # www-authenticate: Bearer realm="https://public.ecr.aws/token/",service="public.ecr.aws",scope="aws"
   result = @[]
-  var challenge = ""
-  for word in data.split(seps = {' ', ','}):
+  var challenge = newSeq[string]()
+  for word in data.quotedWords(seps = {' ', ','}):
     if word.strip() == "":
       continue
-    if "=" notin word and challenge != "":
-      result.add(parseAuthChallenge(challenge.strip(chars = {' ', ','})))
-      challenge = ""
-    if challenge == "":
-      challenge = word & " "
-    else:
-      challenge &= word & ","
-  if challenge != "":
-    result.add(parseAuthChallenge(challenge.strip(chars = {' ', ','})))
+    if "=" notin word and len(challenge) > 0:
+      result.add(parseAuthChallenge(challenge))
+      challenge = @[]
+    challenge.add(word)
+  if len(challenge) > 0:
+    result.add(parseAuthChallenge(challenge))
 
 proc authHeadersSafeRequest*(url: Uri | string,
                              httpMethod: HttpMethod | string = HttpGet,
@@ -150,8 +146,8 @@ proc authHeadersSafeRequest*(url: Uri | string,
                              verifyMode = CVerifyPeer,
                              maxRedirects: int = 3,
                              disallowHttp: bool = false,
-                             only2xx: bool = false,
-                             raiseWhenAbove: int = 0,
+                             acceptStatusCodes: openArray[Slice[int]] = @[],
+                             rejectStatusCodes: openArray[Slice[int]] = @[],
                              ): (HttpHeaders, Response) =
   var
     authHeaders = headers
@@ -169,8 +165,6 @@ proc authHeadersSafeRequest*(url: Uri | string,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
       disallowHttp      = disallowHttp,
-      only2xx           = false,
-      raiseWhenAbove    = 0,
     )
 
   if (
@@ -198,20 +192,20 @@ proc authHeadersSafeRequest*(url: Uri | string,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
       disallowHttp      = disallowHttp,
-      only2xx           = only2xx,
-      raiseWhenAbove    = raiseWhenAbove,
+      acceptStatusCodes = acceptStatusCodes,
+      rejectStatusCodes = rejectStatusCodes,
     )
 
   try:
     discard response.check(
-      url            = url,
-      only2xx        = only2xx,
-      raiseWhenAbove = raiseWhenAbove,
+      url               = url,
+      acceptStatusCodes = acceptStatusCodes,
+      rejectStatusCodes = rejectStatusCodes,
     )
   except:
     # reattempt the request with retries as above response error
     # might be transient however however never retried as
-    # only2xx and raiseWhenAbove is not used on the first call
+    # status code is never checked on the first call
     response = safeRequest(
       url               = url,
       httpMethod        = httpMethod,
@@ -225,8 +219,8 @@ proc authHeadersSafeRequest*(url: Uri | string,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
       disallowHttp      = disallowHttp,
-      only2xx           = only2xx,
-      raiseWhenAbove    = raiseWhenAbove,
+      acceptStatusCodes = acceptStatusCodes,
+      rejectStatusCodes = rejectStatusCodes,
     )
 
   return (newHeaders, response)
@@ -243,23 +237,23 @@ proc authSafeRequest*(url: Uri | string,
                       verifyMode = CVerifyPeer,
                       maxRedirects: int = 3,
                       disallowHttp: bool = false,
-                      only2xx: bool = false,
-                      raiseWhenAbove: int = 0,
+                      acceptStatusCodes: openArray[Slice[int]] = @[],
+                      rejectStatusCodes: openArray[Slice[int]] = @[],
                       ): Response =
   let (_, response) = authHeadersSafeRequest(
-    url = url,
-    httpMethod = httpMethod,
-    body = body,
-    headers = headers,
-    multipart = multipart,
-    retries = retries,
+    url               = url,
+    httpMethod        = httpMethod,
+    body              = body,
+    headers           = headers,
+    multipart         = multipart,
+    retries           = retries,
     firstRetryDelayMs = firstRetryDelayMs,
-    timeout = timeout,
-    pinnedCert = pinnedCert,
-    verifyMode = verifyMode,
-    maxRedirects = maxRedirects,
-    disallowHttp = disallowHttp,
-    only2xx = only2xx,
-    raiseWhenAbove = raiseWhenAbove,
+    timeout           = timeout,
+    pinnedCert        = pinnedCert,
+    verifyMode        = verifyMode,
+    maxRedirects      = maxRedirects,
+    disallowHttp      = disallowHttp,
+    acceptStatusCodes = acceptStatusCodes,
+    rejectStatusCodes = rejectStatusCodes,
   )
   return response
