@@ -10,13 +10,13 @@ docker commands are not tested here but as part of the docker codec tests in tes
 exec commands are tested in test_exec.py as they are more involved
 """
 import json
-import re
 from pathlib import Path
 
 import pytest
 
 from .chalk.runner import Chalk
 from .conf import CONFIGS, DATE_PATH, LS_PATH, HELLO_GO_PATH
+from .utils.cosign import Cosign
 from .utils.dict import ANY
 from .utils.log import get_logger
 from .utils.os import run
@@ -179,25 +179,12 @@ def test_setup(
         "CHALK_GET_URL": f"{server_http}/cosign",
     }
     chalk_copy.load(config, replace=False)
-    setup = chalk_copy.run(command="setup", env=env, tty=True)
-    assert setup.mark.contains(
-        {
-            "$CHALK_PUBLIC_KEY": re.compile(r"^-----BEGIN PUBLIC KEY"),
-            "$CHALK_ENCRYPTED_PRIVATE_KEY": re.compile(
-                r"^-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY"
-            ),
-            "SIGNATURE": ANY,
-            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
-        }
-    )
-
-    if "CHALK_PASSWORD" in setup.text:
-        env["CHALK_PASSWORD"] = setup.find("CHALK_PASSWORD").split("=", 1)[1]
+    mark = chalk_copy.setup(env=env)
 
     insert = chalk_copy.insert(copy_files[0], env=env)
     assert insert.mark.contains(
         {
-            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
+            "INJECTOR_PUBLIC_KEY": mark["$CHALK_PUBLIC_KEY"],
             "SIGNATURE": ANY,
         }
     )
@@ -205,7 +192,7 @@ def test_setup(
     extract = chalk_copy.extract(copy_files[0], env=env)
     assert extract.mark.contains(
         {
-            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
+            "INJECTOR_PUBLIC_KEY": mark["$CHALK_PUBLIC_KEY"],
             "SIGNATURE": insert.mark["SIGNATURE"],
             "_VALIDATED_SIGNATURE": True,
         }
@@ -221,54 +208,30 @@ def test_setup(
 )
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_setup_existing_keys(
-    tmp_data_dir: Path,
     chalk_copy: Chalk,
-    random_hex: str,
+    cosign: Cosign,
     copy_files: list[Path],
     config: Path,
-    server_http: str,
     require_password: bool,
 ):
     """
     needs to display password, and public and private key info in chalk
     """
-    password = (random_hex * 3)[:24]  # at least 24 bytes are required for PRP
-    assert run(
-        ["cosign", "generate-key-pair", "--output-key-prefix", "chalk"],
-        env={"COSIGN_PASSWORD": password},
-    )
-    public = (tmp_data_dir / "chalk.pub").read_text()
-    private = (tmp_data_dir / "chalk.key").read_text()
-    env = {
-        "CHALK_PASSWORD": password,
-    }
-
     chalk_copy.load(config, replace=False)
-    setup = chalk_copy.run(command="setup", env=env)
-    assert setup.mark.contains(
-        {
-            "$CHALK_PUBLIC_KEY": public,
-            "$CHALK_ENCRYPTED_PRIVATE_KEY": private,
-            "SIGNATURE": ANY,
-            "INJECTOR_PUBLIC_KEY": public,
-        }
-    )
+    mark = chalk_copy.setup(cosign=cosign, persist_env=require_password)
 
-    if not require_password:
-        del env["CHALK_PASSWORD"]
-
-    insert = chalk_copy.insert(copy_files[0], env=env)
+    insert = chalk_copy.insert(copy_files[0])
     assert insert.mark.contains(
         {
-            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
+            "INJECTOR_PUBLIC_KEY": mark["$CHALK_PUBLIC_KEY"],
             "SIGNATURE": ANY,
         }
     )
 
-    extract = chalk_copy.extract(copy_files[0], env=env)
+    extract = chalk_copy.extract(copy_files[0])
     assert extract.mark.contains(
         {
-            "INJECTOR_PUBLIC_KEY": setup.mark["$CHALK_PUBLIC_KEY"],
+            "INJECTOR_PUBLIC_KEY": mark["$CHALK_PUBLIC_KEY"],
             "SIGNATURE": insert.mark["SIGNATURE"],
             "_VALIDATED_SIGNATURE": True,
         }

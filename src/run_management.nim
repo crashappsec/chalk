@@ -191,29 +191,29 @@ proc newChalk*(name:          string            = "",
                cache:         RootRef           = RootRef(nil),
                codec:         Plugin            = Plugin(nil),
                platform                         = DockerPlatform(nil),
-               noAttestation                    = false,
+               skipAttestation                  = false,
                startOffset                      = 0,
                ): ChalkObj =
 
-  result = ChalkObj(name:          name,
-                    pid:           pid,
-                    fsRef:         fsRef,
-                    envVarName:    envVarName,
-                    imageId:       imageId,
-                    repos:         newOrderedTable[string, DockerImageRepo](),
-                    containerId:   containerId,
-                    objectsData:   ObjectsDict(),
-                    opFailed:      false,
-                    resourceType:  resourceType,
-                    collectedData: collectedData,
-                    extract:       extract,
-                    cache:         cache,
-                    myCodec:       codec,
-                    failedKeys:    ChalkDict(),
-                    platform:      platform,
-                    noAttestation: noAttestation,
-                    startOffset:   startOffset,
-                    baseChalk:     collectionCtx.baseChalk,
+  result = ChalkObj(name:            name,
+                    pid:             pid,
+                    fsRef:           fsRef,
+                    envVarName:      envVarName,
+                    imageId:         imageId,
+                    repos:           newOrderedTable[string, DockerImageRepo](),
+                    containerId:     containerId,
+                    objectsData:     ObjectsDict(),
+                    opFailed:        false,
+                    resourceType:    resourceType,
+                    collectedData:   collectedData,
+                    extract:         extract,
+                    cache:           cache,
+                    myCodec:         codec,
+                    failedKeys:      ChalkDict(),
+                    platform:        platform,
+                    skipAttestation: skipAttestation,
+                    startOffset:     startOffset,
+                    baseChalk:       collectionCtx.baseChalk,
                    )
 
   if chalkId != "":
@@ -247,8 +247,8 @@ template setFromEnvVar*(o: ChalkDict, k: string, default: string = "") =
   o.setIfNotEmpty(k, os.getEnv(k, default))
 
 template isSubscribedKey*(key: string): bool =
-  when defined(debug):
-    trace("isSubscribedKey: " & key & "=" & $subscribedKeys.getOrDefault(key, false))
+  # when defined(debug):
+  #   trace("isSubscribedKey: " & key & "=" & $subscribedKeys.getOrDefault(key, false))
   subscribedKeys.getOrDefault(key, false)
 
 template setIfSubscribed*[T](o: ChalkDict, k: string, v: T) =

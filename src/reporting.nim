@@ -101,6 +101,7 @@ proc doCommandReport(): string =
     info("Skipping the command report as per the `skip_command_report` directive")
     result = ""
   else:
+    trace(reportTemplate & ": Generating command report.")
     if len(unmarked) != 0:
       hostInfo["_UNMARKED"] = pack(unmarked)
 
@@ -166,9 +167,7 @@ proc doReporting*(topic="report", clearState = false) {.exportc, cdecl.} =
       skipCustom  = attrGet[bool]("skip_custom_reports")
     if skipCommand and skipCustom:
       return
-    trace("Collecting run-time host info.")
     collectRunTimeHostInfo()
-    trace("Generating command report.")
     let report = doCommandReport()
     if report != "":
       safePublish(topic, report)

@@ -30,7 +30,7 @@ proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
 proc chalkJsonLogs(msg: string, info: StringTable): (string, bool) =
   case attrGet[string]("log_format")
   of "auto":
-    if getShowColor() or isInteractive:
+    if getShowColor() or isInteractive or getEnv("CI") != "":
       return (msg, true)
   of "plain":
     return (msg, true)

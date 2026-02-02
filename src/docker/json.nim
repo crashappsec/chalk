@@ -35,15 +35,16 @@ proc parseAndDigestJson*(data: string, digest: string): DigestedJson =
     size:   len(data),
   )
 
-proc newDockerDigestedJson*(data:      string,
+proc newDockerDigestedJson*(data:      string | JsonNode,
                             digest:    string,
                             mediaType: string,
                             kind:      DockerManifestType,
+                            size       = 0,
                             ): DockerDigestedJson =
   return DockerDigestedJson(
-    json:      parseJson(data),
+    json:      when data is string: parseJson(data) else: data,
     digest:    "sha256:" & extractDockerHash(digest),
-    size:      len(data),
+    size:      if size > 0 : size else: len($data),
     mediaType: mediaType,
     kind:      kind,
   )

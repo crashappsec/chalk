@@ -274,14 +274,14 @@ proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
       frontendVersion = some(parseVersion("0"))
   return frontendVersion
 
-var dockerAuth = newJObject()
+var dockerAuth = JsonNode(nil)
 proc getDockerAuthConfig*(): JsonNode =
   once:
     let path = "~/.docker/config.json"
     try:
       let data = tryToLoadFile(path.resolvePath())
       if data != "":
-        dockerAuth = parseJson(data)
+        dockerAuth = parseJson(data).assertIs(JObject, "bad docker runner config type")
       else:
         trace("docker: no auth config file at " & path)
     except:

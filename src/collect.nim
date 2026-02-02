@@ -85,7 +85,9 @@ proc collectChalkTimeHostInfo*() =
     if chalkCollectionSuspendedFor(plugin.name):
       trace(plugin.name & ": suspended")
       continue
-    if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
+    if not plugin.hasSubscribedKey(subscribed, hostInfo):
+      trace(plugin.name & ": skipping plugin; its metadata wouldn't be used.")
+      continue
     try:
       trace(plugin.name & ": running plugin")
       let dict = plugin.callGetChalkTimeHostInfo()
@@ -162,21 +164,29 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
       if chalkCollectionSuspendedFor(plugin.name):
         trace(plugin.name & ": suspended")
         continue
-      if not plugin.hasSubscribedKey(subscribed, data):          continue
+      if not plugin.hasSubscribedKey(subscribed, data) and not plugin.isSystem:
+        trace(plugin.name & ": skipping plugin; its metadata wouldn't be used.")
+        continue
       if attrGet[bool]("plugin." & plugin.name & ".codec") and plugin.name != artifact.myCodec.name:
         trace(plugin.name & ": skipped as its not the chalk codec " & artifact.myCodec.name)
+        continue
+
+      if plugin.getRunTimeArtifactInfo == nil:
+        trace(plugin.name & ": skipping plugin; no run time artifact info collection")
         continue
 
       trace(plugin.name & ": running plugin")
       try:
         let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
-        if dict == nil or len(dict) == 0: continue
+        if dict == nil or len(dict) == 0:
+          continue
         for k, v in dict:
           if not plugin.canWrite(
             k,
             attrGet[seq[string]]("plugin." & plugin.name & ".post_chalk_keys"),
             "run time artifact",
-          ): continue
+          ):
+            continue
           if k notin artifact.collectedData or
               k in attrGet[seq[string]]("plugin." & plugin.name & ".overrides") or
               plugin.isSystem:
@@ -266,7 +276,9 @@ proc collectRunTimeHostInfo*() =
     if chalkCollectionSuspendedFor(plugin.name):
       trace(plugin.name & ": suspended")
       continue
-    if not plugin.hasSubscribedKey(subscribed, hostInfo): continue
+    if not plugin.hasSubscribedKey(subscribed, hostInfo):
+      trace(plugin.name & ": skipping plugin; its metadata wouldn't be used.")
+      continue
 
     trace(plugin.name & ": running plugin")
     try:
@@ -428,7 +440,7 @@ iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
       trace("Processing docker artifacts.")
       for item in iterInfo.otherPaths:
         trace("Processing artifact: " & item)
-        let objOpt = scanLocalImageOrContainer(item)
+        let objOpt = scanImageOrContainer(item)
         if objOpt.isNone():
           if len(iterInfo.filePaths) > 0:
             error(item & ": No file, image or container found with this name")

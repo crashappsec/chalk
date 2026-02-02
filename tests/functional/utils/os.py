@@ -18,6 +18,7 @@ from typing import Literal, Optional
 from filelock import FileLock
 
 from .log import get_logger
+from .text import after_match, valid_json
 
 
 logger = get_logger()
@@ -171,52 +172,27 @@ class Program:
             )
         raise ValueError(f"{needle} could not be found in stdout")
 
-    def after(self, *, match: Optional[str] = None, text: Optional[str] = None) -> str:
-        text = text or self.text
-        if match:
-            found = list(re.finditer(match, text))
-            if found:
-                i = found[0].start(0)
-            else:
-                i = 0
-            text = text[i:]
-        return text
+    def after(
+        self,
+        *,
+        match: Optional[str] = None,
+        text: Optional[str] = None,
+    ) -> str:
+        return after_match(text or self.text, match)
 
     def json(
         self,
         *,
         after: Optional[str] = None,
         text: Optional[str] = None,
-        log_level: Optional[Literal["error", "debug"]] = "error",
         everything: bool = True,
     ):
-        data, _ = self._valid_json(
-            after=after, text=text, log_level=log_level, everything=everything
+        data, _ = valid_json(
+            text or self.text,
+            after=after,
+            everything=everything,
         )
         return data
-
-    def _valid_json(
-        self,
-        *,
-        after: Optional[str] = None,
-        text: Optional[str] = None,
-        log_level: Optional[Literal["error", "debug"]] = "error",
-        everything: bool = True,
-    ):
-        text = self.after(match=after, text=text)
-        try:
-            return json.loads(text), len(text)
-        except json.JSONDecodeError as e:
-            # if there is extra data we grab valid json until the
-            # invalid character
-            e_str = str(e)
-            if everything or not e_str.startswith("Extra data:"):
-                if log_level:
-                    getattr(self.logger, log_level)("output is invalid json", error=e)
-                raise
-            # Extra data: line 25 column 1 (char 596)
-            char = int(e_str.split()[-1].strip(")"))
-            return json.loads(text[:char]), char
 
 
 def run(
