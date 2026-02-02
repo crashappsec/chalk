@@ -30,7 +30,6 @@ from .utils.git import Git
 from .utils.log import get_logger
 from .utils.tmp import make_tmp_file
 
-
 logger = get_logger()
 
 
@@ -1186,14 +1185,12 @@ def test_semgrep(
 @pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
 def test_trufflehog(chalk: Chalk, tmp_data_dir: Path, use_docker: bool):
     target = tmp_data_dir / "aws.sh"
-    target.write_text(
-        f"""
+    target.write_text(f"""
 #!/bin/sh
 export AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID}
 export AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY}
 export AWS_SESSION_TOKEN={AWS_SESSION_TOKEN}
-""".strip()
-    )
+""".strip())
     insert = chalk.insert(
         artifact=target,
         env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)},
