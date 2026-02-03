@@ -38,7 +38,7 @@ You can deploy Chalk by setting a global symlink for Docker and having it call C
 build that runs through your build server using Docker, will automatically be 'chalked'. It's a
 technique that can be combined with chalks ability to deploy tools and configure monitoring, to
 automatically add security controls and collect information for every application. Follow this
-how-to on our docs site [here](https://chalkproject.io/docs/getting-started/ci-cd/)]
+how-to on our docs site [here](https://chalkproject.io/docs/getting-started/ci-cd/).
 
 ## Getting started
 
