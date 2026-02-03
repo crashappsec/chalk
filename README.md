@@ -66,7 +66,7 @@ can read the CLA and about our process [here](https://crashoverride.com/docs/oth
 ## Getting additional help
 
 If you need additional help including a demo of the cloud platform, please contact us using
-hello@crashoverride.com
+hello@crashoverride.com.
 
 ## License
 
