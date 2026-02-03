@@ -99,6 +99,8 @@ proc normalize*(items: seq[DockerPlatform]): seq[DockerPlatform] =
     result.add(i.normalize())
 
 proc `$`*(self: DockerPlatform): string =
+  if self == nil:
+    return "unknown"
   result = self.os & "/" & self.architecture
   if self.variant != "":
     result &= "/" & self.variant
@@ -129,6 +131,12 @@ proc isKnown*(self: DockerPlatform): bool =
     self.architecture != "" and
     self.architecture != "unknown"
   )
+
+proc known*(items: openArray[DockerPlatform]): seq[DockerPlatform] =
+  result = @[]
+  for i in items:
+    if i.isKnown():
+      result.add(i)
 
 proc parseDockerPlatform*(platform: string): DockerPlatform =
   let parts = platform.toLower().split('/', maxsplit = 2)

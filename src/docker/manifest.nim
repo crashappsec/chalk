@@ -415,6 +415,7 @@ proc filterKnownPlatforms*(self: FilterManifests,
 proc filterByPlatforms*(self:      FilterManifests,
                         platforms: openArray[DockerPlatform],
                         ): FilterManifests =
+  let platforms = platforms.known()
   if len(platforms) == 0:
     return self
   for i in platforms:
@@ -424,6 +425,13 @@ proc filterByPlatforms*(self:      FilterManifests,
   for i in manifests:
     if i.platform.isKnown() and i.platform in platforms:
       self.manifests.add(i)
+  return self
+
+proc ifManyFilterByPlatforms*(self: FilterManifests,
+                              platforms: openArray[DockerPlatform],
+                             ): FilterManifests =
+  if len(self.manifests) > 1:
+    return self.filterByPlatforms(platforms)
   return self
 
 proc filterByAnyAnnotation*(self:        FilterManifests,
@@ -564,6 +572,7 @@ proc fetchListManifest*(name:            DockerImage,
 
 proc fetchImageManifest*(name:            DockerImage,
                          platform:        DockerPlatform,
+                         ifManyPlatform = DockerPlatform(nil),
                          fetchConfig    = true,
                          fetchManifests = false,
                          ): DockerManifest =
@@ -574,12 +583,13 @@ proc fetchImageManifest*(name:            DockerImage,
       manifest
       .allImages()
       .filterByPlatforms(@[platform])
+      .ifManyFilterByPlatforms(@[ifManyPlatform])
       .one()
     )
     manifest.fetch()
   if manifest.kind != DockerManifestType.image:
     raise newException(ValueError, "Could not find image manifest for: " & $name)
-  if manifest.platform != platform:
+  if platform.isKnown() and manifest.platform != platform:
     raise newException(
       ValueError,
       "Could not fetch manifest for: " & $name & " " &
