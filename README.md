@@ -61,7 +61,7 @@ like to talk, please get in touch using hello@crashoverride.com.
 ## Making contributions
 
 We welcome contributions but do require you to complete a contributor license agreement or CLA. You
-can read the CLA and about our process [here](https://crashoverride.com/docs/other/contributing).
+can read the CLA and about our process [here](https://chalkproject.io/docs/contributing/contributions/).
 
 ## Getting additional help
 
