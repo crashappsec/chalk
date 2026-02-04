@@ -427,11 +427,11 @@ proc filterByPlatforms*(self:      FilterManifests,
       self.manifests.add(i)
   return self
 
-proc ifManyFilterByPlatforms*(self: FilterManifests,
-                              platforms: openArray[DockerPlatform],
-                             ): FilterManifests =
-  if len(self.manifests) > 1:
-    return self.filterByPlatforms(platforms)
+proc ifManyFilterBySystemPlatform*(self: FilterManifests,
+                                   enabled = true,
+                                   ): FilterManifests =
+  if enabled and len(self.manifests) > 1:
+    return self.filterByPlatforms(@[getSystemBuildPlatform()])
   return self
 
 proc filterByAnyAnnotation*(self:        FilterManifests,
@@ -570,11 +570,11 @@ proc fetchListManifest*(name:            DockerImage,
   if len(found) < len(platforms):
     raise newException(ValueError, "Could not find all platforms for " & $name & " " & $($platforms))
 
-proc fetchImageManifest*(name:            DockerImage,
-                         platform:        DockerPlatform,
-                         ifManyPlatform = DockerPlatform(nil),
-                         fetchConfig    = true,
-                         fetchManifests = false,
+proc fetchImageManifest*(name:                  DockerImage,
+                         platform:              DockerPlatform,
+                         ifManySystemPlatform = false,
+                         fetchConfig          = true,
+                         fetchManifests       = false,
                          ): DockerManifest =
   trace("docker: fetching image manifest for: " & $name & " for " & $platform)
   var manifest = fetchManifest(name, fetchConfig = fetchConfig, fetchManifests = fetchManifests)
@@ -583,7 +583,7 @@ proc fetchImageManifest*(name:            DockerImage,
       manifest
       .allImages()
       .filterByPlatforms(@[platform])
-      .ifManyFilterByPlatforms(@[ifManyPlatform])
+      .ifManyFilterBySystemPlatform(ifManySystemPlatform)
       .one()
     )
     manifest.fetch()

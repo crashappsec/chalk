@@ -339,12 +339,12 @@ proc collectLocalImage*(chalk: ChalkObj,
 proc collectImageManifest*(chalk: ChalkObj,
                            name:  DockerImage,
                            repos: seq[DockerImage] = @[],
-                           ifManyPlatform = DockerPlatform(nil)) =
+                           ifManySystemPlatform    = false) =
   let
     manifest = fetchImageManifest(
       name,
       chalk.platform,
-      ifManyPlatform = ifManyPlatform,
+      ifManySystemPlatform = ifManySystemPlatform,
     )
     contents = manifest.config.json
     allrepos = @[
@@ -358,7 +358,7 @@ proc collectImage*(chalk: ChalkObj,
                    name:  DockerImage,
                    repos: seq[DockerImage] = @[],
                    collectFromManifest     = true,
-                   ifManyPlatform          = DockerPlatform(nil),
+                   ifManySystemPlatform    = false,
                    ) =
   try:
     trace("docker: collecting image locally " & $name)
@@ -380,8 +380,8 @@ proc collectImage*(chalk: ChalkObj,
       trace("docker: collecting image falling back to manifest due to: " & getCurrentExceptionMsg())
       chalk.collectImageManifest(
         name,
-        repos          = repos,
-        ifManyPlatform = ifManyPlatform,
+        repos                = repos,
+        ifManySystemPlatform = ifManySystemPlatform,
       )
     else:
       raise

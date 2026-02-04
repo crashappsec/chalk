@@ -19,7 +19,6 @@ import "."/[
   extract,
   ids,
   inspect,
-  platform,
 ]
 
 template scanImage(chalk:         ChalkObj,
@@ -33,8 +32,8 @@ template scanImage(chalk:         ChalkObj,
     try:
       chalk.collectImage(
         image,
-        collectFromManifest = fromManifest,
-        ifManyPlatform      = findDockerPlatform(),
+        collectFromManifest  = fromManifest,
+        ifManySystemPlatform = true,
       )
     except:
       trace("docker: " & getCurrentExceptionMsg())
@@ -61,7 +60,7 @@ proc scanImage*(name:          string | DockerImage,
   let
     image =
       when name is string:
-        parseImage(name)
+        parseImage(name, defaultTag = "")
       else:
         name
     name = $name
@@ -74,12 +73,12 @@ proc scanImageOrContainer*(name: string): Option[ChalkObj] =
   var
     chalk        = newChalk(name    = name,
                             codec   = getPluginByName("docker"))
-    image        = parseImage(name)
+    image        = parseImage(name, defaultTag = "")
     fromManifest = true
   chalk.withErrorContext():
     try:
       chalk.collectContainer(name)
-      image = parseImage(chalk.imageId)
+      image = parseImage(chalk.imageId, defaultTag = "")
       fromManifest = false
       try:
         chalk.extractContainer()

@@ -82,9 +82,6 @@ CMD ["cat", "/platforms.json"]
       else:
         result[k] = parseDockerPlatform(value)
 
-proc getSystemBuildPlatform*(): DockerPlatform =
-  return DockerPlatform(os: hostOS, architecture: hostCPU)
-
 proc findDockerPlatform*(): DockerPlatform =
   return dockerProbeDefaultPlatforms().getOrDefault("TARGETPLATFORM", getSystemBuildPlatform())
 
