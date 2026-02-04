@@ -452,7 +452,7 @@ proc request(self:              DockerImage,
              contentType        = "",
              useCase            = RegistryUseCase.ReadOnly,
              body               = "",
-             range              = 0 .. 5,
+             range              = 0 .. 0,
              size               = 0,
              acceptStatusCodes: openArray[Slice[int]] = @[200..299],
              ): (string, Response) =

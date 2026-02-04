@@ -314,7 +314,7 @@ proc asJson(self: DockerManifest): JsonNode =
      DockerManifestType.layer:
     discard
 
-proc asChildJson(self: DockerManifest): JsonNode =
+proc asDescriptorJson(self: DockerManifest, withPlatform = true): JsonNode =
   if self == nil:
     return nil
   result = %*({
@@ -331,13 +331,14 @@ proc asChildJson(self: DockerManifest): JsonNode =
   of DockerManifestType.image:
     if self.artifactType != "":
       result["artifactType"] = %(self.artifactType)
-    if self.platform.isKnown():
+    if withPlatform and self.platform.isKnown():
       result["platform"] = self.platform.asJson()
   of DockerManifestType.config,
      DockerManifestType.layer:
     discard
 
 proc updateJson(self: DockerManifest): JsonNode =
+  # https://specs.opencontainers.org/image-spec/manifest/
   case self.kind
   of DockerManifestType.layer:
     discard
@@ -346,16 +347,16 @@ proc updateJson(self: DockerManifest): JsonNode =
   of DockerManifestType.image:
     var layers = newJArray()
     for i in self.layers:
-      layers.add(i.asChildJson())
+      layers.add(i.asDescriptorJson())
     self.json = self.json.update(self.asJson())
     self.json["layers"] = layers
-    self.json["config"] = self.json{"config"}.update(self.config.asChildJson())
+    self.json["config"] = self.json{"config"}.update(self.config.asDescriptorJson())
     if self.subject != nil:
-      self.json["subject"] = self.json{"subject"}.update(self.subject.asChildJson())
+      self.json["subject"] = self.json{"subject"}.update(self.subject.asDescriptorJson(withPlatform = false))
   of DockerManifestType.list:
     var manifests = newJArray()
     for i in self.manifests:
-      manifests.add(i.asChildJson())
+      manifests.add(i.asDescriptorJson())
     self.json = self.json.update(self.asJson())
     self.json["manifests"] = manifests
   return self.json
@@ -666,7 +667,7 @@ proc put*(self: DockerManifest) =
         image       = self.name,
         contentType = self.mediaType,
         data        = self.updateJson(),
-        byTag       = self.name.tag != "" and self.list != nil,
+        byTag       = self.name.tag != "" and self.list == nil,
       ),
       check = false,
     )
