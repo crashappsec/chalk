@@ -21,13 +21,14 @@ import "."/[
   inspect,
 ]
 
-template scanImage(chalk:         ChalkObj,
-                   name:          string,
-                   image:         DockerImage,
-                   fromManifest = true,
-                   ) =
+proc scanImage(chalk:         ChalkObj,
+               name:          string,
+               image:         DockerImage,
+               fromManifest = true,
+               ): Option[ChalkObj] =
   if name == "scratch":
     return none(ChalkObj)
+  var chalk = chalk
   chalk.withErrorContext():
     try:
       chalk.collectImage(
@@ -67,7 +68,7 @@ proc scanImage*(name:          string | DockerImage,
   var chalk = newChalk(name     = name,
                        codec    = getPluginByName("docker"),
                        platform = platform)
-  chalk.scanImage(name, image)
+  return chalk.scanImage(name, image)
 
 proc scanImageOrContainer*(name: string): Option[ChalkObj] =
   var
@@ -90,7 +91,7 @@ proc scanImageOrContainer*(name: string): Option[ChalkObj] =
              ": " & getCurrentExceptionMsg())
     except:
       trace("docker: " & getCurrentExceptionMsg())
-  chalk.scanImage(name, image, fromManifest = fromManifest)
+  return chalk.scanImage(name, image, fromManifest = fromManifest)
 
 iterator scanAllContainers*(): ChalkObj =
   for id in allContainerIDs():
