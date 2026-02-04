@@ -28,7 +28,6 @@ proc runCmdVersion*() =
     client = getDockerClientVersion()
     server = getDockerServerVersion()
     buildx = getBuildXVersion()
-    cosign = getCosignVersion()
 
   cells.add(@["Chalk Version", getChalkExeVersion()])
   if selfChalk != nil:
@@ -41,7 +40,6 @@ proc runCmdVersion*() =
   cells.add(@["Docker Client", client.default()])
   cells.add(@["Docker Server", server.default()])
   cells.add(@["Buildx", buildx.default()])
-  cells.add(@["Cosign", cosign.default()])
 
   var table = cells.quickTable(verticalHeaders = true, borders = BorderTypical)
 

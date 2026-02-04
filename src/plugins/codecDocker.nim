@@ -35,7 +35,11 @@ proc dockerGetRunTimeArtifactInfo(self: Plugin, chalk: ChalkObj, ins: bool):
   # recollect image metadata
   if ResourceContainer notin chalk.resourceType:
     if chalk.imageId != "":
-      chalk.collectLocalImage(chalk.imageId)
+      try:
+        chalk.collectLocalImage(chalk.imageId)
+      except:
+        # this might be an image in registry hence not present locally
+        trace("docker: " & getCurrentExceptionMsg())
     chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerImage)
   else:
     chalk.setIfNeeded("_OP_ARTIFACT_TYPE", artTypeDockerContainer)

@@ -150,8 +150,8 @@ proc authHeadersSafeRequest*(url: Uri | string,
                              verifyMode = CVerifyPeer,
                              maxRedirects: int = 3,
                              disallowHttp: bool = false,
-                             only2xx: bool = false,
-                             raiseWhenAbove: int = 0,
+                             acceptStatusCodes: openArray[Slice[int]] = @[],
+                             rejectStatusCodes: openArray[Slice[int]] = @[],
                              ): (HttpHeaders, Response) =
   var
     authHeaders = headers
@@ -169,8 +169,6 @@ proc authHeadersSafeRequest*(url: Uri | string,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
       disallowHttp      = disallowHttp,
-      only2xx           = false,
-      raiseWhenAbove    = 0,
     )
 
   if (
@@ -198,20 +196,20 @@ proc authHeadersSafeRequest*(url: Uri | string,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
       disallowHttp      = disallowHttp,
-      only2xx           = only2xx,
-      raiseWhenAbove    = raiseWhenAbove,
+      acceptStatusCodes = acceptStatusCodes,
+      rejectStatusCodes = rejectStatusCodes,
     )
 
   try:
     discard response.check(
-      url            = url,
-      only2xx        = only2xx,
-      raiseWhenAbove = raiseWhenAbove,
+      url               = url,
+      acceptStatusCodes = acceptStatusCodes,
+      rejectStatusCodes = rejectStatusCodes,
     )
   except:
     # reattempt the request with retries as above response error
     # might be transient however however never retried as
-    # only2xx and raiseWhenAbove is not used on the first call
+    # status code is never checked on the first call
     response = safeRequest(
       url               = url,
       httpMethod        = httpMethod,
@@ -225,8 +223,8 @@ proc authHeadersSafeRequest*(url: Uri | string,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
       disallowHttp      = disallowHttp,
-      only2xx           = only2xx,
-      raiseWhenAbove    = raiseWhenAbove,
+      acceptStatusCodes = acceptStatusCodes,
+      rejectStatusCodes = rejectStatusCodes,
     )
 
   return (newHeaders, response)
@@ -243,23 +241,23 @@ proc authSafeRequest*(url: Uri | string,
                       verifyMode = CVerifyPeer,
                       maxRedirects: int = 3,
                       disallowHttp: bool = false,
-                      only2xx: bool = false,
-                      raiseWhenAbove: int = 0,
+                      acceptStatusCodes: openArray[Slice[int]] = @[],
+                      rejectStatusCodes: openArray[Slice[int]] = @[],
                       ): Response =
   let (_, response) = authHeadersSafeRequest(
-    url = url,
-    httpMethod = httpMethod,
-    body = body,
-    headers = headers,
-    multipart = multipart,
-    retries = retries,
+    url               = url,
+    httpMethod        = httpMethod,
+    body              = body,
+    headers           = headers,
+    multipart         = multipart,
+    retries           = retries,
     firstRetryDelayMs = firstRetryDelayMs,
-    timeout = timeout,
-    pinnedCert = pinnedCert,
-    verifyMode = verifyMode,
-    maxRedirects = maxRedirects,
-    disallowHttp = disallowHttp,
-    only2xx = only2xx,
-    raiseWhenAbove = raiseWhenAbove,
+    timeout           = timeout,
+    pinnedCert        = pinnedCert,
+    verifyMode        = verifyMode,
+    maxRedirects      = maxRedirects,
+    disallowHttp      = disallowHttp,
+    acceptStatusCodes = acceptStatusCodes,
+    rejectStatusCodes = rejectStatusCodes,
   )
   return response

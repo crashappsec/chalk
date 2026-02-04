@@ -6,6 +6,7 @@
 ##
 
 import std/[
+  json,
   net,
   uri,
 ]
@@ -51,6 +52,9 @@ proc extractDockerHash*(value: Box): Box =
   return pack(extractDockerHash(unpack[string](value)))
 
 # ----------------------------------------------------------------------------
+
+proc getSystemBuildPlatform*(): DockerPlatform =
+  return DockerPlatform(os: hostOS, architecture: hostCPU)
 
 proc normalize*(self: DockerPlatform): DockerPlatform =
   # https://github.com/containerd/containerd/blob/83031836b2cf55637d7abf847b17134c51b38e53/platforms/platforms.go
@@ -98,6 +102,8 @@ proc normalize*(items: seq[DockerPlatform]): seq[DockerPlatform] =
     result.add(i.normalize())
 
 proc `$`*(self: DockerPlatform): string =
+  if self == nil:
+    return "unknown"
   result = self.os & "/" & self.architecture
   if self.variant != "":
     result &= "/" & self.variant
@@ -112,6 +118,14 @@ proc `==`*(self, other: DockerPlatform): bool =
     return isNil(self) == isNil(other)
   return $self.normalize() == $other.normalize()
 
+proc asJson*(self: DockerPlatform): JsonNode =
+  result = %*({
+    "os":           self.os,
+    "architecture": self.architecture,
+  })
+  if self.variant != "":
+    result["variant"] = %(self.variant)
+
 proc isKnown*(self: DockerPlatform): bool =
   return (
     not isNil(self) and
@@ -120,6 +134,12 @@ proc isKnown*(self: DockerPlatform): bool =
     self.architecture != "" and
     self.architecture != "unknown"
   )
+
+proc known*(items: openArray[DockerPlatform]): seq[DockerPlatform] =
+  result = @[]
+  for i in items:
+    if i.isKnown():
+      result.add(i)
 
 proc parseDockerPlatform*(platform: string): DockerPlatform =
   let parts = platform.toLower().split('/', maxsplit = 2)
@@ -431,6 +451,12 @@ proc `$`*(self: DockerImage): string =
 
 proc exists*(self: DockerImage): bool =
   return self != ("", "", "")
+
+proc asOciAttestation*(self: DockerImage): DockerImage =
+  return self.withTag("sha256-" & self.digest).withDigest("")
+
+proc asCosignAttestation*(self: DockerImage): DockerImage =
+  return self.withTag("sha256-" & self.digest & ".att").withDigest("")
 
 proc asRepoTag*(items: seq[DockerImage]): seq[string] =
   result = @[]

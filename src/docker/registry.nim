@@ -14,6 +14,7 @@
 import std/[
   nativesockets,
   net,
+  strscans,
   uri,
 ]
 import pkg/[
@@ -28,6 +29,7 @@ import ".."/[
   utils/http,
   utils/sets,
   utils/strings,
+  utils/uri,
   utils/www_authenticate,
 ]
 import "."/[
@@ -73,7 +75,10 @@ const
     "application/vnd.oci.image.index.v1+json": DockerManifestType.list,
     "application/vnd.oci.image.manifest.v1+json": DockerManifestType.image,
     "application/vnd.oci.image.config.v1+json": DockerManifestType.config,
+
+    "application/octet-stream": DockerManifestType.layer,
   }.toTable()
+  MEGABYTE = 1 shl 20
 
 iterator uses(useCase: RegistryUseCase): RegistryUseCase =
   ## which uses lookups are applicable for the registry use
@@ -439,52 +444,79 @@ var jsonCache = initTable[
   (DockerImage, HttpMethod, string, RegistryUseCase),
   (string, Response)
 ]()
-proc request(self:       DockerImage,
-             httpMethod: HttpMethod,
-             path:       string,
-             accept:     string,
-             useCase =   RegistryUseCase.ReadOnly,
+proc request(self:              DockerImage,
+             httpMethod:        HttpMethod,
+             path               = "",
+             url                = initUri(),
+             accept             = "",
+             contentType        = "",
+             useCase            = RegistryUseCase.ReadOnly,
+             body               = "",
+             range              = 0 .. 0,
+             size               = 0,
+             acceptStatusCodes: openArray[Slice[int]] = @[200..299],
              ): (string, Response) =
   let cacheKey = (self, httpMethod, path, useCase)
   if cacheKey in jsonCache:
     return jsonCache[cacheKey]
   for config in self.getConfigs(useCase = useCase):
-    let uri = self.withRegistry(config.registry).uri(
-      scheme  = config.scheme,
-      prefix  = config.prefix,
-      project = config.project,
-      path    = path,
-    )
-    var msg = $httpMethod & " " & $uri
+    let
+      defaultUri = self.withRegistry(config.registry).uri(
+        scheme  = config.scheme,
+        prefix  = config.prefix,
+        project = config.project,
+        path    = path,
+      )
+      uri = combine(defaultUri, url)
+    var msg = $useCase & " " & $httpMethod & " " & $uri
     if uri.scheme == "https":
       msg &= " " & $config.verifyMode
       if config.certPath != "":
         msg &= "@" & config.certPath
-    trace("docker: " & msg)
     var invalid = false
     try:
       try:
+        var headers = newHttpHeaders()
+        if accept != "":
+          headers["Accept"] = accept
+        if body != "":
+          if contentType != "":
+            headers["Content-Type"] = contentType
+          if range.a > 0 or range.b > 0:
+            var contentRange = "bytes " & $range.a & "-" & $range.b
+            if size > 0:
+              contentRange &= "/" & $size
+            headers["Content-Range"] = contentRange
+          headers["Content-Length"] = $len(body)
+        for k, v in headers.pairs():
+          msg &= " " & k & ":" & v
+        trace("docker: " & msg)
         let
           wwwAuth = config.wwwAuth.getOrDefault(self.repo, newHttpHeaders())
           (authHeaders, response) = authHeadersSafeRequest(
             uri,
             httpMethod,
-            headers    = newHttpHeaders(
-              @[("Accept", accept)],
-            ).update(config.auth).update(wwwAuth),
-            pinnedCert = config.pinnedCert,
-            verifyMode = config.verifyMode,
-            timeout    = TIMEOUT,
-            retries    = 2,
-            only2xx    = true,
+            body              = body,
+            headers           = headers.update(config.auth).update(wwwAuth),
+            pinnedCert        = config.pinnedCert,
+            verifyMode        = config.verifyMode,
+            timeout           = TIMEOUT,
+            retries           = 2,
+            acceptStatusCodes = acceptStatusCodes,
           )
         config.wwwAuth[self.repo] = wwwAuth.update(authHeaders)
+        var respMsg = "docker: " & $response.status
+        for k, v in response.headers.pairs():
+          if k notin ["authorization"]:
+            respMsg &= " " & k & ":" & v
+        trace(respMsg)
         for u in useCase.uses():
           configByRegistry[(u, self.registry)] = config
-          jsonCache[(self, httpMethod, path, u)] = (msg, response)
+          if httpMethod in [HttpHead, HttpGet]:
+            jsonCache[(self, httpMethod, path, u)] = (msg, response)
         return (msg, response)
       except ValueError:
-        # ValueError is only raised when only2xx fails
+        # ValueError is only raised when status code fails
         # for non-mirror registry:
         # as we can talk to the registry, any errors from this point on
         # mean image doesnt exist in the registry or invalid config such as
@@ -524,68 +556,238 @@ proc manifestHead*(image:    DockerImage,
     # TODO do heuristics on response payload as there are bound to be new mime types
     raise newException(
       ValueError,
-      "docker: " & msg & " returned unsupported registry content type: " & contentType
+      msg & " returned unsupported registry content type: " & contentType
     )
-  let kind = CONTENT_TYPE_MAPPING[contentType]
-  return newDockerDigestedJson("{}", digest, contentType, kind)
+  return newDockerDigestedJson(
+    data      = JsonNode(nil),
+    digest    = digest,
+    mediaType = contentType,
+    kind      = CONTENT_TYPE_MAPPING[contentType],
+    size      = parseInt(response.headers["Content-Length"]),
+  )
 
 proc manifestGet*(image:    DockerImage,
                   accept:   string,
                   useCase = RegistryUseCase.ReadOnly,
                   ): DockerDigestedJson =
-  let
-    kind          = CONTENT_TYPE_MAPPING[accept]
-    (_, response) = image.request(
-      useCase    = useCase,
-      httpMethod = HttpGet,
-      path       = "/manifests/" & image.imageRef,
-      accept     = accept,
-    )
-  return newDockerDigestedJson(response.body(), image.imageRef, accept, kind)
+  let (_, response) = image.request(
+    useCase    = useCase,
+    httpMethod = HttpGet,
+    path       = "/manifests/" & image.imageRef,
+    accept     = accept,
+  )
+  return newDockerDigestedJson(
+    data      = response.body(),
+    digest    = image.imageRef,
+    mediaType = accept,
+    kind      = CONTENT_TYPE_MAPPING[accept],
+  )
 
-proc layerGetString*(image:    DockerImage,
+proc layerGetString*(layer:    DockerImage,
                      accept:   string,
                      useCase = RegistryUseCase.ReadOnly,
                      ): string =
   let
-    (_, response) = image.request(
+    (_, response) = layer.request(
       useCase    = useCase,
       httpMethod = HttpGet,
-      path       = "/blobs/" & image.imageRef,
+      path       = "/blobs/" & layer.imageRef,
       accept     = accept,
     )
   return response.body()
 
-proc layerGetJson*(image:    DockerImage,
+proc layerGetJson*(layer:    DockerImage,
                    accept:   string,
                    useCase = RegistryUseCase.ReadOnly,
                    ): DigestedJson =
   return parseAndDigestJson(
-    image.layerGetString(
+    layer.layerGetString(
       useCase = useCase,
       accept  = accept,
     ),
-    digest = image.imageRef,
+    digest = layer.imageRef,
   )
 
-proc layerGetFSFileString*(image:    DockerImage,
-                           name:     string,
-                           accept:   string,
-                           useCase = RegistryUseCase.ReadOnly,
-                           ): string =
-  trace("docker: extracting " & name & " from layer " & $image)
+proc layerGetFileString*(layer:    DockerImage,
+                         name:     string,
+                         accept:   string,
+                         useCase = RegistryUseCase.ReadOnly,
+                         ): string =
+  trace("docker: extracting " & name & " from layer " & $layer)
   let
-    response = image.layerGetString(
+    response = layer.layerGetString(
       useCase = useCase,
       accept  = accept,
     )
     tarPath = writeNewTempFile(response, suffix = name)
   let
     # extract needs non-existing path so doing one more joinPath
-    untarPath = getNewTempDir().joinPath(image.digest)
+    untarPath = getNewTempDir().joinPath(layer.digest)
     namePath  = untarPath.joinPath(name)
   extractAll(tarPath, untarPath)
   result = tryToLoadFile(namePath)
+
+proc layerPutStart(layer: DockerImage,
+                  ): Uri =
+  let (_, initResponse) = layer.request(
+    useCase     = RegistryUseCase.ReadWrite,
+    httpMethod  = HttpPost,
+    path        = "/blobs/uploads/",
+    contentType = "application/octet-stream",
+  )
+  try:
+    result = parseUri(initResponse.headers["Location"])
+  except:
+    raise newException(
+      ValueError,
+      "could not determine layer upload url due to: " & getCurrentExceptionMsg()
+    )
+  if not result.path.startsWith("/"):
+    raise newException(
+      ValueError,
+      "upload Location is expected to be absolute path. Got: " & result.path
+    )
+
+proc layerPutFileStream*(layer:       DockerImage,
+                         contentType: string,
+                         fileStream:  FileStringStream,
+                         # fyi docker cli seems to upload as monolithic upload :shrug:
+                         chunkSize    = 5 * MEGABYTE,
+                        ): DockerDigestedJson =
+  let
+    layer = layer.withDigest(fileStream.sha256Hex())
+    size  = len(fileStream)
+  try:
+    let (_, response) = layer.request(
+      useCase     = RegistryUseCase.ReadWrite,
+      httpMethod  = HttpHead,
+      path        = "/blobs/" & layer.imageRef,
+      accept      = contentType,
+    )
+    trace("docker: layer already exists. nothing to upload")
+    return newDockerDigestedJson(
+      data      = JsonNode(nil),
+      digest    = layer.digest,
+      mediaType = response.headers["Content-Type"],
+      size      = parseInt(response.headers["Content-Length"]),
+      kind      = DockerManifestType.layer,
+    )
+  except RegistryResponseError:
+    trace("docker: layer doesnt exist. uploading " & $layer)
+    var
+      location   = layer.layerPutStart()
+      startAt    = 0
+      httpMethod = HttpPatch
+      response:    Response
+      validRange:  bool
+      rangeStart:  int
+      rangeEnd:    int
+    while startAt < size - 1:
+      let
+        endAt   = min(startAt + chunkSize, size) - 1
+        isFinal = endAt == size - 1
+      if isFinal:
+        location   = location.withQueryPair("digest", layer.imageRef)
+        httpMethod = HttpPut
+      try:
+        (_, response) = layer.request(
+          useCase           = RegistryUseCase.ReadWrite,
+          httpMethod        = httpMethod,
+          url               = location,
+          body              = fileStream[startAt..endAt],
+          range             = startAt..endAt,
+          size              = size,
+          contentType       = "application/octet-stream",
+          acceptStatusCodes = [200..299, 416..416],
+        )
+      except:
+        raise newException(
+          ValueError,
+          "could not upload layer due to: " & getCurrentExceptionMsg()
+        )
+      # update the startAt cursor if not final chunk or response has Range header
+      # in which case we might need to retry, even if its final chunk
+      if not isFinal or response.headers.hasKey("Range"):
+        try:
+          (validRange, rangeStart, rangeEnd) = response.headers["Range"].scanTuple("$i-$i")
+        except:
+          raise newException(
+            ValueError,
+            "could not upload layer as reponse doesnt have expected Range header: " & getCurrentExceptionMsg()
+          )
+        if not validRange:
+          raise newException(
+            ValueError,
+            "could not upload as Range response header is not valid format <start>-<end>: " & response.headers["Range"]
+          )
+        startAt  = rangeEnd + 1
+        location = parseUri(response.headers["location"])
+      else:
+        break
+    # https://docker-docs.uclv.cu/registry/spec/api/
+    # > The Docker-Content-Digest header returns the canonical digest of the
+    # > uploaded blob which may differ from the provided digest.
+    return newDockerDigestedJson(
+      data      = JsonNode(nil),
+      digest    = response.headers["Docker-Content-Digest"],
+      mediaType = contentType,
+      kind      = DockerManifestType.layer,
+      size      = len(fileStream),
+    )
+
+proc layerPutString*(layer:       DockerImage,
+                     contentType: string,
+                     body:        string,
+                     ): DockerDigestedJson =
+  return layer.layerPutFileStream(
+    contentType = contentType,
+    fileStream  = newLoadedFileStringStream(body),
+  )
+
+proc layerPutJson*(layer:       DockerImage,
+                   contentType: string,
+                   data:        JsonNode,
+                  ): DockerDigestedJson =
+  return layer.layerPutString(
+    contentType = contentType,
+    body        = $data,
+  )
+
+proc manifestPut*(image:       DockerImage,
+                  contentType: string,
+                  data:        JsonNode,
+                  byTag        = false,
+                  ): DockerDigestedJson =
+  let
+    body   = $data
+    digest = body.sha256Hex()
+    image  = image.withDigest(body.sha256Hex())
+  try:
+    result = image.manifestHead(
+      useCase = RegistryUseCase.ReadWrite,
+    )
+    trace("docker: manifest already exists. nothing to upload")
+  except RegistryResponseError:
+    trace("docker: manifest doesnt exist. uploading " & $image)
+    let (_, response) = image.request(
+      useCase     = RegistryUseCase.ReadWrite,
+      httpMethod  = HttpPut,
+      contentType = contentType,
+      body        = body,
+      path        = "/manifests/" & (
+        if byTag:
+          image.tag
+        else:
+          image.imageRef
+      ),
+    )
+    return newDockerDigestedJson(
+      data      = data,
+      digest    = response.headers["Docker-Content-Digest"],
+      mediaType = contentType,
+      kind      = CONTENT_TYPE_MAPPING[contentType],
+      size      = len(body),
+    )
 
 proc toChalkDict(self: RegistryConfig): ChalkDict =
   result = ChalkDict()

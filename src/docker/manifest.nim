@@ -7,6 +7,11 @@
 
 ## module for interacting with remote registry docker manifests
 
+import std/[
+  algorithm,
+  base64,
+  json,
+]
 import ".."/[
   types,
   utils/http,
@@ -22,33 +27,14 @@ import "."/[
   registry,
 ]
 
+type FilterManifests = ref object
+  manifests: seq[DockerManifest]
+  filters:   seq[string]
+
 # cache is by repo ref as its normalized in buildx imagetools command
 var
   jsonCache     = initTable[string, DigestedJson]()
   manifestCache = initTable[string, DockerManifest]()
-
-proc findAllPlatformsManifests(self: DockerManifest,
-                               platforms: seq[DockerPlatform] = @[],
-                               ): seq[DockerManifest] =
-  ## find all valid platform images from the manifest list
-  ## as manifest could have additional things in the list which are
-  ## not images such as provenance/sbom blobs
-  if self.kind != DockerManifestType.list:
-    raise newException(AssertionDefect, "can only find platform images from manifest list")
-  result = @[]
-  for manifest in self.manifests:
-    if manifest.platform.isKnown():
-      if len(platforms) > 0 and manifest.platform notin platforms:
-        continue
-      result.add(manifest)
-
-proc findPlatformManifest(self: DockerManifest, platform: DockerPlatform): DockerManifest =
-  if self.kind != DockerManifestType.list:
-    raise newException(AssertionDefect, "can only find platform manifest from manifest list")
-  for manifest in self.manifests:
-    if manifest.platform == platform:
-      return manifest
-  raise newException(KeyError, "Could not find manifest for: " & $self.name & " --platform=" & $platform)
 
 proc getCompressedSize(self: DockerManifest): int =
   if self.kind != DockerManifestType.image:
@@ -112,20 +98,22 @@ proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true)
                        msg & " failed to fetch manifest via www-authenticate challenge: " &
                        getCurrentExceptionMsg())
 
-proc setJson(self: DockerManifest, data: DigestedJson) =
-  if self.digest != "" and self.digest != data.digest:
-    raise newException(
-      ValueError,
-      "Fetched mismatched digest vs digest whats in parent manifest for: " & $self.name,
-    )
-  if self.size > 0 and self.size != data.size:
-    raise newException(
-      ValueError,
-      "Fetched mismatched json size vs whats in parent manifest for: " & $self.name,
-    )
+proc setJson(self: DockerManifest, data: DigestedJson, check = true) =
+  if check:
+    if self.digest != "" and self.digest != data.digest:
+      raise newException(
+        ValueError,
+        "Fetched mismatched digest vs digest whats in parent manifest for: " & $self.name,
+      )
+    if self.size > 0 and self.size != data.size:
+      raise newException(
+        ValueError,
+        "Fetched mismatched json size vs whats in parent manifest for: " & $self.name,
+      )
   self.digest    = data.digest
   self.size      = data.size
-  self.json      = data.json
+  if data.json != nil:
+    self.json      = data.json
 
 proc mimickLocalConfig(self: DockerManifest) =
   ## set additional json fields for easier metadata collection
@@ -183,9 +171,16 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
       size:          layer{"size"}.getInt(),
     ).setAnnotations(layer))
 
-proc fetch(self: DockerManifest, fetchConfig = true): DockerManifest {.discardable.} =
+proc fetch(self:            DockerManifest,
+           fetchConfig    = true,
+           fetchManifests = false,
+           ): DockerManifest {.discardable.} =
   result = self
   case self.kind
+  of DockerManifestType.list:
+    if fetchManifests:
+      for i in self.manifests:
+        i.fetch(fetchConfig = fetchConfig)
   of DockerManifestType.image:
     if not self.isFetched:
       let data =
@@ -244,13 +239,14 @@ proc newManifest(name: DockerImage, data: DigestedJson): DockerManifest =
     for item in json["manifests"].items():
       let platform = item{"platform"}
       list.manifests.add(DockerManifest(
-        kind:        DockerManifestType.image,
-        name:        name,
-        list:        list,
-        mediaType:   item{"mediaType"}.getStr(),
-        digest:      item{"digest"}.getStr(),
-        size:        item{"size"}.getInt(),
-        platform:    DockerPlatform(
+        kind:         DockerManifestType.image,
+        name:         name,
+        list:         list,
+        mediaType:    item{"mediaType"}.getStr(),
+        artifactType: json{"artifactType"}.getStr(),
+        digest:       item{"digest"}.getStr(),
+        size:         item{"size"}.getInt(),
+        platform:     DockerPlatform(
           os:           platform{"os"}.getStr(),
           architecture: platform{"architecture"}.getStr(),
           variant:      platform{"variant"}.getStr(),
@@ -264,6 +260,7 @@ proc newManifest(name: DockerImage, data: DigestedJson): DockerManifest =
       kind:           DockerManifestType.image,
       name:           name,
       mediaType:      json{"mediaType"}.getStr(),
+      artifactType:   json{"artifactType"}.getStr(),
     )
     image.setJson(data)
     image.setAnnotations(json)
@@ -280,8 +277,252 @@ proc newManifest(name: DockerImage, data: DigestedJson): DockerManifest =
   else:
     raise newException(ValueError, "Unsupported docker manifest json")
 
-proc fetchManifest*(name: DockerImage,
-                    fetchConfig = true): DockerManifest =
+proc link*(self: DockerManifest): DockerManifest {.discardable.} =
+  case self.kind
+  of DockerManifestType.layer:
+    discard
+  of DockerManifestType.config:
+    discard
+  of DockerManifestType.image:
+    if self.config != nil:
+      self.config.image = self
+      self.config.name = self.name
+      self.config.link()
+    for i in self.layers:
+      i.name = self.name
+      i.link()
+  of DockerManifestType.list:
+    for i in self.manifests:
+      i.list = self
+      i.name = self.name
+      i.link()
+  return self
+
+proc asJson(self: DockerManifest): JsonNode =
+  result = %*({
+    "schemaVersion": 2,
+    "mediaType":     self.mediaType,
+  })
+  if self.annotations != nil and len(self.annotations) > 0:
+    result["annotations"] = self.annotations
+  case self.kind
+  of DockerManifestType.image,
+     DockerManifestType.list:
+    if self.artifactType != "":
+      result["artifactType"] = %(self.artifactType)
+  of DockerManifestType.config,
+     DockerManifestType.layer:
+    discard
+
+proc asDescriptorJson(self: DockerManifest, withPlatform = true): JsonNode =
+  if self == nil:
+    return nil
+  result = %*({
+    "mediaType": self.mediaType,
+    "digest":    self.digest,
+    "size":      self.size,
+  })
+  if self.annotations != nil and len(self.annotations) > 0:
+    result["annotations"] = self.annotations
+  case self.kind
+  of DockerManifestType.list:
+    if self.artifactType != "":
+      result["artifactType"] = %(self.artifactType)
+  of DockerManifestType.image:
+    if self.artifactType != "":
+      result["artifactType"] = %(self.artifactType)
+    if withPlatform and self.platform.isKnown():
+      result["platform"] = self.platform.asJson()
+  of DockerManifestType.config,
+     DockerManifestType.layer:
+    discard
+
+proc updateJson(self: DockerManifest): JsonNode =
+  # https://specs.opencontainers.org/image-spec/manifest/
+  case self.kind
+  of DockerManifestType.layer:
+    discard
+  of DockerManifestType.config:
+    discard
+  of DockerManifestType.image:
+    var layers = newJArray()
+    for i in self.layers:
+      layers.add(i.asDescriptorJson())
+    self.json = self.json.update(self.asJson())
+    self.json["layers"] = layers
+    self.json["config"] = self.json{"config"}.update(self.config.asDescriptorJson())
+    if self.subject != nil:
+      self.json["subject"] = self.json{"subject"}.update(self.subject.asDescriptorJson(withPlatform = false))
+  of DockerManifestType.list:
+    var manifests = newJArray()
+    for i in self.manifests:
+      manifests.add(i.asDescriptorJson())
+    self.json = self.json.update(self.asJson())
+    self.json["manifests"] = manifests
+  return self.json
+
+proc add*(self: DockerManifest, item: DockerManifest) =
+  if self.kind != DockerManifestType.list:
+    raise newException(ValueError, "can only add manifests to list manifest")
+  if item.kind != DockerManifestType.image:
+    raise newException(ValueError, "Can only add image manfiests to list manifest")
+  self.manifests.add(item)
+  self.isFetched = false
+  self.link()
+
+proc allImages*(self: DockerManifest): FilterManifests =
+  case self.kind
+  of DockerManifestType.list:
+    return FilterManifests(
+      manifests: self.manifests,
+      filters:   @[],
+    )
+  of DockerManifestType.image:
+    if self.list != nil:
+      return FilterManifests(
+        manifests: self.list.manifests,
+        filters:   @[],
+      )
+    return FilterManifests(
+      manifests: @[self],
+      filters:   @[],
+    )
+  else:
+    raise newException(ValueError, "only list or image manifests can normalize to manifests")
+
+proc allLayers*(self: DockerManifest): FilterManifests =
+  case self.kind
+  of DockerManifestType.image:
+    return FilterManifests(
+      manifests: self.layers,
+      filters:   @[],
+    )
+  else:
+    raise newException(ValueError, "only image manifests has layers")
+
+proc filterKnownPlatforms*(self: FilterManifests,
+                           ): FilterManifests =
+  ## find all valid platform images
+  ## as list manifest could have additional things in the list which are
+  ## not images such as provenance/sbom blobs
+  let manifests = self.manifests
+  self.manifests = @[]
+  self.filters.add("--platform")
+  for i in manifests:
+    if i.platform.isKnown():
+      self.manifests.add(i)
+  return self
+
+proc filterByPlatforms*(self:      FilterManifests,
+                        platforms: openArray[DockerPlatform],
+                        ): FilterManifests =
+  let platforms = platforms.known()
+  if len(platforms) == 0:
+    return self
+  for i in platforms:
+    self.filters.add("--platform=" & $i)
+  let manifests = self.manifests
+  self.manifests = @[]
+  for i in manifests:
+    if i.platform.isKnown() and i.platform in platforms:
+      self.manifests.add(i)
+  return self
+
+proc ifManyFilterBySystemPlatform*(self: FilterManifests,
+                                   enabled = true,
+                                   ): FilterManifests =
+  if enabled and len(self.manifests) > 1:
+    return self.filterByPlatforms(@[getSystemBuildPlatform()])
+  return self
+
+proc filterByAnyAnnotation*(self:        FilterManifests,
+                            annotations: openArray[(string, string)],
+                            fetch      = false,
+                            ): FilterManifests =
+  if len(annotations) == 0:
+    return self
+  var filters = newSeq[string]()
+  for (k, v) in annotations:
+    filters.add(k & "=" & v)
+  self.filters.add("--annotation=OR(" & filters.join(", ") & ")")
+  let manifests = self.manifests
+  self.manifests = @[]
+  for i in manifests:
+    if fetch:
+      i.fetch()
+    if i.annotations == nil:
+      continue
+    for (k, v) in annotations:
+      if i.annotations{k}.getStr().toLower().startsWith(v.toLower()):
+        self.manifests.add(i)
+        break
+  return self
+
+proc filterByAllAnnotations*(self:        FilterManifests,
+                             annotations: openArray[(string, string)],
+                             fetch      = false,
+                             ): FilterManifests =
+  if len(annotations) == 0:
+    return self
+  var filters = newSeq[string]()
+  for (k, v) in annotations:
+    filters.add(k & "=" & v)
+  self.filters.add("--annotation=AND(" & filters.join(", ") & ")")
+  let manifests = self.manifests
+  self.manifests = @[]
+  for i in manifests:
+    if fetch:
+      i.fetch()
+    if i.annotations == nil:
+      continue
+    var matched = true
+    for (k, v) in annotations:
+      if not i.annotations{k}.getStr().toLower().startsWith(v.toLower()):
+        matched = false
+        break
+    if matched:
+      self.manifests.add(i)
+  return self
+
+proc sortByAnnotation*(self:       FilterManifests,
+                       annotation: string,
+                       fetch       = false,
+                       ): FilterManifests =
+  let manifests = self.manifests
+  self.manifests = @[]
+  for i in manifests:
+    if fetch:
+      i.fetch()
+    if i.annotations == nil:
+      continue
+    if annotation in i.annotations:
+      self.manifests.add(i)
+  self.manifests = self.manifests.sortedByIt((it.annotations{annotation}.getStr(),)).reversed()
+  return self
+
+proc one*(self: FilterManifests): DockerManifest =
+  case len(self.manifests)
+  of 0:
+    raise newException(KeyError, "there are no manifests matching " & $self.filters)
+  of 1:
+    return self.manifests[0]
+  else:
+    raise newException(KeyError, "there are multiple manifests matching " & $self.filters)
+
+proc first*(self: FilterManifests): DockerManifest =
+  case len(self.manifests)
+  of 0:
+    raise newException(KeyError, "there are no manifests matching " & $self.filters)
+  else:
+    return self.manifests[0]
+
+proc all*(self: FilterManifests): seq[DockerManifest] =
+  return self.manifests
+
+proc fetchManifest*(name:            DockerImage,
+                    fetchConfig    = true,
+                    fetchManifests = false,
+                    ): DockerManifest =
   ## request either manifest list or image manifest for specified image
   # keep in mind that image can be of multiple formats
   # foo                   # image manifest name
@@ -291,7 +532,7 @@ proc fetchManifest*(name: DockerImage,
   for key in @[name.asRepoDigest(), name.asRepoTag(), name.asRepoRef()]:
     if key in manifestCache:
       result = manifestCache[key]
-      result.fetch(fetchConfig = fetchConfig)
+      result.fetch(fetchConfig = fetchConfig, fetchManifests = fetchManifests)
       return result
   try:
     let
@@ -305,7 +546,7 @@ proc fetchManifest*(name: DockerImage,
     error("docker: " & getCurrentExceptionMsg())
     let data = requestManifestJson(name)
     result = newManifest(name, data)
-  result.fetch(fetchConfig = fetchConfig)
+  result.fetch(fetchConfig = fetchConfig, fetchManifests = fetchManifests)
   if name.digest != "":
     manifestCache[name.asRepoDigest()] = result
   elif name.tag != "":
@@ -316,40 +557,40 @@ proc fetchManifest*(name: DockerImage,
     for image in result.manifests:
       manifestCache[image.asImage().asRepoDigest()] = image
 
-proc fetchListManifest*(name: DockerImage, platforms: seq[DockerPlatform] = @[]): DockerManifest =
-  result = fetchManifest(name, fetchConfig = false)
+proc fetchListManifest*(name:            DockerImage,
+                        platforms:       seq[DockerPlatform] = @[],
+                        fetchConfig    = false,
+                        fetchManifests = false,
+                        ): DockerManifest =
+  result = fetchManifest(name, fetchConfig = fetchConfig, fetchManifests = fetchManifests)
   if result.kind != DockerManifestType.list:
     raise newException(ValueError, "No manifest list for " & $name)
   if len(platforms) == 0:
     return
-  let found = result.findAllPlatformsManifests(platforms)
+  let found = result.allImages().filterByPlatforms(platforms).all()
   if len(found) < len(platforms):
     raise newException(ValueError, "Could not find all platforms for " & $name & " " & $($platforms))
 
-proc fetchOnlyImageManifest*(name: DockerImage, fetchConfig = true): DockerManifest =
-  var manifest = fetchManifest(name, fetchConfig = fetchConfig)
-  if manifest.kind == DockerManifestType.list:
-    let manifests = manifest.findAllPlatformsManifests()
-    if len(manifests) == 1:
-      manifest = manifests[0]
-    else:
-      raise newException(KeyError, "There are multiple platform images for: " & $name)
-  if manifest.kind != DockerManifestType.image:
-    raise newException(ValueError, "Could not find image manifest for: " & $name)
-  manifest.fetch(fetchConfig = fetchConfig)
-  return manifest
-
-proc fetchImageManifest*(name: DockerImage,
-                         platform: DockerPlatform,
+proc fetchImageManifest*(name:                  DockerImage,
+                         platform:              DockerPlatform,
+                         ifManySystemPlatform = false,
+                         fetchConfig          = true,
+                         fetchManifests       = false,
                          ): DockerManifest =
-  trace("docker: fetching image manifest for: " & $name)
-  var manifest = fetchManifest(name)
+  trace("docker: fetching image manifest for: " & $name & " for " & $platform)
+  var manifest = fetchManifest(name, fetchConfig = fetchConfig, fetchManifests = fetchManifests)
   if manifest.kind == DockerManifestType.list:
-    manifest = manifest.findPlatformManifest(platform)
+    manifest = (
+      manifest
+      .allImages()
+      .filterByPlatforms(@[platform])
+      .ifManyFilterBySystemPlatform(ifManySystemPlatform)
+      .one()
+    )
     manifest.fetch()
   if manifest.kind != DockerManifestType.image:
     raise newException(ValueError, "Could not find image manifest for: " & $name)
-  if manifest.platform != platform:
+  if platform.isKnown() and manifest.platform != platform:
     raise newException(
       ValueError,
       "Could not fetch manifest for: " & $name & " " &
@@ -357,40 +598,111 @@ proc fetchImageManifest*(name: DockerImage,
     )
   return manifest
 
-proc fetchListOrImageManifest*(name: DockerImage, platforms: seq[DockerPlatform] = @[]): DockerManifest =
-  if len(platforms) > 1:
+proc fetchListOrImageManifest*(name:            DockerImage,
+                               platforms:       seq[DockerPlatform] = @[],
+                               fetchConfig    = true,
+                               fetchManifests = false,
+                               ): DockerManifest =
+  case len(platforms)
+  of 0:
+    result = fetchManifest(name, fetchConfig = fetchConfig, fetchManifests = fetchManifests)
+    case result.kind
+    of DockerManifestType.image, DockerManifestType.list:
+      discard
+    else:
+      raise newException(ValueError, "could not find list or image manifest for " & $name)
+  of 1:
+    let image = fetchImageManifest(
+      name,
+      platforms[0],
+      fetchConfig    = fetchConfig,
+      fetchManifests = fetchManifests,
+    )
+    if image.list != nil:
+      return image.list
+    return image
+  else:
     return fetchListManifest(name, platforms)
-  let
-    platform = platforms[0]
-    image    = fetchImageManifest(name, platform)
-  if image.list != nil:
-    return image.list
-  return image
+
+proc put*(self: DockerManifest) =
+  if self.isFetched:
+    return
+  trace("docker: uploading to registry " & $self.kind & " " & self.mediaType)
+  case self.kind
+  of DockerManifestType.layer:
+    if self.fileStream != nil:
+      self.setJson(
+        layerPutFileStream(
+          layer       = self.name,
+          contentType = self.mediaType,
+          fileStream  = self.fileStream,
+        ),
+        check = false,
+      )
+    else:
+      self.setJson(
+        layerPutJson(
+          layer       = self.name,
+          contentType = self.mediaType,
+          data        = self.updateJson(),
+        ),
+        check = false,
+      )
+  of DockerManifestType.config:
+    self.setJson(
+      layerPutJson(
+        layer       = self.name,
+        contentType = self.mediaType,
+        data        = self.updateJson(),
+      ),
+      check = false,
+    )
+  of DockerManifestType.image:
+    if self.config != nil:
+      self.config.put()
+    for i in self.layers:
+      i.put()
+    self.setJson(
+      manifestPut(
+        image       = self.name,
+        contentType = self.mediaType,
+        data        = self.updateJson(),
+        byTag       = self.name.tag != "" and self.list == nil,
+      ),
+      check = false,
+    )
+  of DockerManifestType.list:
+    for i in self.manifests:
+      i.put()
+    self.setJson(
+      manifestPut(
+        image       = self.name,
+        contentType = self.mediaType,
+        data        = self.updateJson(),
+        byTag       = self.name.tag != "",
+      ),
+      check = false,
+    )
 
 proc findSibling(self: DockerManifest, reference = "attestation-manifest"): DockerManifest =
-  if self.kind != DockerManifestType.image:
-    raise newException(ValueError, "Can only lookup sibling for image manifest")
-  if self.list == nil:
-    raise newException(ValueError, "Need reference to list manifest to lookup sibling")
-  for i in self.list.manifests:
-    if i.annotations == nil:
-      continue
-    if (
-      i.annotations{"vnd.docker.reference.type"}.getStr().toLower() == reference.toLower() and
-      i.annotations{"vnd.docker.reference.digest"}.getStr().toLower() == self.asImage().imageRef.toLower()
-    ):
-      return i.fetch()
-  raise newException(KeyError, "Could not find sibling image of reference type: " & reference)
+  return (
+    self.allImages()
+    .filterByAllAnnotations({
+      "vnd.docker.reference.type":   reference,
+      "vnd.docker.reference.digest": self.asImage().imageRef,
+    })
+    .first()
+    .fetch()
+  )
 
 proc findInTotoLayer(self: DockerManifest, predicate: string): DockerManifest =
-  if self.kind != DockerManifestType.image:
-    raise newException(ValueError, "Can only lookup layers in image manifest")
-  for l in self.layers:
-    if l.annotations == nil:
-      continue
-    if l.annotations{"in-toto.io/predicate-type"}.getStr().toLower().startsWith(predicate.toLower()):
-      return l
-  raise newException(KeyError, "Could not find in-toto layer for predicate: " & predicate)
+  return (
+    self.allLayers()
+    .filterByAllAnnotations({
+      "in-toto.io/predicate-type": predicate,
+    })
+    .first()
+  )
 
 proc fetchProvenance*(name: DockerImage, platform: DockerPlatform): JsonNode =
   # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
@@ -432,7 +744,10 @@ proc fetchSBOM*(name: DockerImage, platform: DockerPlatform): JsonNode =
   # https://docs.docker.com/reference/cli/docker/buildx/imagetools/inspect/
   try:
     trace("docker: looking up SBOM for: " & $name)
-    let layer = name.fetchImageManifest(platform).findSibling().findInTotoLayer("https://spdx.dev/Document")
+    let layer =
+      name.fetchImageManifest(platform)
+      .findSibling()
+      .findInTotoLayer("https://spdx.dev/Document")
     result = layer.asImage().layerGetJson(accept = layer.mediaType).json{"predicate"}
     trace("docker: in registry found SBOM for: " & $name)
   except RegistryResponseError, KeyError:
@@ -460,3 +775,156 @@ proc fetchSBOM*(name: DockerImage, platform: DockerPlatform): JsonNode =
         flags    = @["--format", "{{json (index .SBOM \"" & $platform & "\")}}"],
         fallback = false,
       ).json{"SPDX"}
+
+proc getMarkFromInTotoStatement(statement: JsonNode,
+                                subject:   DockerImage,
+                                ): string =
+  let
+    predicateType = statement{"predicateType"}.getStr()
+    predicate     = statement{"predicate"}.assertIs(JObject, "Bad in-toto statement predicate type")
+    subjects      = statement{"subject"}.assertIs(JArray, "Bad in-toto statement subject type")
+
+  for i in subjects.items():
+    i.assertIs(JObject, "Bad in-toto subject type")
+    let digest = i{"digest"}.assertIs(JObject, "Bad in-toto subject digest"){"sha256"}.getStr()
+    if digest.extractDockerHash() != subject.digest:
+      raise newException(
+        ValueError,
+        "In-Toto attestation subject does not match any known image digest: " &
+        digest & " != " & subject.digest
+      )
+
+  case predicateType
+  of "https://cosign.sigstore.dev/attestation/v1":
+    let
+      data   = predicate{"Data"}.getStr().strip()
+      nested = parseJson(data).assertIs(JObject, "Bad in-toto statement predicate data type")
+    return nested.getMarkFromInTotoStatement(subject)
+
+  of "https://in-toto.io/attestation/scai/attribute-report/v0.2":
+    let attributes = (
+      predicate{"attributes"}
+      .assertIs(JArray, "Bad in-toto statement attributes type")
+      .assertHasLen("In-toto statement predicate doesnt have any attributes")
+    )
+    for i in attributes.items():
+      i.assertIs(JObject, "Bad in-toto statement predicate attribute type")
+      if i{"attribute"}.getStr() == "CHALK":
+        result = i{"evidence"}.getStr()
+
+  of "https://in-toto.io/attestation/scai/v0.3":
+    let attributes = (
+      predicate{"attributes"}
+      .assertIs(JArray, "Bad in-toto statement attributes type")
+      .assertHasLen("In-toto statement predicate doesnt have any attributes")
+    )
+    for i in attributes.items():
+      i.assertIs(JObject, "Bad in-toto statement predicate attribute type")
+      if i{"attribute"}.getStr() == "CHALK":
+        result = $i{"evidence"}.assertIs(JObject, "Bad in-toto statement predicate CHALK attribute type")
+
+  else:
+    raise newException(ValueError, "Unsupported in-toto predicate type " & predicateType)
+
+proc getMarkFromDsseInToto(dsse:    JsonNode,
+                           subject: DockerImage,
+                           ): string =
+  dsse.assertIs(JObject, "Bad in-toto envelope type")
+  let payloadType = dsse{"payloadType"}.getStr()
+  case payloadType
+  of "application/vnd.in-toto+json":
+    let statement = parseJson(base64.decode(dsse{"payload"}.getStr()))
+    return statement.getMarkFromInTotoStatement(subject)
+  else:
+    raise newException(ValueError, "Unsupported in-toto envelope DSSE type " & payloadType)
+
+iterator fetchCosignDsseInTotoMark(image: DockerImage): (JsonNode, string) =
+  let spec = image.asCosignAttestation()
+  trace("docker: getting intoto statement from cosign sigstore attestation for " & $spec)
+  # in cosign v2 there could only be one image but it could have multiple layers
+  # whenever same image is attested multiple times in which case we attempt
+  # to extract it from all of them
+  let manifest = (
+    fetchListOrImageManifest(spec, fetchConfig = false)
+    .allImages()
+    .one()
+  )
+  for layer in (
+      manifest
+      .allLayers()
+      .filterByAllAnnotations(
+        {
+          "predicateType": "https://cosign.sigstore.dev/attestation/v1",
+        },
+        fetch = true,
+      )
+      .all()
+  ):
+    try:
+      let dsse = (
+        layer.asImage()
+        .layerGetJson(accept = layer.mediaType)
+        .json
+        .assertIs(JObject, "Bad dsse in-toto envelope type")
+      )
+      yield (dsse, dsse.getMarkFromDsseInToto(image))
+    except:
+      trace("docker: could not get intoto statement from cosign sigstore attestation from " &
+            $image & " due to " & getCurrentExceptionMsg())
+
+iterator fetchOCIDsseInTotoMark(image: DockerImage): (JsonNode, string) =
+  let spec = image.asOciAttestation()
+  trace("docker: getting intoto statement from cosign OCI attestation for " & $spec)
+  # in cosign v3 which uses OCI there could be multiple manifests
+  # but each having only one attestation layer
+  for manifest in (
+    fetchListOrImageManifest(spec, fetchConfig = false)
+    .allImages()
+    .filterByAllAnnotations(
+      {
+        "dev.sigstore.bundle.predicateType": "https://sigstore.dev/cosign/sign/v1",
+      },
+      fetch = true,
+    )
+    .sortByAnnotation(
+      "org.opencontainers.image.created",
+      fetch = true,
+    )
+    .all()
+  ):
+    let layer = manifest.allLayers().one()
+    try:
+      let
+        envelope = (
+          layer.asImage()
+          .layerGetJson(accept = layer.mediaType)
+          .json
+          .assertIs(JObject, "Bad in-toto bundle type")
+        )
+        dsse = (
+          envelope{"dsseEnvelope"}
+          .assertIs(JObject, "Bad dsse in-toto envelope type")
+        )
+      yield (dsse, dsse.getMarkFromDsseInToto(image))
+    except:
+      trace("docker: could not get intoto statement from OCI attestation from " &
+            $image & " due to " & getCurrentExceptionMsg())
+
+iterator fetchDsseInTotoMark*(image:        DockerImage,
+                              fetchOci    = true,
+                              fetchCosign = true,
+                              ): (JsonNode, string) =
+  if fetchOci:
+    try:
+      for (dsse, mark) in image.fetchOCIDsseInTotoMark():
+        yield (dsse, mark)
+    except:
+      trace("docker: could not get intoto statement from OCI attestation from " &
+            $image & " due to " & getCurrentExceptionMsg())
+  if fetchCosign:
+    try:
+      for (dsse, mark) in image.fetchCosignDsseInTotoMark():
+        yield (dsse, mark)
+    except:
+      trace("docker: could not get intoto statement from sigstore attestation from " &
+            $image & " due to " & getCurrentExceptionMsg())

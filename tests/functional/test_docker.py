@@ -1861,13 +1861,15 @@ def test_git_context(
 
 # extract on image id, and image name, running container id + container name, exited container id + container name
 def test_extract(chalk: Chalk, random_hex: str):
-    tag = f"test_image_{random_hex}"
+    name = f"test_image_{random_hex}"
+    tag = f"{REGISTRY}/{name}"
     container_name = f"test_container_{random_hex}"
 
     # build test image
     image_id, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
         tag=tag,
+        push=True,
     )
 
     # extract chalk from image id and image name
@@ -1885,16 +1887,40 @@ def test_extract(chalk: Chalk, random_hex: str):
             "_OP_ARTIFACT_TYPE": "Docker Image",
             "_IMAGE_ID": image_id,
             "_CURRENT_HASH": image_id,
-            "_REPO_TAGS": MISSING,
+            "_REPO_TAGS": {
+                REGISTRY: {
+                    name: {
+                        "latest": str,
+                    }
+                }
+            },
         }
     )
 
     extract_by_id = chalk.extract(image_id[:12])
     assert extract_by_id.report.contains(extract_by_name.report.deterministic())
 
+    Docker.remove_images([tag])
+
+    extract_registry = chalk.extract(tag)
+    # registry cant retrieve identical metadata as from local image
+    # hence cant assert all chalkmark keys
+    assert extract_registry.mark.contains(
+        {
+            "_OP_ARTIFACT_TYPE": "Docker Image",
+            "_IMAGE_ID": image_id,
+            "_CURRENT_HASH": image_id,
+            "_REPO_DIGESTS": {
+                REGISTRY: {
+                    name: ANY,
+                }
+            },
+        }
+    )
+
     # run container and keep alive via tail
     container_id, _ = Docker.run(
-        image_id,
+        tag,
         name=container_name,
         entrypoint="tail",
         params=["-f", "/dev/null"],
