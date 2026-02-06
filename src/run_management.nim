@@ -275,6 +275,11 @@ template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
   except:
     trace("Could not set chalk key " & k & " due to: " & getCurrentExceptionMsg())
 
+proc filterIfNeeded*(dict: ChalkDict): ChalkDict =
+  result = ChalkDict()
+  for k, v in dict:
+    result.setIfNeeded(k, v)
+
 proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)
   s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]

@@ -1,6 +1,11 @@
 import "."/[
   types,
-  wrapping/string,
+  wrapping/list,
+  wrapping/dict,
+]
+from "./wrapping/string" import `@`
+import ".."/[
+  utils/chalkdict,
 ]
 
 export types
@@ -9,7 +14,7 @@ proc n00b_git_collect(
   repo_root: ptr n00b_string_t,
 ): ptr n00b_dict_t {.header:"util/git.h".}
 
-proc gitCollect*(repoRoot: string): ptr n00b_dict_t =
+proc n00bGitCollect*(repoRoot: string): ChalkDict =
   if repoRoot == "":
-    return nil
-  return n00b_git_collect(@repoRoot)
+    return ChalkDict()
+  return $n00b_git_collect(@repoRoot)

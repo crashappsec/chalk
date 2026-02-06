@@ -7,7 +7,6 @@ import json
 import os
 import pty
 import re
-import sys
 import time
 from contextlib import suppress
 from dataclasses import asdict, dataclass
@@ -361,37 +360,6 @@ def run(
             env=env_vars,
             log_level=log_level,
         )
-        if os.environ.get("CHALK_TEST_GIT_DIFF_LOGS") == "1":
-            for stream in (result.logs, result.text):
-                if "git(n00b)" not in stream and "git(chalk)" not in stream:
-                    continue
-                for line in stream.splitlines():
-                    if "git(n00b)" in line or "git(chalk)" in line:
-                        json_start = line.find("{")
-                        if json_start != -1:
-                            prefix = line[:json_start].rstrip()
-                            try:
-                                data = json.loads(line[json_start:])
-                            except json.JSONDecodeError:
-                                print(line, file=sys.stderr)
-                            else:
-                                print(prefix, file=sys.stderr)
-                                print(
-                                    json.dumps(
-                                        data, indent=2, sort_keys=True, ensure_ascii=True
-                                    ),
-                                    file=sys.stderr,
-                                )
-                        else:
-                            print(line, file=sys.stderr)
-        elif os.environ.get("CHALK_TEST_CMD_LOGS") == "1":
-            try:
-                bin_name = Path(bin_from_cmd(cmd)).name
-            except Exception:
-                bin_name = ""
-            if bin_name == "chalk" and result.logs:
-                print(result.logs, file=sys.stderr)
-
         if check:
             try:
                 result.check()

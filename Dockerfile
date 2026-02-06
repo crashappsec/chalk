@@ -13,12 +13,10 @@ RUN apk add --no-cache \
     curl \
     gcc \
     git \
-    libgit2-dev \
     make \
     musl-dev \
     openssl \
-    strace \
-    http-parser-dev
+    strace
 
 # add musl-gcc so its consistent CC with ubuntu
 RUN ln -s $(which gcc) /usr/bin/musl-gcc
@@ -31,8 +29,6 @@ RUN apt-get update -y && \
     apt-get install -y \
         curl \
         git \
-        libgit2-dev \
-        libhttp-parser-dev \
         make \
         musl-tools \
         strace \

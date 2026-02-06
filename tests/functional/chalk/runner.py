@@ -222,6 +222,15 @@ class ChalkProgram(Program):
         return list(errors)
 
     @property
+    def n00b_diffs(self):
+        diffs: list[str] = []
+        for line in self.logs.splitlines() + self.text.splitlines():
+            msg = self._json_log(line)
+            if "git(n00b) diff" in msg and "no_differences" not in msg:
+                diffs.append(msg)
+        return diffs
+
+    @property
     def reports(self):
         text = "\n".join(
             [
@@ -442,6 +451,11 @@ class Chalk:
                 tty=tty,
             )
         )
+        diffs = result.n00b_diffs
+        if diffs and not ignore_errors:
+            for diff in diffs:
+                logger.error(diff)
+            raise AssertionError("git(n00b) differences detected")
         if not ignore_errors and expected_success and result.errors:
             raise result.error
 

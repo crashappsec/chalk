@@ -2130,16 +2130,6 @@ from the origin to ensure its local definition is up to date.
 """
   }
 
-  field compare_with_n00b {
-    type:     bool
-    default:  false
-    shortdoc: "Compare git parser output with n00b"
-    doc:      """
-When true, chalk will run the n00b git parser in parallel with the
-existing Nim parser and log any differences at debug/trace level.
-This does not change emitted metadata. Intended for parity validation.
-"""
-  }
 }
 
 singleton load {

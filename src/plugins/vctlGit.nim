@@ -19,14 +19,14 @@ import pkg/[
   zippy/inflate,
 ]
 import ".."/[
+  n00b/git,
   n00b/subproc,
-  n00b/wrapping/env,
   plugin_api,
   run_management,
   types,
+  utils/envvars,
   utils/files,
   utils/git,
-  utils/n00b_git,
   utils/strings,
   utils/times,
   chalkjson,
@@ -276,6 +276,14 @@ type
     origin:     Option[string]
     repos:      OrderedTable[string, string]
     vcsDirs:    OrderedTable[string, RepoInfo]
+
+proc root*(info: RepoInfo): string =
+  if info == nil or info.vcsDir == "":
+    return ""
+  let (head, tail) = info.vcsDir.splitPath()
+  if tail == ".git":
+    return head
+  return info.vcsDir
 
 proc clearCallback(self: Plugin) {.cdecl.} =
   self.internalState = RootRef(GitInfo())
@@ -747,46 +755,15 @@ proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   self.origin = ghLocal
   return ghLocal
 
-proc compareWithN00b(info: RepoInfo)
-
-
-proc findAndLoad(plugin: GitInfo, path: string) =
-  trace("Looking for .git directory, from: " & path)
-  let vcsDir = path.findGitDir()
-
-  if vcsDir == "" or vcsDir in plugin.vcsDirs:
-    return
-
-  let
-    confFileName = vcsDir.joinPath(fNameConfig)
-    info         = RepoInfo(vcsDir: vcsDir)
-
-  trace("Found version control dir: " & vcsDir)
-  info.loadHead()
-  if info.commitId == "":
-    return
-
-  withFileStream(confFileName, mode = fmRead, strict = false):
-    try:
-      if stream != nil:
-        let config = stream.parseGitConfig()
-        info.origin = info.calcOrigin(config)
-        info.refetchTags()
-    except:
-      error(confFileName & ": Git configuration file not parsed: " & getCurrentExceptionMsg())
-      dumpExOnDebug()
-
-  plugin.vcsDirs[vcsDir] = info
-  plugin.repos[path] = vcsDir.parentDir()
-  info.compareWithN00b()
-
 # TODO ideally should be done via libgit
 # but for now easier to depend on git CLI
 proc findMissingFiles(info: RepoInfo): seq[string] =
   result = newSeq[string]()
   let
-    root = info.vcsDir.splitPath().head
+    root = info.root()
     exe  = getGitExeLocation()
+  if root == "":
+    return
   if exe == "":
     trace("no git exe. unable to run ls-files. skipping")
     return
@@ -803,7 +780,7 @@ proc findMissingFiles(info: RepoInfo): seq[string] =
 
 proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
   if prefix == "":
-    chalkDict.setIfNeeded(prefix & "VCS_DIR_WHEN_CHALKED", info.vcsDir.splitPath().head)
+    chalkDict.setIfNeeded(prefix & "VCS_DIR_WHEN_CHALKED", info.root())
     chalkDict.setIfNeeded(prefix & "VCS_MISSING_FILES",    info.findMissingFiles())
 
   chalkDict.setIfNeeded(prefix & "ORIGIN_URI",             info.origin)
@@ -828,44 +805,27 @@ proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
     chalkDict.setIfNeeded(prefix & "TAG_SIGNED",           info.latestTag.signed)
     chalkDict.setIfNeeded(prefix & "TAG_MESSAGE",          info.latestTag.message)
 
-proc repoRootForN00b(info: RepoInfo): string =
-  let (head, tail) = info.vcsDir.splitPath()
-  if tail == ".git":
-    return head
-  return info.vcsDir
-
-proc filterSubscribed(dict: ChalkDict): ChalkDict =
-  result = ChalkDict()
-  for k, v in dict:
-    if isSubscribedKey(k):
-      result[k] = v
-
 proc compareWithN00b(info: RepoInfo) =
-  if not attrGet[bool]("git.compare_with_n00b"):
-    return
-
-  let repoRoot = info.repoRootForN00b()
+  let repoRoot = info.root()
   if repoRoot == "":
     return
 
   let refetch = attrGet[bool]("git.refetch_lightweight_tags")
-  let prevRefetch = n00bGetEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS")
-  let prevAllow = n00bGetEnv("N00B_GIT_REFETCH_ALLOW_NETWORK")
-  n00bSetEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS", if refetch: "true" else: "false")
-  n00bSetEnv("N00B_GIT_REFETCH_ALLOW_NETWORK", if refetch: "true" else: "false")
-  defer:
-    if prevRefetch.isSome():
-      n00bSetEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS", prevRefetch.get())
-    else:
-      discard n00bRemoveEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS")
-    if prevAllow.isSome():
-      n00bSetEnv("N00B_GIT_REFETCH_ALLOW_NETWORK", prevAllow.get())
-    else:
-      discard n00bRemoveEnv("N00B_GIT_REFETCH_ALLOW_NETWORK")
-
   var chalkDict = ChalkDict()
   chalkDict.setVcsKeys(info)
-  let n00bDict = filterSubscribed(n00bGitCollect(repoRoot))
+  var n00bDict = ChalkDict()
+
+  let envVars = @[
+    setEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS", if refetch: "true" else: "false"),
+    setEnv("N00B_GIT_REFETCH_ALLOW_NETWORK", if refetch: "true" else: "false"),
+  ]
+  withEnvRestore(envVars):
+    n00bDict = filterIfNeeded(n00bGitCollect(repoRoot))
+    if len(n00bDict) == 0 and info.vcsDir != "":
+      n00bDict = filterIfNeeded(n00bGitCollect(info.vcsDir))
+    if len(n00bDict) == 0:
+      trace("git(n00b) repo=" & repoRoot & " no_data")
+      return
 
   trace("git(chalk) repo=" & repoRoot & " " & chalkDict.toJson())
   trace("git(n00b) repo=" & repoRoot & " " & n00bDict.toJson())
@@ -895,6 +855,36 @@ proc compareWithN00b(info: RepoInfo) =
 
   if diffCount == 0:
     trace("git(n00b) diff repo=" & repoRoot & " no_differences")
+
+proc findAndLoad(plugin: GitInfo, path: string) =
+  trace("Looking for .git directory, from: " & path)
+  let vcsDir = path.findGitDir()
+
+  if vcsDir == "" or vcsDir in plugin.vcsDirs:
+    return
+
+  let
+    confFileName = vcsDir.joinPath(fNameConfig)
+    info         = RepoInfo(vcsDir: vcsDir)
+
+  trace("Found version control dir: " & vcsDir)
+  info.loadHead()
+  if info.commitId == "":
+    return
+
+  withFileStream(confFileName, mode = fmRead, strict = false):
+    try:
+      if stream != nil:
+        let config = stream.parseGitConfig()
+        info.origin = info.calcOrigin(config)
+        info.refetchTags()
+    except:
+      error(confFileName & ": Git configuration file not parsed: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
+
+  plugin.vcsDirs[vcsDir] = info
+  plugin.repos[path] = info.root()
+  info.compareWithN00b()
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":

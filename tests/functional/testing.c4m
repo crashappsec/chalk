@@ -7,8 +7,6 @@ custom_report.terminal_chalk_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 custom_report.terminal_other_op.use_when: ["extract", "delete", "exec", "env", "heartbeat", "postexec"]
 
-git.compare_with_n00b: true
-
 object_store_config server {
   enabled = env_exists("OBJECT_STORE")
   object_store = "presign"
@@ -18,13 +16,17 @@ object_store_config server {
 }
 
 report_template insertion_default {
-  key._OP_EXIT_CODE.use     = true
-  key._CHALK_RUN_TIME.use   = true
-  # key._IMAGE_SBOM.use       = false
-  # key._IMAGE_PROVENANCE.use = false
+  key._OP_EXIT_CODE.use           = true
+  key._CHALK_RUN_TIME.use         = true
+  key.VCS_DIFF_PATCH.use          = env_exists("OBJECT_STORE")
+  key.VCS_DIFF_PATCH.object_store = "server"
+  # key._IMAGE_SBOM.use             = false
+  # key._IMAGE_PROVENANCE.use       = false
 }
 
 report_template report_default {
+  key.VCS_DIFF_PATCH.use          = env_exists("OBJECT_STORE")
+  key.VCS_DIFF_PATCH.object_store = "server"
 }
 
 if not env_exists("CHALK_USAGE_URL") {
