@@ -43,9 +43,11 @@ var
 staticLinkLibraries(
   [
     "n00b",
+    "git2",
     "curl",
     "ssl",
     "crypto",
+    "http_parser",
     "pcre2-8",
     "backtrace",
     "ffi",

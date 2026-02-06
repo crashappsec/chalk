@@ -19,14 +19,17 @@ import pkg/[
   zippy/inflate,
 ]
 import ".."/[
+  n00b/git,
   n00b/subproc,
   plugin_api,
   run_management,
   types,
+  utils/envvars,
   utils/files,
   utils/git,
   utils/strings,
   utils/times,
+  chalkjson,
 ]
 
 const
@@ -273,6 +276,14 @@ type
     origin:     Option[string]
     repos:      OrderedTable[string, string]
     vcsDirs:    OrderedTable[string, RepoInfo]
+
+proc root*(info: RepoInfo): string =
+  if info == nil or info.vcsDir == "":
+    return ""
+  let (head, tail) = info.vcsDir.splitPath()
+  if tail == ".git":
+    return head
+  return info.vcsDir
 
 proc clearCallback(self: Plugin) {.cdecl.} =
   self.internalState = RootRef(GitInfo())
@@ -744,6 +755,106 @@ proc calcOrigin(self: RepoInfo, conf: seq[SecInfo]): string =
   self.origin = ghLocal
   return ghLocal
 
+# TODO ideally should be done via libgit
+# but for now easier to depend on git CLI
+proc findMissingFiles(info: RepoInfo): seq[string] =
+  result = newSeq[string]()
+  let
+    root = info.root()
+    exe  = getGitExeLocation()
+  if root == "":
+    return
+  if exe == "":
+    trace("no git exe. unable to run ls-files. skipping")
+    return
+  withWorkingDir(root):
+    let
+      args   = @["ls-files"]
+      output = runCmdGetEverything(exe, args)
+    if output.exitCode != 0:
+      trace("ingoring git " & args.join(" ") & ": " & output.stderr)
+      return
+    for f in output.stdout.strip().splitLines():
+      if not fileExists(root.joinPath(f)):
+        result.add(f)
+
+proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
+  if prefix == "":
+    chalkDict.setIfNeeded(prefix & "VCS_DIR_WHEN_CHALKED", info.root())
+    chalkDict.setIfNeeded(prefix & "VCS_MISSING_FILES",    info.findMissingFiles())
+
+  chalkDict.setIfNeeded(prefix & "ORIGIN_URI",             info.origin)
+  chalkDict.setIfNeeded(prefix & "COMMIT_ID",              info.commitId)
+  chalkDict.setIfNeeded(prefix & "COMMIT_SIGNED",          info.signed)
+  chalkDict.setIfNeeded(prefix & "BRANCH",                 info.branch)
+  chalkDict.setIfNeeded(prefix & "AUTHOR",                 info.author)
+  chalkDict.setIfNeeded(prefix & "COMMITTER",              info.committer)
+  chalkDict.setIfNeeded(prefix & "COMMIT_MESSAGE",         info.message)
+  if info.author != "":
+    chalkDict.setIfNeeded(prefix & "DATE_AUTHORED",        info.authorDate.forReport().format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & "TIMESTAMP_AUTHORED",   info.authorDate.toUnixInMs())
+  if info.committer != "":
+    chalkDict.setIfNeeded(prefix & "DATE_COMMITTED",       info.commitDate.forReport().format(timesIso8601Format))
+    chalkDict.setIfNeeded(prefix & "TIMESTAMP_COMMITTED",  info.commitDate.toUnixInMs())
+  if info.latestTag != nil:
+    chalkDict.setIfNeeded(prefix & "TAG",                  info.latestTag.name)
+    chalkDict.setIfNeeded(prefix & "TAGGER",               info.latestTag.tagger)
+    if info.latestTag.tagger != "":
+      chalkDict.setIfNeeded(prefix & "DATE_TAGGED",        info.latestTag.date.forReport().format(timesIso8601Format))
+      chalkDict.setIfNeeded(prefix & "TIMESTAMP_TAGGED",   info.latestTag.date.toUnixInMs())
+    chalkDict.setIfNeeded(prefix & "TAG_SIGNED",           info.latestTag.signed)
+    chalkDict.setIfNeeded(prefix & "TAG_MESSAGE",          info.latestTag.message)
+
+proc compareWithN00b(info: RepoInfo) =
+  let repoRoot = info.root()
+  if repoRoot == "":
+    return
+
+  let refetch = attrGet[bool]("git.refetch_lightweight_tags")
+  var chalkDict = ChalkDict()
+  chalkDict.setVcsKeys(info)
+  var n00bDict = ChalkDict()
+
+  let envVars = @[
+    setEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS", if refetch: "true" else: "false"),
+    setEnv("N00B_GIT_REFETCH_ALLOW_NETWORK", if refetch: "true" else: "false"),
+  ]
+  withEnvRestore(envVars):
+    n00bDict = filterIfNeeded(n00bGitCollect(repoRoot))
+    if len(n00bDict) == 0 and info.vcsDir != "":
+      n00bDict = filterIfNeeded(n00bGitCollect(info.vcsDir))
+    if len(n00bDict) == 0:
+      trace("git(n00b) repo=" & repoRoot & " no_data")
+      return
+
+  trace("git(chalk) repo=" & repoRoot & " " & chalkDict.toJson())
+  trace("git(n00b) repo=" & repoRoot & " " & n00bDict.toJson())
+  if len(chalkDict) == 0 and len(n00bDict) == 0:
+    return
+
+  var keys = initOrderedTable[string, bool]()
+  for k in chalkDict.keys():
+    keys[k] = true
+  for k in n00bDict.keys():
+    keys[k] = true
+
+  var diffCount = 0
+  for k in keys.keys():
+    let inChalk = k in chalkDict
+    let inN00b = k in n00bDict
+    if not inChalk:
+      diffCount.inc()
+      trace("git(n00b) diff repo=" & repoRoot & " key=" & k & " missing_in=chalk")
+    elif not inN00b:
+      diffCount.inc()
+      trace("git(n00b) diff repo=" & repoRoot & " key=" & k & " missing_in=n00b")
+    elif chalkDict[k] != n00bDict[k]:
+      diffCount.inc()
+      trace("git(n00b) diff repo=" & repoRoot & " key=" & k &
+            " chalk=" & $chalkDict[k] & " n00b=" & $n00bDict[k])
+
+  if diffCount == 0:
+    trace("git(n00b) diff repo=" & repoRoot & " no_differences")
 
 proc findAndLoad(plugin: GitInfo, path: string) =
   trace("Looking for .git directory, from: " & path)
@@ -772,55 +883,8 @@ proc findAndLoad(plugin: GitInfo, path: string) =
       dumpExOnDebug()
 
   plugin.vcsDirs[vcsDir] = info
-  plugin.repos[path] = vcsDir.parentDir()
-
-# TODO ideally should be done via libgit
-# but for now easier to depend on git CLI
-proc findMissingFiles(info: RepoInfo): seq[string] =
-  result = newSeq[string]()
-  let
-    root = info.vcsDir.splitPath().head
-    exe  = getGitExeLocation()
-  if exe == "":
-    trace("no git exe. unable to run ls-files. skipping")
-    return
-  withWorkingDir(root):
-    let
-      args   = @["ls-files"]
-      output = runCmdGetEverything(exe, args)
-    if output.exitCode != 0:
-      trace("ingoring git " & args.join(" ") & ": " & output.stderr)
-      return
-    for f in output.stdout.strip().splitLines():
-      if not fileExists(root.joinPath(f)):
-        result.add(f)
-
-proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
-  if prefix == "":
-    chalkDict.setIfNeeded(prefix & "VCS_DIR_WHEN_CHALKED", info.vcsDir.splitPath().head)
-    chalkDict.setIfNeeded(prefix & "VCS_MISSING_FILES",    info.findMissingFiles())
-
-  chalkDict.setIfNeeded(prefix & "ORIGIN_URI",             info.origin)
-  chalkDict.setIfNeeded(prefix & "COMMIT_ID",              info.commitId)
-  chalkDict.setIfNeeded(prefix & "COMMIT_SIGNED",          info.signed)
-  chalkDict.setIfNeeded(prefix & "BRANCH",                 info.branch)
-  chalkDict.setIfNeeded(prefix & "AUTHOR",                 info.author)
-  chalkDict.setIfNeeded(prefix & "COMMITTER",              info.committer)
-  chalkDict.setIfNeeded(prefix & "COMMIT_MESSAGE",         info.message)
-  if info.author != "":
-    chalkDict.setIfNeeded(prefix & "DATE_AUTHORED",        info.authorDate.forReport().format(timesIso8601Format))
-    chalkDict.setIfNeeded(prefix & "TIMESTAMP_AUTHORED",   info.authorDate.toUnixInMs())
-  if info.committer != "":
-    chalkDict.setIfNeeded(prefix & "DATE_COMMITTED",       info.commitDate.forReport().format(timesIso8601Format))
-    chalkDict.setIfNeeded(prefix & "TIMESTAMP_COMMITTED",  info.commitDate.toUnixInMs())
-  if info.latestTag != nil:
-    chalkDict.setIfNeeded(prefix & "TAG",                  info.latestTag.name)
-    chalkDict.setIfNeeded(prefix & "TAGGER",               info.latestTag.tagger)
-    if info.latestTag.tagger != "":
-      chalkDict.setIfNeeded(prefix & "DATE_TAGGED",        info.latestTag.date.forReport().format(timesIso8601Format))
-      chalkDict.setIfNeeded(prefix & "TIMESTAMP_TAGGED",   info.latestTag.date.toUnixInMs())
-    chalkDict.setIfNeeded(prefix & "TAG_SIGNED",           info.latestTag.signed)
-    chalkDict.setIfNeeded(prefix & "TAG_MESSAGE",          info.latestTag.message)
+  plugin.repos[path] = info.root()
+  info.compareWithN00b()
 
 proc isInRepo(obj: ChalkObj, repo: string): bool =
   if obj.fsRef == "":

@@ -15,6 +15,7 @@ from ..utils.bin import sha256
 from ..utils.dict import ANY, MISSING, ContainsDict, ContainsList, IfExists
 from ..utils.docker import Docker
 from ..utils.log import get_logger
+from ..utils.git import GIT_NONINTERACTIVE_ENV
 from ..utils.os import CalledProcessError, Program, run
 
 
@@ -219,6 +220,15 @@ class ChalkProgram(Program):
             ],
         )
         return list(errors)
+
+    @property
+    def n00b_diffs(self):
+        diffs: list[str] = []
+        for line in self.logs.splitlines() + self.text.splitlines():
+            msg = self._json_log(line)
+            if "git(n00b) diff" in msg and "no_differences" not in msg:
+                diffs.append(msg)
+        return diffs
 
     @property
     def reports(self):
@@ -430,16 +440,22 @@ class Chalk:
             # TODO: add validation for docker image and container inspection
             cmd.append(target)
 
+        merged_env = {**GIT_NONINTERACTIVE_ENV, **(env or {})}
         result = ChalkProgram.from_program(
             run(
                 cmd,
                 expected_exit_code=int(not expected_success),
                 cwd=cwd,
-                env=env,
+                env=merged_env,
                 stdin=stdin,
                 tty=tty,
             )
         )
+        diffs = result.n00b_diffs
+        if diffs and not ignore_errors:
+            for diff in diffs:
+                logger.error(diff)
+            raise AssertionError("git(n00b) differences detected")
         if not ignore_errors and expected_success and result.errors:
             raise result.error
 

@@ -2129,6 +2129,7 @@ When this config is true, chalk will refetch lightweight tags (not annotated)
 from the origin to ensure its local definition is up to date.
 """
   }
+
 }
 
 singleton load {

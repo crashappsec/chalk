@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.6.6-dev"
+chalk_version :=   "0.6.7-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -1198,6 +1198,66 @@ keyspec VCS_MISSING_FILES {
 Reports names of files which are in VCS but are missing on disk during chalk operation.
 If there are missing files, this might indicate CI process is mutating the repo
 before chalking an artifact.
+"""
+}
+
+keyspec VCS_DELETED_FILES {
+    kind:             ChalkTimeArtifact
+    type:             list[string]
+    standard:         true
+    since:            "0.7.0"
+    shortdoc:         "Tracked files deleted in the working tree"
+    doc:              """
+Reports repository-relative paths that are tracked by VCS but deleted in the
+working tree during chalking.
+"""
+}
+
+keyspec VCS_UNTRACKED_FILES {
+    kind:             ChalkTimeArtifact
+    type:             list[string]
+    standard:         true
+    since:            "0.7.0"
+    shortdoc:         "Untracked files in the working tree"
+    doc:              """
+Reports repository-relative paths that exist in the working tree but are not
+tracked by VCS at chalk time.
+"""
+}
+
+keyspec VCS_MODIFIED_FILES {
+    kind:             ChalkTimeArtifact
+    type:             list[string]
+    standard:         true
+    since:            "0.7.0"
+    shortdoc:         "Tracked files modified in the working tree or index"
+    doc:              """
+Reports repository-relative paths for tracked files that are modified at chalk
+time. This includes staged and unstaged modifications.
+"""
+}
+
+keyspec VCS_DIFF_STAT {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, int]
+    standard:         true
+    since:            "0.7.0"
+    shortdoc:         "Summary diff stats for HEAD vs working tree"
+    doc:              """
+Reports a dict with keys `files`, `insertions`, and `deletions`
+for the diff between HEAD and the working tree (tracked files only).
+"""
+}
+
+keyspec VCS_DIFF_PATCH {
+    kind:             ChalkTimeArtifact
+    type:             string
+    standard:         true
+    since:            "0.7.0"
+    shortdoc:         "Unified diff patch for HEAD vs working tree"
+    doc:              """
+Reports a unified diff patch for the working tree relative to HEAD (tracked
+files only). This value can be large and may include file content.
 """
 }
 
