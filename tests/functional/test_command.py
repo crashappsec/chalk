@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from .chalk.runner import Chalk
-from .conf import CONFIGS, DATE_PATH, LS_PATH
+from .conf import CONFIGS, DATE_PATH, LS_PATH, HELLO_GO_PATH
 from .utils.dict import ANY
 from .utils.log import get_logger
 from .utils.os import run
@@ -73,19 +73,14 @@ def test_insert_extract_repeated(copy_files: list[Path], chalk: Chalk):
 
 
 # test insertion and extraction on a directory with multiple binaries
-@pytest.mark.parametrize("copy_files", [[LS_PATH, DATE_PATH]], indirect=True)
+@pytest.mark.parametrize(
+    "copy_files", [[LS_PATH, DATE_PATH, HELLO_GO_PATH]], indirect=True
+)
 def test_insert_extract_directory(
     tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk
 ):
-    ls_artifact, date_artifact = copy_files
-
     insert = chalk.insert(artifact=tmp_data_dir, virtual=False)
-    assert insert.marks_by_path.contains(
-        {
-            str(ls_artifact): {},
-            str(date_artifact): {},
-        }
-    )
+    assert insert.marks_by_path.contains({str(i): {} for i in copy_files})
 
     assert chalk.extract(artifact=tmp_data_dir)
 

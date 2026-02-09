@@ -47,6 +47,13 @@ RUN apt-get update -y && \
 
 # ----------------------------------------------------------------------------
 
+FROM golang AS hello_go
+
+COPY ./hello/hello_go.go .
+RUN go build -o /hello_go hello_go.go
+
+# ----------------------------------------------------------------------------
+
 FROM $BASE
 
 ARG POETRY_VERSION
@@ -65,6 +72,7 @@ RUN poetry install --no-plugins
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=buildx /buildx /usr/lib/docker/cli-plugins/docker-buildx
+COPY --from=hello_go /hello_go /usr/local/bin/hello_go
 
 RUN docker context create node-amd64
 RUN docker context create node-arm64

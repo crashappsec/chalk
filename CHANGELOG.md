@@ -1,6 +1,8 @@
 # Chalk Release Notes
 
-## On the `main` branch
+## 0.6.6
+
+**February 9, 2026**
 
 ### New Features
 
@@ -35,6 +37,9 @@
 - Only load attestation for `build` and `push` docker sub-commands.
   Otherwise attestation is fully initialized even things like `docker version.`
   ([#617](https://github.com/crashappsec/chalk/pull/617))
+- Fix elf parsing segfault for parsing go-built binaries
+  where the order of the elf section is different.
+  ([#624](https://github.com/crashappsec/chalk/pull/624))
 
 ## 0.6.5
 

@@ -581,7 +581,7 @@ proc parseSectionTable(self: ElfFile): bool =
     return false
   var startIndex        = int(nameSectionHeader.offset.value)
   var endIndex          = startIndex + int(nameSectionHeader.size.value)
-  var nameSection       = self.fileData[startIndex .. endIndex]
+  var nameSection       = self.fileData[startIndex ..< endIndex]
   var maxNameIndex      = uint32(len(nameSection) - 1)
   # validation, and storing names
   for sectionIndex in 0 ..< len(sectionHeaders):

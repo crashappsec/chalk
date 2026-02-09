@@ -66,6 +66,7 @@ DATE_PATH = shutil.which("date")
 LS_PATH = shutil.which("ls")
 UNAME_PATH = shutil.which("uname")
 SLEEP_PATH = shutil.which("sleep")
+HELLO_GO_PATH = shutil.which("hello_go")
 GDB_PATH = shutil.which("gdb")
 
 
