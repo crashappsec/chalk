@@ -4,11 +4,22 @@
 #include <sodium.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+static void init_output_buffer(uint8_t **buffer, size_t *buffer_len) {
+    if (buffer) {
+        *buffer = NULL;
+    }
+    if (buffer_len) {
+        *buffer_len = 0;
+    }
+}
+
 void cfree(void **data) {
+    if (!data) {
+        return;
+    }
     if (*data) {
         free(*data);
         *data = NULL;
@@ -21,8 +32,10 @@ bool pem_to_der(const char *pem_key_str,
     BIO           *bio      = NULL;
     EVP_PKEY      *pkey     = NULL;
     unsigned char *tmp      = NULL;
+    int            der_size = 0;
     bool           result   = false;
 
+    init_output_buffer(der_out, der_len);
     if (!pem_key_str || !der_out || !der_len) {
         goto cleanup;
     }
@@ -34,13 +47,14 @@ bool pem_to_der(const char *pem_key_str,
     if (!pkey) {
         goto cleanup;
     }
-    *der_len = i2d_PUBKEY(pkey, NULL);
-    if (*der_len <= 0) {
+    der_size = i2d_PUBKEY(pkey, NULL);
+    if (der_size <= 0) {
         goto cleanup;
     }
+    *der_len = (size_t)der_size;
     *der_out = malloc(*der_len);
     tmp = *der_out;
-    if (!der_out) {
+    if (!*der_out) {
         goto cleanup;
     }
     if (i2d_PUBKEY(pkey, &tmp) != *der_len) {
@@ -51,12 +65,14 @@ bool pem_to_der(const char *pem_key_str,
 
 cleanup:
     if (!result) {
-        if (*der_out) {
+        if (der_out && der_len && *der_out) {
             OPENSSL_cleanse(*der_out, *der_len);
             free(*der_out);
             *der_out = NULL;
         }
-        *der_len = 0;
+        if (der_len) {
+            *der_len = 0;
+        }
     }
     if (bio) {
         BIO_free(bio);
@@ -89,6 +105,7 @@ bool decrypt_secretbox(
     bool    result = false;
     uint8_t key[crypto_secretbox_KEYBYTES];
 
+    init_output_buffer(plaintext, plaintext_len);
     if (!plaintext || !plaintext_len || !password || !salt || !nonce || !ciphertext) {
         goto cleanup;
     }
@@ -101,7 +118,7 @@ bool decrypt_secretbox(
     if (nonce_len != crypto_secretbox_NONCEBYTES) {
         goto cleanup;
     }
-    if (ciphertext_len <= crypto_secretbox_MACBYTES) {
+    if (ciphertext_len < crypto_secretbox_MACBYTES) {
         goto cleanup;
     }
     if (password_len < crypto_pwhash_scryptsalsa208sha256_PASSWD_MIN ||
@@ -130,7 +147,7 @@ bool decrypt_secretbox(
     }
 
     *plaintext_len = ciphertext_len - crypto_secretbox_MACBYTES;
-    *plaintext = malloc(*plaintext_len);
+    *plaintext = malloc(*plaintext_len == 0 ? 1 : *plaintext_len);
     if (!*plaintext) {
         goto cleanup;
     }
@@ -150,12 +167,14 @@ bool decrypt_secretbox(
 cleanup:
     sodium_memzero(key, sizeof key);
     if (!result) {
-        if (*plaintext) {
+        if (plaintext && plaintext_len && *plaintext) {
             sodium_memzero(*plaintext, *plaintext_len);
             free(*plaintext);
             *plaintext = NULL;
         }
-        *plaintext_len = 0;
+        if (plaintext_len) {
+            *plaintext_len = 0;
+        }
     }
     return result;
 }
@@ -181,8 +200,14 @@ bool encrypt_secretbox(
 ) {
     bool    result = false;
     uint8_t key[crypto_secretbox_KEYBYTES];
+    uint8_t empty_plaintext = 0;
+    const uint8_t *plaintext_input = plaintext;
 
-    if (!salt || !salt_len || !nonce || !nonce_len || !ciphertext || !ciphertext_len || !password || !plaintext) {
+    init_output_buffer(salt, salt_len);
+    init_output_buffer(nonce, nonce_len);
+    init_output_buffer(ciphertext, ciphertext_len);
+    if (!salt || !salt_len || !nonce || !nonce_len || !ciphertext || !ciphertext_len || !password ||
+        (!plaintext && plaintext_len != 0)) {
         goto cleanup;
     }
     if (!kdf_name || strcmp(kdf_name, "scrypt") != 0) {
@@ -197,6 +222,9 @@ bool encrypt_secretbox(
     }
     if (sodium_init() < 0) {
         goto cleanup;
+    }
+    if (!plaintext_input) {
+        plaintext_input = &empty_plaintext;
     }
 
     *salt_len = crypto_pwhash_scryptsalsa208sha256_SALTBYTES;
@@ -227,6 +255,9 @@ bool encrypt_secretbox(
         goto cleanup;
     }
 
+    if (plaintext_len > SIZE_MAX - crypto_secretbox_MACBYTES) {
+        goto cleanup;
+    }
     *ciphertext_len = plaintext_len + crypto_secretbox_MACBYTES;
     *ciphertext = malloc(*ciphertext_len);
     if (!*ciphertext) {
@@ -235,7 +266,7 @@ bool encrypt_secretbox(
 
     if (crypto_secretbox_easy(
         *ciphertext,
-        plaintext,
+        plaintext_input,
         plaintext_len,
         *nonce,
         key
@@ -248,24 +279,30 @@ bool encrypt_secretbox(
 cleanup:
     sodium_memzero(key, sizeof key);
     if (!result) {
-        if (*salt) {
+        if (salt && salt_len && *salt) {
             sodium_memzero(*salt, *salt_len);
             free(*salt);
             *salt = NULL;
         }
-        if (*nonce) {
+        if (nonce && nonce_len && *nonce) {
             sodium_memzero(*nonce, *nonce_len);
             free(*nonce);
             *nonce = NULL;
         }
-        if (*ciphertext) {
+        if (ciphertext && ciphertext_len && *ciphertext) {
             sodium_memzero(*ciphertext, *ciphertext_len);
             free(*ciphertext);
             *ciphertext = NULL;
         }
-        *salt_len       = 0;
-        *nonce_len      = 0;
-        *ciphertext_len = 0;
+        if (salt_len) {
+            *salt_len = 0;
+        }
+        if (nonce_len) {
+            *nonce_len = 0;
+        }
+        if (ciphertext_len) {
+            *ciphertext_len = 0;
+        }
     }
     return result;
 }
@@ -281,6 +318,21 @@ bool verify_signature(
     EVP_PKEY   *pkey   = NULL;
     EVP_MD_CTX *ctx    = NULL;
     bool        result = false;
+    unsigned char empty_message = 0;
+    unsigned char empty_signature = 0;
+    const unsigned char *message_input = message;
+    const unsigned char *signature_input = signature;
+    if (!pem_key_buffer ||
+        (!message && message_len != 0) ||
+        (!signature && signature_len != 0)) {
+        goto cleanup;
+    }
+    if (!message_input) {
+        message_input = &empty_message;
+    }
+    if (!signature_input) {
+        signature_input = &empty_signature;
+    }
 
     bio = BIO_new_mem_buf(pem_key_buffer, -1);
     if (!bio) {
@@ -297,10 +349,10 @@ bool verify_signature(
     if (EVP_DigestVerifyInit(ctx, NULL, EVP_sha256(), NULL, pkey) != 1) {
         goto cleanup;
     }
-    if (EVP_DigestVerifyUpdate(ctx, message, message_len) != 1) {
+    if (EVP_DigestVerifyUpdate(ctx, message_input, message_len) != 1) {
         goto cleanup;
     }
-    if (EVP_DigestVerifyFinal(ctx, signature, signature_len) == 1) {
+    if (EVP_DigestVerifyFinal(ctx, signature_input, signature_len) == 1) {
         result = true;
     }
 
@@ -325,11 +377,20 @@ bool sign_message(
     unsigned char      **signature,
     size_t              *signature_len
 ) {
-    BIO        *bio    = NULL;
     EVP_PKEY   *pkey   = NULL;
     EVP_MD_CTX *ctx    = NULL;
     bool        result = false;
+    size_t      sig_alloc_len = 0;
+    unsigned char empty_message = 0;
+    const unsigned char *message_input = message;
 
+    init_output_buffer(signature, signature_len);
+    if (!private_key || !signature || !signature_len || (!message && message_len != 0)) {
+        goto cleanup;
+    }
+    if (!message_input) {
+        message_input = &empty_message;
+    }
     pkey = d2i_AutoPrivateKey(NULL, &private_key, private_key_len);
     if (!pkey) {
         goto cleanup;
@@ -342,13 +403,14 @@ bool sign_message(
     if (EVP_DigestSignInit(ctx, NULL, EVP_sha256(), NULL, pkey) != 1) {
         goto cleanup;
     }
-    if (EVP_DigestSignUpdate(ctx, message, message_len) != 1) {
+    if (EVP_DigestSignUpdate(ctx, message_input, message_len) != 1) {
         goto cleanup;
     }
     if (EVP_DigestSignFinal(ctx, NULL, signature_len) != 1) {
         goto cleanup;
     }
-    *signature = malloc(*signature_len);
+    sig_alloc_len = *signature_len;
+    *signature = malloc(sig_alloc_len == 0 ? 1 : sig_alloc_len);
     if (!*signature) {
         goto cleanup;
     }
@@ -361,21 +423,20 @@ bool sign_message(
 
 cleanup:
     if (!result) {
-        if (*signature) {
-            OPENSSL_cleanse(*signature, *signature_len);
+        if (signature && *signature) {
+            OPENSSL_cleanse(*signature, sig_alloc_len);
             free(*signature);
             *signature = NULL;
         }
-        *signature_len = 0;
+        if (signature_len) {
+            *signature_len = 0;
+        }
     }
     if (ctx) {
         EVP_MD_CTX_free(ctx);
     }
     if (pkey) {
         EVP_PKEY_free(pkey);
-    }
-    if (bio) {
-        BIO_free(bio);
     }
     return result;
 }
@@ -392,8 +453,15 @@ bool generate_p256_keypair(
     BIO          *priv_bio  = NULL;
     char         *pub_data  = NULL;
     char         *priv_data = NULL;
+    long          pub_size  = 0;
+    long          priv_size = 0;
     bool          result    = false;
 
+    init_output_buffer(public_key_out, public_key_len);
+    init_output_buffer(private_key_out, private_key_len);
+    if (!public_key_out || !public_key_len || !private_key_out || !private_key_len) {
+        goto cleanup;
+    }
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
     if (!pctx) {
         goto cleanup;
@@ -415,10 +483,11 @@ bool generate_p256_keypair(
     if (PEM_write_bio_PUBKEY(pub_bio, pkey) != 1) {
         goto cleanup;
     }
-    *public_key_len = BIO_get_mem_data(pub_bio, &pub_data);
-    if (*public_key_len <= 0) {
+    pub_size = BIO_get_mem_data(pub_bio, &pub_data);
+    if (pub_size <= 0) {
         goto cleanup;
     }
+    *public_key_len = (size_t)pub_size;
 
     priv_bio = BIO_new(BIO_s_mem());
     if (!priv_bio) {
@@ -427,10 +496,11 @@ bool generate_p256_keypair(
     if (i2d_PKCS8PrivateKey_bio(priv_bio, pkey, NULL, NULL, 0, NULL, NULL) != 1) {
         goto cleanup;
     }
-    *private_key_len = BIO_get_mem_data(priv_bio, &priv_data);
-    if (*private_key_len <= 0) {
+    priv_size = BIO_get_mem_data(priv_bio, &priv_data);
+    if (priv_size <= 0) {
         goto cleanup;
     }
+    *private_key_len = (size_t)priv_size;
 
     *public_key_out = malloc(*public_key_len);
     if (!*public_key_out) {
@@ -449,18 +519,22 @@ bool generate_p256_keypair(
 
 cleanup:
     if (!result) {
-        if (*public_key_out) {
+        if (public_key_out && public_key_len && *public_key_out) {
             OPENSSL_cleanse(*public_key_out, *public_key_len);
             free(*public_key_out);
             *public_key_out = NULL;
         }
-        if (*private_key_out) {
+        if (private_key_out && private_key_len && *private_key_out) {
             OPENSSL_cleanse(*private_key_out, *private_key_len);
             free(*private_key_out);
             *private_key_out = NULL;
         }
-        *public_key_len  = 0;
-        *private_key_len = 0;
+        if (public_key_len) {
+            *public_key_len = 0;
+        }
+        if (private_key_len) {
+            *private_key_len = 0;
+        }
     }
     pub_data  = NULL;
     priv_data = NULL;
@@ -501,6 +575,14 @@ bool generate_and_encrypt_keypair(
     size_t         private_key_len = 0;
     bool           result          = false;
 
+    init_output_buffer(public_key_out, public_key_len);
+    init_output_buffer(salt, salt_len);
+    init_output_buffer(nonce, nonce_len);
+    init_output_buffer(ciphertext, ciphertext_len);
+    if (!public_key_out || !public_key_len || !salt || !salt_len || !nonce || !nonce_len || !ciphertext || !ciphertext_len) {
+        goto cleanup;
+    }
+
     if (!generate_p256_keypair(
         public_key_out,
         public_key_len,
@@ -539,5 +621,38 @@ cleanup:
         private_key = NULL;
     }
     private_key_len = 0;
+    if (!result) {
+        if (public_key_out && public_key_len && *public_key_out) {
+            free(*public_key_out);
+            *public_key_out = NULL;
+        }
+        if (salt && salt_len && *salt) {
+            sodium_memzero(*salt, *salt_len);
+            free(*salt);
+            *salt = NULL;
+        }
+        if (nonce && nonce_len && *nonce) {
+            sodium_memzero(*nonce, *nonce_len);
+            free(*nonce);
+            *nonce = NULL;
+        }
+        if (ciphertext && ciphertext_len && *ciphertext) {
+            sodium_memzero(*ciphertext, *ciphertext_len);
+            free(*ciphertext);
+            *ciphertext = NULL;
+        }
+        if (public_key_len) {
+            *public_key_len = 0;
+        }
+        if (salt_len) {
+            *salt_len = 0;
+        }
+        if (nonce_len) {
+            *nonce_len = 0;
+        }
+        if (ciphertext_len) {
+            *ciphertext_len = 0;
+        }
+    }
     return result;
 }
