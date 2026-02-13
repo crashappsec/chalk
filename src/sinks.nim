@@ -27,11 +27,17 @@ import "."/[
 proc chalkLogWrap(msg: string, extra: StringTable) : (string, bool) =
   return (msg, true)
 
-proc chalkJsonLogs(msg: string, info: StringTable): (string, bool) =
+proc logFormat*(): string =
   case attrGet[string]("log_format")
   of "auto":
     if getShowColor() or isInteractive or getEnv("CI") != "":
-      return (msg, true)
+      return "plain"
+  of "plain":
+    return "plain"
+  return "json"
+
+proc chalkJsonLogs(msg: string, info: StringTable): (string, bool) =
+  case logFormat()
   of "plain":
     return (msg, true)
   let data = %*{

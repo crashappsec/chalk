@@ -3316,7 +3316,10 @@ problem where it had to restart the operation without chalk.
     doc: """
 Log format
 
-* `auto` picks plain when either color is enabled or chalk runs in interactive TTY
+* `auto` picks plain when either
+  * color is enabled
+  * chalk runs in interactive TTY
+  * chalk is running in CI
 * `plain` text chalk logs
 * `json` chalk logs
 """

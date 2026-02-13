@@ -98,7 +98,10 @@ proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true)
                        msg & " failed to fetch manifest via www-authenticate challenge: " &
                        getCurrentExceptionMsg())
 
-proc setJson(self: DockerManifest, data: DigestedJson, check = true) =
+proc setJson(self:   DockerManifest,
+             data:   DigestedJson,
+             check = true,
+             ) =
   if check:
     if self.digest != "" and self.digest != data.digest:
       raise newException(
@@ -148,14 +151,21 @@ proc setAnnotations(self: DockerManifest, data: JsonNode): DockerManifest {.disc
   self.annotations = self.annotations.update(data{"annotations"})
   return self
 
-proc setImagePlatform(self: DockerManifest, platform: DockerPlatform) =
+proc setImagePlatform(self:     DockerManifest,
+                      platform: DockerPlatform,
+                      check   = true,
+                      ) =
   if self.kind != DockerManifestType.image:
     raise newException(AssertionDefect, "can only set image platform on image manifests")
   if self.platform.isKnown() and self.platform != platform:
-    raise newException(
-      ValueError,
-      "Received mismatching docker image platforms from manifest and its config",
+    let msg = (
+      "Received mismatching docker image platforms from manifest and its config " &
+      $self.platform & " != " & $platform
     )
+    if check:
+      raise newException(ValueError, msg)
+    else:
+      trace("docker: " & msg)
   self.platform = platform
 
 proc setImageLayers(self: DockerManifest, data: DigestedJson) =
@@ -174,6 +184,8 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
 proc fetch(self:            DockerManifest,
            fetchConfig    = true,
            fetchManifests = false,
+           checkJson      = true,
+           checkPlatform  = true,
            ): DockerManifest {.discardable.} =
   result = self
   case self.kind
@@ -192,13 +204,13 @@ proc fetch(self:            DockerManifest,
         except:
           error("docker: " & getCurrentExceptionMsg())
           requestManifestJson(self.asImage())
-      self.setJson(data)
+      self.setJson(data, check = checkJson)
       self.setAnnotations(data.json)
       self.setImageConfig(data)
       self.setImageLayers(data)
     if fetchConfig:
       self.config.fetch()
-      self.setImagePlatform(self.config.configPlatform)
+      self.setImagePlatform(self.config.configPlatform, check = checkPlatform)
   of DockerManifestType.config:
     if self.isFetched:
       return
@@ -211,7 +223,7 @@ proc fetch(self:            DockerManifest,
       except:
         error("docker: " & getCurrentExceptionMsg())
         requestManifestJson(self.asImage())
-    self.setJson(data)
+    self.setJson(data, check = checkJson)
     self.setAnnotations(data.json)
     self.mimickLocalConfig()
     self.configPlatform = DockerPlatform(
@@ -415,6 +427,7 @@ proc filterKnownPlatforms*(self: FilterManifests,
 
 proc filterByPlatforms*(self:      FilterManifests,
                         platforms: openArray[DockerPlatform],
+                        fetch    = true,
                         ): FilterManifests =
   let platforms = platforms.known()
   if len(platforms) == 0:
@@ -426,13 +439,24 @@ proc filterByPlatforms*(self:      FilterManifests,
   for i in manifests:
     if i.platform.isKnown() and i.platform in platforms:
       self.manifests.add(i)
+  # if no matching platforms are found there is a possibility
+  # the list manifest had the wrong platform
+  # hence we explicitly refetch the platform from the
+  # image config object
+  # see https://github.com/moby/buildkit/issues/6518
+  if len(self.manifests) == 0 and fetch:
+    for i in manifests:
+      i.fetch(fetchConfig = true, checkPlatform = false)
+      if i.platform.isKnown() and i.platform in platforms:
+        self.manifests.add(i)
   return self
 
 proc ifManyFilterBySystemPlatform*(self: FilterManifests,
                                    enabled = true,
+                                   fetch   = true,
                                    ): FilterManifests =
   if enabled and len(self.manifests) > 1:
-    return self.filterByPlatforms(@[getSystemBuildPlatform()])
+    return self.filterByPlatforms(@[getSystemBuildPlatform()], fetch = fetch)
   return self
 
 proc filterByAnyAnnotation*(self:        FilterManifests,

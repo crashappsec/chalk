@@ -16,6 +16,7 @@ import ".."/[
   utils/files,
 ]
 import "."/[
+  base,
   dockerfile,
   exe,
   ids,
@@ -184,7 +185,11 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
         "Could not write to context directory (" & dstLoc & "): " & getCurrentExceptionMsg(),
       )
 
-proc addByPlatform(ctx: DockerInvocation, newPath: string, image = "scratch"): string =
+proc addByPlatform(ctx:          DockerInvocation,
+                   newPath:      string,
+                   onlyPlatform: DockerPlatform,
+                   image       = "scratch",
+                   ): string =
   # in order to copy file by platform, we need to create
   # an intermediate build where the file path contains
   # the build platform which will allow us to COPY
@@ -199,12 +204,16 @@ proc addByPlatform(ctx: DockerInvocation, newPath: string, image = "scratch"): s
   # COPY --from=chalk_base /$TARGETPLATFORM /chalk.json
   let
     base = "chalk" & newPath.replace("/", "_").replace(".", "_")
-    env  = "/$TARGETPLATFORM"
+    path =
+      if ctx.isMultiPlatform():
+        "/$TARGETPLATFORM"
+      else:
+        "/" & $onlyPlatform.normalize()
     arg  = "ARG TARGETPLATFORM"
-    copy = "COPY --from=" & base & " " & env & " " & newPath
+    copy = "COPY --from=" & base & " " & path & " " & newPath
   if base notin ctx.addedPlatform:
     ctx.addedPlatform[base] = @["FROM " & image & " AS " & base]
-  if arg notin ctx.addedInstructions:
+  if arg notin ctx.addedInstructions and ctx.isMultiPlatform():
     ctx.addedInstructions.add(arg)
   if copy notin ctx.addedInstructions:
     ctx.addedInstructions.add(copy)
@@ -230,7 +239,7 @@ proc makeFileAvailableToDocker*(ctx:        DockerInvocation,
       user    = user,
       move    = move,
       chmod   = chmod,
-      toAdd   = ctx.addedPlatform[ctx.addByPlatform(newPath)],
+      toAdd   = ctx.addedPlatform[ctx.addByPlatform(newPath, platform)],
     )
   else:
     ctx.makeFileAvailableToDocker(
@@ -285,9 +294,14 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
       # so we ensure we honor self config via CLI arg
       check     = if validate: "--validation" else: "--no-validation"
       config    = writeNewTempFile(getAllDumpJson())
-      base      = ctx.addByPlatform(newPath, image = "busybox")
+      base      = ctx.addByPlatform(newPath, onlyPlatform = first, image = "busybox")
       log_level = getLogLevel()
       verbosity = if log_level == llTrace: "trace" else: "error"
+      # docker doesnt always use TARGETPLATFORM
+      # e.g. FROM --platform=<arch>
+      # doesnt update TARGETPLATFORM as its not passed as CLI --platform flag
+      # hence if we know exact architecture we just hardcode it
+      name      = if ctx.isMultiPlatform(): "$TARGETPLATFORM" else: $first.normalize()
     ctx.makeFileAvailableToDocker(
       path    = config,
       newPath = "/config.json",
@@ -321,9 +335,12 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
         chmod   = chmod,
         toAdd   = ctx.addedPlatform[base],
       )
+    if ctx.isMultiPlatform():
+      ctx.addedPlatform[base] &= @[
+        "ARG TARGETPLATFORM",
+      ]
     ctx.addedPlatform[base] &= @[
-     "ARG TARGETPLATFORM",
-     ("RUN /$TARGETPLATFORM load /config.json " &
+     ("RUN /" & name & " load /config.json " &
       "--log-level=" & verbosity & " " &
       "--skip-command-report " &
       "--skip-custom-reports " &
@@ -332,7 +349,7 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
       "--all " &
       check),
      # sanity check plus it will show chalk metadata in build logs
-     ("RUN /$TARGETPLATFORM version " &
+     ("RUN /" & name & " version " &
       "--log-level=" & verbosity & " " &
       "--skip-command-report " &
       "--skip-custom-reports " &
