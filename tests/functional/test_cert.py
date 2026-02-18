@@ -27,6 +27,7 @@ def test_cert(
         config=CONFIGS / "certs.c4m",
         artifact=certifi.where(),
         env={
+            "BAD_ENV_VAR": "   a",
             "CO_CERT": base64.b64encode(server_cert.read_bytes()).decode(),
         },
     )
