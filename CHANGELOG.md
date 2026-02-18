@@ -1,5 +1,16 @@
 # Chalk Release Notes
 
+## 0.6.7
+
+**February 18, 2026**
+
+### Fixes
+
+- Parsing certs from env vars could cause chalk to fatally exit
+  due to a bug in base64 decode logic.
+  ([Nim #25530](https://github.com/nim-lang/Nim/issues/25530),
+  [#629](https://github.com/crashappsec/chalk/issues/629))
+
 ## 0.6.6
 
 **February 9, 2026**

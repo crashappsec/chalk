@@ -195,7 +195,7 @@ proc certsSearchEnvVar(self: Plugin,
   if len(result) == 0:
     var b64 = ""
     try:
-      b64 = decode(v)
+      b64 = decode(v.strip())
     except:
       discard # not base64 string
     if b64 != "":
