@@ -271,6 +271,23 @@ def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
     assert ChalkProgram.from_program(build)
 
 
+def test_buildx_stdin_scan_context_debug_no_indexdefect(
+    chalk: Chalk,
+    random_hex: str,
+):
+    _, build = chalk.docker_build(
+        context=DOCKERFILES / "valid" / "sample_1",
+        content="FROM alpine\n",
+        tag=f"scan-context-{random_hex}",
+        buildx=True,
+        run_docker=False,
+        config=CONFIGS / "docker_wrap.c4m",
+    )
+    assert build.exit_code == 0
+    assert "IndexDefect" not in build.text
+    assert "ERROR: Docker build failed" not in build.text
+
+
 @pytest.mark.parametrize("buildx", [True, False])
 @pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
 def test_multiple_tags(

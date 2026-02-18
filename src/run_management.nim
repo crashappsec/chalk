@@ -277,7 +277,16 @@ template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
 
 proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)
-  s[0 ..< 6] & "-" & s[6 ..< 10] & "-" & s[10 ..< 14] & "-" & s[14 ..< 20]
+  var
+    current = 0
+    dash    = ""
+  for size in [6, 4, 4, 6]:
+    if current >= len(s):
+      break
+    let stop = min(current + size, len(s))
+    result.add(dash & s[current ..< stop])
+    dash = "-"
+    current = stop
 
 proc isChalkingOp*(): bool =
   return commandName in attrGet[seq[string]]("valid_chalk_command_names")
