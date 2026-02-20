@@ -1,5 +1,16 @@
 # Chalk Release Notes
 
+## 0.6.8
+
+**February 20, 2026**
+
+### Fixes
+
+- Harden cert env-var base64 parsing to prevent `sysFatal` / `IndexDefect`
+  for malformed boundary-whitespace inputs.
+- Add functional regression coverage for malformed values such as
+  `AAAA AAA` and `AAAAAAAA AAA` to ensure extract does not crash.
+
 ## 0.6.7
 
 **February 18, 2026**
