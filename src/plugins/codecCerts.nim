@@ -57,6 +57,44 @@ proc toTable(t: cstringArray): TableRef[string, string] =
       value = kv[i*2+1]
     result[key] = $value
 
+proc normalizeBase64Input(v: string): string =
+  result = newStringOfCap(len(v))
+  for c in v:
+    case c
+    of ' ', '\t', '\n', '\r':
+      discard
+    else:
+      result.add(c)
+
+proc isValidBase64Input(v: string): bool =
+  if len(v) == 0 or len(v) mod 4 != 0:
+    return false
+
+  var padding = 0
+  for i, c in v:
+    if c == '=':
+      inc padding
+      # Padding must only appear in the last two positions.
+      if i < len(v) - 2:
+        return false
+    else:
+      # Non-padding chars after '=' are not valid.
+      if padding > 0:
+        return false
+      if c notin {'A'..'Z', 'a'..'z', '0'..'9', '+', '/'}:
+        return false
+
+  return padding <= 2
+
+proc safeDecodeBase64(v: string): string =
+  let normalized = v.normalizeBase64Input()
+  if not normalized.isValidBase64Input():
+    return ""
+  try:
+    return decode(normalized)
+  except CatchableError:
+    return ""
+
 iterator findCerts(self:       Plugin,
                    bio:        CertBIO,
                    name:       string,
@@ -193,11 +231,7 @@ proc certsSearchEnvVar(self: Plugin,
 
   # sometimes env vars are base64-encoded certs os attempt to parse them
   if len(result) == 0:
-    var b64 = ""
-    try:
-      b64 = decode(v.strip())
-    except:
-      discard # not base64 string
+    let b64 = safeDecodeBase64(v)
     if b64 != "":
       for chalk in self.certsSearchEnvVar(
         bio = read_cert(cstring(b64), cint(len(b64))),

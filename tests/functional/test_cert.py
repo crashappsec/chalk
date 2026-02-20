@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 import certifi
+import pytest
 
 from .chalk.runner import Chalk
 from .conf import CONFIGS
@@ -44,6 +45,44 @@ def test_cert(
                         "CN": "DigiCert Global Root CA",
                     },
                 },
+                {
+                    "_OP_ARTIFACT_ENV_VAR_NAME": "CO_CERT",
+                    "_X509_SIGNATURE": COLON_HEX,
+                    "_X509_SUBJECT": {
+                        "commonName": "tls.chalk.local",
+                    },
+                    "_X509_SUBJECT_SHORT": {
+                        "CN": "tls.chalk.local",
+                    },
+                },
+            ]
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "bad_env_var",
+    [
+        "AAAA AAA",
+        "AAAAAAAA AAA",
+    ],
+)
+def test_cert_bad_env_var_boundary_base64_does_not_crash(
+    server_cert: Path,
+    chalk: Chalk,
+    bad_env_var: str,
+):
+    extract = chalk.extract(
+        config=CONFIGS / "certs.c4m",
+        artifact=certifi.where(),
+        env={
+            "BAD_ENV_VAR": bad_env_var,
+            "CO_CERT": base64.b64encode(server_cert.read_bytes()).decode(),
+        },
+    )
+    assert extract.marks.contains(
+        Contains(
+            [
                 {
                     "_OP_ARTIFACT_ENV_VAR_NAME": "CO_CERT",
                     "_X509_SIGNATURE": COLON_HEX,
