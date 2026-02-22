@@ -7,13 +7,11 @@
 
 ## extract chalkmark json from images/containers into chalk object
 
-import std/[
-  base64,
-]
 import ".."/[
   attestation/utils,
   chalkjson,
   types,
+  utils/base64,
   utils/json,
   utils/files,
 ]
@@ -138,7 +136,7 @@ proc extractMarkFromLayer(self: ChalkObj): string =
 proc extractMarkFromInToto(self: ChalkObj, json: JsonNode): string =
   let
     sigs          = json{"signatures"}
-    payload       = parseJson(json{"payload"}.getStr().decode())
+    payload       = parseJson(json{"payload"}.getStr().safeDecode())
     predicateKind = payload{"predicateType"}.getStr()
     docPredicate  = payload{"predicate"}
   if docPredicate.kind != JObject:

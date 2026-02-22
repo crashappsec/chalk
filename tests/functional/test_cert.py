@@ -28,6 +28,8 @@ def test_cert(
         artifact=certifi.where(),
         env={
             "BAD_ENV_VAR": "   a",
+            "BAD_ENV_VAR_2": "AAAA AAA",
+            "BAD_ENV_VAR_3": "AAAAAAAA AAA",
             "CO_CERT": base64.b64encode(server_cert.read_bytes()).decode(),
         },
     )

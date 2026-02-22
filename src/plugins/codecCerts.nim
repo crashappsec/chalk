@@ -8,15 +8,13 @@
 ## This plugin is responsible for providing metadata gleaned from a
 ## Jenkins CI environment.
 
-import std/[
-  base64,
-]
 import ".."/[
   chalkjson,
   config,
   plugin_api,
   run_management,
   types,
+  utils/base64,
   utils/files,
   utils/strings,
 ]
@@ -193,11 +191,7 @@ proc certsSearchEnvVar(self: Plugin,
 
   # sometimes env vars are base64-encoded certs os attempt to parse them
   if len(result) == 0:
-    var b64 = ""
-    try:
-      b64 = decode(v.strip())
-    except:
-      discard # not base64 string
+    let b64 = safeDecode(v)
     if b64 != "":
       for chalk in self.certsSearchEnvVar(
         bio = read_cert(cstring(b64), cint(len(b64))),

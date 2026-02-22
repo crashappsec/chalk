@@ -5,11 +5,11 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 import std/[
-  base64,
   uri,
 ]
 import ".."/[
   types,
+  utils/base64,
   utils/envvars,
   utils/exe,
   utils/files,
