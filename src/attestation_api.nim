@@ -12,6 +12,7 @@ import std/[
 import "."/[
   chalkjson,
   config,
+  n00b/subproc,
   plugin_api,
   run_management,
   selfextract,
@@ -224,10 +225,10 @@ proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage):
   info("cosign: verifying attestation for " & spec)
   trace("cosign " & args.join(" "))
   let
-    allOut = runCmdGetEverything(cosign, args)
-    res    = allOut.getStdout()
-    err    = allOut.getStderr()
-    code   = allOut.getExit()
+    allOut = subproc.runCommand(cosign, args)
+    res    = allOut.stdout
+    err    = allOut.stderr
+    code   = allOut.exitCode
   if code == 0:
     let
       blob = parseJson(res)
@@ -244,7 +245,7 @@ proc verifyBySigStore(chalk: ChalkObj, key: AttestationKey, image: DockerImage):
       return (vNoHash, dict)
     else:
       # note that we fail hard on any connection/auth errors
-      trace("Verification failed: " & allOut.getStderr())
+      trace("Verification failed: " & err)
       warn(spec & ": Did not validate signature.")
       return (vBadSig, dict)
 

@@ -13,9 +13,10 @@ import std/[
 import ".."/[
   attestation/utils,
   chalkjson,
+  n00b/subproc,
   types,
-  utils/json,
   utils/files,
+  utils/json,
 ]
 import "."/[
   exe,
@@ -195,11 +196,11 @@ proc extractMarkFromSigStoreCosign(self: ChalkObj): string =
     info("cosign: downloading attestation for " & spec)
     trace("cosign " & args.join(" "))
     let
-      allOut = runCmdGetEverything(cosign, args)
-      res    = allOut.getStdout()
-      code   = allOut.getExit()
+      allOut = subproc.runCommand(cosign, args)
+      res    = allOut.stdout
+      code   = allOut.exitCode
     if code != 0:
-      err = allOut.getStderr().splitLines()[0]
+      err = allOut.stderr.splitLines()[0]
       continue
     let json = parseJson(res)
     return self.extractMarkFromInToto(json)

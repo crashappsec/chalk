@@ -25,9 +25,9 @@ proc pullImage*(name: string) =
   let
     args   = @["pull", name]
     output = runDockerGetEverything(args)
-    stdout = output.getStdout().strip()
-    stderr = output.getStderr().strip()
-  if output.getExit() != 0:
+    stdout = output.stdout.strip()
+    stderr = output.stderr.strip()
+  if output.exitCode != 0:
     raise newException(
       ValueError,
       "cannot pull " & name & " due to: " &
