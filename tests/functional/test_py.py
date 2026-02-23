@@ -12,7 +12,6 @@ from .chalk.runner import Chalk
 from .conf import MAGIC, PYS, SHEBANG
 from .utils.log import get_logger
 
-
 logger = get_logger()
 
 

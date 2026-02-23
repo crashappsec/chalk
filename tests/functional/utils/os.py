@@ -19,7 +19,6 @@ from filelock import FileLock
 
 from .log import get_logger
 
-
 logger = get_logger()
 
 

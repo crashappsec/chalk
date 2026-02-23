@@ -13,7 +13,6 @@ from .dict import ContainsDict
 from .log import get_logger
 from .os import Program, run
 
-
 logger = get_logger()
 
 ProgramType = TypeVar("ProgramType", bound=Program)

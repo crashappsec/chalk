@@ -10,7 +10,6 @@ from fastapi.responses import PlainTextResponse
 from ..utils.log import get_logger
 from .app import app
 
-
 logger = get_logger()
 
 PREFIX = "/latest"
