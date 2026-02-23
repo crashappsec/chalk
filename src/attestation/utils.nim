@@ -6,13 +6,13 @@
 ##
 
 import std/[
-  base64,
   os,
 ]
 import ".."/[
   docker/ids,
   config,
   types,
+  utils/base64,
   utils/files,
   utils/json,
   utils/semver,

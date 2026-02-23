@@ -1,5 +1,16 @@
 # Chalk Release Notes
 
+## 0.6.8
+
+**February 22, 2026**
+
+### Fixes
+
+- Harden cert env-var base64 parsing to prevent `sysFatal` / `IndexDefect`
+  for malformed boundary-whitespace inputs.
+  ([Nim #25530](https://github.com/nim-lang/Nim/issues/25530),
+  [#631](https://github.com/crashappsec/chalk/issues/631))
+
 ## 0.6.7
 
 **February 18, 2026**

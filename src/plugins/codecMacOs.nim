@@ -9,14 +9,12 @@
 
 # We use slightly different magic for our heredoc. It's uppercase and longer.
 
-import std/[
-  base64,
-]
 import ".."/[
   chalkjson,
   plugin_api,
   run_management,
   types,
+  utils/base64,
   utils/files,
 ]
 
@@ -196,7 +194,7 @@ proc macGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
     let cache = ExeCache(chalk.cache)
 
     if cache.b64.isSome():
-       contents = decode(cache.b64.get())
+       contents = safeDecode(cache.b64.get())
 
     elif cache.contents != "":
       contents = cache.contents

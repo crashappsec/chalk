@@ -17,7 +17,6 @@ when hostOS != "linux":
   {.warning[UnusedImport]: off.}
 
 import std/[
-  base64,
   posix,
   re,
 ]
@@ -25,6 +24,7 @@ import ".."/[
   plugin_api,
   run_management,
   types,
+  utils/base64,
   utils/envvars,
   utils/files,
   utils/json,

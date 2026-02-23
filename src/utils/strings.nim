@@ -19,6 +19,12 @@ proc replaceItemWith*(data: seq[string], match: string, sub: string): seq[string
     else:
       result.add(i)
 
+proc removeChars*(data: string, chars: set[char]): string =
+  result = newStringOfCap(len(data))
+  for i in data:
+    if i notin chars:
+      result.add(i)
+
 proc isInt*(i: string): bool =
   try:
     discard parseInt(i)
