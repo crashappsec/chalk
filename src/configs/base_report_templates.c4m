@@ -176,7 +176,7 @@ report and subtract from it.
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  key.DOCKER_BASE_IMAGE_ID.use                = true
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   key.DOCKER_BASE_IMAGES.use                  = true
   key.DOCKER_COPY_IMAGES.use                  = true
   key._OP_ARTIFACT_TYPE.use                   = true
@@ -214,7 +214,7 @@ report and subtract from it.
   key._PROCESS_MOUNT_INFO.use                 = true
   key._OP_ALL_IMAGE_METADATA.use              = true
   key._OP_ALL_CONTAINER_METADATA.use          = true
-  key._IMAGE_ID.use                           = true
+  key._IMAGE_CONFIG_DIGEST.use                = true
   key._IMAGE_COMMENT.use                      = true
   key._IMAGE_CREATION_DATETIME.use            = true
   key._IMAGE_DOCKER_VERSION.use               = true
@@ -825,7 +825,7 @@ doc: """
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  key.DOCKER_BASE_IMAGE_ID.use                = true
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   key.DOCKER_BASE_IMAGES.use                  = true
   key.DOCKER_COPY_IMAGES.use                  = true
   key._OP_ARTIFACT_TYPE.use                   = true
@@ -860,7 +860,7 @@ doc: """
   key._PROCESS_MOUNT_INFO.use                 = true
   key._OP_ALL_IMAGE_METADATA.use              = false
   key._OP_ALL_CONTAINER_METADATA.use          = false
-  key._IMAGE_ID.use                           = true
+  key._IMAGE_CONFIG_DIGEST.use                = true
   key._IMAGE_COMMENT.use                      = true
   key._IMAGE_CREATION_DATETIME.use            = true
   key._IMAGE_DOCKER_VERSION.use               = true
@@ -1357,7 +1357,7 @@ container.
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  key.DOCKER_BASE_IMAGE_ID.use                = true
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   key.DOCKER_BASE_IMAGES.use                  = true
   key.DOCKER_COPY_IMAGES.use                  = true
   key._OP_ARTIFACT_TYPE.use                   = true
@@ -1391,7 +1391,7 @@ container.
   key._PROCESS_MOUNT_INFO.use                 = true
   key._OP_ALL_IMAGE_METADATA.use              = false
   key._OP_ALL_CONTAINER_METADATA.use          = false
-  key._IMAGE_ID.use                           = true
+  key._IMAGE_CONFIG_DIGEST.use                = true
   key._IMAGE_COMMENT.use                      = true
   key._IMAGE_CREATION_DATETIME.use            = true
   key._IMAGE_DOCKER_VERSION.use               = true
@@ -1874,7 +1874,7 @@ and keep the run-time key.
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  key.DOCKER_BASE_IMAGE_ID.use                = true
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   key.DOCKER_BASE_IMAGES.use                  = true
   key.DOCKER_COPY_IMAGES.use                  = true
   key._OP_ARTIFACT_TYPE.use                   = true
@@ -1908,7 +1908,7 @@ and keep the run-time key.
   key._PROCESS_MOUNT_INFO.use                 = true
   key._OP_ALL_IMAGE_METADATA.use              = false
   key._OP_ALL_CONTAINER_METADATA.use          = false
-  key._IMAGE_ID.use                           = true
+  key._IMAGE_CONFIG_DIGEST.use                = true
   key._IMAGE_COMMENT.use                      = true
   key._IMAGE_CREATION_DATETIME.use            = true
   key._IMAGE_DOCKER_VERSION.use               = true
@@ -2255,7 +2255,7 @@ running insert commands.
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = false
   key.DOCKER_BASE_IMAGE_DIGEST.use            = false
-  key.DOCKER_BASE_IMAGE_ID.use                = false
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = false
   key.DOCKER_BASE_IMAGES.use                  = false
   key.DOCKER_COPY_IMAGES.use                  = false
   key.METADATA_ID.use                         = true
@@ -2264,7 +2264,7 @@ running insert commands.
   key._VALIDATED_SIGNATURE.use                = true
   key._VIRTUAL.use                            = true
   key._CURRENT_HASH.use                       = true
-  key._IMAGE_ID.use                           = true
+  key._IMAGE_CONFIG_DIGEST.use                = true
   key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
@@ -2359,7 +2359,7 @@ running commands that do NOT insert chalk marks.
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  key.DOCKER_BASE_IMAGE_ID.use                = true
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   key.DOCKER_BASE_IMAGES.use                  = true
   key.DOCKER_COPY_IMAGES.use                  = true
   key.METADATA_ID.use                         = true
@@ -2373,7 +2373,7 @@ running commands that do NOT insert chalk marks.
   key._OP_ARTIFACT_PATH_WITHIN_VCTL.use       = true
   key._OP_ARTIFACT_ENV_VAR_NAME.use           = true
   key._CURRENT_HASH.use                       = true
-  key._IMAGE_ID.use                           = true
+  key._IMAGE_CONFIG_DIGEST.use                = true
   key._INSTANCE_CONTAINER_ID.use              = true
   key._INSTANCE_NAME.use                      = true
   key._REPO_URLS.use                          = true

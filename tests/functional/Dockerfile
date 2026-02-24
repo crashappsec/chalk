@@ -9,6 +9,7 @@ ARG POETRY_VERSION=2.0.1
 FROM docker:$DOCKER_VERSION AS docker
 FROM docker/buildx-bin:$BUILDX_VERSION AS buildx
 FROM ghcr.io/sigstore/cosign/cosign:v$COSIGN_VERSION AS cosign
+FROM gcr.io/go-containerregistry/crane:latest AS crane
 
 # ----------------------------------------------------------------------------
 
@@ -74,6 +75,7 @@ RUN poetry install --no-plugins
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=buildx /buildx /usr/lib/docker/cli-plugins/docker-buildx
+COPY --from=crane /ko-app/crane /usr/local/bin/crane
 COPY --from=hello_go /hello_go /usr/local/bin/hello_go
 
 RUN docker context create node-amd64

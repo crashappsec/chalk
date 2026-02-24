@@ -963,7 +963,7 @@ def test_syft_docker(
     }
 
     tag = f"{test_file}_{random_hex}"
-    image_hash, build = chalk.docker_build(
+    digests, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag,
         env={
@@ -989,7 +989,7 @@ def test_syft_docker(
 
     # check sbom data from running container
     _, result = Docker.run(
-        image=image_hash,
+        image=digests.id,
         entrypoint="cat",
         params=["chalk.json"],
     )

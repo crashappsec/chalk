@@ -123,7 +123,7 @@ or vice versa.
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  key.DOCKER_BASE_IMAGE_ID.use                = true
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   key.DOCKER_BASE_IMAGE_METADATA_ID.use       = true
   key.DOCKER_BASE_IMAGE_CHALK.use             = true
   key.DOCKER_BASE_IMAGES.use                  = true
@@ -241,7 +241,7 @@ mark_template mark_large {
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  key.DOCKER_BASE_IMAGE_ID.use                = true
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   key.DOCKER_BASE_IMAGE_METADATA_ID.use       = true
   key.DOCKER_BASE_IMAGE_CHALK.use             = true
   key.DOCKER_BASE_IMAGES.use                  = true
@@ -336,7 +336,7 @@ use the mark template named `reproducable`.
   key.DOCKER_BASE_IMAGE_NAME.use              = true
   key.DOCKER_BASE_IMAGE_TAG.use               = true
   key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  key.DOCKER_BASE_IMAGE_ID.use                = true
+  key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   key.DOCKER_BASE_IMAGE_METADATA_ID.use       = true
   key.DOCKER_BASE_IMAGE_CHALK.use             = true
   key.DOCKER_BASE_IMAGES.use                  = true

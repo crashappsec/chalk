@@ -129,6 +129,13 @@ proc getDockerInfo*(): string =
       dockerInfo = output.getStdout()
   return dockerInfo
 
+proc isDockerOverlayFS*(): bool =
+  for line in getDockerInfo().splitLines():
+    if line.strip().startsWith("Storage Driver:"):
+      let (_, driver) = line.splitBy(":", "overlay2")
+      return driver == "overlayfs"
+  return false
+
 proc getDockerInfoSubList*(key: string): seq[string] =
   let lower = key.toLower()
   result = @[]

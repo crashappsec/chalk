@@ -348,7 +348,7 @@ proc readIidFile(ctx: DockerInvocation) =
 
 proc tryParseMetadataFile(data: string): JsonNode =
   try:
-    return parseJson(data)
+    return parseJson(data).assertIs(JObject, "bad --metadata-file json type")
   except:
     warn("docker: --metadata-file has invalid json: " & getCurrentExceptionMsg())
     return newJObject()
@@ -388,6 +388,8 @@ proc collectBaseImage(chalk: ChalkObj, ctx: DockerInvocation, section: DockerFil
       trace("docker: base image could not be scanned")
       return
     let baseChalk = baseChalkOpt.get()
+    withSuspendChalkCollectionFor(@["docker"]):
+      baseChalk.collectRunTimeArtifactInfo(isChalking = some(false))
     baseChalk.addToAllArtifacts()
     baseChalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("base")
     section.chalk   = baseChalk
@@ -411,7 +413,7 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
     if chalk.baseChalk.isMarked():
       dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA_ID", chalk.baseChalk.extract["METADATA_ID"])
       dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK",       chalk.baseChalk.extract)
-    dict.setIfNeeded("DOCKER_BASE_IMAGE_ID",            chalk.baseChalk.collectedData.getOrDefault("_IMAGE_ID"))
+    dict.setIfNeeded("DOCKER_BASE_IMAGE_CONFIG_DIGEST", chalk.baseChalk.collectedData.getOrDefault("_IMAGE_CONFIG_DIGEST"))
   dict.setIfNeeded("DOCKERFILE_PATH",                   ctx.dockerFileLoc)
   dict.setIfNeeded("DOCKERFILE_PATH_WITHIN_VCTL",       ctx.vctlDockerFileLoc)
   dict.setIfNeeded("DOCKER_ADDITIONAL_CONTEXTS",        ctx.foundExtraContexts)
@@ -440,37 +442,76 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerFile())
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
-  if dockerImageExists(ctx.iidFile):
-    trace("docker: built image is loaded locally")
-    # in some cases even with --push, repo digests show up as blank in docker inspect
-    # but we might know the digest from the --metadata-file so we normalize to that
-    let
-      names  = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
-      config = ctx.metadataFile{"containerimage.config.digest"}.getStr()
-      maybe  = ctx.metadataFile{"containerimage.digest"}.getStr()
-      # if the digest matches config digest we know this is config digest (image id)
-      # and not image digest most likely because there was no --push
-      # and therefore digest is unknown at this time
-      digest = if config == maybe: "" else: maybe
-      repos  = if digest == "": @[] else: names.withDigest(digest)
-    # image was loaded to docker cache
-    for platform, chalk in chalksByPlatform:
-      chalk.withErrorContext():
-        chalk.collectLocalImage(ctx.iidFile, repos = repos)
-  elif len(ctx.foundTags) > 0:
-    trace("docker: inspecting pushed image from registry")
+  let
+    iidFile               = ctx.iidFile
+    metadataNames         = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
+    metadataImage         = ctx.metadataFile{"containerimage.digest"}.getStr().extractDockerHash()
+    metadataConfig        = ctx.metadataFile{"containerimage.config.digest"}.getStr().extractDockerHash()
+    descriptor            = ctx.metadataFile{"containerimage.descriptor"}
+    descMediaType         = descriptor{"mediaType"}.getStr()
+    descDigest            = descriptor{"digest"}.getStr().extractDockerHash()
+  var
+    localId               : string
+    configDigest          : string
+    imageDigest           : string
+    listDigest            : string
+    listOrImageDigest     : string
+    repos                 = newSeq[DockerImage]()
+
+  if len(ctx.metadataFile) == 0:
+    if not isDockerOverlayFS():
+      configDigest        = iidFile
+    localId               = iidFile
+    repos                 = ctx.foundTags.withDigest(iidFile)
+
+  elif isDockerOverlayFS():
+    case CONTENT_TYPE_MAPPING.getOrDefault(descMediaType, DockerManifestType.layer)
+    of DockerManifestType.list:
+      listDigest          = descDigest
+    of DockerManifestType.image:
+      imageDigest         = descDigest
+    else:
+      discard
+    # sometimes config digest is the same as manifest list in the metadata.json :shrug:
+    if metadataConfig != metadataImage:
+      configDigest        = metadataConfig
+    listOrImageDigest     = metadataImage
+    localId               = listOrImageDigest
+    repos                 = (ctx.foundTags & metadataNames).withDigest(listOrImageDigest)
+
+  else:
     # iidfile can be one of in order of precedence:
     # 1. manifest list digest
     # 2. image config digest
-    # and so we attempt to get digest id from metadata file first
-    let
-      digest = ctx.metadataFile{"containerimage.digest"}.getStr(ctx.iidFile)
-      names  = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
+    if iidFile == metadataImage:
+      if dockerImageExists(iidFile):
+        # if the digest matches config digest and image exists locally
+        # we know this is config digest
+        # and not image digest most likely because there was no --push
+        # and therefore digest is unknown at this time
+        configDigest      = iidFile
+        localId           = iidFile
+      else:
+        # otherwise this is list digest therefore we need to check registry
+        listOrImageDigest = metadataImage
+        repos             = (ctx.foundTags & metadataNames).withDigest(listOrImageDigest)
+    else:
+      configDigest        = iidFile
+      localId             = iidFile
+      listOrImageDigest   = metadataImage
+      repos               = (ctx.foundTags & metadataNames).withDigest(listOrImageDigest)
+
+  if dockerImageExists(localId):
+    trace("docker: built image is loaded locally")
     for platform, chalk in chalksByPlatform:
       chalk.withErrorContext():
-        let name = ctx.foundTags[0].withDigest(digest)
-        trace("docker: inspecting " & $name & " for " & $platform)
-        chalk.collectImageManifest(name, repos = names)
+        chalk.collectLocalImage(localId, repos = repos, configDigest = configDigest)
+  elif len(repos) > 0:
+    trace("docker: inspecting pushed image from registry")
+    for platform, chalk in chalksByPlatform:
+      chalk.withErrorContext():
+        trace("docker: inspecting " & $repos[0] & " for " & $platform)
+        chalk.collectImageManifest(repos[0], repos = repos)
   else:
     # this case in theory should never happen
     # as iid file when present should always be either locally loaded image

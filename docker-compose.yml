@@ -198,7 +198,7 @@ services:
   # MISC DEPS
 
   registry:
-    image: registry:2
+    image: registry:3
     ports:
       - "5044:5044"
     environment:
@@ -213,7 +213,7 @@ services:
       interval: 1s
 
   registry-tls:
-    image: registry:2
+    image: registry:3
     ports:
       - "5045:5045"
     volumes:
@@ -233,7 +233,7 @@ services:
       interval: 1s
 
   registry-tls-insecure:
-    image: registry:2
+    image: registry:3
     ports:
       - "5046:5046"
     volumes:
@@ -253,7 +253,7 @@ services:
       interval: 1s
 
   registry-proxy:
-    image: registry:2
+    image: registry:3
     ports:
       - "5047:5047"
     environment:

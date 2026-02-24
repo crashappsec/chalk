@@ -70,6 +70,8 @@ proc inspectJson(name: string, what: string): JsonNode =
   result = json[0]
 
 proc exists(name: string, what: string): bool =
+  if name == "":
+    return false
   try:
     discard inspectJson(name, what)
     return true

@@ -285,7 +285,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DOCKER_BASE_IMAGE_NAME.use              = true
   ~key.DOCKER_BASE_IMAGE_TAG.use               = true
   ~key.DOCKER_BASE_IMAGE_DIGEST.use            = true
-  ~key.DOCKER_BASE_IMAGE_ID.use                = true
+  ~key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   ~key.DOCKER_BASE_IMAGES.use                  = true
   ~key.DOCKER_COPY_IMAGES.use                  = true
   ~key._OP_ARTIFACT_TYPE.use                   = true
@@ -321,7 +321,6 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._PROCESS_MOUNT_INFO.use                 = true
   ~key._OP_ALL_IMAGE_METADATA.use              = false
   ~key._OP_ALL_CONTAINER_METADATA.use          = false
-  ~key._IMAGE_ID.use                           = true
   ~key._IMAGE_COMMENT.use                      = true
   ~key._IMAGE_CREATION_DATETIME.use            = true
   ~key._IMAGE_DOCKER_VERSION.use               = true

@@ -123,13 +123,17 @@ proc mimickLocalConfig(self: DockerManifest) =
   ## to match local docker inspect json output
   if self.kind != DockerManifestType.config:
     raise newException(AssertionDefect, "can only mimick config json on config manifest")
-  self.json["id"] = %(self.digest.extractDockerHash())
+  if isDockerOverlayFS():
+    self.json["id"] = %(self.image.digest.extractDockerHash())
+  else:
+    self.json["id"] = %(self.digest.extractDockerHash())
   # config object does not contain size so we add compressed size
   # for easier metadata collection
   self.json["compressedSize"] = %(self.image.getCompressedSize())
+  if "config" notin self.json:
+    self.json["config"] = newJObject()
+  self.json["config"]["digest"] = %(self.digest)
   if self.image.annotations != nil:
-    if "config" notin self.json:
-      self.json["config"] = newJObject()
     self.json["config"]["annotations"] = self.image.annotations
 
 proc setImageConfig(self: DockerManifest, data: DigestedJson) =
@@ -553,7 +557,12 @@ proc fetchManifest*(name:            DockerImage,
   # foo:tag               # manifest for specific tag
   # foo@sha256:<checksum> # pinned to specific digest
   # therefore we gracefully handle each possibility
-  for key in @[name.asRepoDigest(), name.asRepoTag(), name.asRepoRef()]:
+  var cacheKeys = @[name.asRepoRef()]
+  if name.digest != "":
+    cacheKeys.add(name.asRepoDigest())
+  if name.tag != "":
+    cacheKeys.add(name.asRepoTag())
+  for key in cacheKeys:
     if key in manifestCache:
       result = manifestCache[key]
       result.fetch(fetchConfig = fetchConfig, fetchManifests = fetchManifests)

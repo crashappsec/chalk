@@ -34,8 +34,8 @@ proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =
   ## to correctly guage default build platform.
   result = defaultPlatforms
 
-  trace("docker: probing for build platforms")
   once:
+    trace("docker: probing for build platforms")
     let
       tmpTag     = chooseNewTag()
       envVars    = @[setEnv("DOCKER_BUILDKIT", "1")]

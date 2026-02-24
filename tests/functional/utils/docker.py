@@ -2,14 +2,16 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import re
 from contextlib import contextmanager
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
-from subprocess import CalledProcessError
 from typing import Optional, TypeVar
 
 from more_itertools import windowed
 
-from .dict import ContainsDict
+from .dict import ContainsDict, Either, MISSING, Repr
 from .log import get_logger
 from .os import Program, run
 
@@ -17,6 +19,71 @@ from .os import Program, run
 logger = get_logger()
 
 ProgramType = TypeVar("ProgramType", bound=Program)
+
+
+@lru_cache()
+def is_overlayfs() -> bool:
+    return "overlayfs" in run(["docker", "info"]).text
+
+
+@dataclass
+class DockerDigests:
+    config: str
+    digest: str
+    index: str
+    registry_digest: str
+    registry_index: str
+
+    @property
+    def registry(self) -> str:
+        return (
+            self.registry_index  #
+            or self.registry_digest  #
+            or self.index  #
+            or self.digest  #
+        )
+
+    @property
+    def id(self) -> str:
+        if is_overlayfs():
+            return self.index or self.digest
+        else:
+            return self.config
+
+    @property
+    def either_ids(self) -> Either | Repr:
+        ids: list[str] = []
+        if is_overlayfs():
+            if self.index:
+                ids.append(self.index)
+            if self.digest:
+                ids.append(self.digest)
+        elif self.config:
+            ids.append(self.config)
+        if not ids:
+            return MISSING
+        return Either(*ids)
+
+    @property
+    def either_registry_ids(self) -> Either | Repr:
+        ids: list[str] = []
+        if is_overlayfs():
+            if self.registry_index:
+                ids.append(self.registry_index)
+            if self.registry_digest:
+                ids.append(self.registry_digest)
+            if self.index:
+                ids.append(self.index)
+            if self.digest:
+                ids.append(self.digest)
+        elif self.config:
+            ids.append(self.config)
+        if not ids:
+            return MISSING
+        return Either(*ids)
+
+    def __bool__(self) -> bool:
+        return bool(self.config) or bool(self.digest) or bool(self.index)
 
 
 class Docker:
@@ -115,7 +182,7 @@ class Docker:
         env: Optional[dict[str, str]] = None,
         labels: Optional[dict[str, str]] = None,
         annotations: Optional[dict[str, str]] = None,
-    ) -> tuple[str, Program]:
+    ) -> tuple[DockerDigests, Program]:
         """
         run docker build with parameters
         """
@@ -138,14 +205,16 @@ class Docker:
             labels=labels,
             annotations=annotations,
         ) as (params, stdin):
-            return Docker.with_image_id(
+            return Docker.with_digests(
                 run(
                     params,
                     stdin=stdin,
                     expected_exit_code=int(not expected_success),
                     env={**Docker.build_env(buildkit=buildkit), **(env or {})},
                     cwd=cwd,
-                )
+                ),
+                push=push,
+                tag=tag,
             )
 
     @staticmethod
@@ -156,13 +225,14 @@ class Docker:
         return {"DOCKER_BUILDKIT": str(int(buildkit))}
 
     @staticmethod
-    def with_image(
-        build: ProgramType,
-        buildkit="writing image",
-        buildx="exporting config",
-        legacy="{{ .ID }}",
-    ) -> tuple[str, ProgramType]:
-        image_id = ""
+    def with_digests(
+        build: ProgramType, push: bool, tag: Optional[str] = None
+    ) -> tuple[DockerDigests, ProgramType]:
+        config_digest = ""
+        image_digest = ""
+        list_digest = ""
+        registry_list_digest = ""
+        registry_image_digest = ""
 
         if build.exit_code == 0:
             if build.env.get("DOCKER_BUILDKIT", "1") == "1" or (
@@ -170,71 +240,91 @@ class Docker:
                 "buildx",
             ) in list(windowed(build.cmd, 2)):
 
-                def get_sha256(needle: str) -> str:
-                    if needle == "":
-                        return ""
+                def get_sha256(
+                    needle: re.Pattern,
+                    ignore_in_between: Optional[list[tuple[str, str]]] = None,
+                ) -> str:
+                    ignore_in_between = ignore_in_between or []
                     return build.find(
                         needle,
                         text=build.logs,
                         words=1,  # there is "done" after hash
-                        reverse=True,
                         default="",
                         log_level=None,
-                        ignore_in_between=[
-                            (
-                                "docker: probing for build platforms",
-                                "docker: done probing for build platforms",
-                            )
-                        ],
-                    ).split(":")[-1]
+                        ignore_in_between=(
+                            [
+                                (
+                                    "docker: probing for build platforms",
+                                    "docker: done probing for build platforms",
+                                )
+                            ]
+                            + (ignore_in_between if is_overlayfs() else [])
+                        ),
+                    )
 
-                image_id = get_sha256(buildx) or get_sha256(buildkit)
-                if not image_id and (
+                oci = [("exporting to oci image format", "DONE")]
+                docker = [("exporting to image", "DONE")]
+                registry_list_digest = get_sha256(
+                    re.compile("exporting manifest list sha256:"),
+                    oci,
+                )
+                registry_image_digest = get_sha256(
+                    re.compile("exporting manifest sha256:"),
+                    oci,
+                )
+                list_digest = get_sha256(
+                    re.compile("exporting manifest list sha256:"),
+                    docker,
+                )
+                image_digest = get_sha256(
+                    re.compile("exporting manifest sha256:"),
+                    docker,
+                )
+
+                config_digest = get_sha256(
+                    re.compile("exporting config sha256:"),
+                ) or get_sha256(
+                    re.compile("writing image sha256:"),
+                )
+                if not config_digest and (
                     # this is a multi-platform build so image_id is expected to be missing
-                    get_sha256("exporting_manifest_list")
+                    list_digest
                     # --load wasnt used so no image id is provided
                     or "Build result will only remain in the build cache" in build.logs
                 ):
                     pass
-                elif not image_id:
+                elif not config_digest:
                     raise ValueError("No buildx image found during docker build")
 
             else:
-                image_id = build.find(
+                short_id = build.find(
                     "Successfully built",
                     words=1,
                     reverse=True,
                     log_level=None,
                 )
                 # legacy builder returns short id so we figure out longer id
-                image_id = run(
-                    ["docker", "inspect", image_id, "--format", legacy],
+                long_id = run(
+                    ["docker", "inspect", short_id, "--format", "{{ .ID }}"],
                     log_level="debug",
                 ).text.rsplit(":", maxsplit=1)[1]
+                if is_overlayfs():
+                    image_digest = long_id
+                else:
+                    config_digest = long_id
 
-        return image_id, build
+        digests = DockerDigests(
+            config=config_digest,
+            digest=image_digest or registry_image_digest,
+            index=list_digest or registry_list_digest,
+            registry_digest=registry_image_digest,
+            registry_index=registry_list_digest,
+        )
 
-    @staticmethod
-    def with_image_id(build: ProgramType) -> tuple[str, ProgramType]:
-        return Docker.with_image(build)
+        if tag and push and not digests.registry:
+            digests = Docker.crane_digests(tag, digests)
 
-    @staticmethod
-    def with_image_digest(build: ProgramType) -> tuple[str, ProgramType]:
-        image_id, _ = Docker.with_image_id(build)
-        format = "{{ (index .RepoDigests 0) }}"
-        try:
-            image_digest = run(
-                ["docker", "inspect", image_id, "--format", format],
-                log_level="debug",
-            ).text.rsplit(":", maxsplit=1)[1]
-            return image_digest, build
-        except (IndexError, CalledProcessError):
-            return Docker.with_image(
-                build,
-                buildkit="",
-                buildx="exporting manifest",
-                legacy=format,
-            )
+        return (digests, build)
 
     @staticmethod
     def run(
@@ -296,8 +386,14 @@ class Docker:
         return run(["docker", "pull", tag] + p)
 
     @staticmethod
-    def push(tag: str) -> Program:
-        return run(["docker", "push", tag])
+    def push(
+        tag: str, digests: Optional[DockerDigests] = None
+    ) -> tuple[DockerDigests, Program]:
+        push = run(["docker", "push", tag])
+        return (
+            Docker.crane_digests(tag, digests),
+            push,
+        )
 
     @staticmethod
     def tag(tag: str, new_tag: str) -> Program:
@@ -318,8 +414,54 @@ class Docker:
         return run(["docker", "buildx", "imagetools", "inspect", "--raw", tag])
 
     @staticmethod
-    def inspect(name: str) -> list[ContainsDict]:
-        return [ContainsDict(i) for i in run(["docker", "inspect", name]).json()]
+    def crane_inspect(tag: str) -> Program:
+        return run(["crane", "manifest", "--insecure", tag])
+
+    @staticmethod
+    def crane_digests(
+        tag: str,
+        digests: Optional[DockerDigests] = None,
+        architecture: Optional[str] = None,
+    ) -> DockerDigests:
+        list_digest = ""
+        image_digest = ""
+        config_digest = ""
+
+        output = Docker.crane_inspect(tag)
+        if "manifests" in output.json():
+            list_digest = output.digest
+            image_digest = [
+                i["digest"].split(":")[1]
+                for i in output.json()["manifests"]
+                if i.get("platform", {}).get("os", "unknown") != "unknown"
+                and (
+                    i.get("platform", {}).get("architecture", "unknown")
+                    == (
+                        architecture
+                        or i.get("platform", {}).get("architecture", "unknown")
+                    )
+                )
+            ][0].split(":")[0]
+            tag = tag.split("@")[0]
+            output = Docker.crane_inspect(f"{tag}@sha256:{image_digest}")
+
+        image_digest = output.digest
+        config_digest = output.json()["config"]["digest"].split(":")[1]
+
+        return DockerDigests(
+            config=config_digest,
+            digest=digests.digest if digests else "",
+            index=digests.index if digests else "",
+            registry_digest=image_digest,
+            registry_index=list_digest,
+        )
+
+    @staticmethod
+    def inspect(name: str) -> ContainsDict:
+        data = run(["docker", "inspect", name]).json()
+        if len(data) != 1:
+            raise IndexError(f"only single inspect output expected. got: {len(data)}")
+        return ContainsDict(data[0])
 
     @staticmethod
     def all_images(only_id=True) -> list[str]:
@@ -359,3 +501,7 @@ class Docker:
             check=False,
             log_level="debug",
         )
+
+    @staticmethod
+    def is_overlayfs() -> bool:
+        return is_overlayfs()
