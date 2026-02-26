@@ -282,7 +282,8 @@ plugin procfs {
     post_run_keys:   ["_OP_TCP_SOCKET_INFO", "_OP_UDP_SOCKET_INFO",
                       "_OP_IPV4_ROUTES", "_OP_IPV6_ROUTES",
                       "_OP_IPV4_INTERFACES", "_OP_IPV6_INTERFACES",
-                      "_OP_ARP_TABLE", "_OP_CPU_INFO", "_OP_ALL_PS_INFO"]
+                      "_OP_ARP_TABLE", "_OP_CPU_INFO", "_OP_ALL_PS_INFO",
+                      "_OP_ANCESTOR_ARGVS"]
     doc: """
 Captures host-level information for Linux machines from the proc file
 system interface, including process and network information.

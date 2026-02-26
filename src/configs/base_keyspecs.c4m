@@ -2913,7 +2913,7 @@ entry point.
 
 keyspec _PROCESS_DETAIL {
     kind:             RunTimeArtifact
-    type:             dict[string, string]
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
     shortdoc:         "All process detail for exec operation"
@@ -3207,13 +3207,13 @@ entry point.
 
 keyspec _PROCESS_FD_INFO {
     kind:             RunTimeArtifact
-    type:             dict[string, dict[string, string]]
+    type:             dict[string, dict[string, `x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Info on file descriptors of exec'd process"
     doc: """
 Returns information for all file descriptors in the process.
-Keys are file descriptor numbers, but encoded as a string.
+Keys are file descriptor numbers.
 
 Values are dictionaries of info that vary based on the file type.
 """
@@ -3221,7 +3221,7 @@ Values are dictionaries of info that vary based on the file type.
 
 keyspec _PROCESS_MOUNT_INFO {
     kind:             RunTimeArtifact
-    type:             list[list[string]]
+    type:             list[dict[string, `x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Mount info reported for exec'd process"
@@ -5196,6 +5196,18 @@ be inserted into chalk marks, but will have the same value as the
 """
 }
 
+keyspec _OP_ANCESTOR_ARGVS {
+    kind:           RunTimeHost
+    type:           list[list[string]]
+    standard:       true
+    since:          "0.6.9"
+    shortdoc: "Command-line arguments of op ancestor processes"
+    doc:              """
+This field contains the full contents of the command line arguments
+used to invoke `chalk` for all ancestor processes.
+"""
+}
+
 keyspec _OP_CONFIG {
     kind:             RunTimeHost
     type:             string
@@ -5426,7 +5438,7 @@ where the full contents are not being duplicated.
 
 keyspec _OP_TCP_SOCKET_INFO {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             list[list[list[int]]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local TCP socket info during run-time exec op"
@@ -5451,7 +5463,7 @@ virtualized view available insider the container.
 
 keyspec _OP_UDP_SOCKET_INFO {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             list[list[list[int]]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local UDP socket info during run-time exec op"
@@ -5475,7 +5487,7 @@ virtualized view available insider the container.
 
 keyspec _OP_IPV4_ROUTES {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             list[list[`x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local IPV4 routes during run-time exec op"
@@ -5532,7 +5544,7 @@ virtualized view available insider the container.
 
 keyspec _OP_IPV4_INTERFACES {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             dict[string, list[list[int]]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local IPV4 interfaces during run-time exec op"
@@ -5555,7 +5567,7 @@ virtualized view available insider the container.
 
 keyspec _OP_IPV6_INTERFACES {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             dict[string, list[string]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local IPV6 interfaces routes during run-time exec op"

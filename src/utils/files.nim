@@ -220,3 +220,20 @@ proc getOrWriteExclusiveFile*(path: string,
         return result
       attempts += 1
     raise newException(ValueError, "failed to read full content from exclusive file " & path)
+
+proc optExpandSymlink*(s: string): Option[string] =
+  ## Get optional symlink path
+  try:
+    return some(expandSymlink(s))
+  except:
+    return none(string)
+
+proc optLoadFile*(s: string): Option[string] =
+  ## Get optional file content
+  try:
+    let content = tryToLoadFile(s).strip()
+    if content != "":
+      return some(content)
+    return none(string)
+  except:
+    return none(string)

@@ -1,0 +1,29 @@
+report_template report_default {
+  key._PROCESS_PID.use            = true
+  key._PROCESS_ARGV.use           = true
+  key._PROCESS_CWD.use            = true
+  key._PROCESS_EXE_PATH.use       = true
+  key._PROCESS_COMMAND_NAME.use   = true
+
+  key._PROCESS_PARENT_PID.use     = true
+  key._PROCESS_PGID.use           = true
+  key._PROCESS_START_TIME.use     = true
+  key._PROCESS_UTIME.use          = true
+  key._PROCESS_STIME.use          = true
+  key._PROCESS_CHILDREN_UTIME.use = true
+  key._PROCESS_CHILDREN_STIME.use = true
+  key._PROCESS_STATE.use          = true
+
+  key._PROCESS_UMASK.use          = true
+  key._PROCESS_UID.use            = true
+  key._PROCESS_GID.use            = true
+  key._PROCESS_NUM_FD_SIZE.use    = true
+  key._PROCESS_GROUPS.use         = true
+  key._PROCESS_SECCOMP_STATUS.use = true
+
+  key._PROCESS_FD_INFO.use        = true
+  key._PROCESS_MOUNT_INFO.use     = true
+  key._PROCESS_DETAIL.use         = true
+
+  key._OP_ANCESTOR_ARGVS.use      = true
+}

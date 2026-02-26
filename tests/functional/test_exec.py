@@ -3,11 +3,13 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 from pathlib import Path
+import sys
 
 import pytest
 
 from .chalk.runner import Chalk
 from .conf import CONFIGS, SLEEP_PATH, UNAME_PATH
+from .utils.dict import Contains, ContainsDict
 from .utils.bin import sha256
 from .utils.log import get_logger
 
@@ -29,6 +31,7 @@ def test_exec_unchalked(
     exec_proc = chalk.exec(
         bin_path,
         as_parent=as_parent,
+        config=CONFIGS / "procfs.c4m",
     )
     # first line must be linux
     assert exec_proc.text.startswith("Linux")
@@ -50,17 +53,21 @@ def test_exec_unchalked(
 
 
 @pytest.mark.parametrize("as_parent", [True, False])
-@pytest.mark.parametrize("copy_files", [[UNAME_PATH]], indirect=True)
+@pytest.mark.parametrize("copy_files", [[SLEEP_PATH]], indirect=True)
 def test_exec_chalked(
     as_parent: bool,
     copy_files: list[Path],
     chalk: Chalk,
+    tmp_data_dir: Path,
 ):
     bin_path = copy_files[0]
     bin_hash = sha256(bin_path)
 
     # add chalk mark
-    chalk.insert(artifact=bin_path, virtual=False)
+    chalk.insert(
+        artifact=bin_path,
+        virtual=False,
+    )
 
     # hash of chalked binary
     chalk_hash = sha256(bin_path)
@@ -68,10 +75,10 @@ def test_exec_chalked(
 
     exec_proc = chalk.exec(
         bin_path,
+        params=["3"],
         as_parent=as_parent,
+        config=CONFIGS / "procfs.c4m",
     )
-    # first line must be linux
-    assert exec_proc.text.startswith("Linux")
 
     assert exec_proc.report["_OPERATION"] == "exec"
     # we expect the binary to be marked
@@ -91,7 +98,61 @@ def test_exec_chalked(
     # but can't check exact values for most of these
     assert exec_proc.mark["_PROCESS_PID"] > 0
     assert exec_proc.mark["_PROCESS_PARENT_PID"] > 0
-    assert exec_proc.mark["_PROCESS_UID"] is not None
+    assert exec_proc.mark.has(
+        _PROCESS_PID=int,
+        _PROCESS_PARENT_PID=int,
+        _PROCESS_ARGV=[str(bin_path), "3"],
+        _PROCESS_CWD=str(tmp_data_dir),
+        _PROCESS_EXE_PATH=str(bin_path),
+        _PROCESS_COMMAND_NAME=bin_path.name,
+        _PROCESS_PGID=int,
+        _PROCESS_START_TIME=float,
+        _PROCESS_UTIME=float,
+        _PROCESS_STIME=float,
+        _PROCESS_CHILDREN_UTIME=float,
+        _PROCESS_CHILDREN_STIME=float,
+        _PROCESS_STATE="Sleeping",
+        _PROCESS_UMASK=int,
+        _PROCESS_UID=[int, int, int, int],
+        _PROCESS_GID=[int, int, int, int],
+        _PROCESS_NUM_FD_SIZE=int,
+        _PROCESS_GROUPS=[int],
+        _PROCESS_SECCOMP_STATUS="disabled",
+        _PROCESS_FD_INFO={
+            "0": {
+                "pos": 0,
+                "mnt_id": int,
+                "ino": int,
+                "path": "/dev/null",
+                "flags": str,
+            }
+        },
+        _PROCESS_MOUNT_INFO=Contains(
+            [
+                ContainsDict(
+                    {
+                        "mount_id": int,
+                        "parent_id": int,
+                        "major": int,
+                        "minor": int,
+                        "root": "/",
+                        "mount_point": str,
+                        "options": list,
+                        "tags": [],
+                        "fs_type": str,
+                        "source": str,
+                        "super": list,
+                    }
+                ),
+            ],
+        ),
+        _PROCESS_DETAIL={
+            "pid": int,
+        },
+    )
+    assert exec_proc.report.has(
+        _OP_ANCESTOR_ARGVS=Contains([[sys.executable] + sys.argv]),
+    )
 
 
 # exec wrapping with heartbeat

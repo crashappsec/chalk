@@ -64,6 +64,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OP_EXE_NAME.use                               = true
   ~key._OP_EXE_PATH.use                               = true
   ~key._OP_ARGV.use                                   = true
+  ~key._OP_ANCESTOR_ARGVS.use                         = true
   ~key._OP_CONFIG.use                                 = true
   ~key._UNMARKED.use                                  = true
   ~key._OP_CHALKER_COMMIT_ID.use                      = true
