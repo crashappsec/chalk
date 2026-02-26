@@ -73,6 +73,15 @@ GDB_PATH = shutil.which("gdb")
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 AWS_SESSION_TOKEN = os.environ.get("AWS_SESSION_TOKEN", "")
+AWS_ACCOUNT_ID = os.environ.get("AWS_ACCOUNT_ID", "")
+
+
+AWS_ECR_REPO = os.environ.get(
+    "AWS_ECR_REPO",
+    AWS_ACCOUNT_ID and f"{AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com",
+)
+DOCKER_HUB_REPO = os.environ.get("DOCKER_HUB_REPO", "crashappsec/chalk_tests")
+GHCR_REPO = os.environ.get("GHCR_REPO", "crashappsec/chalk-ci-tests")
 
 
 def aws_secrets_configured() -> bool:

@@ -6,16 +6,19 @@ import datetime
 import itertools
 import json
 import os
+import re
 import secrets
 from pathlib import Path
 from typing import Any, Literal, Optional, cast
 
 from ..conf import MAGIC, TESTS
 from ..utils.bin import sha256
+from ..utils.cosign import Cosign
 from ..utils.dict import ANY, MISSING, ContainsDict, ContainsList, IfExists
 from ..utils.docker import Docker
 from ..utils.log import get_logger
 from ..utils.os import CalledProcessError, Program, run
+from ..utils.text import valid_json
 
 
 ChalkCommand = Literal[
@@ -144,15 +147,14 @@ class ChalkMark(ContainsDict):
 
     @classmethod
     def from_binary(cls, path: Path):
-        text = path.read_text(errors="ignore")
-        # MAGIC must always be present in chalk mark and marks the beginning of the json
+        text = path.read_text(errors="ignore").replace("\x00", "\n")
         assert MAGIC in text
-        start = text.rfind("{", 0, text.find(MAGIC))
-        assert start > 0
-        beginning = text[start:].split("\x00")[0]
-        end = beginning.rfind("}")
-        mark_json = beginning[: end + 1]
-        mark = json.loads(mark_json)
+        # MAGIC must always be present in chalk mark and marks the beginning of the json
+        mark, _ = valid_json(
+            text,
+            everything=False,
+            after=rf'{{\s*"MAGIC"\s*:\s*"{MAGIC}"\s*,',
+        )
         assert mark
         return cls(report=ChalkReport({}), mark=mark)
 
@@ -245,9 +247,9 @@ class ChalkProgram(Program):
         while text.strip():
             try:
                 # assume all of text is valid json
-                reports += self.json(text=text, log_level=None)
+                reports += self.json(text=text)
             except json.JSONDecodeError:
-                next_reports, char = self._valid_json(text=text, everything=False)
+                next_reports, char = valid_json(text, everything=False)
                 reports += next_reports
                 text = self.after(match=match, text=text[char:])
                 if not text.strip().startswith("["):
@@ -343,6 +345,7 @@ class Chalk:
             raise
 
         assert self.binary.is_file()
+        self.env = {}
 
     def __repr__(self):
         return f"{self.__class__.__name__}(binary={self.binary!r})"
@@ -435,7 +438,7 @@ class Chalk:
                 cmd,
                 expected_exit_code=int(not expected_success),
                 cwd=cwd,
-                env=env,
+                env={**self.env, **(env or {})},
                 stdin=stdin,
                 tty=tty,
             )
@@ -612,6 +615,41 @@ class Chalk:
         if expected_success:
             assert hash != sha256(self.binary)
         return result
+
+    def setup(
+        self,
+        env: Optional[dict[str, str]] = None,
+        cosign: Optional[Cosign] = None,
+        persist_env=True,
+    ) -> ChalkMark:
+        env = env or {}
+        if cosign:
+            cosign.write()
+            env.update(cosign.env)
+            if persist_env:
+                self.env.update(cosign.env)
+        setup = self.run(command="setup", env=env, tty=True)
+        mark = ChalkMark.from_binary(self.binary)
+        assert mark.contains(
+            {
+                "$CHALK_PUBLIC_KEY": re.compile(r"^-----BEGIN PUBLIC KEY"),
+                "$CHALK_ENCRYPTED_PRIVATE_KEY": re.compile(
+                    r"^-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY"
+                ),
+                "SIGNATURE": ANY,
+                "INJECTOR_PUBLIC_KEY": mark["$CHALK_PUBLIC_KEY"],
+            }
+        )
+        if cosign:
+            assert mark.contains(
+                {
+                    "$CHALK_PUBLIC_KEY": cosign.public,
+                    "$CHALK_ENCRYPTED_PRIVATE_KEY": cosign.private,
+                }
+            )
+        if persist_env and "CHALK_PASSWORD" in setup.text:
+            self.env["CHALK_PASSWORD"] = setup.find("CHALK_PASSWORD").split("=", 1)[1]
+        return mark
 
     def docker_build(
         self,

@@ -14,15 +14,13 @@ import ".."/[
 ]
 import "."/[
   base,
-  collect,
   scan,
 ]
 
 proc dockerPush*(ctx: DockerInvocation): int =
   ctx.newCmdLine = ctx.originalArgs
 
-  let chalkOpt = scanLocalImage(ctx.foundImage)
-
+  let chalkOpt = scanImage(ctx.foundImage, fromManifest = false)
   if chalkOpt.isNone():
     error("docker: " & ctx.foundImage & " is not found. pushing without chalk")
     return setExitCode(ctx.runMungedDockerInvocation())

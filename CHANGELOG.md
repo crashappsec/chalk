@@ -1,5 +1,51 @@
 # Chalk Release Notes
 
+## On the `main` branch
+
+### Breaking Changes
+
+- `cosign` is removed as external dependency.
+  As such some configurations are removed:
+  - `ignore_unsigned_images`
+  - `inform_if_cant_sign`
+  - `use_transparency_log` (chalk does not use transparency log)
+
+  Note that `cosign` sigstore key format is maintained.
+  New keys minted with `chalk setup` still use same sigstore secretbox
+  encrypted format keys. Previously generated keys are also fully supported.
+  ([#619](https://github.com/crashappsec/chalk/pull/619))
+
+## New Features
+
+- All chalk attestations now use [OCI Image and Distribution] 1.1 spec.
+  This means chalk's attestations are compatible with other
+  OCI-compatible tools. Chalk pushes these objects to the registry:
+  - [In-Toto Statement] predicated by
+    Software Supply Chain Attribute Integrity ([SCAI])
+    with attribute containing chalkmark.
+    The statement is signed by:
+  - [Sigstore bundle] artifact which is included in:
+  - Attestation image manifest with subject of image being signed.
+  - Appends manifest to referrers list manifest. Creates list if non-existing.
+
+  This is very similar to how `cosign` 3 pushes attestations to the registry
+  except:
+  - Chalk does not use transparency log
+  - Chalk can validate signatures for images signed by both cosign 2 and 3.
+    Cosign 3 relies on transparency log for validation.
+
+  ([#619](https://github.com/crashappsec/chalk/pull/619))
+
+[OCI Image and Distribution]: https://github.com/opencontainers/distribution-spec/blob/main/spec.md
+[Sigstore bundle]: https://docs.sigstore.dev/about/bundle/
+[In-Toto Statement]: https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md
+[SCAI]: https://github.com/in-toto/attestation/blob/main/spec/predicates/scai.md
+
+- `chalk extract` can now extract chalk mark directly from registry.
+  This is useful to validate validity of the attestation of the image
+  without needing to pull it locally.
+  ([#619](https://github.com/crashappsec/chalk/pull/619))
+
 ## 0.6.8
 
 **February 22, 2026**

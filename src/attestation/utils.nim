@@ -7,78 +7,251 @@
 
 import std/[
   os,
+  sequtils,
 ]
 import ".."/[
-  docker/ids,
-  config,
   types,
   utils/base64,
   utils/files,
   utils/json,
-  utils/semver,
 ]
 
-var cosignLoc      = ""
-var cosignVersion  = parseVersion("0")
-let minimumVersion = parseVersion("2.2.0")
+{.compile:"./attestation.c".}
 
-template getOrDownloadCosignLocation(downloadCosign: bool) =
-  if cosignLoc == "":
-    const cosignLoader = "load_attestation_binary(bool) -> string"
-    let args = @[pack(downloadCosign)]
-    cosignLoc = unpack[string](runCallback(cosignLoader, args).get())
-    if cosignLoc == "":
-      warn("Could not find or install cosign; cannot sign or verify.")
-    else:
-      trace("found cosign: " & cosignLoc)
+type ucstring = ptr uint8
 
-proc getCosignLocation*(downloadCosign = false): string =
-  # a bit repetitive however it allows once blocks to be per download branch
-  # otherwise if there is only a single once block
-  # if this function is called with downloadCosign=false
-  # even if it is later called with downloadCosign=true
-  # it will never be downloaded
-  if downloadCosign:
-    once:
-      getOrDownloadCosignLocation(downloadCosign)
-  else:
-    once:
-      getOrDownloadCosignLocation(downloadCosign)
-  return cosignLoc
+proc cfree(data: pointer) {.importc.}
 
-proc getCosignVersion*(): Version =
-  once:
-    let path = getCosignLocation()
-    if path == "":
-      return cosignVersion
-    let
-      cmd    = runCmdGetEverything(path, @["version"])
-      stdOut = cmd.getStdout()
-      lines  = stdOut.splitLines()
-    if cmd.getExit() != 0:
-      warn("Could not find cosign version")
-      return cosignVersion
-    try:
-      cosignVersion = lines.getVersionFromLineWhich(startsWith = "GitVersion:")
-      trace("cosign version: " & $cosignVersion)
-      if cosignVersion < minimumVersion:
-        warn("Unsupported cosign version is installed " & $cosignVersion & ". " &
-             "Please upgrade to >= " & $minimumVersion & ". " &
-             "See https://blog.sigstore.dev/tuf-root-update/ for more details.")
-    except:
-      warn("Could not find cosign version from: " & stdOut)
-  return cosignVersion
+proc toString(data: ucstring, length: csize_t): string =
+  result = newString(length)
+  copyMem(addr result[0], data, length)
+  cfree(addr data)
 
-proc isCosignInstalled*(): bool =
-  return getCosignLocation() != ""
+proc decodeKey(data: string): JsonNode =
+  var encoded = ""
+  for l in data.splitLines():
+    if l.startsWith('-'):
+      continue
+    encoded &= l
+  let decoded = base64.safeDecode(encoded)
+  result = parseJson(decoded)
+
+proc pem_to_der(
+  pem:     cstring,
+  der:     ptr ucstring,
+  der_len: ptr csize_t,
+): bool {.importc.}
+
+proc asDer*(self: AttestationKey): string =
+  var
+    der:       ucstring
+    derLength: csize_t
+  if not pem_to_der(
+    pem     = cstring(self.publicKey),
+    der     = addr der,
+    der_len = addr derLength,
+  ):
+    raise newException(ValueError, "could not convert pem to der")
+  return base64.encode(der.toString(derLength))
+
+proc generate_and_encrypt_keypair(
+  password:       ucstring,
+  password_len:   csize_t,
+  kdf_name:       cstring,
+  N:              uint64,
+  r:              uint32,
+  p:              uint32,
+  cipher_name:    cstring,
+  public_key_out: ptr ucstring,
+  public_key_len: ptr csize_t,
+  salt_out:       ptr ucstring,
+  salt_len:       ptr csize_t,
+  nonce_out:      ptr ucstring,
+  nonce_len:      ptr csize_t,
+  ciphertext_out: ptr ucstring,
+  ciphertext_len: ptr csize_t,
+): bool {.importc.}
+
+proc mintKey(): AttestationKey =
+  let
+    password = base64.encode(randString(16), safe = true)
+    kdf      = "scrypt"
+    cipher   =  "nacl/secretbox"
+    N        = 65536
+    r        = 8
+    p        = 1
+  var
+    publicKey:        ucstring
+    publicKeyLength:  csize_t
+    salt:             ucstring
+    saltLength:       csize_t
+    nonce:            ucstring
+    nonceLength:      csize_t
+    ciphertext:       ucstring
+    ciphertextLength: csize_t
+  if not generate_and_encrypt_keypair(
+    password       = cast[ucstring](cstring(password)),
+    password_len   = csize_t(len(password)),
+    kdf_name       = cstring(kdf),
+    N              = uint64(N),
+    r              = uint32(r),
+    p              = uint32(p),
+    cipher_name    = cstring(cipher),
+    public_key_out = addr publicKey,
+    public_key_len = addr publicKeyLength,
+    salt_out       = addr salt,
+    salt_len       = addr saltLength,
+    nonce_out      = addr nonce,
+    nonce_len      = addr nonceLength,
+    ciphertext_out = addr ciphertext,
+    ciphertext_len = addr ciphertextLength,
+  ):
+    raise newException(ValueError, "could not mint new attestation key")
+  let
+    data = %*({
+      "kdf": {
+        "name": kdf,
+        "params": {
+          "N": N,
+          "r": r,
+          "p": p
+        },
+        "salt": base64.encode(salt.toString(saltLength)),
+      },
+      "cipher": {
+        "name": cipher,
+        "nonce": base64.encode(nonce.toString(nonceLength)),
+      },
+      "ciphertext": base64.encode(ciphertext.toString(ciphertextLength)),
+    })
+  result = AttestationKey(
+    password: password,
+    publicKey: publicKey.toString(publicKeyLength),
+    privateKey: (
+      "-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY-----\n" &
+      base64.encode($data).chunks(64).toSeq().join("\n") & "\n" &
+      "-----END ENCRYPTED SIGSTORE PRIVATE KEY-----\n"
+    ),
+  )
+
+proc decrypt_secretbox(
+  password:       ucstring,
+  password_len:   csize_t,
+  salt:           ucstring,
+  salt_len:       csize_t,
+  kdf_name:       cstring,
+  N:              uint64,
+  r:              uint32,
+  p:              uint32,
+  cipher_name:    cstring,
+  nonce:          ucstring,
+  nonce_len:      csize_t,
+  ciphertext:     ucstring,
+  ciphertext_len: csize_t,
+  plaintext:      ptr ucstring,
+  plaintext_len:  ptr csize_t,
+): bool {.importc.}
+
+proc decrypt(self: AttestationKey): string =
+  var
+    plaintext:       ucstring
+    plaintextLength: csize_t
+  let
+    data       = self.privateKey.decodeKey()
+    password   = self.password.strip()
+    salt       = base64.safeDecode(data{"kdf"}{"salt"}.getStr())
+    nonce      = base64.safeDecode(data{"cipher"}{"nonce"}.getStr())
+    ciphertext = base64.safeDecode(data{"ciphertext"}.getStr())
+    cipher     = data{"cipher"}{"name"}.getStr()
+    kdf        = data{"kdf"}{"name"}.getStr()
+    N          = data{"kdf"}{"params"}{"N"}.getInt()
+    r          = data{"kdf"}{"params"}{"r"}.getInt()
+    p          = data{"kdf"}{"params"}{"p"}.getInt()
+
+  if not decrypt_secretbox(
+    password       = cast[ucstring](cstring(password)),
+    password_len   = csize_t(len(password)),
+    salt           = cast[ucstring](cstring(salt)),
+    salt_len       = csize_t(len(salt)),
+    kdf_name       = cstring(kdf),
+    N              = uint64(N),
+    r              = uint32(r),
+    p              = uint32(p),
+    cipher_name    = cstring(cipher),
+    nonce          = cast[ucstring](cstring(nonce)),
+    nonce_len      = csize_t(len(nonce)),
+    ciphertext     = cast[ucstring](cstring(ciphertext)),
+    ciphertext_len = csize_t(len(ciphertext)),
+    plaintext      = addr plaintext,
+    plaintext_len  = addr plaintextLength,
+  ):
+    raise newException(ValueError, "could not decrypt key with secretbox")
+
+  result = plaintext.toString(plaintextLength)
+
+proc sign_message(
+  private_key:        ucstring,
+  private_key_length: csize_t,
+  message:            ucstring,
+  message_length:     csize_t,
+  signature:          ptr ucstring,
+  signature_length:   ptr csize_t,
+): bool {.importc.}
+
+proc sign*(self: AttestationKey,
+           message: string,
+           ): string =
+  var
+    signature:       ucstring
+    signatureLength: csize_t
+  let private  = self.decrypt()
+
+  if not sign_message(
+    private_key        = cast[ucstring](cstring(private)),
+    private_key_length = csize_t(len(private)),
+    message            = cast[ucstring](cstring(message)),
+    message_length     = csize_t(len(message)),
+    signature          = addr signature,
+    signature_length   = addr signatureLength,
+  ) or signature == nil:
+    raise newException(ValueError, "could not sign")
+
+  return base64.encode(signature.toString(signatureLength))
+
+proc verify_signature(
+  public_key:       cstring,
+  message:          ucstring,
+  message_length:   csize_t,
+  signature:        ucstring,
+  signature_length: csize_t,
+): bool {.importc.}
+
+proc verify*(self:      AttestationKey,
+             message:   string,
+             signature: string,
+             ): bool =
+  let sig = base64.safeDecode(signature)
+  return verify_signature(
+    public_key       = cstring(self.publicKey),
+    message          = cast[ucstring](cstring(message)),
+    message_length   = csize_t(len(message)),
+    signature        = cast[ucstring](cstring(sig)),
+    signature_length = csize_t(len(sig)),
+  )
+
+proc dsse*(payload: string, payloadType: string): string =
+  return (
+    "DSSEv1 " &
+    $len(payloadType) & " " &
+    payloadType & " " &
+    $len(payload) & " " &
+    payload
+  )
 
 proc canAttest*(key: AttestationKey): bool =
   if key == nil:
     return false
   return (
-    isCosignInstalled() and
-    # https://blog.sigstore.dev/tuf-root-update/
-    getCosignVersion() >= minimumVersion and
     key.privateKey != "" and
     key.publicKey != "" and
     key.password != ""
@@ -88,131 +261,36 @@ proc canAttestVerify*(key: AttestationKey): bool =
   if key == nil:
     return false
   return (
-    isCosignInstalled() and
-    # https://blog.sigstore.dev/tuf-root-update/
-    getCosignVersion() >= minimumVersion and
     key.publicKey != ""
   )
 
 proc canVerifyByHash*(chalk: ChalkObj): bool =
-  return isCosignInstalled() and chalk.fsRef != "" and ResourceCert notin chalk.resourceType
+  return chalk.fsRef != "" and ResourceCert notin chalk.resourceType
 
 proc canVerifyBySigStore*(chalk: ChalkObj): bool =
   return (
-    isCosignInstalled() and
     ResourceImage     in    chalk.resourceType and
     ResourceContainer notin chalk.resourceType and
     len(chalk.repos)  >     0
   )
 
-template withCosignPassword(password: string, code: untyped) =
-  putEnv("COSIGN_PASSWORD", password)
-  trace("Adding COSIGN_PASSWORD to env")
-  try:
-    code
-  finally:
-    delEnv("COSIGN_PASSWORD")
-    trace("Removed COSIGN_PASSWORD from env")
-
-template withCosignKey*(key: AttestationKey, code: untyped) =
-  if key.tmpPath == "":
-    key.tmpPath = getNewTempDir()
-    var wrotePrivateKey, wrotePublicKey = true
-    if key.privateKey != "":
-      wrotePrivateKey = tryToWriteFile(key.tmpPath / "chalk.key", key.privateKey)
-    if key.publicKey != "":
-      wrotePublicKey = tryToWriteFile(key.tmpPath / "chalk.pub", key.publicKey)
-    if not (wrotePrivateKey and wrotePublicKey):
-      error("Cannot write to temporary directory; sign and verify " &
-            "will not work this run.")
-      key.tmpPath = ""
-
-  withWorkingDir(key.tmpPath):
-    if key.password != "":
-      withCosignPassword(key.password):
-        code
-    else:
-      code
-
-proc signBlob*(self: AttestationKey, blob: string, tlog: bool): string =
-  let
-    cosign    = getCosignLocation()
-    # in cosign 3 bundle is required
-    useBundle = getCosignVersion() >= parseVersion("3")
-  var
-    bundle = ""
-    args   = @["sign-blob",
-               "--tlog-upload=" & $tlog,
-               "--yes",
-               "--key=chalk.key",
-               "-"]
-  if useBundle:
-    let (stream, path) = getNewTempFile(suffix = "bundle.json")
-    stream.close() # release fd so that cosign can write to it
-    bundle = path
-    args.add("--bundle=" & path)
-
-  trace("signing blob: '" & blob & "'")
-  trace("cosign " & args.join(" "))
-  let
-    cmd = runCmdGetEverything(cosign, args, blob)
-    err = cmd.getStderr()
-
-  if cmd.getExit() != 0:
-    raise newException(ValueError, err)
-
-  if not useBundle:
-    result = cmd.getStdout().strip()
-  else:
-    let bundleData = tryToLoadFile(bundle)
-    if bundleData == "":
-      raise newException(
-        ValueError,
-        "Cosign error: empty signed bundle file"
-      )
-    let bundleJson = parseJson(bundleData)
-    if bundleJson.kind != JObject:
-      raise newException(
-        ValueError,
-        "Cosign error: bundle is not a json object"
-      )
-    trace(bundleJson.pretty())
-    result = bundleJson{"messageSignature"}{"signature"}.getStr()
-
-  if result == "":
-    raise newException(ValueError, "empty signature. stderr: " & err)
-  trace("cosign signature: " & result)
-
 proc isValid*(self: AttestationKey): bool =
-  self.withCosignKey:
-    let
-      cosign   = getCosignLocation()
-      toSign   = "Test string for signing"
-    var sig    = ""
-    try:
-      sig = self.signBlob(toSign, tlog = false)
-    except:
-      error("Could not sign; either password is wrong, or key is invalid: " & getCurrentExceptionMsg())
-      return false
+  let toSign = "Test string for signing"
+  var sig    = ""
 
-    info("Test sign successful.")
+  try:
+    sig = self.sign(toSign)
+    trace("attestation: test sign successful.")
+  except:
+    error("attestation: could not sign; either password is wrong, or key is invalid: " & getCurrentExceptionMsg())
+    return false
 
-    let
-      vfyArgs = @["verify-blob",
-                  "--key=chalk.pub",
-                  "--insecure-ignore-tlog=true",
-                  "--insecure-ignore-sct=true",
-                  "--signature=" & sig,
-                  "-"]
-      vfyOut  = runCmdGetEverything(cosign, vfyArgs, toSign)
+  if not self.verify(toSign, sig):
+    error("attestation: could not validate; public key is invalid.")
+    return false
+  trace("attestation: test verify successful.")
 
-    if vfyOut.getExit() != 0:
-      error("Could not validate; public key is invalid.")
-      return false
-
-    info("Test verify successful.")
-
-    return true
+  return true
 
 proc getChalkPassword*(): string =
   if not existsEnv("CHALK_PASSWORD"):
@@ -226,11 +304,11 @@ proc normalizeKeyPath(path: string): tuple[publicKey: string, privateKey: string
     (dir, name, _) = resolved.splitFile()
     publicKey      = dir / name & ".pub"
     privateKey     = dir / name & ".key"
-  trace("Cosign public attestion keys path: " & publicKey)
-  trace("Cosign private attestion keys path: " & privateKey)
+  trace("attestation public attestion keys path: " & publicKey)
+  trace("attestation private attestion keys path: " & privateKey)
   return (publicKey, privateKey)
 
-proc getCosignKeyFromDisk*(path: string, password = ""): AttestationKey =
+proc getAttestationKeyFromDisk*(path: string, password = ""): AttestationKey =
   let
     pass       = if password != "": password else: getChalkPassword()
     paths      = normalizeKeyPath(path)
@@ -238,9 +316,9 @@ proc getCosignKeyFromDisk*(path: string, password = ""): AttestationKey =
     privateKey = tryToLoadFile(paths.privateKey)
 
   if publicKey == "":
-    raise newException(ValueError, "Unable to read cosign public key @" & paths.publicKey)
+    raise newException(ValueError, "Unable to read attestation public key @" & paths.publicKey)
   if privateKey == "":
-    raise newException(ValueError, "Unable to read cosign private key @" & paths.privateKey)
+    raise newException(ValueError, "Unable to read attestation private key @" & paths.privateKey)
 
   return AttestationKey(
     password:   pass,
@@ -248,24 +326,20 @@ proc getCosignKeyFromDisk*(path: string, password = ""): AttestationKey =
     privateKey: privateKey,
   )
 
-proc mintCosignKey*(path: string): AttestationKey =
+proc mintAttestationKeyToDisk*(path: string): AttestationKey =
   let
-    password       = randString(16).encode(safe = true)
-    (dir, name, _) = path.splitFile()
-    paths          = normalizeKeyPath(path)
-    keyCmd         = @["generate-key-pair", "--output-key-prefix", dir / name]
+    (dir, _, _) = path.splitFile()
+    paths       = normalizeKeyPath(path)
 
   if not dir.dirExists():
     dir.createDir()
-
   if paths.publicKey.fileExists():
     raise newException(ValueError, paths.publicKey & ": already exists. Remove to generate new key.")
   if paths.privateKey.fileExists():
     raise newException(ValueError, paths.privateKey & ": already exists. Remove to generate new key.")
 
-  withCosignPassword(password):
-    let results = runCmdGetEverything(getCosignLocation(), keyCmd)
-    if results.getExit() != 0:
-      raise newException(ValueError, "Could not mint cosign key: " & getCurrentExceptionMsg())
-
-    return getCosignKeyFromDisk(path, password = password)
+  result = mintKey()
+  if not tryToWriteFile(paths.publicKey, result.publicKey):
+    raise newException(ValueError, paths.publicKey & ": could not save public key.")
+  if not tryToWriteFile(paths.privateKey, result.privateKey):
+    raise newException(ValueError, paths.publicKey & ": could not save private key.")

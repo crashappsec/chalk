@@ -151,6 +151,7 @@ services:
     volumes:
       - $PWD:$PWD
       - $HOME/.pdbrc.py:/root/.pdbrc.py
+      - $HOME/.docker/config.json:/root/.docker/config.json.host
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/docker/certs.d:/etc/docker/certs.d
       - /etc/buildkit:/etc/buildkit
@@ -178,6 +179,7 @@ services:
         condition: service_healthy
     environment:
       AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCOUNT_ID: ${AWS_ACCOUNT_ID:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
       AWS_PROFILE: ${AWS_PROFILE:-}
@@ -186,9 +188,11 @@ services:
       DOCKER_GIT_CONTEXT_TOKEN_REPO: ${DOCKER_GIT_CONTEXT_TOKEN_REPO:-}
       GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      DOCKER_HUB_TOKEN: ${DOCKER_HUB_TOKEN:-}
       IP: ${IP:-} # host IP for docker registry tests
       SSH_KEY: ${SSH_KEY:-}
       STRACE: ${STRACE:-}
+      CI: ${CI:-}
 
   # --------------------------------------------------------------------------
   # MISC DEPS

@@ -18,10 +18,14 @@ import pytest
 
 from .chalk.runner import Chalk, ChalkMark, ChalkProgram
 from .conf import (
+    AWS_ECR_REPO,
     CONFIGS,
+    DOCKER_HUB_REPO,
     DOCKERFILES,
     DOCKER_SSH_REPO,
     DOCKER_TOKEN_REPO,
+    GHCR_REPO,
+    IP,
     MAGIC,
     MARKS,
     REGISTRY,
@@ -29,7 +33,9 @@ from .conf import (
     REGISTRY_TLS,
     REGISTRY_TLS_INSECURE,
     TESTS,
+    aws_secrets_configured,
 )
+from .utils.cosign import Cosign
 from .utils.dict import (
     ANY,
     MISSING,
@@ -188,7 +194,7 @@ def test_build(
                     "http": False,
                     "secure": True,
                     "insecure": False,
-                    "auth": False,
+                    "auth": bool,
                     "www_auth": True,
                 }
                 # without empty builder, docker hub should be used as there is no proxy config anymore
@@ -274,17 +280,19 @@ def test_docker_context(chalk: Chalk, tmp_data_dir: Path):
 @pytest.mark.parametrize("buildx", [True, False])
 @pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
 def test_multiple_tags(
-    chalk: Chalk,
+    chalk_copy: Chalk,
     dockerfile: Path,
     random_hex: str,
     buildx: bool,
+    cosign: Cosign,
 ):
+    chalk_copy.setup(cosign=cosign)
     tags = [
         f"{REGISTRY}/{random_hex}-1",
         f"{REGISTRY}/{random_hex}-1:foo",
         f"{REGISTRY}/{random_hex}-2",
     ]
-    image_id, build = chalk.docker_build(
+    image_id, build = chalk_copy.docker_build(
         dockerfile=dockerfile / "Dockerfile",
         tags=tags,
         config=CONFIGS / "docker_wrap.c4m",
@@ -296,7 +304,7 @@ def test_multiple_tags(
         run_docker=False,
     )
     assert image_id
-    assert build.mark.has(
+    assert build.mark.lifted.has(
         _REPO_TAGS={
             REGISTRY: {
                 f"{random_hex}-1": {
@@ -307,12 +315,18 @@ def test_multiple_tags(
                     "latest": ANY,
                 },
             },
-        }
+        },
+        INJECTOR_PUBLIC_KEY=cosign.public,
+        # each repo in the registry should have dedicated signature
+        _SIGNATURES=Length(2),
     )
 
     # ensure all tags are pushed
     for tag in tags:
         assert Docker.pull(tag)
+
+    # check that chalk signs with cosign compatible key
+    assert cosign.verify(tags[0])
 
 
 @pytest.mark.parametrize("buildkit", [True, False])
@@ -1329,15 +1343,58 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
 
 
 @pytest.mark.parametrize(
-    "registry, push, buildkit, buildx",
+    "registry, name, tag, push, buildkit, buildx",
     [
-        (REGISTRY, True, True, False),  # non-buildx does not support --push
-        (REGISTRY, False, True, False),
-        (REGISTRY, False, False, False),
-        (REGISTRY_TLS, True, True, False),
-        (REGISTRY_TLS_INSECURE, True, True, False),
-        (REGISTRY_TLS, True, True, True),
-        (REGISTRY_TLS_INSECURE, True, True, True),
+        (
+            REGISTRY,
+            "",
+            "latest",
+            True,
+            True,
+            False,
+        ),  # non-buildx does not support --push
+        (REGISTRY, "", "latest", False, True, False),
+        (REGISTRY, "", "latest", False, False, False),
+        (REGISTRY_TLS, "", "latest", True, True, False),
+        (REGISTRY_TLS_INSECURE, "", "latest", True, True, False),
+        (REGISTRY_TLS, "", "latest", True, True, True),
+        (REGISTRY_TLS_INSECURE, "", "latest", True, True, True),
+        pytest.param(
+            AWS_ECR_REPO,
+            "chalk-tests",
+            "latest",
+            True,
+            True,
+            True,
+            marks=pytest.mark.skipif(
+                not aws_secrets_configured() or not AWS_ECR_REPO,
+                reason="AWS secrets not configured",
+            ),
+        ),
+        pytest.param(
+            "ghcr.io",
+            GHCR_REPO,
+            "registry-push",
+            True,
+            True,
+            True,
+            marks=pytest.mark.skipif(
+                not os.environ.get("GITHUB_TOKEN"),
+                reason="GITHUB_TOKEN is required",
+            ),
+        ),
+        pytest.param(
+            "registry-1.docker.io",
+            DOCKER_HUB_REPO,
+            "latest",
+            True,
+            True,
+            True,
+            marks=pytest.mark.skipif(
+                not os.environ.get("DOCKER_HUB_TOKEN"),
+                reason="DOCKER_HUB_TOKEN is required",
+            ),
+        ),
     ],
 )
 @pytest.mark.parametrize(
@@ -1351,17 +1408,23 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     reason="Skipping local docker push on mac due to issues https://github.com/docker/for-mac/issues/6704",
 )
 def test_build_and_push(
-    chalk: Chalk,
+    chalk_copy: Chalk,
     registry: str,
+    name: str,
+    tag: str,
     test_file: str,
     random_hex: str,
     push: bool,
     buildkit: bool,
     buildx: bool,
+    cosign: Cosign,
 ):
-    name = f"{test_file}_{random_hex}"
-    tag_base = f"{registry}/{name}"
-    tag = f"{tag_base}:latest"
+    chalk_copy.setup(cosign=cosign)
+
+    name = name or f"{test_file}_{random_hex}"
+    repo = f"{registry}/{name}"
+    tag = tag or "latest"
+    full = f"{repo}:{tag}"
     env = {
         "CI": "true",
         "GITHUB_SHA": "abc",
@@ -1370,39 +1433,52 @@ def test_build_and_push(
         "GITHUB_ACTOR": "octocat",
     }
 
-    image_id, build_result = chalk.docker_build(
+    image_id, build_result = chalk_copy.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         buildkit=buildkit,
         buildx=buildx,
-        tag=tag,
+        tag=full,
         push=push,
-        run_docker=buildkit,  # legacy builder doesnt allow to build empty image
+        # legacy builder doesnt allow to build empty image
+        # and some registries (ECR) doesnt allow to push images without layers
+        run_docker=buildkit and registry.startswith(IP),
         env=env,
     )
 
     push_result = build_result
     # if without --push at build time, explicitly push to registry
     if not push:
-        assert build_result.mark.has(
+        assert build_result.mark.lifted.has(
             _IMAGE_LAYERS=MISSING,
+            _SIGNATURES=MISSING,
         )
-        push_result = chalk.docker_push(tag, buildkit=buildkit, env=env)
+        push_result = chalk_copy.docker_push(full, buildkit=buildkit, env=env)
 
     image_digest, _ = Docker.with_image_digest(build_result)
 
-    assert build_result.mark.has(
+    signatures = [
+        {
+            "payload": str,
+            "payloadType": "application/vnd.in-toto+json",
+            "signatures": [
+                {"sig": str},
+            ],
+        }
+    ]
+
+    assert build_result.mark.lifted.has(
         CHALK_ID=ANY,
         # primary key needed to associate build+push
         METADATA_ID=ANY,
         METADATA_HASH=ANY,
         _CURRENT_HASH=image_id,
         _IMAGE_ID=image_id,
-        DOCKER_TAGS=[tag],
+        DOCKER_TAGS=[full],
         _REPO_TAGS=(
             {
                 registry: {
                     name: {
-                        "latest": image_digest,
+                        tag: image_digest,
                     }
                 }
             }
@@ -1418,9 +1494,11 @@ def test_build_and_push(
             if push
             else MISSING
         ),
+        INJECTOR_PUBLIC_KEY=cosign.public,
+        _SIGNATURES=signatures if push else MISSING,
     )
 
-    assert push_result.mark.has(
+    assert push_result.mark.lifted.has(
         CHALK_ID=build_result.mark["CHALK_ID"],
         METADATA_ID=build_result.mark["METADATA_ID"],
         METADATA_HASH=build_result.mark["METADATA_HASH"],
@@ -1432,9 +1510,11 @@ def test_build_and_push(
             }
         },
         _IMAGE_LAYERS=Length(1, operator.ge),
+        INJECTOR_PUBLIC_KEY=cosign.public,
+        _SIGNATURES=signatures,
     )
 
-    pull = chalk.docker_pull(tag)
+    pull = chalk_copy.docker_pull(full)
     assert pull.find("Digest:") == f"sha256:{image_digest}"
 
 
@@ -1861,13 +1941,15 @@ def test_git_context(
 
 # extract on image id, and image name, running container id + container name, exited container id + container name
 def test_extract(chalk: Chalk, random_hex: str):
-    tag = f"test_image_{random_hex}"
+    name = f"test_image_{random_hex}"
+    tag = f"{REGISTRY}/{name}"
     container_name = f"test_container_{random_hex}"
 
     # build test image
     image_id, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
         tag=tag,
+        push=True,
     )
 
     # extract chalk from image id and image name
@@ -1885,16 +1967,40 @@ def test_extract(chalk: Chalk, random_hex: str):
             "_OP_ARTIFACT_TYPE": "Docker Image",
             "_IMAGE_ID": image_id,
             "_CURRENT_HASH": image_id,
-            "_REPO_TAGS": MISSING,
+            "_REPO_TAGS": {
+                REGISTRY: {
+                    name: {
+                        "latest": str,
+                    }
+                }
+            },
         }
     )
 
     extract_by_id = chalk.extract(image_id[:12])
     assert extract_by_id.report.contains(extract_by_name.report.deterministic())
 
+    Docker.remove_images([tag])
+
+    extract_registry = chalk.extract(tag)
+    # registry cant retrieve identical metadata as from local image
+    # hence cant assert all chalkmark keys
+    assert extract_registry.mark.contains(
+        {
+            "_OP_ARTIFACT_TYPE": "Docker Image",
+            "_IMAGE_ID": image_id,
+            "_CURRENT_HASH": image_id,
+            "_REPO_DIGESTS": {
+                REGISTRY: {
+                    name: ANY,
+                }
+            },
+        }
+    )
+
     # run container and keep alive via tail
     container_id, _ = Docker.run(
-        image_id,
+        tag,
         name=container_name,
         entrypoint="tail",
         params=["-f", "/dev/null"],

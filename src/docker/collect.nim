@@ -337,10 +337,15 @@ proc collectLocalImage*(chalk: ChalkObj,
   chalk.collectSBOM()
 
 proc collectImageManifest*(chalk: ChalkObj,
-                           name: DockerImage,
-                           repos: seq[DockerImage] = @[]) =
+                           name:  DockerImage,
+                           repos: seq[DockerImage] = @[],
+                           ifManySystemPlatform    = false) =
   let
-    manifest = fetchImageManifest(name, chalk.platform)
+    manifest = fetchImageManifest(
+      name,
+      chalk.platform,
+      ifManySystemPlatform = ifManySystemPlatform,
+    )
     contents = manifest.config.json
     allrepos = @[
       name.withDigest(manifest.digest),
@@ -350,8 +355,11 @@ proc collectImageManifest*(chalk: ChalkObj,
   chalk.collectSBOM()
 
 proc collectImage*(chalk: ChalkObj,
-                   name: DockerImage,
-                   repos: seq[DockerImage] = @[]) =
+                   name:  DockerImage,
+                   repos: seq[DockerImage] = @[],
+                   collectFromManifest     = true,
+                   ifManySystemPlatform    = false,
+                   ) =
   try:
     trace("docker: collecting image locally " & $name)
     # pass the tagged name to repos as otherwise the tag can be dropped
@@ -363,10 +371,20 @@ proc collectImage*(chalk: ChalkObj,
     # hence only nginx:latest is going to be collected as the tag.
     # By passing tagged name to the repos it allows to match both tags
     # in the registry and report both tags
-    chalk.collectLocalImage(name.asRepoRef(), repos = @[name] & repos)
+    chalk.collectLocalImage(
+      name.asRepoRef(),
+      repos = @[name] & repos,
+    )
   except:
-    trace("docker: collecting image falling back to manifest due to: " & getCurrentExceptionMsg())
-    chalk.collectImageManifest(name, repos = repos)
+    if collectFromManifest:
+      trace("docker: collecting image falling back to manifest due to: " & getCurrentExceptionMsg())
+      chalk.collectImageManifest(
+        name,
+        repos                = repos,
+        ifManySystemPlatform = ifManySystemPlatform,
+      )
+    else:
+      raise
 
 proc collectContainer*(chalk: ChalkObj, name: string) =
   let

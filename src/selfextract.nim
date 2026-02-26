@@ -257,7 +257,6 @@ proc testConfigFile(newCon4m: string,
                addConfLoad(baseConfName,      toStream(baseConfig)).
                setErrorHandler(newConfFileError).
                addConfLoad(ioConfName,        toStream(ioConfig)).
-               addConfLoad(attestConfName,    toStream(attestConfig)).
                addConfLoad(sbomConfName,      toStream(sbomConfig)).
                addConfLoad(sastConfName,      toStream(sastConfig)).
                addConfLoad(secretsConfName,   toStream(secretsConfig)).
@@ -307,10 +306,11 @@ const nocache = [getoptConfName,
                  sbomConfName,
                  sastConfName,
                  ioConfName,
-                 attestConfName,
                  defCfgFname,
                  coConfName,
-                 embeddedConfName]
+                 embeddedConfName,
+                 secretsConfName,
+                ]
 
 proc handleConfigLoadAll*(inpath: string): bool =
   info("Replacing all chalk configuration from " & inpath)

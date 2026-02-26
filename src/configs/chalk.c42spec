@@ -1378,7 +1378,7 @@ attestation_key_types := ["embed", "get"]
 singleton attestation {
   user_def_ok:   true
   doc:           """
-Attestation allows chalk to sign artifacts (via cosign) which embeds the
+Attestation allows chalk to sign artifacts which embeds the
 signature into the chalk mark, which allows validation of the signature by
 extracting the chalk mark later.
 
@@ -1699,24 +1699,10 @@ for chalk marks on images, particularly since extracting large docker
 images to look for marks in the top layer isn't necessarily fast.
 
 If you have code signing set up, marks will be added locally on build,
-but when you push, we will add a signed attestation using the In Toto
-standard (and the Cosign tool for the moment).  Such marks are MUCH
-faster to access reliably and are the preferred method. See the `chalk
-setup` command.
-
+but when you push, we will add a signed attestation using the Sigstore
+standard.  Such marks are MUCH faster to access reliably and are the
+preferred method. See the `chalk setup` command.
 """
-
-  field ignore_unsigned_images {
-    type:    bool
-    default: false
-    shortdoc: "Ignore unsigned images"
-    doc: """
-When running a scan of all images, if this is `true`, Chalk only will try to extract Chalk marks from locally stored images if the image has a Chalk signature added via cosign attestations.
-
-By default we skip unsigned images, because the process (necessarily) involves downloading the container image.
-"""
-  }
-
 }
 
 singleton docker {
@@ -3502,32 +3488,10 @@ If neither is provided, you may very well end up with `/tmp` or
     default:  true
     shortdoc: "Always sign"
     doc:      """
-When true, Chalk will attempt to use Cosign to sign *all* artifacts
-when chalking.
+When true, Chalk will attempt to sign *all* artifacts when chalking.
 
 Even if this is false, Chalk will try to sign if either the chalking
 template or the reporting template have SIGNATURE set.
-"""
-  }
-
-  field inform_if_cant_sign {
-    type: bool
-    default: false
-    shortdoc: "Inform if we can't sign"
-    doc: """
-If true, when code signing is on, but Chalk cannot find a passphrase in
-its environment, this will cause an info-level message to be logged.
-"""
-  }
-
-  field use_transparency_log {
-    type:     bool
-    default:  false
-    shortdoc: "Use transparency logging"
-    doc: """
-When this is true, digital signings will get published to a
-transparency log, and extracts from container images will attempt to
-validate in the transparency log.
 """
   }
 

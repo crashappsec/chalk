@@ -12,6 +12,29 @@ import std/[
 
 export json
 
+proc assertIs*(self: JsonNode,
+               kind: JsonNodeKind,
+               msg = "JsonNode kind doesnt match expected",
+               ): JsonNode {.discardable.} =
+  if self == nil:
+    raise newException(
+      ValueError,
+      msg & ": nil"
+    )
+  if self.kind != kind:
+    raise newException(
+      ValueError,
+      msg & ": " & $self.kind & " != " & $kind
+    )
+  return self
+
+proc assertHasLen*(self: JsonNode,
+                   msg = "JsonNode len() == 0",
+                   ): JsonNode {.discardable.} =
+  if len(self) == 0:
+    raise newException(ValueError, msg)
+  return self
+
 proc update*(self: JsonNode, other: JsonNode): JsonNode {.discardable.} =
   if self == nil:
     return other
