@@ -2913,7 +2913,7 @@ entry point.
 
 keyspec _PROCESS_DETAIL {
     kind:             RunTimeArtifact
-    type:             dict[string, string]
+    type:             dict[string, `x]
     standard:         true
     since:            "0.1.0"
     shortdoc:         "All process detail for exec operation"
@@ -2921,12 +2921,11 @@ keyspec _PROCESS_DETAIL {
 Collects key process info; the same info as in `_OP_ALL_PS_INFO`, but
 only for the given process.
 
-This overlaps with many of the other keys beginning with `_PROCESS`.
+This overlaps with many of the other keys beginning with `_PROCESS`
+but allows to get all data in one value.
 
-If you use this key, then the only such keys that do not overlap are:
-``` _PROCESS_FD_INFO _PROCESS_MOUNT_INFO ``` Currently, this is only
-available during a `chalk exec` operation, where Chalk has been
-configured to report when spawning the container entry point.
+Currently, this is only available during a `chalk exec` operation, where Chalk
+has been configured to report when spawning the container entry point.
 """
 }
 
@@ -3207,21 +3206,20 @@ entry point.
 
 keyspec _PROCESS_FD_INFO {
     kind:             RunTimeArtifact
-    type:             dict[string, dict[string, string]]
+    type:             dict[string, dict[string, `x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Info on file descriptors of exec'd process"
     doc: """
 Returns information for all file descriptors in the process.
-Keys are file descriptor numbers, but encoded as a string.
-
-Values are dictionaries of info that vary based on the file type.
+Keys are file descriptor numbers. Values are dictionaries of info that vary
+based on the file type.
 """
 }
 
 keyspec _PROCESS_MOUNT_INFO {
     kind:             RunTimeArtifact
-    type:             list[list[string]]
+    type:             list[dict[string, `x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Mount info reported for exec'd process"
@@ -5196,6 +5194,18 @@ be inserted into chalk marks, but will have the same value as the
 """
 }
 
+keyspec _OP_ANCESTOR_ARGVS {
+    kind:           RunTimeHost
+    type:           list[list[string]]
+    standard:       true
+    since:          "0.6.9"
+    shortdoc: "Command-line arguments of op ancestor processes"
+    doc:              """
+This field contains the full contents of the command line arguments
+used to invoke `chalk` for all ancestor processes.
+"""
+}
+
 keyspec _OP_CONFIG {
     kind:             RunTimeHost
     type:             string
@@ -5426,7 +5436,7 @@ where the full contents are not being duplicated.
 
 keyspec _OP_TCP_SOCKET_INFO {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             list[list[`x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local TCP socket info during run-time exec op"
@@ -5451,7 +5461,7 @@ virtualized view available insider the container.
 
 keyspec _OP_UDP_SOCKET_INFO {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             list[list[`x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local UDP socket info during run-time exec op"
@@ -5475,7 +5485,7 @@ virtualized view available insider the container.
 
 keyspec _OP_IPV4_ROUTES {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             list[list[`x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local IPV4 routes during run-time exec op"
@@ -5504,9 +5514,9 @@ virtualized view available insider the container.
 
 keyspec _OP_IPV6_ROUTES {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             list[list[`x]]
     standard:         true
-    shortdoc: "Local IPV6 routes during run-time exec op"
+    shortdoc:         "Local IPV6 routes during run-time exec op"
     since:            "0.1.0"
     doc: """
 On Linux machines, will return IPV6 routing table information, to the
@@ -5515,9 +5525,9 @@ information.
 
 One route is returned per row.  The columns returned are:
 1. The destination network
-2. The destination prefix length in hex
+2. The destination prefix length
 3. The source network
-4. The source prefix length in hex
+4. The source prefix length
 5. The next hop (gateway address)
 6. The interface (device) associated with the route
 7. The kernel's 'Flags' field
@@ -5532,17 +5542,16 @@ virtualized view available insider the container.
 
 keyspec _OP_IPV4_INTERFACES {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             dict[string, list[list[int]]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local IPV4 interfaces during run-time exec op"
     doc: """
 On Linux machines, will return information on IPV4 interface status.
 
-One interface is listed per row.  The first column is the interface
-name.
+The keys are interface names.
 
-The next 8 columns are receive statistics:
+The first 8 columns are receive statistics:
 bytes, packets, errors, drops, fifo, frame, compressed, multicast
 
 The remaining columns are transmission statistics:
@@ -5555,19 +5564,18 @@ virtualized view available insider the container.
 
 keyspec _OP_IPV6_INTERFACES {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             dict[string, list[`x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local IPV6 interfaces routes during run-time exec op"
     doc: """
 On Linux machines, will return information on IPV6 interface status.
 
-One interface is listed per row.  The first column is the interface name.
+Keys are interface names. Values consist of:
 
-The remaining columns are:
-
-- The netlink device number in hex
-- The prefix length in hex
+- Interface IP
+- The netlink device number
+- The prefix length
 - The kernel's 'Scope value' (see include/net/ipv6.h)
 - The kernel's 'Interface flags' (see include/linux/rtnetlink.h')
 
@@ -5578,7 +5586,7 @@ virtualized view available insider the container.
 
 keyspec _OP_ARP_TABLE {
     kind:             RunTimeHost
-    type:             list[list[string]]
+    type:             list[list[`x]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Local ARP table during run-time exec op"

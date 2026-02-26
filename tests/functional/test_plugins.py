@@ -24,7 +24,7 @@ from .conf import (
     REPO,
     aws_secrets_configured,
 )
-from .utils.dict import ANY, MISSING, Contains, ContainsDict, ContainsList
+from .utils.dict import ANY, MISSING, Contains, ContainsDict, ContainsList, IfExists
 from .utils.docker import Docker
 from .utils.git import Git
 from .utils.log import get_logger
@@ -37,7 +37,11 @@ logger = get_logger()
 @pytest.mark.flaky(max_runs=5)
 @pytest.mark.exclusive
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
-def test_network(copy_files: list[Path], chalk: Chalk):
+def test_network(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_imds: str,
+):
     bin_path = copy_files[0]
     insert = chalk.insert(bin_path, config=CONFIGS / "netstats.c4m")
     assert insert.report.has(
@@ -50,12 +54,12 @@ def test_network(copy_files: list[Path], chalk: Chalk):
                 ContainsList(
                     [
                         str,
-                        str,  # port
+                        int,  # port
                         str,  # ip
-                        str,  # port
+                        int,  # port
                         "LISTEN",
-                        str,  # uid
-                        str,  # inode
+                        int,  # uid
+                        int,  # inode
                     ]
                 )
             ]
@@ -65,15 +69,103 @@ def test_network(copy_files: list[Path], chalk: Chalk):
                 ContainsList(
                     [
                         str,  # ip
-                        str,  # port
+                        int,  # port
                         str,  # ip
-                        str,  # port
+                        int,  # port
                         "UNCONN",
-                        str,  # uid
-                        str,  # inode
+                        int,  # uid
+                        int,  # inode
                     ]
                 )
             ]
+        ),
+        _OP_IPV4_INTERFACES={
+            "eth0": [
+                # receive
+                [
+                    int,  # bytes
+                    int,  # packets
+                    int,  # errors
+                    int,  # drops
+                    int,  # fifo
+                    int,  # frame
+                    int,  # compressed
+                    int,  # multicast
+                ],
+                # transmit
+                [
+                    int,  # bytes
+                    int,  # packets
+                    int,  # errors
+                    int,  # drops
+                    int,  # fifo
+                    int,  # colls
+                    int,  # carrier
+                    int,  # compressed
+                ],
+            ]
+        },
+        _OP_IPV4_ROUTES=Contains(
+            [
+                ContainsList(
+                    [
+                        "0.0.0.0",  # destination
+                        re.compile(r"\d+.\d+.\d+.\d+"),  # gateway
+                        "0.0.0.0",  # mask
+                        re.compile("eth"),  # interface
+                        int,  # flags
+                        int,  # reference count
+                        int,  # use
+                        int,  # metric/priority
+                        int,  # mtu
+                        int,  # window
+                        int,  # irtt
+                    ]
+                )
+            ]
+        ),
+        _OP_IPV6_INTERFACES={
+            "lo": [
+                "0000:0000:0000:0000:0000:0000:0000:0001",  # ip
+                int,  # interface index
+                int,  # prefix
+                int,  # scope
+                int,  # flags
+            ]
+        },
+        _OP_IPV6_ROUTES=Contains(
+            [
+                ContainsList(
+                    [
+                        "0000:0000:0000:0000:0000:0000:0000:0000",  # destination
+                        int,  # destination prefix len
+                        "0000:0000:0000:0000:0000:0000:0000:0000",  # source
+                        int,  # source prefix len
+                        "0000:0000:0000:0000:0000:0000:0000:0000",  # gateway
+                        "lo",  # interface
+                        int,  # flags
+                        int,  # reference count
+                        int,  # use
+                        int,  # metric
+                    ]
+                ),
+            ]
+        ),
+        _OP_ARP_TABLE=IfExists(
+            Contains(
+                [
+                    ContainsList(
+                        [
+                            re.compile(r"\d+\.\d+\.\d+\.\d+"),  # ip
+                            int,  # hw type
+                            int,  # flags
+                            re.compile(r"\w+:\w+:\w+:\w+:\w+:\w+"),  # mac
+                            str,  # mask
+                            re.compile("eth"),  # interface
+                        ]
+                    )
+                ]
+            )
         ),
     )
     assert {i[4] for i in insert.report["_OP_TCP_SOCKET_INFO"]} <= {
