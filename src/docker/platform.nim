@@ -85,8 +85,7 @@ CMD ["cat", "/platforms.json"]
 proc findDockerPlatform*(): DockerPlatform =
   return dockerProbeDefaultPlatforms().getOrDefault("TARGETPLATFORM", getSystemBuildPlatform())
 
-proc findBaseImagePlatform*(ctx: DockerInvocation,
-                            platformFlag = DockerPlatform(nil)): DockerPlatform =
+proc findBaseImagePlatform*(ctx: DockerInvocation): DockerPlatform =
   ## find platform for base image
   ## this can be either:
   ## * explicit platform provided in --platform CLI flag
@@ -96,8 +95,6 @@ proc findBaseImagePlatform*(ctx: DockerInvocation,
   ## * if base image has multiple platforms, we need to pick the
   ##   default host platform by probing one
   trace("docker: looking for base image platform")
-  if platformFlag != nil:
-    return platformFlag
   let baseSection = ctx.getBaseDockerSection()
   if baseSection.platform != nil:
     trace("docker: base image section defines platform")
@@ -266,11 +263,12 @@ proc doesBuilderSupportPlatform*(ctx: DockerInvocation, platform: DockerPlatform
   let info = ctx.getBuilderInfo()
   for line in info.splitLines():
     if line.startsWith("Platforms: "):
-      let platforms = line.split(maxsplit = 1)[1].split(Whitespace + {','})
+      let platforms = line.split(maxsplit = 1)[1].splitAnd(Whitespace + {','})
+      trace("docker: checking if builder can build " & $platform & ". " &
+            "It supports: " & $platforms)
       for p in platforms:
-        if p != "":
-          if parseDockerPlatform(p) == platform:
-            return true
+        if parseDockerPlatform(p) == platform:
+          return true
       return false
   raise newException(
     ValueError,

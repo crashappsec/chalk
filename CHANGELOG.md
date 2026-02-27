@@ -15,7 +15,7 @@
   encrypted format keys. Previously generated keys are also fully supported.
   ([#619](https://github.com/crashappsec/chalk/pull/619))
 
-## New Features
+### New Features
 
 - All chalk attestations now use [OCI Image and Distribution] 1.1 spec.
   This means chalk's attestations are compatible with other
@@ -45,6 +45,17 @@
   This is useful to validate validity of the attestation of the image
   without needing to pull it locally.
   ([#619](https://github.com/crashappsec/chalk/pull/619))
+- `--log-format` CLI argument to match `log_format` configuration.
+  ([#628](https://github.com/crashappsec/chalk/pull/628))
+
+### Fixes
+
+- For single architecture docker builds limit use of `TARGETPLATFORM`
+  in wrapped `Dockerfile`. When `--platform` is provided in the `Dockerfile`
+  which does not match host platform, `docker` does not pass correct
+  value to `TARGETPLATFORM` which causes wrapping failure.
+  See https://github.com/moby/buildkit/issues/6518 for more details.
+  ([#628](https://github.com/crashappsec/chalk/pull/628))
 
 ## 0.6.8
 

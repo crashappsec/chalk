@@ -322,9 +322,10 @@ class Docker:
         return [ContainsDict(i) for i in run(["docker", "inspect", name]).json()]
 
     @staticmethod
-    def all_images() -> list[str]:
+    def all_images(only_id=True) -> list[str]:
         return run(
-            ["docker", "image", "ls", "-a", "--format", "{{ .ID }}"],
+            ["docker", "image", "ls", "-a"]
+            + (["--format", "{{ .ID }}"] if only_id else []),
             log_level="debug",
         ).text.splitlines()
 

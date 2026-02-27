@@ -745,6 +745,12 @@ class Chalk:
                     show_config=show_config,
                 )
             )
+            if "--load" in params:
+                try:
+                    Docker.inspect(image_hash)[0]
+                except:
+                    Docker.all_images(only_id=False)
+                    raise
         if expecting_report and expected_success and image_hash:
             assert result.report.has(_VIRTUAL=IfExists(virtual))
             if platforms:

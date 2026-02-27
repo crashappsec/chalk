@@ -344,7 +344,7 @@ proc setMetadataFile(ctx: DockerInvocation) =
 
 proc readIidFile(ctx: DockerInvocation) =
   ctx.iidFile = tryToLoadFile(ctx.iidFilePath).extractDockerHash()
-  trace("docker: --iddfile: " & ctx.iidFile)
+  trace("docker: --iidfile: " & ctx.iidFile)
 
 proc tryParseMetadataFile(data: string): JsonNode =
   try:

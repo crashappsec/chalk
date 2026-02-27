@@ -234,6 +234,28 @@ def test_build(
     )
 
 
+def test_build_platform(
+    chalk_copy: Chalk,
+    random_hex: str,
+    server_http: str,
+):
+    chalk_copy.binary.rename("chalk")
+    _, build = chalk_copy.docker_build(
+        cwd=DOCKERFILES / "valid" / "from_platform",
+        tag=f"{REGISTRY}/{random_hex}",
+        buildx=True,
+        push=True,
+        config=CONFIGS / "docker_wrap.c4m",
+        env={
+            # for downloading arm chalk binary
+            "CHALK_SERVER": server_http,
+            # to isolate downloaded binaries
+            "CHALK_TMP": f"/tmp/{random_hex}",
+        },
+    )
+    assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
+
+
 @pytest.mark.parametrize("buildkit", [True, False])
 def test_scratch(chalk: Chalk, buildkit: bool):
     _, build = chalk.docker_build(

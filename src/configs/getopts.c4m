@@ -60,6 +60,14 @@ Sets the console log-level to the specified value, controlling what logs are out
 """
   }
 
+  flag_choice log_format {
+    choices:      ["auto", "json", "plain"]
+    field_to_set: "log_format"
+    doc: """
+Sets the console log-format.
+"""
+  }
+
   flag_arg config_file {
     aliases:  ["f"]
     callback: func set_config_file

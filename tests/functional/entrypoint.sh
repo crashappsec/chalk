@@ -68,9 +68,9 @@ fi
 (
     set -x
     docker info
+    docker buildx inspect --bootstrap $insecure_builder
+    docker buildx inspect --bootstrap $empty_builder
     docker buildx ls
-    docker buildx inspect $insecure_builder
-    docker buildx inspect $empty_builder
 )
 
 if [ -f "$HOME/.docker/config.json.host" ]; then

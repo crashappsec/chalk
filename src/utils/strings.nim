@@ -72,6 +72,24 @@ proc strip*(items: seq[string],
   for i in items:
     result.add(i.strip(leading = leading, trailing = trailing, chars = chars))
 
+proc splitAnd*(data:       string,
+               seps      = Whitespace,
+               keepEmpty = false,
+               strip     = true,
+               ): seq[string] =
+  result = @[]
+  for i in data.split(seps):
+    let item =
+      if strip:
+        i.strip()
+      else:
+        i
+    if item == "":
+      if keepEmpty:
+        result.add(item)
+    else:
+      result.add(item)
+
 proc splitLinesAnd*(items: string, keepEol = false, keepEmpty = true): seq[string] =
   let lines = items.splitLines(keepEol = keepEol)
   if keepEmpty:

@@ -53,11 +53,12 @@ proc inspectJson(name: string, what: string): JsonNode =
     stdout = output.getStdout().strip()
     stderr = output.getStderr().strip()
   if output.getExit() != 0:
-    raise newException(
-      ValueError,
+    let msg = (
       "cannot inspect " & what & " " & name & " due to: " &
-      stdout & " " & stderr,
+      stdout & " " & stderr
     )
+    trace("docker: " & msg)
+    raise newException(ValueError, msg)
   let json = parseJson(stdout)
   when defined(debug):
     trace(json.pretty())

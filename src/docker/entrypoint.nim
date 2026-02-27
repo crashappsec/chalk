@@ -8,6 +8,7 @@
 ## Utilities for inspecting/fetching/wrapping dockerfile entrypoints
 
 import ".."/[
+  sinks,
   types,
   utils/json,
 ]
@@ -126,7 +127,14 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
   let hasUser = user != "" and user != "root" and user != "0"
   if hasUser:
     toAdd.add("ONBUILD USER 0:0")
-  toAdd.add("""ONBUILD RUN ["/chalk", "--no-use-embedded-config", "--no-use-external-config", "__", "onbuild"]""")
+  toAdd.add("ONBUILD RUN " & $(%*(@[
+    "/chalk",
+    "--no-use-embedded-config",
+    "--no-use-external-config",
+    "--log-format=" & logFormat(),
+    "__",
+    "onbuild",
+  ])))
   if hasUser:
     toAdd.add("ONBUILD USER " & user)
 
@@ -186,6 +194,7 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
       "/chalk",
       "--no-use-embedded-config",
       "--no-use-external-config",
+      "--log-format=" & logFormat(),
     ])
     if getLogLevel() == llTrace:
       postExecCmd.add(%("--log-level=trace"))
