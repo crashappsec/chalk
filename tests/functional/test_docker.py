@@ -50,7 +50,6 @@ from .utils.git import Git
 from .utils.log import get_logger
 from .utils.os import run
 
-
 logger = get_logger()
 
 
@@ -519,11 +518,9 @@ def test_subscan(chalk: Chalk, server_cert: Path, random_hex: str):
         config=CONFIGS / "docker_wrap.c4m",
         tag=random_hex,
         context=server_cert.parent,
-        content=Docker.dockerfile(
-            """
+        content=Docker.dockerfile("""
             FROM alpine
-            """
-        ),
+            """),
     )
     assert build.artifacts_by_path.contains(
         {
@@ -554,12 +551,10 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     _, base = chalk.docker_build(
         config=CONFIGS / "docker_wrap.c4m",
         tag=image,
-        content=Docker.dockerfile(
-            """
+        content=Docker.dockerfile("""
             FROM alpine
             CMD /true
-            """
-        ),
+            """),
         push=True,
         buildx=True,
     )
@@ -578,8 +573,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     )
 
     _, result = chalk.docker_build(
-        content=Docker.dockerfile(
-            f"""
+        content=Docker.dockerfile(f"""
             ARG BASE=seven
 
             FROM alpine as one
@@ -607,8 +601,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
 
             FROM $BASE
             COPY --from=four /usr/sbin/nginx /nginx
-            """
-        ),
+            """),
     )
     assert result.report.has(
         _OP_CHALK_COUNT=1,
@@ -892,13 +885,11 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     "test_file, docker_entrypoint, chalk_entrypoint, cmd, buildkit, buildx, runnable",
     [
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine
                 ENTRYPOINT echo hello
                 CMD echo world
-                """
-            ),
+                """),
             ["/bin/sh", "-c", "echo hello"],
             [
                 "/chalk",
@@ -915,13 +906,11 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             True,  # runnable
         ),
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine
                 ENTRYPOINT ["echo"]
                 CMD ["hello"]
-                """
-            ),
+                """),
             ["echo"],
             ["/chalk", "exec", "--exec-command-name", "echo", "--"],
             ["hello"],
@@ -930,15 +919,13 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             True,  # runnable
         ),
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine as base
                 ENTRYPOINT ["/bin/sh", "-c"]
                 FROM base
                 ENTRYPOINT []
                 CMD ["echo", "hello"]
-                """
-            ),
+                """),
             None,
             ["/chalk", "exec", "--"],
             ["echo", "hello"],
@@ -947,13 +934,11 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             True,  # runnable
         ),
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine
                 ENTRYPOINT
                 CMD ["echo", "hello"]
-            """
-            ),
+            """),
             ["/bin/sh", "-c", ""],
             ["/chalk", "exec", "--exec-command-name", "/bin/sh", "--", "-c", ""],
             ["echo", "hello"],
@@ -962,13 +947,11 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             True,  # runnable
         ),
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine
                 ENTRYPOINT
                 CMD ["echo", "hello"]
-                """
-            ),
+                """),
             None,
             ["/chalk", "exec", "--"],
             ["echo", "hello"],
@@ -977,13 +960,11 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             True,  # runnable
         ),
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine
                 ENTRYPOINT
                 CMD ["echo", "hello"]
-                """
-            ),
+                """),
             ["/bin/sh", "-c", ""],
             ["/chalk", "exec", "--exec-command-name", "/bin/sh", "--", "-c", ""],
             ["echo", "hello"],
@@ -992,13 +973,11 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             True,  # runnable
         ),
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine
                 ENTRYPOINT [""]
                 CMD ["echo", "hello"]
-                """
-            ),
+                """),
             [""],
             ["/chalk", "exec", "--"],
             ["echo", "hello"],
@@ -1007,13 +986,11 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             True,  # runnable
         ),
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine
                 ENTRYPOINT [" "]
                 CMD ["echo", "hello"]
-                """
-            ),
+                """),
             [" "],
             [" "],  # chalk should bail out wrapping known invalid entrypoint
             ["echo", "hello"],
@@ -1022,13 +999,11 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
             False,  # runnable
         ),
         (
-            Docker.dockerfile(
-                """
+            Docker.dockerfile("""
                 FROM alpine
                 ENTRYPOINT ["", ""]
                 CMD ["echo", "hello"]
-                """
-            ),
+                """),
             ["", ""],
             ["", ""],  # same thing. chalk should bail out
             ["echo", "hello"],

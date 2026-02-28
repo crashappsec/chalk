@@ -4,7 +4,6 @@ from pathlib import Path
 from ...utils.log import get_logger
 from .selfsigned import generate_selfsigned_cert
 
-
 logger = get_logger()
 
 

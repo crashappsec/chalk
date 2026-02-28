@@ -11,6 +11,7 @@ LOG_LEVEL
     default logging level for all logs
     should be any of the standard logging levels succh as DEBUG,INFO,etc
 """
+
 import logging
 import logging.config
 import os
@@ -21,7 +22,6 @@ from typing import Any, Iterable, TypedDict, cast
 import _pytest.logging
 import structlog
 import structlog.types
-
 
 __all__ = ("get_logger",)
 
