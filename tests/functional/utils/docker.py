@@ -242,7 +242,9 @@ class Docker:
 
                 def get_sha256(
                     needle: re.Pattern,
-                    ignore_in_between: Optional[list[tuple[str, str]]] = None,
+                    ignore_in_between: Optional[
+                        list[tuple[list[str], list[str]]]
+                    ] = None,
                 ) -> str:
                     ignore_in_between = ignore_in_between or []
                     return build.find(
@@ -254,16 +256,16 @@ class Docker:
                         ignore_in_between=(
                             [
                                 (
-                                    "docker: probing for build platforms",
-                                    "docker: done probing for build platforms",
+                                    ["docker: probing for build platforms"],
+                                    ["docker: done probing for build platforms"],
                                 )
                             ]
                             + (ignore_in_between if is_overlayfs() else [])
                         ),
                     )
 
-                oci = [("exporting to oci image format", "DONE")]
-                docker = [("exporting to image", "DONE")]
+                oci = [(["exporting to oci image format"], ["DONE", "..."])]
+                docker = [(["exporting to image"], ["DONE", "..."])]
                 registry_list_digest = get_sha256(
                     re.compile("exporting manifest list sha256:"),
                     oci,

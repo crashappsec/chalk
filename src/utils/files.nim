@@ -49,6 +49,7 @@ proc replaceFileContents*(fsRef: string, contents: string): bool =
 
   var
     (f, path) = createTempFile(tmpFilePrefix, tmpFileSuffix)
+    oldPath   = path & ".old"
     ctx       = newFileStream(f)
     info: Stat
 
@@ -61,10 +62,14 @@ proc replaceFileContents*(fsRef: string, contents: string): bool =
         # If we can successfully stat the file, we will try to
         # re-apply the same mode bits via chmod after the move.
         let statResult = stat(cstring(fsRef), info)
-        moveFile(fsRef, path & ".old")
+        moveFile(fsRef, oldPath)
         moveFile(path, fsRef)
         if statResult == 0:
           discard chmod(cstring(fsRef), info.st_mode)
+        try:
+          removeFile(oldPath)
+        except:
+          error(fsRef & ": could not remove old pre-wrapped backup file " & oldPath)
       except:
         error("file: " & getCurrentExceptionMsg())
         removeFile(path)
@@ -77,7 +82,7 @@ proc replaceFileContents*(fsRef: string, contents: string): bool =
               "file, but the op failed, and the file could not be replaced. " &
               " It currently is in: " & path & ".old")
         else:
-            error(fsRef & ": Could not write (no permission)")
+            error(fsRef & ": Could not write - " & getCurrentExceptionMsg())
         dumpExOnDebug()
         return false
 

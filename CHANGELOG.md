@@ -66,6 +66,11 @@
   value to `TARGETPLATFORM` which causes wrapping failure.
   See https://github.com/moby/buildkit/issues/6518 for more details.
   ([#628](https://github.com/crashappsec/chalk/pull/628))
+- When replacing a file such as during `chalk insert`,
+  the original pre-wrapped backup is now deleted.
+  Otherwise `/tmp` was accumulating backup files after multiple
+  `insert` commands.
+  ([#633](https://github.com/crashappsec/chalk/issues/633))
 
 ## 0.6.8
 
