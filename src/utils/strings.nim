@@ -39,6 +39,11 @@ proc isUInt*(i: string): bool =
   except:
     return false
 
+proc parseInts*(items: openArray[string]): seq[int] =
+  result = newSeq[int]()
+  for i in items:
+    result.add(parseInt(i.strip()))
+
 proc splitBy*(s: string, sep: string, default: string = ""): (string, string) =
   let parts = s.split(sep, maxsplit = 1)
   if len(parts) == 2:

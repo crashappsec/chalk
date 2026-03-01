@@ -151,11 +151,11 @@ tests: DOCKER=$(_DOCKER) # force rebuilds to use docker to match tests
 tests: $(HOME)/.pdbrc.py
 tests: docker-setup
 tests: $(BINARY) # note this will rebuild chalk if necessary
-	docker compose run --rm tests $(make_args) $(args)
+	CI=true docker compose run --rm tests $(make_args) $(args)
 
 .PHONY: unit-tests
 unit-tests:
-	$(DOCKER) nimble test args='$(args)'
+	CI=true $(DOCKER) nimble test args='$(args)'
 
 .PHONY: parallel
 tests_parallel: make_args=-nauto

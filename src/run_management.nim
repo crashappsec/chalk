@@ -236,7 +236,7 @@ template setIfNotEmpty*[T](o: ChalkDict, k: string, v: T) =
     if not isNil(v):
       setIfNotEmptyBox(o, k, v)
   elif T is JsonNode:
-    if v != nil:
+    if not isNil(v):
       setIfNotEmptyBox(o, k, v.nimJsonToBox())
   elif T is Option:
     if v.isSome():

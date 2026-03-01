@@ -3207,13 +3207,13 @@ entry point.
 
 keyspec _PROCESS_FD_INFO {
     kind:             RunTimeArtifact
-    type:             dict[string, dict[string, string]]
+    type:             dict[int, dict[string, string]]
     standard:         true
     since:            "0.1.0"
     shortdoc: "Info on file descriptors of exec'd process"
     doc: """
 Returns information for all file descriptors in the process.
-Keys are file descriptor numbers, but encoded as a string.
+Keys are file descriptor numbers.
 
 Values are dictionaries of info that vary based on the file type.
 """
