@@ -137,7 +137,7 @@ class Program:
         reverse: bool = False,
         log_level: Optional[Literal["error", "debug"]] = "error",
         default: Optional[str] = None,
-        ignore_in_between: Optional[list[tuple[str, str]]] = None,
+        ignore_in_between: Optional[list[tuple[list[str], list[str]]]] = None,
     ) -> str:
         if isinstance(needle, str):
             needle = re.compile(needle)
@@ -145,18 +145,18 @@ class Program:
         if reverse:
             lines = lines[::-1]
         ignoring = False
-        in_between_end = ""
+        in_between_end: list[str] = []
         for line in lines:
             if not ignoring and ignore_in_between:
                 for start, end in ignore_in_between:
                     if reverse:
                         start, end = end, start
-                    if start in line:
+                    if any(i in line for i in start):
                         ignoring = True
                         in_between_end = end
                         break
             if ignoring:
-                if in_between_end in line:
+                if any(i in line for i in in_between_end):
                     ignoring = False
                 else:
                     continue
