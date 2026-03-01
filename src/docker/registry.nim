@@ -66,7 +66,7 @@ type
 
 const
   TIMEOUT = 3000 # sec
-  CONTENT_TYPE_MAPPING = {
+  CONTENT_TYPE_MAPPING* = {
     "application/vnd.docker.distribution.manifest.list.v2+json": DockerManifestType.list,
     "application/vnd.docker.distribution.manifest.v2+json": DockerManifestType.image,
     "application/vnd.docker.container.image.v1+json": DockerManifestType.config,
@@ -536,7 +536,8 @@ proc request(self:              DockerImage,
             respMsg &= " " & k & ":" & v
         trace(respMsg)
         for u in useCase.uses():
-          configByRegistry[(u, self.registry)] = config
+          discard configByRegistry.hasKeyOrPut((u, normalized.registry), config)
+          discard configByRegistry.hasKeyOrPut((u, self.registry), config)
           if isGet:
             jsonCache[cacheKey] = (msg, response)
         return (msg, response)
@@ -554,6 +555,9 @@ proc request(self:              DockerImage,
         raise
     except:
       if invalid:
+        for u in useCase.uses():
+          discard configByRegistry.hasKeyOrPut((u, normalized.registry), config)
+          discard configByRegistry.hasKeyOrPut((u, self.registry), config)
         raise newException(RegistryResponseError, getCurrentExceptionMsg())
       else:
         trace("docker: ignoring error: " & getCurrentExceptionMsg())

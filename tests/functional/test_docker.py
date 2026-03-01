@@ -67,14 +67,14 @@ def do_docker_cleanup() -> Iterator[None]:
     _docker_run = Docker.run
 
     def chalk_docker_build(self, *args, **kwargs):
-        image_hash, result = _chalk_docker_build(self, *args, **kwargs)
-        images.add(image_hash)
-        return image_hash, result
+        digests, result = _chalk_docker_build(self, *args, **kwargs)
+        images.add(digests.id)
+        return digests, result
 
     def docker_build(*args, **kwargs):
-        image_hash, result = _docker_build(*args, **kwargs)
-        images.add(image_hash)
-        return image_hash, result
+        digests, result = _docker_build(*args, **kwargs)
+        images.add(digests.id)
+        return digests, result
 
     def docker_tag(tag, new_tag):
         images.add(new_tag)
@@ -152,7 +152,7 @@ def test_build(
     Test various variants of docker build command
     """
     chalk_copy.binary.rename("chalk")
-    image_id, build = chalk_copy.docker_build(
+    digests, build = chalk_copy.docker_build(
         dockerfile=dockerfile,
         cwd=cwd,
         tag=random_hex if tag else None,
@@ -161,7 +161,7 @@ def test_build(
         builder=builder,
         config=CONFIGS / "docker_wrap.c4m",
     )
-    assert image_id
+    assert digests
     assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
     assert build.report.has(
         _OP_EXIT_CODE=build.exit_code,
@@ -269,14 +269,14 @@ def test_scratch(chalk: Chalk, buildkit: bool):
 
 
 def test_distroless(chalk: Chalk):
-    image_id, build = chalk.docker_build(
+    digests, build = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "distroless" / "Dockerfile",
         config=CONFIGS / "docker_wrap.c4m",
     )
     # distroless image has user marked as "0" vs usual "root" or missing user
     assert "ONBUILD USER" not in build.mark["DOCKER_FILE_CHALKED"]
 
-    _, output = Docker.run(image=image_id)
+    _, output = Docker.run(image=digests.id)
     assert "hello" in output.text
 
 
@@ -314,7 +314,7 @@ def test_multiple_tags(
         f"{REGISTRY}/{random_hex}-1:foo",
         f"{REGISTRY}/{random_hex}-2",
     ]
-    image_id, build = chalk_copy.docker_build(
+    digests, build = chalk_copy.docker_build(
         dockerfile=dockerfile / "Dockerfile",
         tags=tags,
         config=CONFIGS / "docker_wrap.c4m",
@@ -325,7 +325,7 @@ def test_multiple_tags(
         # whereas we want to ensure chalk does the pushing
         run_docker=False,
     )
-    assert image_id
+    assert digests
     assert build.mark.lifted.has(
         _REPO_TAGS={
             REGISTRY: {
@@ -368,20 +368,20 @@ def test_composite_build(
     buildkit: bool,
     random_hex: str,
 ):
-    image_id, _ = Docker.build(
+    digests, _ = Docker.build(
         dockerfile=base,
         buildkit=buildkit,
         tag=random_hex,
     )
-    assert image_id
+    assert digests
 
-    second_image_id, _ = chalk.docker_build(
+    second_digests, _ = chalk.docker_build(
         dockerfile=test,
         buildkit=buildkit,
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.c4m",
     )
-    assert second_image_id
+    assert second_digests
 
 
 @pytest.mark.parametrize(
@@ -400,26 +400,25 @@ def test_onbuild(chalk: Chalk, base: Path, test: Path, random_hex: str):
     when using chalked image as base image, all child builds, when not wrapped
     should reflect that in /chalk.json
     """
-    image_id, build = chalk.docker_build(
+    digests, build = chalk.docker_build(
         dockerfile=base,
         tag=random_hex,
         config=CONFIGS / "docker_wrap.c4m",
     )
-    assert image_id
+    assert digests
     assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
 
-    second_image_id, _ = Docker.build(
+    second_digests, _ = Docker.build(
         dockerfile=test,
         args={"BASE": random_hex},
     )
-    assert second_image_id
+    assert second_digests
     assert (
-        Docker.inspect(second_image_id)[0]["Config"]["User"]
-        == build.mark["_IMAGE_USER"]
+        Docker.inspect(second_digests.id)["Config"]["User"] == build.mark["_IMAGE_USER"]
     )
 
     _, result = Docker.run(
-        image=second_image_id,
+        image=second_digests.id,
         entrypoint="cat",
         params=["/chalk.json"],
         expected_success=True,
@@ -485,32 +484,32 @@ def test_base_image(chalk: Chalk, random_hex: str, push: bool):
     )
     assert base_id
 
-    image_id, _ = chalk.docker_build(
+    digests, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
         context=DOCKERFILES / "valid" / "base",
         args={"BASE": base},
         config=CONFIGS / "docker_wrap.c4m",
     )
-    _, run = Docker.run(image_id)
+    _, run = Docker.run(digests.id)
     assert run
 
 
 def test_recursion_wrapping(chalk: Chalk, random_hex: str):
-    base_id, _ = chalk.docker_build(
+    base_digests, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile.base",
         context=DOCKERFILES / "valid" / "base",
         tag=random_hex,
         config=CONFIGS / "docker_wrap.c4m",
     )
-    assert base_id
+    assert base_digests
 
-    image_id, _ = chalk.docker_build(
+    digests, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "base" / "Dockerfile",
         context=DOCKERFILES / "valid" / "base",
         args={"BASE": random_hex},
         config=CONFIGS / "docker_wrap.c4m",
     )
-    _, run = Docker.run(image_id)
+    _, run = Docker.run(digests.id)
     assert run
 
 
@@ -551,7 +550,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     # so we create a dummy one which is guaranteed to be regular image manifest
     name = f"{random_hex}_image"
     image = f"{REGISTRY}/{name}"
-    _, base = chalk.docker_build(
+    base_digests, base = chalk.docker_build(
         config=CONFIGS / "docker_wrap.c4m",
         tag=image,
         content=Docker.dockerfile(
@@ -573,7 +572,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
         COMMIT_ID=ANY,
         ORIGIN_URI="git@github.com:crashappsec/foo.git",
         DOCKER_BASE_IMAGE_METADATA_ID=MISSING,
-        DOCKER_BASE_IMAGE_ID=ANY,
+        DOCKER_BASE_IMAGE_CONFIG_DIGEST=ANY,
         _OP_ARTIFACT_CONTEXT="build",
     )
 
@@ -624,14 +623,14 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                     },
                     **{
                         "_OP_ARTIFACT_CONTEXT": "base",
-                        "_IMAGE_ID": base.mark["_IMAGE_ID"],
+                        "_CURRENT_HASH": base_digests.either_registry_ids,
                         "METADATA_ID": base.mark["METADATA_ID"],
                         "COMMIT_ID": base.mark["COMMIT_ID"],
                         "ORIGIN_URI": base.mark["ORIGIN_URI"],
                     },
                 },
                 {
-                    "_IMAGE_ID": ANY,
+                    "_CURRENT_HASH": ANY,
                     "METADATA_ID": MISSING,
                     "COMMIT_ID": ANY,
                     "_IMAGE_CREATION_DATETIME": Iso8601(),
@@ -655,7 +654,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                     },
                 },
                 {
-                    "_IMAGE_ID": ANY,
+                    "_CURRENT_HASH": ANY,
                     "METADATA_ID": MISSING,
                     "COMMIT_ID": ANY,
                     "_IMAGE_CREATION_DATETIME": Iso8601(),
@@ -680,7 +679,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                     },
                 },
                 {
-                    "_IMAGE_ID": ANY,
+                    "_CURRENT_HASH": ANY,
                     "METADATA_ID": MISSING,
                     "COMMIT_ID": ANY,
                     "_IMAGE_CREATION_DATETIME": Iso8601(),
@@ -705,7 +704,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
                     },
                 },
                 {
-                    "_IMAGE_ID": ANY,
+                    "_CURRENT_HASH": ANY,
                     "METADATA_ID": ANY,
                     "COMMIT_ID": ANY,
                     "_IMAGE_CREATION_DATETIME": Iso8601(),
@@ -729,7 +728,7 @@ def test_base_images(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
         _OP_ARTIFACT_CONTEXT="build",
         DOCKER_BASE_IMAGE_METADATA_ID=base.mark["METADATA_ID"],
         DOCKER_BASE_IMAGE_CHALK={k: IfExists(v) for k, v in base.mark.items()},
-        DOCKER_BASE_IMAGE_ID=base.mark["_IMAGE_ID"],
+        DOCKER_BASE_IMAGE_CONFIG_DIGEST=base.mark["_IMAGE_CONFIG_DIGEST"],
         DOCKER_BASE_IMAGE=re.compile(rf"{image}:latest@sha256:"),
         DOCKER_BASE_IMAGE_REPO=image,
         DOCKER_BASE_IMAGE_REGISTRY=REGISTRY,
@@ -1048,20 +1047,20 @@ def test_wrap_entrypoint(
     buildx: bool,
     runnable: bool,
 ):
-    docker_id, _ = Docker.build(
+    docker_digests, _ = Docker.build(
         content=test_file,
         buildkit=buildkit,
         buildx=buildx,
     )
-    assert Docker.inspect(docker_id)[0].has(
+    assert Docker.inspect(docker_digests.id).has(
         Config={
             "Entrypoint": docker_entrypoint,
             "Cmd": cmd,
         }
     )
-    _, docker_output = Docker.run(docker_id, expected_success=runnable)
+    _, docker_output = Docker.run(docker_digests.id, expected_success=runnable)
 
-    image_id, result = chalk.docker_build(
+    digests, result = chalk.docker_build(
         content=test_file,
         config=CONFIGS / "docker_wrap.c4m",
         buildkit=buildkit,
@@ -1072,7 +1071,7 @@ def test_wrap_entrypoint(
         _IMAGE_ENTRYPOINT=chalk_entrypoint,
         _IMAGE_CMD=cmd,
     )
-    _, chalk_output = Docker.run(image_id, expected_success=runnable)
+    _, chalk_output = Docker.run(digests.id, expected_success=runnable)
     assert docker_output == chalk_output
 
 
@@ -1129,12 +1128,12 @@ def test_wrap_base_entrypoint(
     ],
 )
 def test_wrap_cmd(chalk: Chalk, test_file: str, entrypoint: list[str], cmd: list[str]):
-    image_id, result = chalk.docker_build(
+    digests, result = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "cmd" / test_file,
         context=DOCKERFILES / "valid" / "cmd",
         config=CONFIGS / "docker_wrap.c4m",
     )
-    _, output = Docker.run(image_id)
+    _, output = Docker.run(digests.id)
     assert "hello" in output.text
     assert result.mark.has(_IMAGE_ENTRYPOINT=entrypoint, _IMAGE_CMD=cmd)
 
@@ -1148,11 +1147,14 @@ def test_wrap_cmd(chalk: Chalk, test_file: str, entrypoint: list[str], cmd: list
     ],
 )
 def test_virtual_valid(
-    tmp_data_dir: Path, chalk: Chalk, test_file: str, random_hex: str
+    tmp_data_dir: Path,  # needed for virtual path
+    chalk: Chalk,
+    test_file: str,
+    random_hex: str,
 ):
     tag = f"{test_file}_{random_hex}"
     dockerfile = DOCKERFILES / test_file / "Dockerfile"
-    image_hash, build = chalk.docker_build(
+    digests, build = chalk.docker_build(
         dockerfile=dockerfile,
         tag=tag,
         virtual=True,
@@ -1160,8 +1162,7 @@ def test_virtual_valid(
     )
     assert build.mark.contains(
         {
-            "_CURRENT_HASH": image_hash,
-            "_IMAGE_ID": image_hash,
+            "_CURRENT_HASH": digests.either_ids,
             "_REPO_TAGS": MISSING,  # not pushed
             "DOCKERFILE_PATH": str(dockerfile),
             "DOCKERFILE_PATH_WITHIN_VCTL": str(
@@ -1175,7 +1176,7 @@ def test_virtual_valid(
     assert build.vmark.contains({k: IfExists(v) for k, v in build.mark.items()})
 
     _, result = Docker.run(
-        image=image_hash,
+        image=digests.id,
         entrypoint="cat",
         params=["chalk.json"],
         expected_success=False,
@@ -1211,15 +1212,14 @@ def test_virtual_invalid(
 def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     tag = f"{test_file}_{random_hex}"
     dockerfile = DOCKERFILES / test_file / "Dockerfile"
-    image_hash, build = chalk.docker_build(
+    digests, build = chalk.docker_build(
         dockerfile=dockerfile,
         tag=tag,
         config=CONFIGS / "docker_wrap.c4m",
     )
     assert build.mark.contains(
         {
-            "_CURRENT_HASH": image_hash,
-            "_IMAGE_ID": image_hash,
+            "_CURRENT_HASH": digests.either_ids,
             "_REPO_TAGS": MISSING,  # not pushed
             "DOCKERFILE_PATH": str(DOCKERFILES / test_file / "Dockerfile"),
             "DOCKERFILE_PATH_WITHIN_VCTL": str(
@@ -1231,7 +1231,7 @@ def test_nonvirtual_valid(chalk: Chalk, test_file: str, random_hex: str):
     )
 
     _, result = Docker.run(
-        image=image_hash,
+        image=digests.id,
         entrypoint="cat",
         params=["chalk.json"],
     )
@@ -1287,12 +1287,12 @@ def test_postexec(chalk_copy: Chalk, server_cert: Path):
     chalk_copy.load(CONFIGS / "docker_postexec.c4m", use_embedded=True, replace=False)
 
     # build dockerfile with chalk docker entrypoint wrapping
-    image_id, _ = chalk_copy.docker_build(
+    digests, _ = chalk_copy.docker_build(
         dockerfile=DOCKERFILES / "valid" / "cert" / "Dockerfile",
     )
 
     _, result = Docker.run(
-        image=image_id,
+        image=digests.id,
         check=False,
         volumes={
             server_cert: "/cert.pem",
@@ -1356,9 +1356,7 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
     )
 
     inspected = Docker.inspect(tag)
-    assert len(inspected) == 1
-
-    docker_configs = inspected[0]["Config"]
+    docker_configs = inspected["Config"]
     assert "Labels" in docker_configs
     labels = docker_configs["Labels"]
     assert "CRASH_OVERRIDE_TEST_LABEL" in labels.values()
@@ -1455,7 +1453,7 @@ def test_build_and_push(
         "GITHUB_ACTOR": "octocat",
     }
 
-    image_id, build_result = chalk_copy.docker_build(
+    digests, build_result = chalk_copy.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         buildkit=buildkit,
         buildx=buildx,
@@ -1467,6 +1465,7 @@ def test_build_and_push(
         env=env,
     )
 
+    build_digests = digests
     push_result = build_result
     # if without --push at build time, explicitly push to registry
     if not push:
@@ -1474,9 +1473,12 @@ def test_build_and_push(
             _IMAGE_LAYERS=MISSING,
             _SIGNATURES=MISSING,
         )
-        push_result = chalk_copy.docker_push(full, buildkit=buildkit, env=env)
-
-    image_digest, _ = Docker.with_image_digest(build_result)
+        digests, push_result = chalk_copy.docker_push(
+            full,
+            buildkit=buildkit,
+            env=env,
+            digests=digests,
+        )
 
     signatures = [
         {
@@ -1493,14 +1495,13 @@ def test_build_and_push(
         # primary key needed to associate build+push
         METADATA_ID=ANY,
         METADATA_HASH=ANY,
-        _CURRENT_HASH=image_id,
-        _IMAGE_ID=image_id,
+        _CURRENT_HASH=digests.either_ids,
         DOCKER_TAGS=[full],
         _REPO_TAGS=(
             {
                 registry: {
                     name: {
-                        tag: image_digest,
+                        tag: digests.registry,
                     }
                 }
             }
@@ -1510,7 +1511,7 @@ def test_build_and_push(
         _REPO_DIGESTS=(
             {
                 registry: {
-                    name: [image_digest],
+                    name: [digests.registry_digest],
                 }
             }
             if push
@@ -1524,11 +1525,10 @@ def test_build_and_push(
         CHALK_ID=build_result.mark["CHALK_ID"],
         METADATA_ID=build_result.mark["METADATA_ID"],
         METADATA_HASH=build_result.mark["METADATA_HASH"],
-        _CURRENT_HASH=image_id,
-        _IMAGE_ID=image_id,
+        _CURRENT_HASH=digests.either_ids,
         _REPO_DIGESTS={
             registry: {
-                name: [image_digest],
+                name: [digests.registry_digest],
             }
         },
         _IMAGE_LAYERS=Length(1, operator.ge),
@@ -1537,14 +1537,14 @@ def test_build_and_push(
     )
 
     pull = chalk_copy.docker_pull(full)
-    assert pull.find("Digest:") == f"sha256:{image_digest}"
+    assert pull.find("Digest:") == f"sha256:{digests.registry}"
 
 
 def test_push_nonchalked(chalk: Chalk, random_hex: str):
     tag_base = f"{REGISTRY}/nonchalked_{random_hex}"
     tag = f"{tag_base}:latest"
     Docker.build(content="FROM alpine", tag=tag)
-    push = chalk.docker_push(tag)
+    _, push = chalk.docker_push(tag)
     assert push.report.has(
         _OP_EXIT_CODE=0,
         _CHALK_RUN_TIME=ANY,
@@ -1560,38 +1560,29 @@ def test_retagging(chalk: Chalk, random_hex: str):
     Docker.tag("alpine", tag)
     # this pushes only a single platform
     Docker.push(tag)
-    local_alpine = Docker.inspect("alpine")[0]["Id"].split(":")[1]
-    registry_image = Docker.imagetools_inspect(tag).digest
-    hub_alpine = Docker.imagetools_inspect("alpine")
-    hub_alpine_list = hub_alpine.digest
-    hub_alpine_image = next(
-        i["digest"].split(":")[1]
-        for i in hub_alpine.json()["manifests"]
-        if i["platform"]["architecture"] == "amd64"
-    )
+    registry_digests = Docker.crane_digests(tag, architecture="amd64")
+    hub_digests = Docker.crane_digests("alpine", architecture="amd64")
     extract = chalk.extract(tag)
-    assert hub_alpine_image != registry_image
     assert extract.mark.has(
-        _IMAGE_ID=local_alpine,
         _REPO_TAGS={
             "registry-1.docker.io": {
-                "library/alpine": {"latest": hub_alpine_list},
+                "library/alpine": {"latest": hub_digests.registry},
             },
             REGISTRY: {
-                name: {"foo": registry_image},
+                name: {"foo": registry_digests.registry},
             },
         },
         _REPO_DIGESTS={
             "registry-1.docker.io": {
-                "library/alpine": [hub_alpine_image],
+                "library/alpine": [hub_digests.registry_digest],
             },
             REGISTRY: {
-                name: [registry_image],
+                name: [registry_digests.registry_digest],
             },
         },
         _REPO_LIST_DIGESTS={
             "registry-1.docker.io": {
-                "library/alpine": [hub_alpine_list],
+                "library/alpine": [hub_digests.registry_index],
             },
             REGISTRY: IfExists(
                 {
@@ -1609,60 +1600,84 @@ def test_remanifest(chalk: Chalk, random_hex: str):
     tag_list2 = "list2"
     tag_amd64 = "amd64"
     tag_arm64 = "arm64"
-    id_amd64, _ = Docker.build(
+    digests_amd64, _ = Docker.build(
         content="FROM alpine",
         tag=f"{tag_base}:{tag_amd64}",
         push=True,
         platforms=["linux/amd64"],
     )
-    Docker.build(
+    digests_arm64, _ = Docker.build(
         content="FROM alpine",
         tag=f"{tag_base}:{tag_arm64}",
         push=True,
         platforms=["linux/arm64"],
     )
-    amd64_image = Docker.imagetools_inspect(f"{tag_base}:{tag_amd64}").digest
-    arm64_image = Docker.imagetools_inspect(f"{tag_base}:{tag_arm64}").digest
     Docker.manifest_create(
         f"{tag_base}:{tag_list1}",
-        f"{tag_base}@sha256:{amd64_image}",
-        f"{tag_base}@sha256:{arm64_image}",
+        f"{tag_base}@sha256:{digests_amd64.registry_digest}",
+        f"{tag_base}@sha256:{digests_arm64.registry_digest}",
     )
     Docker.manifest_create(
         f"{tag_base}:{tag_list2}",
-        f"{tag_base}@sha256:{amd64_image}",
+        f"{tag_base}@sha256:{digests_amd64.registry_digest}",
     )
-    amd64_list1 = Docker.imagetools_inspect(f"{tag_base}:{tag_list1}").digest
-    amd64_list2 = Docker.imagetools_inspect(f"{tag_base}:{tag_list2}").digest
+    list1_digests = Docker.crane_digests(
+        f"{tag_base}:{tag_list1}",
+        digests=digests_amd64,
+        architecture="amd64",
+    )
+    list2_digests = Docker.crane_digests(
+        f"{tag_base}:{tag_list2}",
+        digests=digests_amd64,
+        architecture="amd64",
+    )
+    assert digests_amd64.config == list1_digests.config
+    assert digests_amd64.config == list2_digests.config
     Docker.pull(f"{tag_base}:{tag_list1}", platform="linux/amd64")
     Docker.pull(f"{tag_base}:{tag_list2}", platform="linux/amd64")
     Docker.pull(f"{tag_base}:{tag_amd64}", platform="linux/amd64")
-    Docker.inspect(f"{tag_base}:{tag_amd64}")
     extract = chalk.extract(f"{tag_base}:{tag_list1}")
     assert extract.mark.has(
-        _IMAGE_ID=id_amd64,
+        _CURRENT_HASH=list1_digests.either_registry_ids,
+        _IMAGE_CONFIG_DIGEST=list1_digests.config,
         _REPO_DIGESTS={
             REGISTRY: {
                 name: {
-                    amd64_image,
+                    list1_digests.registry_digest,
                 }
             }
         },
         _REPO_LIST_DIGESTS={
             REGISTRY: {
-                name: {
-                    amd64_list1,
-                    amd64_list2,
-                }
+                name: (
+                    {
+                        list1_digests.registry_index,
+                    }
+                    # docker inspect doesnt combine multiple digests of the same image
+                    # as the local id is the list digest in overlayfs
+                    if Docker.is_overlayfs()
+                    else {
+                        list1_digests.registry_index,
+                        list2_digests.registry_index,
+                    }
+                )
             }
         },
         _REPO_TAGS={
             REGISTRY: {
-                name: {
-                    tag_list1: amd64_list1,
-                    tag_list2: amd64_list2,
-                    tag_amd64: amd64_image,
-                }
+                name: (
+                    {
+                        tag_list1: list1_digests.registry,
+                    }
+                    # docker inspect doesnt combine multiple tags of the same image
+                    # as the local id is the list digest in overlayfs
+                    if Docker.is_overlayfs()
+                    else {
+                        tag_list1: list1_digests.registry,
+                        tag_list2: list2_digests.registry,
+                        tag_amd64: digests_amd64.registry,
+                    }
+                )
             }
         },
     )
@@ -1678,7 +1693,7 @@ def test_push_without_buildx(
     tag_base = f"{REGISTRY}/{name}"
     tag = f"{tag_base}:latest"
 
-    image_id, build = chalk.docker_build(
+    digests, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         buildkit=False,
         tag=tag,
@@ -1700,16 +1715,15 @@ def test_push_without_buildx(
         },
     )
     push = ChalkProgram.from_program(program)
-    image_digest = Docker.inspect(tag_base)[0]["RepoDigests"][0].rsplit(
-        ":", maxsplit=1
-    )[-1]
+    image_digest = Docker.inspect(tag_base)["RepoDigests"][0].rsplit(":", maxsplit=1)[
+        -1
+    ]
     assert push.mark.has(
         CHALK_ID=build.mark["CHALK_ID"],
         # primary key needed to associate build+push
         METADATA_ID=build.mark["METADATA_ID"],
         METADATA_HASH=build.mark["METADATA_HASH"],
-        _CURRENT_HASH=image_id,
-        _IMAGE_ID=image_id,
+        _CURRENT_HASH=digests.either_ids,
         _REPO_DIGESTS={
             REGISTRY: {
                 name: [image_digest],
@@ -1742,7 +1756,7 @@ def test_multiplatform_build(
     platforms = {"linux/amd64/v1", "linux/arm64/v8", "linux/arm/v7"}
     target_platforms = {"linux/amd64", "linux/arm64", "linux/arm/v7"}
 
-    image_id, build = chalk.docker_build(
+    digests, build = chalk.docker_build(
         dockerfile=DOCKERFILES / test_file / "Dockerfile",
         tag=tag_base,
         push=push,
@@ -1762,7 +1776,7 @@ def test_multiplatform_build(
         # as no image is loaded without --push,
         # we cant inspect anything
         for mark in build.marks:
-            assert mark.has(_CURRENT_HASH=MISSING, _IMAGE_ID=MISSING)
+            assert mark.has(_CURRENT_HASH=MISSING)
         return
 
     assert len(build.marks) == len(platforms)
@@ -1771,7 +1785,6 @@ def test_multiplatform_build(
     chalk_ids = {i["CHALK_ID"] for i in build.marks}
     metadata_ids = {i["METADATA_ID"] for i in build.marks}
     hashes = {i["_CURRENT_HASH"] for i in build.marks}
-    ids = {i["_IMAGE_ID"] for i in build.marks}
     list_digests = set(
         itertools.chain(*[i["_REPO_LIST_DIGESTS"][REGISTRY][name] for i in build.marks])
     )
@@ -1781,9 +1794,6 @@ def test_multiplatform_build(
 
     assert len(chalk_ids) == 1
     assert len(metadata_ids) == len(platforms)
-    assert image_id in hashes
-    assert len(ids) == len(platforms)
-    assert hashes == ids
     assert len(hashes) == len(platforms)
     assert len(repo_digests) == len(platforms)
     assert len(list_digests) == 1
@@ -1968,7 +1978,7 @@ def test_extract(chalk: Chalk, random_hex: str):
     container_name = f"test_container_{random_hex}"
 
     # build test image
-    image_id, _ = chalk.docker_build(
+    digests, _ = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
         tag=tag,
         push=True,
@@ -1987,8 +1997,7 @@ def test_extract(chalk: Chalk, random_hex: str):
     assert extract_by_name.mark.contains(
         {
             "_OP_ARTIFACT_TYPE": "Docker Image",
-            "_IMAGE_ID": image_id,
-            "_CURRENT_HASH": image_id,
+            "_CURRENT_HASH": digests.either_ids,
             "_REPO_TAGS": {
                 REGISTRY: {
                     name: {
@@ -1999,7 +2008,7 @@ def test_extract(chalk: Chalk, random_hex: str):
         }
     )
 
-    extract_by_id = chalk.extract(image_id[:12])
+    extract_by_id = chalk.extract(digests.id[:12])
     assert extract_by_id.report.contains(extract_by_name.report.deterministic())
 
     Docker.remove_images([tag])
@@ -2010,8 +2019,7 @@ def test_extract(chalk: Chalk, random_hex: str):
     assert extract_registry.mark.contains(
         {
             "_OP_ARTIFACT_TYPE": "Docker Image",
-            "_IMAGE_ID": image_id,
-            "_CURRENT_HASH": image_id,
+            "_CURRENT_HASH": digests.either_ids,
             "_REPO_DIGESTS": {
                 REGISTRY: {
                     name: ANY,
@@ -2045,7 +2053,6 @@ def test_extract(chalk: Chalk, random_hex: str):
     assert extract_container_name.mark.contains(
         {
             "_OP_ARTIFACT_TYPE": "Docker Container",
-            "_IMAGE_ID": image_id,
             "_CURRENT_HASH": container_id,
             "_INSTANCE_CONTAINER_ID": container_id,
             "_INSTANCE_NAME": container_name,
@@ -2075,7 +2082,6 @@ def test_extract(chalk: Chalk, random_hex: str):
     assert extract_container_name_stopped.mark.contains(
         {
             "_OP_ARTIFACT_TYPE": "Docker Container",
-            "_IMAGE_ID": image_id,
             "_CURRENT_HASH": container_id,
             "_INSTANCE_CONTAINER_ID": container_id,
             "_INSTANCE_NAME": container_name,
@@ -2119,12 +2125,12 @@ def test_version_bare(chalk_default: Chalk):
     """
     Runs in empty container which tests chalk has no external startup deps
     """
-    image_id, build = Docker.build(
+    digests, build = Docker.build(
         dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
     )
     assert build
     _, run = Docker.run(
-        image_id,
+        digests.id,
         volumes={chalk_default.binary: "/chalk"},
         entrypoint="/chalk",
         params=["version"],

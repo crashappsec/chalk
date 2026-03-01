@@ -556,6 +556,17 @@ proc `+`*(a: DockerImageRepo, b: DockerImageRepo): DockerImageRepo =
     tags       : b.tags        + a.tags,
   )
 
+proc asSomeImageRepos*(items: seq[DockerImage],
+                       ): OrderedTableRef[string, DockerImageRepo] =
+  result = newOrderedTable[string, DockerImageRepo]()
+  for i in items:
+    result[i.repo] = result.getOrDefault(i.repo) + DockerImageRepo(
+      repo:        i.repo,
+      listDigests: initOrderedSet[string](),
+      digests:     (if i.digest != "": @[i.digest] else: @[]).toOrderedSet(),
+      tags:        (if i.tag != "":    @[i.tag]    else: @[]).toOrderedSet(),
+    )
+
 # ----------------------------------------------------------------------------
 
 proc getImageName*(self: ChalkObj): string =
@@ -568,10 +579,10 @@ proc getImageName*(self: ChalkObj): string =
 proc asImage*(self: DockerManifest): DockerImage =
   return self.name.withDigest(self.digest)
 
-proc asImageRepo*(self: DockerManifest, tag = ""): DockerImageRepo =
+proc asImageRepo*(self: DockerManifest, tag = "", tags: seq[string] = @[]): DockerImageRepo =
   if self.kind != image:
     raise newException(ValueError, "Only image manifest can be image repo referenced")
-  var tags = newSeq[string]()
+  var tags = tags
   if self.name.tag != "":
     tags.add(self.name.tag)
   if tag != "":

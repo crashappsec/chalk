@@ -2313,14 +2313,14 @@ Note this only specifies the base image of the final build target.
 """
 }
 
-keyspec DOCKER_BASE_IMAGE_ID {
+keyspec DOCKER_BASE_IMAGE_CONFIG_DIGEST {
     kind:             ChalkTimeArtifact
     type:             string
     standard:         true
     system:           false
-    since:            "0.5.0"
+    since:            "0.6.7"
     doc: """
-Docker image id (config digest) of the base image.
+Docker config digest of the base image.
 Note this only specifies the base image of the final build target.
 """
 }
@@ -2342,7 +2342,7 @@ Each base image will break it into its individual components of:
 * `repo` - only the repo of the image
 * `tag` - only the tag of the image (if `:<tag>` is provided)
 * `digest` - only the digest of the image (if `@sha256:<digest>` is provided)
-* `config_digest` - digest of the image config (aka docker id)
+* `config_digest` - digest of the image config
 
 Some special cases:
 
@@ -3257,15 +3257,14 @@ running `docker inspect` on a running container.
 """
 }
 
-keyspec _IMAGE_ID {
+keyspec _IMAGE_CONFIG_DIGEST {
     kind:     RunTimeArtifact
     type:     string
     standard: true
-    since:    "0.1.0"
-    shortdoc: "Reported image ID for the image or container"
+    since:    "0.6.7"
+    shortdoc: "Reported config digest for the image"
     doc: """
-The image ID reported by docker for an image or a container.
-Image ID is the digest of the image config json object.
+The image config digest.
 """
 }
 

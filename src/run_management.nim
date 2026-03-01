@@ -222,7 +222,7 @@ proc newChalk*(name:          string            = "",
   if extract != nil and len(extract) > 1:
     result.marked = true
 
-template setIfNotEmptyBox*(o: ChalkDict, k: string, v: Box) =
+template setIfNotEmptyBox(o: ChalkDict, k: string, v: Box) =
   let value = v
   case value.kind
   of MkSeq, MkTable, MkStr:
@@ -233,7 +233,8 @@ template setIfNotEmptyBox*(o: ChalkDict, k: string, v: Box) =
 
 template setIfNotEmpty*[T](o: ChalkDict, k: string, v: T) =
   when T is Box:
-    setIfNotEmptyBox(o, k, v)
+    if not isNil(v):
+      setIfNotEmptyBox(o, k, v)
   elif T is JsonNode:
     if v != nil:
       setIfNotEmptyBox(o, k, v.nimJsonToBox())

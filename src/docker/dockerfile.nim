@@ -1064,7 +1064,7 @@ proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection): TableRe
     result["digest"] = base.image.digest
   if base.chalk != nil:
     let
-      config   = unpack[string](base.chalk.collectedData.getOrDefault("_IMAGE_ID", pack("")))
+      config   = unpack[string](base.chalk.collectedData.getOrDefault("_IMAGE_CONFIG_DIGEST", pack("")))
       metadata = unpack[string](base.chalk.collectedData.getOrDefault("_METADATA_ID", pack("")))
     if config != "":
       result["config_digest"] = config

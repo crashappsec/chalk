@@ -12,6 +12,7 @@ import std/[
 ]
 import ".."/[
   selfextract,
+  sinks,
   types,
   utils/files,
 ]
@@ -342,6 +343,7 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
     ctx.addedPlatform[base] &= @[
      ("RUN /" & name & " load /config.json " &
       "--log-level=" & verbosity & " " &
+      "--log-format=" & logFormat() & " " &
       "--skip-command-report " &
       "--skip-custom-reports " &
       "--skip-summary-report " &
@@ -351,6 +353,7 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
      # sanity check plus it will show chalk metadata in build logs
      ("RUN /" & name & " version " &
       "--log-level=" & verbosity & " " &
+      "--log-format=" & logFormat() & " " &
       "--skip-command-report " &
       "--skip-custom-reports " &
       "--skip-summary-report"),

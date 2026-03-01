@@ -3,7 +3,6 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import datetime
-import json
 import os
 import pty
 import re
@@ -132,7 +131,7 @@ class Program:
 
     def find(
         self,
-        needle: str,
+        needle: str | re.Pattern,
         text: Optional[str] = None,
         words: int = 0,
         reverse: bool = False,
@@ -140,6 +139,8 @@ class Program:
         default: Optional[str] = None,
         ignore_in_between: Optional[list[tuple[str, str]]] = None,
     ) -> str:
+        if isinstance(needle, str):
+            needle = re.compile(needle)
         lines = (text or self.text).splitlines()
         if reverse:
             lines = lines[::-1]
@@ -153,17 +154,19 @@ class Program:
                     if start in line:
                         ignoring = True
                         in_between_end = end
+                        break
             if ignoring:
                 if in_between_end in line:
                     ignoring = False
                 else:
                     continue
-            if needle in line:
-                i = line.find(needle)
-                result = line[i:].replace(needle, "", 1).strip()
+            match = needle.search(line)
+            if match:
+                result = line[match.end() :].strip()
                 if words:
                     result = " ".join(result.split()[:words])
                 return result
+
         if default is not None:
             return default
         if log_level:

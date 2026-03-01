@@ -42,14 +42,14 @@ proc isUInt*(i: string): bool =
 proc splitBy*(s: string, sep: string, default: string = ""): (string, string) =
   let parts = s.split(sep, maxsplit = 1)
   if len(parts) == 2:
-    return (parts[0], parts[1])
-  return (s, default)
+    return (parts[0].strip(), parts[1].strip())
+  return (s.strip(), default)
 
 proc rSplitBy*(s: string, sep: string, default: string = ""): (string, string) =
   let parts = s.rsplit(sep, maxsplit = 1)
   if len(parts) == 2:
-    return (parts[0], parts[1])
-  return (s, default)
+    return (parts[0].strip(), parts[1].strip())
+  return (s.strip(), default)
 
 proc removeSuffix*(s: string, suffix: string | char): string =
   # similar to strutil except it returns result back

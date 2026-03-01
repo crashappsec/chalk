@@ -63,7 +63,7 @@ proc getByPathOpt(top: JsonNode, key: string): Option[JsonNode] =
   if key in top:
     return some(top[key])
   var cur = top
-  for item in key.split('.'):
+  for item in key.split(':'):
     if cur.kind != JObject:
       return none(JsonNode)
     if item notin cur:

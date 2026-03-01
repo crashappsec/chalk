@@ -43,7 +43,7 @@ proc scanImage(chalk:         ChalkObj,
       # if we already collected the same image before, return the same pointer
       # so that we do not duplicate collected artifacts
       for artifact in getAllChalks() & getAllArtifacts():
-        if artifact.collectedData.getOrDefault("_IMAGE_ID", pack("")) == chalk.collectedData["_IMAGE_ID"]:
+        if artifact.cachedEndingHash != "" and artifact.cachedEndingHash == chalk.cachedEndingHash:
           artifact.collectedData.merge(chalk.collectedData)
           chalk = artifact
     try:

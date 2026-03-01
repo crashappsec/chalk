@@ -64,6 +64,14 @@ class Values:
         return f"{self.__class__.__name__}({self.values!r})"
 
 
+class Either:
+    def __init__(self, *values: Any):
+        self.values = values
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.values!r})"
+
+
 class Contains:
     def __init__(self, items: set[Any] | list[Any]):
         self.items = ContainsList(items)
@@ -150,6 +158,15 @@ class SubsetCompare:
             assert (
                 self.__class__(self.expected.values, f"Values({self.path})") == values
             )
+        elif isinstance(self.expected, Either):
+            for i in self.expected.values:
+                try:
+                    assert self.__class__(i, f"Either({self.path})") == value
+                except AssertionError:
+                    pass
+                else:
+                    return True
+            raise AssertionError(self._message_ne(value))
         elif isinstance(self.expected, Iso8601):
             assert self.expected == value, self._message_ne(value)
         else:
@@ -171,7 +188,7 @@ class ContainsMixin:
         """
         return self.contains(kwargs)
 
-    def contains(self, other: dict[Any, Any]):
+    def contains(self, other: Any):
         """
         >>> ContainsDict({"foo": "bar"}).contains({"foo": "bar"})
         True
@@ -233,6 +250,11 @@ class ContainsMixin:
         Traceback (most recent call last):
         ...
         AssertionError: ['foo']: ["['baz']: is missing", "['baz']: is missing"]
+
+        >>> ContainsDict({"foo": "bar"}).contains({"foo": Either("foo", "baz")})
+        Traceback (most recent call last):
+        ...
+        AssertionError: ['foo']: 'bar' != Either(('foo', 'baz'))
         """
         return SubsetCompare(other, getattr(self, "name", None)) == self
 

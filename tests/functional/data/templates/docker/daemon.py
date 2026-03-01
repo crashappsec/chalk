@@ -53,6 +53,12 @@ if __name__ == "__main__":
             f"http://{IP}:5047",
         }
     )
+    updated["features"] = {
+        **(updated.get("features") or {}),
+        "containerd-snapshotter": (
+            os.environ.get("DOCKER_OVERLAYFS", "true").lower() == "true"
+        ),
+    }
     has_changes = config != updated
     formatted = json.dumps(updated, indent=4)
 

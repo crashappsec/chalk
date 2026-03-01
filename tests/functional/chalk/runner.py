@@ -14,8 +14,8 @@ from typing import Any, Literal, Optional, cast
 from ..conf import MAGIC, TESTS
 from ..utils.bin import sha256
 from ..utils.cosign import Cosign
-from ..utils.dict import ANY, MISSING, ContainsDict, ContainsList, IfExists
-from ..utils.docker import Docker
+from ..utils.dict import ANY, MISSING, Contains, ContainsDict, ContainsList, IfExists
+from ..utils.docker import Docker, DockerDigests
 from ..utils.log import get_logger
 from ..utils.os import CalledProcessError, Program, run
 from ..utils.text import valid_json
@@ -680,7 +680,7 @@ class Chalk:
         show_config: bool = False,
         labels: Optional[dict[str, str]] = None,
         annotations: Optional[dict[str, str]] = None,
-    ) -> tuple[str, ChalkProgram]:
+    ) -> tuple[DockerDigests, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
 
@@ -727,7 +727,7 @@ class Chalk:
             labels=labels,
             annotations=annotations,
         ) as (params, stdin):
-            image_hash, result = Docker.with_image_id(
+            digests, result = Docker.with_digests(
                 self.run(
                     log_level=log_level,
                     debug=True,
@@ -743,15 +743,11 @@ class Chalk:
                         **(env or {}),
                     },
                     show_config=show_config,
-                )
+                ),
+                push=push,
+                tag=tag,
             )
-            if "--load" in params:
-                try:
-                    Docker.inspect(image_hash)[0]
-                except:
-                    Docker.all_images(only_id=False)
-                    raise
-        if expecting_report and expected_success and image_hash:
+        if expecting_report and expected_success and digests:
             assert result.report.has(_VIRTUAL=IfExists(virtual))
             if platforms:
                 assert len(result.marks) == len(platforms)
@@ -760,8 +756,24 @@ class Chalk:
             for chalk in result.marks:
                 assert chalk.has(_OP_ARTIFACT_TYPE="Docker Image")
             # sanity check that chalk mark includes basic chalk keys
-            assert image_hash in [i["_CURRENT_HASH"] for i in result.marks]
-            assert image_hash in [i["_IMAGE_ID"] for i in result.marks]
+            assert result.marks.contains(
+                Contains(
+                    [
+                        {
+                            "_CURRENT_HASH": digests.either_ids,
+                        }
+                    ]
+                )
+            )
+            assert result.marks.contains(
+                Contains(
+                    [
+                        {
+                            "_IMAGE_CONFIG_DIGEST": IfExists(digests.config),
+                        }
+                    ]
+                )
+            )
             if isinstance(context, Path) and not content:
                 dockerfile = dockerfile or (
                     (cwd or context or Path(os.getcwd())) / "Dockerfile"
@@ -774,20 +786,25 @@ class Chalk:
                 # we are not expecting any report json to be present in output
                 # so this exception is expected here
                 pass
-        return image_hash, result
+        return digests, result
 
     def docker_push(
         self,
         image: str,
         buildkit: bool = True,
         env: Optional[dict[str, str]] = None,
-    ):
-        return self.run(
+        digests: Optional[DockerDigests] = None,
+    ) -> tuple[DockerDigests, ChalkProgram]:
+        push = self.run(
             params=["docker", "push", image],
             env={
                 **Docker.build_env(buildkit=buildkit),
                 **(env or {}),
             },
+        )
+        return (
+            Docker.crane_digests(image, digests),
+            push,
         )
 
     def docker_pull(self, image: str):

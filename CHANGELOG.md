@@ -15,6 +15,16 @@
   encrypted format keys. Previously generated keys are also fully supported.
   ([#619](https://github.com/crashappsec/chalk/pull/619))
 
+- Docker `overlayfs` support. As it changes how images are referenced
+  it required to change some metadata keys:
+  - Drop `_IMAGE_ID`. Instead `_CURRENT_HASH` will reference image
+    same as docker references it.
+  - Replace it with explicit `_IMAGE_CONFIG_DIGEST` (if known during build)
+  - Similar changes to base image keys:
+    - `DOCKER_BASE_IMAGE_ID` replaced with `DOCKER_BASE_IMAGE_CONFIG_DIGEST`
+
+  ([#632](https://github.com/crashappsec/chalk/pull/632))
+
 ### New Features
 
 - All chalk attestations now use [OCI Image and Distribution] 1.1 spec.

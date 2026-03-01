@@ -153,7 +153,7 @@ proc initCollection*(collectHost = true) =
   if isChalkingOp() and collectHost:
       collectChalkTimeHostInfo()
 
-proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
+proc collectRunTimeArtifactInfo*(artifact: ChalkObj, isChalking = none(bool)) =
   artifact.withErrorContext():
     trace("Collecting run-time artifact info " & artifact.name & " (" & artifact.myCodec.name & ")")
     for plugin in getAllPlugins():
@@ -177,7 +177,7 @@ proc collectRunTimeArtifactInfo*(artifact: ChalkObj) =
 
       trace(plugin.name & ": running plugin")
       try:
-        let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalkingOp())
+        let dict = plugin.callGetRunTimeArtifactInfo(artifact, isChalking.get(isChalkingOp()))
         if dict == nil or len(dict) == 0:
           continue
         for k, v in dict:
