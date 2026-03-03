@@ -56,7 +56,8 @@ proc getAzureDevopsMetadata(self: Plugin, prefix = ""): ChalkDict =
   # Construct BUILD_URI from components
   if SYSTEM_TEAMFOUNDATIONCOLLURI != "" and SYSTEM_TEAMPROJECT != "" and BUILD_BUILDID != "":
     result.setIfNeeded(prefix & "BUILD_URI",
-      SYSTEM_TEAMFOUNDATIONCOLLURI & SYSTEM_TEAMPROJECT & "/_build/results?buildId=" & BUILD_BUILDID)
+      SYSTEM_TEAMFOUNDATIONCOLLURI.strip(leading = false, chars = {'/'}) &
+      "/" & SYSTEM_TEAMPROJECT & "/_build/results?buildId=" & BUILD_BUILDID)
 
   if BUILD_REQUESTEDFOR != "":
     result.setIfNeeded(prefix & "BUILD_CONTACT", @[BUILD_REQUESTEDFOR])

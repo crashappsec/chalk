@@ -58,6 +58,8 @@ proc getBitbucketMetadata(self: Plugin, prefix = ""): ChalkDict =
 
   if BITBUCKET_PR_ID != "":
     result.setIfNeeded(prefix & "BUILD_TRIGGER", "pullrequest")
+  elif BITBUCKET_TAG != "":
+    result.setIfNeeded(prefix & "BUILD_TRIGGER", "tag")
   else:
     result.setIfNeeded(prefix & "BUILD_TRIGGER", "push")
 
