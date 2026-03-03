@@ -177,11 +177,27 @@ This only collects data when adding chalk marks.
 plugin ci_jenkins {
     enabled:         true
     pre_run_keys:    ["BUILD_ID",
+                      "BUILD_COMMIT_ID",
                       "BUILD_URI",
-                      "BUILD_API_URI"]
+                      "BUILD_API_URI",
+                      "BUILD_ORIGIN_ID",
+                      "BUILD_ORIGIN_URI",
+                      "BUILD_WORKFLOW_NAME",
+                      "BUILD_WORKFLOW_PATH",
+                      "BUILD_REF",
+                      "BUILD_TRIGGER",
+                      "BUILD_CONTACT"]
     post_run_keys:   ["_BUILD_ID",
+                      "_BUILD_COMMIT_ID",
                       "_BUILD_URI",
-                      "_BUILD_API_URI"]
+                      "_BUILD_API_URI",
+                      "_BUILD_ORIGIN_ID",
+                      "_BUILD_ORIGIN_URI",
+                      "_BUILD_WORKFLOW_NAME",
+                      "_BUILD_WORKFLOW_PATH",
+                      "_BUILD_REF",
+                      "_BUILD_TRIGGER",
+                      "_BUILD_CONTACT"]
     doc: """
 Collects information about associated build jobs in Jenkins.
 
