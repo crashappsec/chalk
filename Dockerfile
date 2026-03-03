@@ -13,6 +13,7 @@ RUN apk add --no-cache \
     curl \
     gcc \
     git \
+    linux-headers \
     make \
     musl-dev \
     openssl \

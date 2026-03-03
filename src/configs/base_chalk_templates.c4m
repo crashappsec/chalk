@@ -75,6 +75,10 @@ or vice versa.
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.VCS_MISSING_FILES.use                   = true
+  key.VCS_DELETED_FILES.use                   = true
+  key.VCS_UNTRACKED_FILES.use                 = true
+  key.VCS_MODIFIED_FILES.use                  = true
+  key.VCS_DIFF_STAT.use                       = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_ATTEMPT.use                       = true
@@ -190,6 +194,10 @@ mark_template mark_large {
   key.CODE_OWNERS.use                         = true
   key.VCS_DIR_WHEN_CHALKED.use                = true
   key.VCS_MISSING_FILES.use                   = true
+  key.VCS_DELETED_FILES.use                   = true
+  key.VCS_UNTRACKED_FILES.use                 = true
+  key.VCS_MODIFIED_FILES.use                  = true
+  key.VCS_DIFF_STAT.use                       = true
   key.BUILD_ID.use                            = true
   key.BUILD_UNIQUE_ID.use                     = true
   key.BUILD_ATTEMPT.use                       = true

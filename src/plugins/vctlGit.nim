@@ -805,27 +805,33 @@ proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
     chalkDict.setIfNeeded(prefix & "TAG_SIGNED",           info.latestTag.signed)
     chalkDict.setIfNeeded(prefix & "TAG_MESSAGE",          info.latestTag.message)
 
+proc setN00bVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
+  let
+    refetch = attrGet[bool]("git.refetch_lightweight_tags")
+    envVars = @[
+      setEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS", if refetch: "true" else: "false"),
+      setEnv("N00B_GIT_REFETCH_ALLOW_NETWORK", if refetch: "true" else: "false"),
+    ]
+  withEnvRestore(envVars):
+    var data = n00bGitCollect(info.root())
+    if len(data) == 0 and info.vcsDir != "":
+      data = n00bGitCollect(info.vcsDir)
+    if len(data) == 0:
+      trace("git(n00b) repo=" & info.root() & " no_data")
+      return
+    for k, v in data:
+      chalkDict.setIfNeeded(prefix & k, v)
+
 proc compareWithN00b(info: RepoInfo) =
   let repoRoot = info.root()
   if repoRoot == "":
     return
 
-  let refetch = attrGet[bool]("git.refetch_lightweight_tags")
   var chalkDict = ChalkDict()
   chalkDict.setVcsKeys(info)
-  var n00bDict = ChalkDict()
 
-  let envVars = @[
-    setEnv("N00B_GIT_REFETCH_LIGHTWEIGHT_TAGS", if refetch: "true" else: "false"),
-    setEnv("N00B_GIT_REFETCH_ALLOW_NETWORK", if refetch: "true" else: "false"),
-  ]
-  withEnvRestore(envVars):
-    n00bDict = filterIfNeeded(n00bGitCollect(repoRoot))
-    if len(n00bDict) == 0 and info.vcsDir != "":
-      n00bDict = filterIfNeeded(n00bGitCollect(info.vcsDir))
-    if len(n00bDict) == 0:
-      trace("git(n00b) repo=" & repoRoot & " no_data")
-      return
+  var n00bDict = ChalkDict()
+  n00bDict.setN00bVcsKeys(info)
 
   trace("git(chalk) repo=" & repoRoot & " " & chalkDict.toJson())
   trace("git(n00b) repo=" & repoRoot & " " & n00bDict.toJson())
@@ -933,11 +939,13 @@ proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
   if obj.fsRef == "":
     for dir, info in cache.vcsDirs:
       result.setVcsKeys(info)
+      result.setN00bVcsKeys(info)
       break
 
   for dir, info in cache.vcsDirs:
     if obj.isInRepo(dir):
       result.setVcsKeys(info)
+      result.setN00bVcsKeys(info)
       break
 
 proc gitGetRunTimeArtifactInfo*(self:  Plugin,
@@ -959,6 +967,7 @@ proc gitGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]):
   let cache = GitInfo(self.internalState)
   for dir, info in cache.vcsDirs:
     result.setVcsKeys(info, prefix = "_")
+    result.setN00bVcsKeys(info, prefix = "_")
     break
 
 proc loadVctlGit*() =
