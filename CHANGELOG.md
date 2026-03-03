@@ -57,6 +57,9 @@
   ([#619](https://github.com/crashappsec/chalk/pull/619))
 - `--log-format` CLI argument to match `log_format` configuration.
   ([#628](https://github.com/crashappsec/chalk/pull/628))
+- Chalk can wrap "pull" docker commands. The report emits all metadata
+  about the pulled image.
+  ([#635](https://github.com/crashappsec/chalk/pull/635))
 
 ### Fixes
 

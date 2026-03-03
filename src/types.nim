@@ -415,7 +415,7 @@ type
     src*:  string
 
   DockerCmd* = enum
-    build, push, other
+    build, push, pull, other
 
   DockerInvocation* = ref object
     chalkId*:                 string # shared between multi-platform builds
@@ -467,7 +467,7 @@ type
       dfSectionAliases*:      OrderedTable[string, DockerFileSection]
       dfDirectives*:          OrderedTableRef[string, string]
 
-    of DockerCmd.push:
+    of DockerCmd.push, DockerCmd.pull:
       foundImage*:            string
       foundAllTags*:          bool
 

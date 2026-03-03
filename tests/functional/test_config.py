@@ -283,6 +283,7 @@ outconf = {
     "extract",
     "build",
     "push",
+    "pull",
     "exec",
     "postexec",
     "heartbeat",
