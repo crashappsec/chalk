@@ -68,8 +68,10 @@ def test_repo(
         if not empty
         else ""
     )
-    dummy = tmp_data_dir / "dummy"
-    dummy.write_text("hello")
+    delete = tmp_data_dir / "delete"
+    delete.write_text("DELETE_SENTINEL\n" * 20)
+    modify = tmp_data_dir / "modify"
+    modify.write_text("hello")
     git = (
         Git(tmp_data_dir, sign=sign)
         .init(remote=remote, branch="foo/bar")
@@ -78,11 +80,14 @@ def test_repo(
         .tag(f"foo/{random_hex}-1")
         .tag(f"foo/{random_hex}-2", tag_message if sign or annotate else None)
     )
+    untrack = tmp_data_dir / "untrack"
+    untrack.write_text("UNTRACKED_SENTINEL\n" * 20)
+    modify.write_text("world")
     if pack:
         git.pack()
     if symbolic_ref:
         git.symbolic_ref(f"refs/tags/foo/{random_hex}-2")
-    dummy.unlink()
+    delete.unlink()
     artifact = copy_files[0]
     result = chalk_copy.insert(artifact)
     assert result.mark.has(
@@ -101,7 +106,15 @@ def test_repo(
         TAG_MESSAGE=(tag_message if (sign or annotate) and not empty else MISSING),
         ORIGIN_URI=expected_remote or remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
-        VCS_MISSING_FILES=[dummy.name],
+        VCS_MISSING_FILES=[delete.name],
+        VCS_DELETED_FILES=[delete.name],
+        VCS_MODIFIED_FILES=[modify.name],
+        VCS_UNTRACKED_FILES=[untrack.name],
+        VCS_DIFF_STAT={
+            "files": 2,
+            "insertions": 1,
+            "deletions": 21,
+        },
     )
     assert result.report.has(
         _ORIGIN_URI=expected_remote or remote or "local",

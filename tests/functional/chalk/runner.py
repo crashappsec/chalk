@@ -17,6 +17,7 @@ from ..utils.cosign import Cosign
 from ..utils.dict import ANY, MISSING, Contains, ContainsDict, ContainsList, IfExists
 from ..utils.docker import Docker, DockerDigests
 from ..utils.log import get_logger
+from ..utils.git import GIT_NONINTERACTIVE_ENV
 from ..utils.os import CalledProcessError, Program, run
 from ..utils.text import valid_json
 
@@ -232,6 +233,11 @@ class ChalkProgram(Program):
                 self._json_log(i)
                 for i in self.logs.splitlines() + self.text.splitlines()
                 if self._json_log(i).lower().startswith("error:")
+                or (
+                    "git(n00b) diff" in i
+                    and "no_differences" not in i
+                    and "missing_in=chalk" not in i
+                )
             ],
         )
         return list(errors)
@@ -447,12 +453,13 @@ class Chalk:
             # TODO: add validation for docker image and container inspection
             cmd.append(target)
 
+        merged_env = {**self.env, **GIT_NONINTERACTIVE_ENV, **(env or {})}
         result = ChalkProgram.from_program(
             run(
                 cmd,
                 expected_exit_code=int(not expected_success),
                 cwd=cwd,
-                env={**self.env, **(env or {})},
+                env=merged_env,
                 stdin=stdin,
                 tty=tty,
             )

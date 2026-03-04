@@ -344,7 +344,6 @@ def run(
             log_level=log_level,
             binary=binary,
         )
-
         if check:
             try:
                 result.check()
