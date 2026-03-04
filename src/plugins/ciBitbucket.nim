@@ -45,10 +45,10 @@ proc getBitbucketMetadata(self: Plugin, prefix = ""): ChalkDict =
   result.setIfNeeded(prefix & "BUILD_WORKFLOW_NAME",   BITBUCKET_REPO_FULL_NAME)
   result.setIfNeeded(prefix & "BUILD_WORKFLOW_PATH",   BITBUCKET_PIPELINE_UUID)
 
-  # Construct BUILD_URI from components
-  if BITBUCKET_WORKSPACE != "" and BITBUCKET_REPO_SLUG != "" and BITBUCKET_PIPELINE_UUID != "":
+  # Construct BUILD_URI from BITBUCKET_GIT_HTTP_ORIGIN (e.g. https://bitbucket.org/workspace/repo)
+  if BITBUCKET_GIT_HTTP_ORIGIN != "" and BITBUCKET_BUILD_NUMBER != "":
     result.setIfNeeded(prefix & "BUILD_URI",
-      "https://bitbucket.org/" & BITBUCKET_WORKSPACE & "/" & BITBUCKET_REPO_SLUG &
+      BITBUCKET_GIT_HTTP_ORIGIN.strip(leading = false, chars = {'/'}) &
       "/pipelines/results/" & BITBUCKET_BUILD_NUMBER)
 
   if BITBUCKET_TAG != "":
