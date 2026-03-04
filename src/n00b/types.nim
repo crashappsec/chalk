@@ -37,6 +37,9 @@ proc n00b_type_stream*():   n00b_ntype_t {.header:"n00b/core.h".}
 proc n00b_type_process*():  n00b_ntype_t {.header:"n00b/core.h".}
 
 proc n00b_type_is_string*(typeId: n00b_ntype_t):   bool {.header:"n00b/core.h".}
+proc n00b_type_is_bool*(typeId: n00b_ntype_t):     bool {.header:"n00b/core.h".}
+proc n00b_type_is_int_type*(typeId: n00b_ntype_t): bool {.header:"n00b/core.h".}
+proc n00b_type_is_box*(typeId: n00b_ntype_t):      bool {.header:"n00b/core.h".}
 proc n00b_type_is_list*(typeId: n00b_ntype_t):     bool {.header:"n00b/core.h".}
 proc n00b_type_is_dict*(typeId: n00b_ntype_t):     bool {.header:"n00b/core.h".}
 proc n00b_type_is_tuple*(typeId: n00b_ntype_t):    bool {.header:"n00b/core.h".}
@@ -44,8 +47,16 @@ proc n00b_type_is_buffer*(typeId: n00b_ntype_t):   bool {.header:"n00b/core.h".}
 proc n00b_type_is_duration*(typeId: n00b_ntype_t): bool {.header:"n00b/core.h".}
 proc n00b_type_is_stream*(typeId: n00b_ntype_t):   bool {.header:"n00b/core.h".}
 proc n00b_type_is_process*(typeId: n00b_ntype_t):  bool {.header:"n00b/core.h".}
+proc n00b_type_unbox*(typeId: n00b_ntype_t):       n00b_ntype_t {.header:"n00b/core.h".}
 
 proc n00b_get_my_type*(obj: pointer): n00b_ntype_t {.header:"n00b/core.h".}
+proc n00b_unbox*(obj: N00bPrimitive): int64 {.header:"n00b/adts.h".}
+
+proc normalizedType*(typeId: n00b_ntype_t): n00b_ntype_t =
+  if n00b_type_is_box(typeId):
+    return n00b_type_unbox(typeId)
+  return typeId
+
 proc n00bType*(obj: N00bPrimitive): n00b_ntype_t =
   if obj == nil:
     return n00b_ntype_t(0)
@@ -55,6 +66,17 @@ proc isStringType*(typeId: n00b_ntype_t): bool =
   return n00b_type_is_string(typeId)
 proc isString*(x: N00bPrimitive): bool =
   return x.n00bType().isStringType()
+
+proc isBoolType*(typeId: n00b_ntype_t): bool =
+  return n00b_type_is_bool(typeId.normalizedType())
+proc isBool*(x: N00bPrimitive): bool =
+  return x.n00bType().isBoolType()
+
+proc isIntType*(typeId: n00b_ntype_t): bool =
+  let unboxed = typeId.normalizedType()
+  return n00b_type_is_int_type(unboxed) and not n00b_type_is_bool(unboxed)
+proc isInt*(x: N00bPrimitive): bool =
+  return x.n00bType().isIntType()
 
 proc isListType*(typeId: n00b_ntype_t): bool =
   return n00b_type_is_list(typeId)
@@ -105,3 +127,13 @@ proc asDict*(x: N00bPrimitive): ptr n00b_dict_t =
   if not x.isDict():
     raise newException(ValueError, "not a dict")
   return cast[ptr n00b_dict_t](x)
+
+proc asBool*(x: N00bPrimitive): bool =
+  if not x.isBool():
+    raise newException(ValueError, "not a bool")
+  return n00b_unbox(x) != 0
+
+proc asInt64*(x: N00bPrimitive): int64 =
+  if not x.isInt():
+    raise newException(ValueError, "not an int")
+  return n00b_unbox(x)

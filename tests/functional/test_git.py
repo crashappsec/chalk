@@ -69,7 +69,7 @@ def test_repo(
         else ""
     )
     delete = tmp_data_dir / "delete"
-    delete.write_text("hello")
+    delete.write_text("DELETE_SENTINEL\n" * 20)
     modify = tmp_data_dir / "modify"
     modify.write_text("hello")
     git = (
@@ -81,7 +81,7 @@ def test_repo(
         .tag(f"foo/{random_hex}-2", tag_message if sign or annotate else None)
     )
     untrack = tmp_data_dir / "untrack"
-    untrack.write_text("hello")
+    untrack.write_text("UNTRACKED_SENTINEL\n" * 20)
     modify.write_text("world")
     if pack:
         git.pack()

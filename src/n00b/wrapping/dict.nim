@@ -15,14 +15,6 @@ import "."/[
 
 export types
 
-when defined(no_chalk):
-  proc trace(s: string) =
-    discard
-else:
-  import pkg/[
-    nimutils/logging,
-  ]
-
 proc n00b_dict_get(
   dict:  ptr n00b_dict_t,
   key:   N00bPrimitives,
@@ -110,9 +102,14 @@ proc `$`*(dict: ptr n00b_dict_t): ChalkDict =
   for key, val in dict:
     if not key.isString():
       continue
+    let dictKey = $key.asString()
     if val.isString():
-      result[$key.asString()] = pack($val.asString())
+      result[dictKey] = pack($val.asString())
     elif val.isList():
-      result[$key.asString()] = pack($val.asList())
+      result[dictKey] = pack($val.asList())
     elif val.isDict():
-      result[$key.asString()] = pack($val.asDict())
+      result[dictKey] = pack($val.asDict())
+    elif val.isBool():
+      result[dictKey] = pack(val.asBool())
+    elif val.isInt():
+      result[dictKey] = pack(val.asInt64())

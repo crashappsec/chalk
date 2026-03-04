@@ -805,6 +805,45 @@ proc setVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
     chalkDict.setIfNeeded(prefix & "TAG_SIGNED",           info.latestTag.signed)
     chalkDict.setIfNeeded(prefix & "TAG_MESSAGE",          info.latestTag.message)
 
+proc normalizeN00bGitDateAndTimestamp(
+  chalkDict: ChalkDict,
+  prefix: string,
+  timeKey: string,
+  offsetKey: string,
+  dateKey: string,
+  timestampKey: string,
+) =
+  let
+    fullTimeKey = prefix & timeKey
+    fullOffsetKey = prefix & offsetKey
+  if fullTimeKey notin chalkDict or fullOffsetKey notin chalkDict:
+    return
+  try:
+    let seconds = unpack[int64](chalkDict[fullTimeKey])
+    # Offset value is not used for canonicalization, but required for this path.
+    discard unpack[int64](chalkDict[fullOffsetKey])
+    let normalized = fromUnix(seconds).utc
+    chalkDict[prefix & dateKey] = pack(normalized.forReport().format(timesIso8601Format))
+    chalkDict[prefix & timestampKey] = pack(normalized.toUnixInMs())
+  except CatchableError:
+    trace("git(n00b) normalize key=" & fullTimeKey & " parse_error")
+
+proc normalizeN00bGitTimes(chalkDict: ChalkDict, prefix = "") =
+  chalkDict.normalizeN00bGitDateAndTimestamp(
+    prefix,
+    "TIME_AUTHORED",
+    "OFFSET_AUTHORED",
+    "DATE_AUTHORED",
+    "TIMESTAMP_AUTHORED",
+  )
+  chalkDict.normalizeN00bGitDateAndTimestamp(
+    prefix,
+    "TIME_COMMITTED",
+    "OFFSET_COMMITTED",
+    "DATE_COMMITTED",
+    "TIMESTAMP_COMMITTED",
+  )
+
 proc setN00bVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
   let
     refetch = attrGet[bool]("git.refetch_lightweight_tags")
@@ -819,6 +858,8 @@ proc setN00bVcsKeys(chalkDict: ChalkDict, info: RepoInfo, prefix = "") =
     if len(data) == 0:
       trace("git(n00b) repo=" & info.root() & " no_data")
       return
+    # Normalize date/timestamp values before setIfNeeded() filters by key subscription.
+    data.normalizeN00bGitTimes()
     for k, v in data:
       chalkDict.setIfNeeded(prefix & k, v)
 
@@ -842,7 +883,8 @@ proc compareWithN00b(info: RepoInfo) =
   for k in chalkDict.keys():
     keys[k] = true
   for k in n00bDict.keys():
-    keys[k] = true
+    if k in chalkDict:
+      keys[k] = true
 
   var diffCount = 0
   for k in keys.keys():
