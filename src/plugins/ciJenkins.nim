@@ -50,6 +50,8 @@ proc getJenkinsMetadata(self: Plugin, prefix = ""): ChalkDict =
 
   if GIT_BRANCH != "":
     var buildRef = GIT_BRANCH
+    if buildRef.startsWith("origin/"):
+      buildRef = buildRef[7..^1]
     if not buildRef.startsWith("refs/"):
       buildRef = "refs/heads/" & buildRef
     result.setIfNeeded(prefix & "BUILD_REF", buildRef)

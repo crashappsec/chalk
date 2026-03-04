@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2025, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -14,6 +14,7 @@ import ".."/[
   run_management,
   types,
   utils/envvars,
+  utils/files,
 ]
 
 proc getTeamcityMetadata(self: Plugin, prefix = ""): ChalkDict =
@@ -39,8 +40,8 @@ proc getTeamcityMetadata(self: Plugin, prefix = ""): ChalkDict =
 
   # Parse system properties from the properties file for richer metadata
   if TC_PROPS_FILE != "":
-    try:
-      let props = readFile(TC_PROPS_FILE)
+    let props = tryToLoadFile(TC_PROPS_FILE)
+    if props != "":
       for line in props.splitLines():
         let parts = line.split('=', maxsplit=1)
         if parts.len == 2:
@@ -62,8 +63,6 @@ proc getTeamcityMetadata(self: Plugin, prefix = ""): ChalkDict =
               result.setIfNeeded(prefix & "BUILD_CONTACT", @[val])
           else:
             discard
-    except:
-      discard  # Properties file not readable; use env vars only
 
 proc teamcityGetChalkTimeHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   return self.getTeamcityMetadata()
