@@ -165,7 +165,7 @@ type
     init*:         proc (self: ObjectStore, name: string): ObjectStoreConfig
     uri*:          proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef): Uri
     objectExists*: proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef): ObjectStoreRef
-    createObject*: proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef, data: string): ObjectStoreRef
+    createObject*: proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef, data: string, contentType: string): ObjectStoreRef
 
   ObjectStoreConfig* = ref object of RootRef
     name*:  string
@@ -415,7 +415,7 @@ type
     src*:  string
 
   DockerCmd* = enum
-    build, push, other
+    build, push, pull, other
 
   DockerInvocation* = ref object
     chalkId*:                 string # shared between multi-platform builds
@@ -467,7 +467,7 @@ type
       dfSectionAliases*:      OrderedTable[string, DockerFileSection]
       dfDirectives*:          OrderedTableRef[string, string]
 
-    of DockerCmd.push:
+    of DockerCmd.push, DockerCmd.pull:
       foundImage*:            string
       foundAllTags*:          bool
 

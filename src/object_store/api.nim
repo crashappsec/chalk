@@ -88,7 +88,9 @@ proc objectifyKey(dict:            ChalkDict,
                   v:               Box,
                   content:         string,
                   objectsData:     ObjectsDict,
-                  storeConfigName: string) =
+                  storeConfigName: string,
+                  onlyStore:       bool,
+                  contentType:     string) =
   let objectRefs = objectsData.mgetOrPut(storeConfigName, newOrderedTable[string, ObjectStoreRef]())
   # key was already objectified before. use existing ref
   if k in objectRefs:
@@ -105,7 +107,7 @@ proc objectifyKey(dict:            ChalkDict,
     if storeRef == nil:
       try:
         trace("object store: creating key in object store: " & $lookupRef)
-        storeRef = storeConfig.store.createObject(storeConfig, lookupRef, content)
+        storeRef = storeConfig.store.createObject(storeConfig, lookupRef, content, contentType)
       except:
         let e = getCurrentExceptionMsg()
         # it is possible multiple chalks might be trying to upload the same object/hash
@@ -125,7 +127,7 @@ proc objectifyKey(dict:            ChalkDict,
   if storeRef != nil:
     objectRefs[k] = storeRef
     dict[objectStorePrefix & k] = pack($storeRef)
-  else:
+  elif not onlyStore:
     error("object store: could not either lookup existing or upload object for " & k)
     dict[k] = v
 
@@ -143,14 +145,27 @@ proc objectifyByTemplate*(collectedData: ChalkDict,
     let
       storeConfigName = attrGetOpt[string](temp & ".key." & k & ".object_store").get("")
       enabled         = attrGetOpt[bool]("object_store_config." & storeConfigName & ".enabled").get(false)
+      onlyStore       = attrGet[bool]("keyspec." & k & ".only_object_store")
       useStore        = enabled and storeConfigName != ""
-      content         = v.boxToJson()
-    if useStore:
-      trace("object_store: using per-key " & k & " object store " & storeConfigName)
-      objectifyKey(result, k, v, content, objectsData, storeConfigName)
+      contentType     =
+        if v.kind == MkStr:
+          "application/octet-stream"
+        else:
+          "application/json"
+      content         =
+        if v.kind == MkStr:
+          $v
+        else:
+          v.boxToJson()
+    if onlyStore or useStore:
+      if useStore:
+        trace("object_store: using per-key " & k & " object store " & storeConfigName)
+        objectifyKey(result, k, v, content, objectsData, storeConfigName, onlyStore, contentType)
+      else:
+        trace("object_store: keyspec." & k & ".only_object_store=True but the object store is disabled. Skipping key.")
     elif useDefault and Con4mSize(len(content)) > defaultThreshold:
       trace("object_store: " & k & " using default object store " & defaultStoreConfigName)
-      objectifyKey(result, k, v, content, objectsData, defaultStoreConfigName)
+      objectifyKey(result, k, v, content, objectsData, defaultStoreConfigName, onlyStore, contentType)
     else:
       # when defined(debug):
       #   trace("object_store: no object store for " & k)

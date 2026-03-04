@@ -27,6 +27,10 @@ outconf push {
   report_template:        "insertion_default"
 }
 
+outconf pull {
+  report_template:        "report_default"
+}
+
 outconf exec {
   report_template:        "report_default"
 }

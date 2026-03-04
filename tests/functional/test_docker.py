@@ -1536,8 +1536,21 @@ def test_build_and_push(
         _SIGNATURES=signatures,
     )
 
-    pull = chalk_copy.docker_pull(full)
+    Docker.remove_images([full])
+
+    _, pull = chalk_copy.docker_pull(full)
     assert pull.find("Digest:") == f"sha256:{digests.registry}"
+    assert pull.mark.lifted.has(
+        CHALK_ID=build_result.mark["CHALK_ID"],
+        METADATA_ID=build_result.mark["METADATA_ID"],
+        METADATA_HASH=build_result.mark["METADATA_HASH"],
+        _CURRENT_HASH=digests.either_registry_ids,
+        _REPO_DIGESTS={
+            registry: {
+                name: [digests.registry_digest],
+            }
+        },
+    )
 
 
 def test_push_nonchalked(chalk: Chalk, random_hex: str):

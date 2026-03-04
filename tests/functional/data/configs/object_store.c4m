@@ -1,0 +1,16 @@
+keyspec _X_OBJECT_STORE_STRING {
+  kind:              RunTimeHost
+  type:              string
+  value:             "hello world"
+  only_object_store: true
+}
+
+keyspec _X_OBJECT_STORE_DICT {
+  kind:              RunTimeHost
+  type:              dict[string, `x]
+  value:             {"hello": "world"}
+  only_object_store: true
+}
+
+report_template.insertion_default.key._X_OBJECT_STORE_STRING.object_store = "server"
+report_template.insertion_default.key._X_OBJECT_STORE_DICT.object_store = "server"

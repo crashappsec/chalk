@@ -20,7 +20,7 @@ all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
 
 
 # Beyond valid chalk commands, these can generate reports.
-other_report_ops     := ["build", "push", "heartbeat", "postexec"]
+other_report_ops     := ["build", "push", "pull", "heartbeat", "postexec"]
 tool_types           := ["sbom", "sast", "secret_scanner"]
 valid_log_levels     := ["verbose", "trace", "info", "warn", "error", "none"]
 valid_log_formats    := ["auto", "plain", "json"]
@@ -746,6 +746,15 @@ The normalization order used for signing and hashing metadata.
 This only works for built-in keys; everything else is given the same
 priority and should be sorted alphabetically.
 """
+  }
+
+  field only_object_store {
+    type:       bool
+    default:    false
+    doc: """
+Only send the field to the object store and otherwise never include
+the field in regular chalk reports.
+    """
   }
 
   field canonicalize {

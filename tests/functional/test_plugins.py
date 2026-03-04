@@ -1476,3 +1476,44 @@ def test_bitbucket(copy_files: list[Path], chalk: Chalk):
             "BUILD_CONTACT": MISSING,
         }
     )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_object_store(
+    chalk: Chalk,
+    copy_files: list[Path],
+    server_http: str,
+):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        config=CONFIGS / "object_store.c4m",
+        env={
+            "OBJECT_STORE": f"{server_http}/presign/objects",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "@_X_OBJECT_STORE_STRING": re.compile(
+                rf"^presign\+{server_http}/presign/objects/_X_OBJECT_STORE_STRING"
+            ),
+            "@_X_OBJECT_STORE_DICT": re.compile(
+                rf"^presign\+{server_http}/presign/objects/_X_OBJECT_STORE_DICT"
+            ),
+        }
+    )
+
+    str_url = insert.report["@_X_OBJECT_STORE_STRING"].split("+", maxsplit=1)[1]
+    dict_url = insert.report["@_X_OBJECT_STORE_DICT"].split("+", maxsplit=1)[1]
+
+    assert (
+        httpx.get(
+            str_url,
+            follow_redirects=True,
+        ).text
+        == "hello world"
+    )
+    assert httpx.get(
+        dict_url,
+        follow_redirects=True,
+    ).json() == {"hello": "world"}

@@ -134,6 +134,13 @@ docker {
     }
     command pull {
       args: (0, high())
+      flag_multi_arg all_tags {
+        aliases: ["a"]
+        optional_arg: true
+      }
+      flag_yn        quiet {
+        yes_aliases: ["q"]
+      }
     }
     command rename {
       args: (0, high())

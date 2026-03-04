@@ -72,15 +72,22 @@ proc request(self:           ObjectStorePresign,
              auth:           AuthConfig,
              httpMethod:     HttpMethod,
              body:           string,
+             contentType   = "",
              ): (Response, ObjectStoreRef) =
+  let contentTypeHeaders =
+    if contentType == "":
+      newHttpHeaders()
+    else:
+      newHttpHeaders(@[
+        ("Content-Type", contentType),
+      ])
   var signHeaders = newHttpHeaders(@[
-    ("Content-Type", "application/json"),
     ("X-Content-Length", $len(body)),
     ("X-Chalk-Digest-Sha256", keyRef.digest),
     ("X-Chalk-Version", getChalkExeVersion()),
     # TODO expose better API for action id interaction
     ("X-Chalk-Action-Id", unpack[string](hostInfo["_ACTION_ID"])),
-  ]).update(self.headers)
+  ]).update(contentTypeHeaders).update(self.headers)
   if auth != nil:
     signHeaders = auth.implementation.injectHeaders(auth, signHeaders)
 
@@ -121,9 +128,8 @@ proc request(self:           ObjectStorePresign,
   var
     names   = newSeq[string]()
     headers = newHttpHeaders(@[
-      ("Content-Type", "application/json"),
       ("Content-Length", $len(body)),
-    ])
+    ]).update(contentTypeHeaders)
   if signResponse.headers.hasKey("x-forward-headers"):
     names = signResponse.headers["x-forward-headers"].strip().split(',')
     for i in names:
@@ -148,14 +154,16 @@ proc request(self:           ObjectStorePresign,
   updatedRef.query = signResponse.headers.getOrDefault("x-chalk-object-query")
   return (response, updatedRef)
 
-proc objectExists(this: ObjectStoreConfig, keyRef: ObjectStoreRef): ObjectStoreRef =
+proc objectExists(this:   ObjectStoreConfig,
+                  keyRef: ObjectStoreRef,
+                  ): ObjectStoreRef =
   let
     self = ObjectStorePresign(this)
     (response, updatedRef) = self.request(
       keyRef,
-      auth       = self.readAuth,
-      httpMethod = HttpHead,
-      body       = "",
+      auth        = self.readAuth,
+      httpMethod  = HttpHead,
+      body        = "",
     )
   if response.code.is2xx():
     return updatedRef
@@ -164,14 +172,19 @@ proc objectExists(this: ObjectStoreConfig, keyRef: ObjectStoreRef): ObjectStoreR
   else:
     raise newException(ValueError, $response.code & " " & response.body())
 
-proc createObject(this: ObjectStoreConfig, keyRef: ObjectStoreRef, data: string): ObjectStoreRef =
+proc createObject(this:        ObjectStoreConfig,
+                  keyRef:      ObjectStoreRef,
+                  data:        string,
+                  contentType: string,
+                  ): ObjectStoreRef =
   let
     self = ObjectStorePresign(this)
     (response, updatedRef) = self.request(
       keyRef,
-      auth       = self.writeAuth,
-      httpMethod = HttpPut,
-      body       = data,
+      auth        = self.writeAuth,
+      httpMethod  = HttpPut,
+      body        = data,
+      contentType = contentType,
     )
   if response.code.is2xx():
     return updatedRef
