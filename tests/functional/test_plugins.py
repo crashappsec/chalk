@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2025, Crash Override, Inc.
+# Copyright (c) 2023-2026, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -1228,6 +1228,255 @@ export AWS_SESSION_TOKEN={AWS_SESSION_TOKEN}
     assert insert.mark.has(
         # scans specific file
         SECRET_SCANNER=data,
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_jenkins(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    env = {
+        "CI": "true",
+        "BUILD_ID": "77",
+        "BUILD_NUMBER": "77",
+        "BUILD_URL": "http://jenkins:8080/job/chalk-test/77/",
+        "JENKINS_URL": "http://jenkins:8080/",
+        "JOB_NAME": "chalk-test",
+        "JOB_URL": "http://jenkins:8080/job/chalk-test/",
+        "NODE_NAME": "built-in",
+        "BUILD_TAG": "jenkins-chalk-test-77",
+        "GIT_COMMIT": "ffac537e6cbbf934b08745a378932722df287a53",
+        "GIT_BRANCH": "origin/main",
+        "GIT_URL": "https://github.com/crashappsec/chalk.git",
+        "BUILD_CAUSE": "UserIdCause",
+    }
+    insert = chalk.insert(bin_path, env=env)
+    assert insert.report.contains(
+        {
+            "BUILD_ID": "77",
+            "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_URI": "http://jenkins:8080/job/chalk-test/77/",
+            "BUILD_API_URI": "http://jenkins:8080/",
+            "BUILD_ORIGIN_ID": "chalk-test",
+            "BUILD_ORIGIN_URI": "https://github.com/crashappsec/chalk.git",
+            "BUILD_WORKFLOW_NAME": "chalk-test",
+            "BUILD_WORKFLOW_PATH": "http://jenkins:8080/job/chalk-test/",
+            "BUILD_REF": "refs/heads/main",
+            "BUILD_TRIGGER": "UserIdCause",
+            "BUILD_CONTACT": ["built-in"],
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_teamcity(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    with make_tmp_file() as props_file:
+        props_file.write_text(
+            """
+teamcity.build.id=12345
+teamcity.serverUrl=http://teamcity:8111
+teamcity.buildType.id=MyProject_Build
+teamcity.build.branch=main
+teamcity.build.triggeredBy.username=testuser
+        """
+        )
+        env = {
+            "TEAMCITY_VERSION": "2024.12",
+            "BUILD_NUMBER": "42",
+            "BUILD_VCS_NUMBER": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_URL": "http://teamcity:8111/viewLog.html?buildId=42",
+            "TEAMCITY_BUILDCONF_NAME": "MyProject :: Build",
+            "TEAMCITY_BUILD_PROPERTIES_FILE": str(props_file),
+        }
+        insert = chalk.insert(bin_path, env=env)
+        assert insert.report.contains(
+            {
+                "BUILD_ID": "12345",
+                "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+                "BUILD_URI": "http://teamcity:8111/viewLog.html?buildId=42",
+                "BUILD_API_URI": "http://teamcity:8111",
+                "BUILD_WORKFLOW_NAME": "MyProject :: Build",
+                "BUILD_WORKFLOW_PATH": "MyProject_Build",
+                "BUILD_REF": "refs/heads/main",
+                "BUILD_CONTACT": ["testuser"],
+            }
+        )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_buildkite(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={
+            "BUILDKITE": "true",
+            "BUILDKITE_BUILD_ID": "abc-123",
+            "BUILDKITE_JOB_ID": "job-456",
+            "BUILDKITE_COMMIT": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILDKITE_BRANCH": "main",
+            "BUILDKITE_BUILD_URL": "https://buildkite.com/org/pipe/builds/42",
+            "BUILDKITE_PIPELINE_ID": "pipe-id",
+            "BUILDKITE_ORGANIZATION_SLUG": "org",
+            "BUILDKITE_PIPELINE_SLUG": "pipe",
+            "BUILDKITE_STEP_KEY": "build",
+            "BUILDKITE_SOURCE": "webhook",
+            "BUILDKITE_REPO": "https://github.com/org/repo.git",
+            "BUILDKITE_BUILD_CREATOR": "testuser",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "BUILD_ID": "job-456",
+            "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_URI": "https://buildkite.com/org/pipe/builds/42",
+            "BUILD_ORIGIN_ID": "pipe-id",
+            "BUILD_ORIGIN_OWNER_ID": "org",
+            "BUILD_ORIGIN_URI": "https://github.com/org/repo.git",
+            "BUILD_WORKFLOW_NAME": "pipe",
+            "BUILD_WORKFLOW_PATH": "build",
+            "BUILD_REF": "refs/heads/main",
+            "BUILD_TRIGGER": "webhook",
+            "BUILD_CONTACT": ["testuser"],
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_buildkite_tag(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={
+            "BUILDKITE": "true",
+            "BUILDKITE_BUILD_ID": "abc-123",
+            "BUILDKITE_JOB_ID": "job-456",
+            "BUILDKITE_COMMIT": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILDKITE_TAG": "v1.0.0",
+            "BUILDKITE_BUILD_URL": "https://buildkite.com/org/pipe/builds/42",
+            "BUILDKITE_PIPELINE_ID": "pipe-id",
+            "BUILDKITE_ORGANIZATION_SLUG": "org",
+            "BUILDKITE_PIPELINE_SLUG": "pipe",
+            "BUILDKITE_STEP_KEY": "build",
+            "BUILDKITE_SOURCE": "webhook",
+            "BUILDKITE_REPO": "https://github.com/org/repo.git",
+            "BUILDKITE_BUILD_CREATOR": "testuser",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "BUILD_REF": "refs/tags/v1.0.0",
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_circleci(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={
+            "CIRCLECI": "true",
+            "CIRCLE_BUILD_NUM": "42",
+            "CIRCLE_BUILD_URL": "https://circleci.com/gh/org/repo/42",
+            "CIRCLE_SHA1": "ffac537e6cbbf934b08745a378932722df287a53",
+            "CIRCLE_BRANCH": "main",
+            "CIRCLE_JOB": "build",
+            "CIRCLE_WORKFLOW_ID": "wf-123",
+            "CIRCLE_WORKFLOW_JOB_ID": "wf-job-456",
+            "CIRCLE_PROJECT_ID": "proj-id",
+            "CIRCLE_ORGANIZATION_ID": "org-id",
+            "CIRCLE_REPOSITORY_URL": "https://github.com/org/repo",
+            "CIRCLE_USERNAME": "testuser",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "BUILD_ID": "wf-job-456",
+            "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_URI": "https://circleci.com/gh/org/repo/42",
+            "BUILD_ORIGIN_ID": "proj-id",
+            "BUILD_ORIGIN_OWNER_ID": "org-id",
+            "BUILD_ORIGIN_URI": "https://github.com/org/repo",
+            "BUILD_WORKFLOW_NAME": "wf-123",
+            "BUILD_WORKFLOW_PATH": "build",
+            "BUILD_REF": "refs/heads/main",
+            "BUILD_CONTACT": ["testuser"],
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_azure_devops(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={
+            "TF_BUILD": "True",
+            "BUILD_BUILDID": "789",
+            "BUILD_SOURCEVERSION": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_SOURCEBRANCH": "refs/heads/main",
+            "BUILD_REPOSITORY_URI": "https://dev.azure.com/org/proj/_git/repo",
+            "BUILD_REPOSITORY_ID": "repo-id",
+            "BUILD_DEFINITIONNAME": "CI Build",
+            "BUILD_REASON": "IndividualCI",
+            "BUILD_REQUESTEDFOR": "testuser",
+            "SYSTEM_TEAMPROJECT": "myproject",
+            "SYSTEM_TEAMPROJECTID": "proj-id",
+            "SYSTEM_TEAMFOUNDATIONCOLLECTIONURI": "https://dev.azure.com/org/",
+            "SYSTEM_JOBID": "job-123",
+            "SYSTEM_DEFINITIONID": "42",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "BUILD_ID": "job-123",
+            "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_URI": "https://dev.azure.com/org/myproject/_build/results?buildId=789",
+            "BUILD_API_URI": "https://dev.azure.com/org/",
+            "BUILD_ORIGIN_ID": "repo-id",
+            "BUILD_ORIGIN_OWNER_ID": "proj-id",
+            "BUILD_ORIGIN_URI": "https://dev.azure.com/org/proj/_git/repo",
+            "BUILD_WORKFLOW_NAME": "CI Build",
+            "BUILD_WORKFLOW_PATH": "42",
+            "BUILD_REF": "refs/heads/main",
+            "BUILD_TRIGGER": "IndividualCI",
+            "BUILD_CONTACT": ["testuser"],
+        }
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_bitbucket(copy_files: list[Path], chalk: Chalk):
+    bin_path = copy_files[0]
+    insert = chalk.insert(
+        bin_path,
+        env={
+            "BITBUCKET_BUILD_NUMBER": "42",
+            "BITBUCKET_COMMIT": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BITBUCKET_BRANCH": "main",
+            "BITBUCKET_REPO_SLUG": "repo",
+            "BITBUCKET_REPO_UUID": "{repo-uuid}",
+            "BITBUCKET_REPO_FULL_NAME": "workspace/repo",
+            "BITBUCKET_WORKSPACE": "workspace",
+            "BITBUCKET_PIPELINE_UUID": "{pipe-uuid}",
+            "BITBUCKET_STEP_UUID": "{step-uuid}",
+            "BITBUCKET_GIT_HTTP_ORIGIN": "https://bitbucket.org/workspace/repo",
+        },
+    )
+    assert insert.report.contains(
+        {
+            "BUILD_ID": "{step-uuid}",
+            "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
+            "BUILD_URI": "https://bitbucket.org/workspace/repo/pipelines/results/42",
+            "BUILD_ORIGIN_ID": "{repo-uuid}",
+            "BUILD_ORIGIN_OWNER_ID": "workspace",
+            "BUILD_ORIGIN_URI": "https://bitbucket.org/workspace/repo",
+            "BUILD_WORKFLOW_NAME": "workspace/repo",
+            "BUILD_WORKFLOW_PATH": "{pipe-uuid}",
+            "BUILD_REF": "refs/heads/main",
+            "BUILD_TRIGGER": "push",
+            "BUILD_CONTACT": MISSING,
+        }
     )
 
 
