@@ -110,7 +110,11 @@ def test_repo(
         VCS_DELETED_FILES=[delete.name],
         VCS_MODIFIED_FILES=[modify.name],
         VCS_UNTRACKED_FILES=[untrack.name],
-        VCS_DIFF_STAT={},  # TODO
+        VCS_DIFF_STAT={
+            "files": 2,
+            "insertions": 1,
+            "deletions": 21,
+        },
     )
     assert result.report.has(
         _ORIGIN_URI=expected_remote or remote or "local",
