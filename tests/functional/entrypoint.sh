@@ -64,16 +64,6 @@ if ! docker buildx inspect $empty_builder &> /dev/null; then
         > /dev/null
 fi
 
-# The functional tests run in a root-owned container against a bind-mounted
-# repository owned by the host user. Mark the mounted repo as safe so git/libgit2
-# can open it during chalk startup checks.
-if which git &> /dev/null; then
-    repo_root="$(cd "$FILEDIR/../.." && pwd)"
-    if ! git config --global --get-all safe.directory | grep -Fxq "$repo_root"; then
-        git config --global --add safe.directory "$repo_root"
-    fi
-fi
-
 if which "${1:-}" &> /dev/null; then
     exec "$@"
 else
