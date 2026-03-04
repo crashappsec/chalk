@@ -748,6 +748,15 @@ priority and should be sorted alphabetically.
 """
   }
 
+  field only_object_store {
+    type:       bool
+    default:    false
+    doc: """
+Only send the field to the object store and otherwise never include
+the field in regular chalk reports.
+    """
+  }
+
   field canonicalize {
     type:       func (`x) -> `y
     require:    false

@@ -60,6 +60,9 @@
 - Chalk can wrap "pull" docker commands. The report emits all metadata
   about the pulled image.
   ([#635](https://github.com/crashappsec/chalk/pull/635))
+- New configuration `keyspec.<key>.only_object_store` which forces key to be
+  only reported via object store.
+  ([#637](https://github.com/crashappsec/chalk/pull/637))
 
 ### Fixes
 
@@ -74,6 +77,9 @@
   Otherwise `/tmp` was accumulating backup files after multiple
   `insert` commands.
   ([#633](https://github.com/crashappsec/chalk/issues/633))
+- String keys are uploaded as raw blobs to the object store instead
+  of uploading json string which will add wrapping quotes.
+  ([#636](https://github.com/crashappsec/chalk/pull/636))
 
 ## 0.6.8
 

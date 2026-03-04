@@ -3,6 +3,7 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import asyncio
+import json
 import os
 import pathlib
 import secrets
@@ -240,11 +241,23 @@ async def object_exists(key: str):
 async def object_get(key: str):
     if key not in objects:
         raise HTTPException(status_code=404)
-    return objects[key]
+    data = objects[key]
+    if isinstance(data, bytes):
+        return PlainTextResponse(data)
+    else:
+        return objects[key]
 
 
 @app.put("/objects/{key}")
-async def object_create(key: str, data: dict = Body(None)):
+async def object_create(key: str, request: Request):
     if key in objects:
         raise HTTPException(status_code=status.HTTP_412_PRECONDITION_FAILED)
-    objects[key] = data
+    content_type = request.headers.get("content-type", "")
+    body = await request.body()
+    if "application/json" in content_type:
+        try:
+            objects[key] = json.loads(body)
+        except Exception:
+            raise HTTPException(status_code=400)
+    else:
+        objects[key] = body
