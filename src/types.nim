@@ -165,7 +165,7 @@ type
     init*:         proc (self: ObjectStore, name: string): ObjectStoreConfig
     uri*:          proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef): Uri
     objectExists*: proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef): ObjectStoreRef
-    createObject*: proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef, data: string): ObjectStoreRef
+    createObject*: proc (self: ObjectStoreConfig, keyRef: ObjectStoreRef, data: string, contentType: string): ObjectStoreRef
 
   ObjectStoreConfig* = ref object of RootRef
     name*:  string
