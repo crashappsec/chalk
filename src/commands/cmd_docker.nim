@@ -27,6 +27,7 @@ import "../docker"/[
   build,
   cmdline,
   exe,
+  pull,
   push,
 ]
 import ".."/[
@@ -60,6 +61,10 @@ proc runCmdDocker*(args: seq[string]) =
       info("Running docker push.")
       setFullCommandName("push")
       exitCode = ctx.dockerPush()
+    of DockerCmd.pull:
+      info("Running docker pull.")
+      setFullCommandName("pull")
+      exitCode = ctx.dockerPull()
     else:
       ctx.dockerPassThrough()
 

@@ -223,6 +223,8 @@ proc initDockerInvocation*(originalArgs: seq[string]): DockerInvocation =
         DockerCmd.build
       of "push":
         DockerCmd.push
+      of "pull":
+        DockerCmd.pull
       else:
         DockerCmd.other
     flags =
@@ -271,6 +273,9 @@ proc extractDockerCommand*(self: DockerInvocation): DockerCmd =
     self.addedPlatform = newOrderedTable[string, seq[string]]()
     self.dfDirectives  = newOrderedTable[string, string]()
   of DockerCmd.push:
+    self.extractImage()
+    self.extractAllTags()
+  of DockerCmd.pull:
     self.extractImage()
     self.extractAllTags()
   else:

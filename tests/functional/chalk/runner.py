@@ -807,8 +807,11 @@ class Chalk:
             push,
         )
 
-    def docker_pull(self, image: str):
-        return self.run(
-            params=["docker", "pull", image],
-            expecting_report=False,
+    def docker_pull(self, image: str) -> tuple[DockerDigests, ChalkProgram]:
+        return (
+            Docker.crane_digests(image),
+            self.run(
+                params=["docker", "pull", image],
+                expecting_report=False,
+            ),
         )
