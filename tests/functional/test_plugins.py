@@ -1272,11 +1272,13 @@ def test_teamcity(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
     with make_tmp_file() as props_file:
         props_file.write_text(
-            "teamcity.build.id=12345\n"
-            "teamcity.serverUrl=http://teamcity:8111\n"
-            "teamcity.buildType.id=MyProject_Build\n"
-            "teamcity.build.branch=main\n"
-            "teamcity.build.triggeredBy.username=testuser\n"
+            """
+teamcity.build.id=12345
+teamcity.serverUrl=http://teamcity:8111
+teamcity.buildType.id=MyProject_Build
+teamcity.build.branch=main
+teamcity.build.triggeredBy.username=testuser
+        """
         )
         env = {
             "TEAMCITY_VERSION": "2024.12",

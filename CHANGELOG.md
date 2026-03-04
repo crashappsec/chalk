@@ -63,6 +63,15 @@
 - New configuration `keyspec.<key>.only_object_store` which forces key to be
   only reported via object store.
   ([#637](https://github.com/crashappsec/chalk/pull/637))
+- New chalk plugins for collecting CI metadata for:
+  - Jenkins
+  - Buildkite
+  - BitBucket
+  - CircleCI
+  - Azure DevOps
+  - TeamCity
+
+  ([#636](https://github.com/crashappsec/chalk/pull/636))
 
 ### Fixes
 
