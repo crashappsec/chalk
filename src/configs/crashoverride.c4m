@@ -207,6 +207,10 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.CODE_OWNERS.use                         = true
   ~key.VCS_DIR_WHEN_CHALKED.use                = true
   ~key.VCS_MISSING_FILES.use                   = true
+  ~key.VCS_DELETED_FILES.use                   = true
+  ~key.VCS_UNTRACKED_FILES.use                 = true
+  ~key.VCS_MODIFIED_FILES.use                  = true
+  ~key.VCS_DIFF_STAT.use                       = true
   ~key._BUILD_ID.use                           = true
   ~key._BUILD_UNIQUE_ID.use                    = true
   ~key._BUILD_COMMIT_ID.use                    = true

@@ -360,7 +360,6 @@ def run(
             env=env_vars,
             log_level=log_level,
         )
-
         if check:
             try:
                 result.check()

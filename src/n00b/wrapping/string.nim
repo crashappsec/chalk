@@ -27,16 +27,16 @@ proc n00b_buffer_to_c(
   n: ptr int64,
 ): cstring {.header:"n00b/adts.h"}
 
-proc `@`*(s: string): ptr n00b_string_t =
+converter `@`*(s: string): ptr n00b_string_t =
   return n00b_cstring(cstring(s), n00bLoc())
 
-proc `@`*(s: seq[string]): ptr n00b_list_t =
+converter `@`*(s: seq[string]): ptr n00b_list_t =
   let p = allocCStringArray(s)
   result = n00b_from_cstr_list(p, n00b_size_t(len(s)))
   deallocCStringArray(p)
 
-proc `$`*(s: ptr n00b_string_t): string =
+converter `$`*(s: ptr n00b_string_t): string =
   return $(n00b_string_to_cstr(s))
 
-proc `$`*(b: ptr n00b_buf_t): string =
+converter `$`*(b: ptr n00b_buf_t): string =
   return $(n00b_buffer_to_c(b, nil))

@@ -68,8 +68,8 @@ ifneq "$(TMUX)" ""
 	tmux clear-history
 endif
 	$(DOCKER) nimble -y $(CHALK_BUILD)
-	mv $(BINARY) $@
-	cp $@ $(BINARY)
+	mv -f $(BINARY) $@
+	cp -f $@ $(BINARY)
 	ls -la $(BINARY) $@
 
 debug: DEBUG=true

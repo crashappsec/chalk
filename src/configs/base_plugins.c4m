@@ -102,7 +102,9 @@ plugin vctl_git {
                       "AUTHOR", "DATE_AUTHORED", "TIMESTAMP_AUTHORED",
                       "COMMITTER", "DATE_COMMITTED", "TIMESTAMP_COMMITTED", "COMMIT_MESSAGE",
                       "TAG", "TAG_SIGNED", "TAGGER", "DATE_TAGGED", "TIMESTAMP_TAGGED",
-                      "TAG_MESSAGE", "VCS_DIR_WHEN_CHALKED", "VCS_MISSING_FILES"]
+                      "TAG_MESSAGE", "VCS_DIR_WHEN_CHALKED", "VCS_MISSING_FILES",
+                      "VCS_DELETED_FILES", "VCS_UNTRACKED_FILES", "VCS_MODIFIED_FILES",
+                      "VCS_DIFF_STAT", "VCS_DIFF_PATCH"]
     post_chalk_keys: ["_OP_ARTIFACT_PATH_WITHIN_VCTL"]
     post_run_keys:   ["_COMMIT_ID", "_COMMIT_SIGNED",
                       "_BRANCH", "_ORIGIN_URI",

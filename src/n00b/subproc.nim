@@ -1,5 +1,6 @@
 import std/[
   posix,
+  strutils,
 ]
 import ".."/[
   utils/times,
