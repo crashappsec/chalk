@@ -2,4 +2,9 @@ network.tcp_socket_statuses = ["LISTEN", "ESTABLISHED"]
 report_template insertion_default {
   key._OP_TCP_SOCKET_INFO.use = true
   key._OP_UDP_SOCKET_INFO.use = true
+  key._OP_ARP_TABLE.use       = true
+  key._OP_IPV4_ROUTES.use     = true
+  key._OP_IPV4_INTERFACES.use = true
+  key._OP_IPV6_ROUTES.use     = true
+  key._OP_IPV6_INTERFACES.use = true
 }
