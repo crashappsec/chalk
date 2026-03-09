@@ -15,7 +15,6 @@ from .dict import ContainsDict, Either, MISSING, Repr
 from .log import get_logger
 from .os import Program, run
 
-
 logger = get_logger()
 
 ProgramType = TypeVar("ProgramType", bound=Program)
