@@ -402,6 +402,7 @@ report and subtract from it.
   key._OP_EXE_NAME.use                        = true
   key._OP_EXE_PATH.use                        = true
   key._OP_ARGV.use                            = true
+  key._OP_ANCESTOR_ARGVS.use                  = true
   key._OP_CONFIG.use                          = true
   key._UNMARKED.use                           = true
   key._OP_CHALKER_COMMIT_ID.use               = true
@@ -578,6 +579,7 @@ doc: """
   key._OP_EXE_NAME.use                        = true
   key._OP_EXE_PATH.use                        = true
   key._OP_ARGV.use                            = true
+  key._OP_ANCESTOR_ARGVS.use                  = true
   key._OP_CONFIG.use                          = true
   key._UNMARKED.use                           = true
   key._OP_CHALKER_COMMIT_ID.use               = true
@@ -1134,6 +1136,7 @@ container.
   key._OP_EXE_NAME.use                        = true
   key._OP_EXE_PATH.use                        = true
   key._OP_ARGV.use                            = true
+  key._OP_ANCESTOR_ARGVS.use                  = true
   key._OP_CONFIG.use                          = true
   key._UNMARKED.use                           = true
   key._OP_CHALKER_COMMIT_ID.use               = true
@@ -1651,6 +1654,7 @@ and keep the run-time key.
   key._OP_EXE_NAME.use                        = true
   key._OP_EXE_PATH.use                        = true
   key._OP_ARGV.use                            = true
+  key._OP_ANCESTOR_ARGVS.use                  = true
   key._OP_CONFIG.use                          = true
   key._UNMARKED.use                           = true
   key._OP_CHALKER_COMMIT_ID.use               = true
@@ -2183,6 +2187,7 @@ running insert commands.
   key._CHALKS.use                             = true
   key._COLLECTED_ARTIFACTS.use                = true
   key._OP_ARGV.use                            = true
+  key._OP_ANCESTOR_ARGVS.use                  = true
   key._OP_CHALKER_VERSION.use                 = true
   key._OP_CHALK_COUNT.use                     = true
   key._OP_UNMARKED_COUNT.use                  = true
@@ -2288,6 +2293,7 @@ running commands that do NOT insert chalk marks.
   key._CHALKS.use                             = true
   key._COLLECTED_ARTIFACTS.use                = true
   key._OP_ARGV.use                            = true
+  key._OP_ANCESTOR_ARGVS.use                  = true
   key._OP_CHALKER_VERSION.use                 = true
   key._OP_CHALK_COUNT.use                     = true
   key._OP_UNMARKED_COUNT.use                  = true

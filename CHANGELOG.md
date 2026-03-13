@@ -25,6 +25,181 @@
 
   ([#632](https://github.com/crashappsec/chalk/pull/632))
 
+- Better types for `/proc`-based keys:
+  - `_PROCESS_FD_INFO` values are mixed-type now whereas they used
+    to be all strings, even for int fields. New shape:
+
+    ```json
+    {
+      "_PROCESS_FD_INFO": {
+        "0": {
+          "pos": 0,
+          "mnt_id": 1269,
+          "ino": 5,
+          "flags": 32768,
+          "path": "/dev/null"
+        }
+      }
+    }
+    ```
+
+  - `_PROCESS_MOUNT_INFO` items are mixed-type now which better parses
+    `mountinfo` files whereas they used to be all strings, even for int or list
+    fields. New shape:
+
+    ```json
+    {
+      "_PROCESS_MOUNT_INFO": [
+        {
+          "mount_id": 1272,
+          "parent_id": 1270,
+          "major": 0,
+          "minor": 434,
+          "root": "/",
+          "mount_point": "/proc",
+          "options": ["rw", "nosuid", "nodev", "noexec", "relatime"],
+          "tags": [],
+          "fs_type": "proc",
+          "source": "proc",
+          "super": ["rw"]
+        }
+      ]
+    }
+    ```
+
+  - `_OP_TCP_SOCKET_INFO` and `_OP_UDP_SOCKET_INFO` items are mixed-type to
+    better reflect individual fields. TCP example:
+
+    ```json
+    {
+      "_OP_TCP_SOCKET_INFO": [
+        [
+          "127.0.0.11", // local ip
+          33031, // local port
+          "0.0.0.0", // remote ip
+          0, // remote port
+          "LISTEN", // status
+          0, // uid
+          63015733 // inode
+        ]
+      ]
+    }
+    ```
+
+  - `_OP_IPV4_INTERFACES` is now a dict where keys are interface names and
+    values are int stats for receive/transmit:
+
+    ```json
+    {
+      "_OP_IPV4_INTERFACES": {
+        "eth0": [
+          [
+            6665, // bytes
+            20, // packets
+            0, // errors
+            0, // drops
+            0, // fifo
+            0, // frame
+            0, // compressed
+            0 // multicast
+          ],
+          [
+            2101, // bytes
+            21, // packets
+            0, // errors
+            0, // drops
+            0, // fifo
+            0, // colls
+            0, // carrier
+            0 // compressed
+          ]
+        ]
+      }
+    }
+    ```
+
+  - `_OP_IPV4_ROUTES` items are mixed-type to better reflect fields:
+
+    ```json
+    {
+    "_OP_IPV4_ROUTES": [
+      [
+        "0.0.0.0", // destination
+        "172.21.0.1", // gateway
+        "0.0.0.0", // mask
+        "eth0", // interface
+        3, // flags
+        0, // reference count
+        0, // use
+        0, // metric/priority
+        0, // mtu
+        0, // window
+        0  // irtt
+      ],
+    }
+    ```
+
+  - `_OP_IPV6_INTERFACES` is now a dict where keys are interface names and
+    values are mixed-type interface metadata:
+
+    ```json
+    {
+      "_OP_IPV6_INTERFACES": {
+        "lo": [
+          "0000:0000:0000:0000:0000:0000:0000:0001", // ip
+          1, // interface index
+          128, // prefix
+          16, // scope
+          128 // flags
+        ]
+      }
+    }
+    ```
+
+  - `_OP_IPV6_ROUTES` is list of mixed-type values to better reflect
+    route metadata:
+
+    ```json
+    {
+      "_OP_IPV6_ROUTES": [
+        [
+          "0000:0000:0000:0000:0000:0000:0000:0000", // dst
+          0, // dst prefix
+          "0000:0000:0000:0000:0000:0000:0000:0000", // src
+          0, // src prefix
+          "0000:0000:0000:0000:0000:0000:0000:0000", // gateway
+          "lo", // interface
+          2097664, // flags
+          1, // reference count
+          0, // use
+          4294967295 // metric
+        ]
+      ]
+    }
+    ```
+
+  - `_OP_ARP_TABLE` items are now mixed-type:
+
+    ```json
+    {
+      "_OP_ARP_TABLE": [
+        [
+          "172.21.0.1", // ip
+          1, // hw type
+          2, // flags
+          "46:8f:bc:ef:c5:3c", // mac
+          "*", // mask
+          "eth0" // interface
+        ]
+      ]
+    }
+    ```
+
+  - `_PROCESS_DETAIL` is a dict with mixed-type values
+    which match individual `_PROCESS_*` keys.
+
+    ([#634](https://github.com/crashappsec/chalk/pull/634))
+
 ### New Features
 
 - All chalk attestations now use [OCI Image and Distribution] 1.1 spec.
@@ -72,6 +247,11 @@
   - TeamCity
 
   ([#636](https://github.com/crashappsec/chalk/pull/636))
+
+- `_OP_ANCESTOR_ARGVS` reports all parent processes argv
+  (if chalk can read them) which allows to put chalk invocations within
+  the context of CI scripts.
+  ([#634](https://github.com/crashappsec/chalk/pull/634))
 
 ### Fixes
 
