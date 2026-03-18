@@ -42,16 +42,21 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
 - **Flexibility**. Chalk collects a lot of cheaply available data when it runs. It gives you control over what data goes where, and supports custom data collection.
 
 ## Quick start
+
 1. Download a pre-compiled executable from our release page, or:
+
 ```shell
    VERSION=$(curl -fsSL https://dl.crashoverride.run/chalk/current-version.txt)
    curl -Lo chalk https://dl.crashoverride.run/chalk/chalk-$VERSION-$(uname -s)-$(uname -m)
    chmod +x chalk
-   ```
+```
+
 2. (optional) Set up full Sigstore signing
+
 ```shell
 ./chalk setup
 ```
+
 ```shell
  ------------------------------------------
  CHALK_PASSWORD=p66oICCD8ME7xdjcClWEQg==
@@ -59,10 +64,12 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
  Write this down. In future chalk commands, you will need
  to provide it via CHALK_PASSWORD environment variable.
 ```
+
 The setup process generates a key pair, and embeds them in your Chalk binary. The embedded private key is encrypted, so you will need to provide the secret via the `CHALK_PASSWORD` environment variable once you've done this.
 
 3. Add chalk marks!
-For chalking executables and shell scripts, you can just use the `chalk insert` command:
+   For chalking executables and shell scripts, you can just use the `chalk insert` command:
+
 ```shell
 echo '#include<stdio.h>
 int main() {
@@ -72,19 +79,20 @@ int main() {
 $ gcc -o hello hello.c
 CHALK_PASSWORD=p66oICCD8ME7xdjcClWEQg== ./chalk insert ./hello 2>/dev/null | jq '.[]|._CHALKS[]|.'
 ```
+
 Remember here to use _your_ generated password if signing. After insertion, you should see something like:
 
 ```json
 {
- "CHALK_ID": "6RW6AD-1SCM-T3CE-3561JP",
- "PRE_CHALK_HASH": "2796945bbcbd5ce33d1833d6b49569e9d4035322aabf6f772d2e49be65d327c2",
- "PATH_WHEN_CHALKED": "/home/admin/hello/hello",
- "ARTIFACT_TYPE": "ELF",
- "CHALK_VERSION": "1.0.0",
- "METADATA_ID": "RQCGKG-M8CK-FG5Z-2YHSSW",
- "SIGNATURE": "MEUCIHD8ev5tijJ/m8U7c0U5pXNpE/OYTr2sfGEv6BqNja9lAiEA3eMTPU0Pj78NNcinM83wEZ46tqmHlol9yvCoQSH25kc=",
- "_VIRTUAL": false,
- "_CURRENT_HASH": "2796945bbcbd5ce33d1833d6b49569e9d4035322aabf6f772d2e49be65d327c2"
+  "CHALK_ID": "6RW6AD-1SCM-T3CE-3561JP",
+  "PRE_CHALK_HASH": "2796945bbcbd5ce33d1833d6b49569e9d4035322aabf6f772d2e49be65d327c2",
+  "PATH_WHEN_CHALKED": "/home/admin/hello/hello",
+  "ARTIFACT_TYPE": "ELF",
+  "CHALK_VERSION": "1.0.0",
+  "METADATA_ID": "RQCGKG-M8CK-FG5Z-2YHSSW",
+  "SIGNATURE": "MEUCIHD8ev5tijJ/m8U7c0U5pXNpE/OYTr2sfGEv6BqNja9lAiEA3eMTPU0Pj78NNcinM83wEZ46tqmHlol9yvCoQSH25kc=",
+  "_VIRTUAL": false,
+  "_CURRENT_HASH": "2796945bbcbd5ce33d1833d6b49569e9d4035322aabf6f772d2e49be65d327c2"
 }
 ```
 
