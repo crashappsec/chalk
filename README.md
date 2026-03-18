@@ -43,7 +43,7 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
 
 ## Quick start
 
-1. Download a pre-compiled executable from our release page, or:
+1. Download a pre-compiled executable from our release page. Alternately, download the latest:
 
 ```shell
    VERSION=$(curl -fsSL https://dl.crashoverride.run/chalk/current-version.txt)
@@ -51,12 +51,12 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
    chmod +x chalk
 ```
 
-2. (optional) Set up full [Sigstore](https://www.sigstore.dev) signing
+2. If desired, set up full [Sigstore](https://www.sigstore.dev) signing:
 
 ```shell
 ./chalk setup
 ```
-
+The setup process generates a key pair, and embeds them in your Chalk binary. The embedded private key is encrypted, so you will see a secret that you'll need to provide via the `CHALK_PASSWORD` environment variable. For instance:
 ```shell
  ------------------------------------------
  CHALK_PASSWORD=p66oICCD8ME7xdjcClWEQg==
@@ -65,10 +65,8 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
  to provide it via CHALK_PASSWORD environment variable.
 ```
 
-The setup process generates a key pair, and embeds them in your Chalk binary. The embedded private key is encrypted, so you will need to provide the secret via the `CHALK_PASSWORD` environment variable once you've done this.
 
-3. Add chalk marks!
-   For chalking executables and shell scripts, you can just use the `chalk insert` command:
+Now you're ready to add chalk marks. To chalk executables and shell scripts, you can just use the `chalk insert` command:
 
 ```shell
 echo '#include<stdio.h>
@@ -76,7 +74,7 @@ int main() {
   printf("Hello world!\n");
   return 0;
 }' > hello.c
-$ gcc -o hello hello.c
+gcc -o hello hello.c
 CHALK_PASSWORD=p66oICCD8ME7xdjcClWEQg== ./chalk insert ./hello 2>/dev/null | jq '.[]|._CHALKS[]|.'
 ```
 
