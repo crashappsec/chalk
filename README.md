@@ -1,80 +1,63 @@
 ![Chalk Logo](https://chalkproject.io/logo.svg)
 
-[![tests](https://github.com/crashappsec/chalk/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/crashappsec/chalk/actions/workflows/tests.yml?query=branch%3Amain)
+![tests](https://github.com/crashappsec/chalk/actions/workflows/tests.yml/badge.svg?branch=main&event=push)
 
-## About Chalk
+## Software provenance and attestation made easy
 
-Chalk™ captures metadata at build time, and can add a small 'chalk mark' (metadata) to any
-artifacts, so they can be identified in production. Chalk can also extract chalk marks and collect
-additional metadata about the operating environment when it does this.
+Chalk gives you a cryptographically verifiable chain of custody from build through production, with minimal configuration, and no changes to how your software is run.
 
-Using Chalk, you can build a graph connecting people, development, builds and production, so that
-devops engineers understand what is happening in the development process, and so that developers
-can understand what is happening in the infrastructure.
+### Overview
 
-## How-tos
+Chalk seamlessly handles provenance and attestation for production software, collecting detailed environmental info about software being built or run, cradle to grave.
 
-You can use Chalk to solve a variety of specific use cases such as:
+Correlating all that provenance information is the hard part. We handle this by adding a tamperproof identifier into all artifacts (the *chalk mark*). The identifier is inert JSON; we can auto-insert into a containers, executables, JARs (and other ZIP-based archives), shell scripts and source for nearly all interpreted languages. Chalking never impacts execution.
 
-### Create software security supply chain compliance reports automatically
+ Automatically chalking software during the build process makes it trivial to do two things that can be a large source of enterprise pain:
 
-Many companies and the US Government are now mandating suppliers to provide supply chain statements
-when delivering software. This how to is an easy button to deliver the
-[software bill of materials (SBOM)](https://www.cisa.gov/sbom), code and
-builds provenance and supports [SLSA](https://www.slsa.dev), Supply-chain Levels for Software
-Artifacts, [level 2](https://slsa.dev/spec/v1.0/levels) compliance (an emerging supply chain
-standard) before SLSA [level 1](https://slsa.dev/spec/v1.0/levels) has been mandated. Follow this
-how-to on our docs site [here](https://chalkproject.io/docs/advanced-topics/sbom/).
+1. Easily determine the integrity of individual artifacts.
+2. Automatically correlate information collected about those artifacts at any point.
 
-### Gathering runtime information using exec reports
+When collecting attestation information, we handle a lot of plumbing transparently. For instance, we automatically apply Docker’s SBOM tooling when available, but will fall back to using a stand-alone OSS tool (Syft) when not available. Similarly, we collect cloud-specific metadata, probing for common cloud metadata interfaces.
 
-From a code base, easily understand the environments where code and even particular branches are
-running. Gather code owners for the applications and code repos. Follow this how-to on our docs
-site [here](https://chalkproject.io/docs/getting-started/exec/).
+If you set up build signature mode, the build attestation will be signed using a Sigstore *[in-toto* attestation](https://docs.sigstore.dev/cosign/verifying/attestation/), and automatically pushed to the container registry when your image is pushed.
 
-### Deploy Chalk globally using Docker
+In a build environment, Chalk can be set up to “wrap” container entry points and lambdas, changing them to fire off a background process to collect provenance information at startup.
 
-You can deploy Chalk by setting a global symlink for Docker and having it call Chalk, so that every
-build that runs through your build server using Docker, will automatically be 'chalked'. It's a
-technique that can be combined with chalks ability to deploy tools and configure monitoring, to
-automatically add security controls and collect information for every application. Follow this
-how-to on our docs site [here](https://chalkproject.io/docs/getting-started/ci-cd/).
+All  collected data can automatically be written to files, REST APIs, S3 buckets, or even into the embedded artifact metadata.
+
+Chalk is already used at scale in enterprises of varying sizes, including multiple Fortune 50 companies.
+
+## Use Cases
+
+- **Incident response.** When there’s a production incident, you will already have all the key information authoritatively connected, such as the branch, commit, package changes, committers, and container base.
+- **Tech stack visibility.** Keep track of software as it changes, and have answers about what’s actually true right now. For supply chain poisoning, you’ll have all the data to be able to automatically find any affected production systems.
+- **Compliance.** SLSA Level 2 compliance is trivial; you don’t need to select a patchwork of tools, nor do you have to worry about how to map artifacts to attestations (the needed identifying info is embedded directly into the artifact).
+- **Audit.** Chalk’s continuous attestation model makes it easy to validate whether appropriate controls were applied.
+
+## Design Goals
+
+- **Ease of use.** Our internal mantra is “give engineers value, not work.” It’s straightforward to integrate with your existing CI/CD, and then operates transparently as your build and deploy software.
+- **Minimal overhead.** Chalk collects only “cheap” data during builds and deployments, and is deployed as a statically linked executable.
+- **Safety**. Chalk “fails open”; if a build fails, Chalk reruns the original build without itself in the path. Your pipeline should never break due to Chalk. Additionally, Chalk’s written in a type-safe language with full bounds checking.
+- **Flexibility**. Chalk collects a lot of cheaply available data when it runs. It gives you control over what data goes where, and supports custom data collection.
 
 ## Getting started
 
-We recommend following the [getting started guide](https://chalkproject.io/docs/getting-started/)
-on our documentation web site. Full documentation is also available directly inside the CLI.
+- Our [getting started guide](https://chalkproject.io/docs/getting-started/) covers how to chalk mark your own binaries and Docker images.
+- See how to hook Chalk up to your build environment with [our CI/CD guide](https://chalkproject.io/docs/integration/ci-cd/).
+- You can learn more about our [automatic tracking of program execution](https://chalkproject.io/docs/use-cases/exec/).
+- *(optional)* [Set up Sigstore](https://chalkproject.io/docs/integration/attestation/) for adding full provenance attestations to container manifests.
 
-We provide free binary downloads on our [release page](https://chalkproject.io/download/).
+If you’re not familiar with the in-toto format, there is an overview [here](https://docs.sigstore.dev/cosign/verifying/attestation/).
 
-## Issues
+## Bugs + Feature Requests
 
-If you encounter any issues with Chalk please submit a GitHub issue to
-[this repo](https://github.com/crashappsec/chalk/issues).
+Please create a [GitHub issue](https://github.com/crashappsec/chalk/issues) for any bugs or feature requests. 
 
-## Ideas and feedback
+## Contributions
 
-We are constantly learning about emerging use cases for Chalk, and are always interested in hearing
-about how others are using it. We are also interested in ideas and feature requests.If you would
-like to talk, please get in touch using hello@crashoverride.com.
-
-## Making contributions
-
-We welcome contributions but do require you to complete a contributor license agreement or CLA. You
-can read the CLA and about our process [here](https://crashoverride.com/docs/other/contributing).
-
-## Getting additional help
-
-If you need additional help including a demo of the cloud platform, please contact us using
-hello@crashoverride.com.
+Chalk is maintained by [Crash Override](https://crashoverride.com/). Outside contributions are welcome. The CLA process is [here](https://crashoverride.com/docs/other/contributing).
 
 ## License
 
 Chalk is licensed under the GPL version 3 license.
-
-## Try our cloud platform.
-
-Our cloud hosted platform is built using Chalk. It makes enterprise deployments easy, and provides
-additional functionality including prebuilt integrations to enrich your data.
-
-You can learn more at [crashoverride.com](https://crashoverride.com/).
