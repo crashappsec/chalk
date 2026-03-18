@@ -41,12 +41,61 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
 - **Safety**. Chalk “fails open”; if a build fails, Chalk reruns the original build without itself in the path. Your pipeline should never break due to Chalk. Additionally, Chalk’s written in a type-safe language with full bounds checking.
 - **Flexibility**. Chalk collects a lot of cheaply available data when it runs. It gives you control over what data goes where, and supports custom data collection.
 
-## Getting started
+## Quick start
+1. Download a pre-compiled executable from our release page, or:
+```shell
+   VERSION=$(curl -fsSL https://dl.crashoverride.run/chalk/current-version.txt)
+   curl -Lo chalk https://dl.crashoverride.run/chalk/chalk-$VERSION-$(uname -s)-$(uname -m)
+   chmod +x chalk
+   ```
+2. (optional) Set up full Sigstore signing
+```shell
+./chalk setup
+```
+```shell
+ ------------------------------------------
+ CHALK_PASSWORD=p66oICCD8ME7xdjcClWEQg==
+ ------------------------------------------
+ Write this down. In future chalk commands, you will need
+ to provide it via CHALK_PASSWORD environment variable.
+```
+The setup process generates a key pair, and embeds them in your Chalk binary. The embedded private key is encrypted, so you will need to provide the secret via the `CHALK_PASSWORD` environment variable once you've done this.
+
+3. Add chalk marks!
+For chalking executables and shell scripts, you can just use the `chalk insert` command:
+```shell
+echo '#include<stdio.h>
+int main() {
+  printf("Hello world!\n");
+  return 0;
+}' > hello.c
+$ gcc -o hello hello.c
+CHALK_PASSWORD=p66oICCD8ME7xdjcClWEQg== ./chalk insert ./hello 2>/dev/null | jq '.[]|._CHALKS[]|.'
+```
+Remember here to use _your_ generated password if signing. After insertion, you should see something like:
+
+```json
+{
+ "CHALK_ID": "6RW6AD-1SCM-T3CE-3561JP",
+ "PRE_CHALK_HASH": "2796945bbcbd5ce33d1833d6b49569e9d4035322aabf6f772d2e49be65d327c2",
+ "PATH_WHEN_CHALKED": "/home/admin/hello/hello",
+ "ARTIFACT_TYPE": "ELF",
+ "CHALK_VERSION": "1.0.0",
+ "METADATA_ID": "RQCGKG-M8CK-FG5Z-2YHSSW",
+ "SIGNATURE": "MEUCIHD8ev5tijJ/m8U7c0U5pXNpE/OYTr2sfGEv6BqNja9lAiEA3eMTPU0Pj78NNcinM83wEZ46tqmHlol9yvCoQSH25kc=",
+ "_VIRTUAL": false,
+ "_CURRENT_HASH": "2796945bbcbd5ce33d1833d6b49569e9d4035322aabf6f772d2e49be65d327c2"
+}
+```
+
+Without the filtering, you'll also see all the metadata collected about the host node.
+
+## Resources
 
 - Our [getting started guide](https://chalkproject.io/docs/getting-started/) covers how to chalk mark your own binaries and Docker images.
 - See how to hook Chalk up to your build environment with [our CI/CD guide](https://chalkproject.io/docs/integration/ci-cd/).
 - You can learn more about our [automatic tracking of program execution](https://chalkproject.io/docs/use-cases/exec/).
-- _(optional)_ [Set up Sigstore](https://chalkproject.io/docs/integration/attestation/) for adding full provenance attestations to container manifests.
+- [Set up Sigstore](https://chalkproject.io/docs/integration/attestation/) for more detail on adding full provenance attestations to container manifests.
 
 If you’re not familiar with the in-toto format, there is an overview [here](https://docs.sigstore.dev/cosign/verifying/attestation/).
 
