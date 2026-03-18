@@ -112,7 +112,7 @@ Please create a [GitHub issue](https://github.com/crashappsec/chalk/issues) for 
 
 ## Contributions
 
-Chalk is maintained by [Crash Override](https://crashoverride.com/). Outside contributions are welcome. The CLA process is [here](https://crashoverride.com/docs/other/contributing).
+Chalk is maintained by [Crash Override](https://crashoverride.com/). Outside contributions are welcome. The CLA process is [here](https://chalkproject.io/docs/contributing/contributions/).
 
 ## License
 
