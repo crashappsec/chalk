@@ -19,7 +19,7 @@ Automatically chalking software during the build process makes it trivial to do 
 
 When collecting attestation information, we handle a lot of plumbing transparently. For instance, we automatically apply Docker’s SBOM tooling when available, but will fall back to using a stand-alone OSS tool (Syft) when not available. Similarly, we collect cloud-specific metadata, probing for common cloud metadata interfaces.
 
-If you set up build signature mode, the build attestation will be signed using a Sigstore _[in-toto_ attestation](https://docs.sigstore.dev/cosign/verifying/attestation/), and automatically pushed to the container registry when your image is pushed.
+If you set up build signature mode, the build attestation will be signed using [Sigstore](https://www.sigstore.dev), and automatically pushed to the container registry when your image is pushed.
 
 In a build environment, Chalk can be set up to “wrap” container entry points and lambdas, changing them to fire off a background process to collect provenance information at startup.
 
@@ -51,7 +51,7 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
    chmod +x chalk
 ```
 
-2. (optional) Set up full Sigstore signing
+2. (optional) Set up full [Sigstore](https://www.sigstore.dev) signing
 
 ```shell
 ./chalk setup
@@ -96,7 +96,7 @@ Remember here to use _your_ generated password if signing. After insertion, you 
 }
 ```
 
-Without the filtering, you'll also see all the metadata collected about the host node.
+That `jq` command filters out the host-level data we collect. To see the entire report, you can drop the `jq` command.
 
 ## Resources
 
