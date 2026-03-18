@@ -99,7 +99,7 @@ That `jq` command filters out the host-level data we collect. To see the entire 
 
 ## Resources
 
-- Our [getting started guide](https://chalkproject.io/docs/getting-started/) covers how to chalk mark your own binaries and Docker images.
+- Our [getting started guide](https://chalkproject.io/docs/quick-start/) covers how to chalk mark your own binaries and Docker images.
 - See how to hook Chalk up to your build environment with [our CI/CD guide](https://chalkproject.io/docs/integration/ci-cd/).
 - You can learn more about our [automatic tracking of program execution](https://chalkproject.io/docs/use-cases/exec/).
 - [Set up Sigstore](https://chalkproject.io/docs/integration/attestation/) for more detail on adding full provenance attestations to container manifests.
