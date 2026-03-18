@@ -56,7 +56,9 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
 ```shell
 ./chalk setup
 ```
+
 The setup process generates a key pair, and embeds them in your Chalk binary. The embedded private key is encrypted, so you will see a secret that you'll need to provide via the `CHALK_PASSWORD` environment variable. For instance:
+
 ```shell
  ------------------------------------------
  CHALK_PASSWORD=p66oICCD8ME7xdjcClWEQg==
@@ -64,7 +66,6 @@ The setup process generates a key pair, and embeds them in your Chalk binary. Th
  Write this down. In future chalk commands, you will need
  to provide it via CHALK_PASSWORD environment variable.
 ```
-
 
 Now you're ready to add chalk marks. To chalk executables and shell scripts, you can just use the `chalk insert` command:
 
