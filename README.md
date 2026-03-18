@@ -10,20 +10,20 @@ Chalk gives you a cryptographically verifiable chain of custody from build throu
 
 Chalk seamlessly handles provenance and attestation for production software, collecting detailed environmental info about software being built or run, cradle to grave.
 
-Correlating all that provenance information is the hard part. We handle this by adding a tamperproof identifier into all artifacts (the *chalk mark*). The identifier is inert JSON; we can auto-insert into a containers, executables, JARs (and other ZIP-based archives), shell scripts and source for nearly all interpreted languages. Chalking never impacts execution.
+Correlating all that provenance information is the hard part. We handle this by adding a tamperproof identifier into all artifacts (the _chalk mark_). The identifier is inert JSON; we can auto-insert into a containers, executables, JARs (and other ZIP-based archives), shell scripts and source for nearly all interpreted languages. Chalking never impacts execution.
 
- Automatically chalking software during the build process makes it trivial to do two things that can be a large source of enterprise pain:
+Automatically chalking software during the build process makes it trivial to do two things that can be a large source of enterprise pain:
 
 1. Easily determine the integrity of individual artifacts.
 2. Automatically correlate information collected about those artifacts at any point.
 
 When collecting attestation information, we handle a lot of plumbing transparently. For instance, we automatically apply Docker’s SBOM tooling when available, but will fall back to using a stand-alone OSS tool (Syft) when not available. Similarly, we collect cloud-specific metadata, probing for common cloud metadata interfaces.
 
-If you set up build signature mode, the build attestation will be signed using a Sigstore *[in-toto* attestation](https://docs.sigstore.dev/cosign/verifying/attestation/), and automatically pushed to the container registry when your image is pushed.
+If you set up build signature mode, the build attestation will be signed using a Sigstore _[in-toto_ attestation](https://docs.sigstore.dev/cosign/verifying/attestation/), and automatically pushed to the container registry when your image is pushed.
 
 In a build environment, Chalk can be set up to “wrap” container entry points and lambdas, changing them to fire off a background process to collect provenance information at startup.
 
-All  collected data can automatically be written to files, REST APIs, S3 buckets, or even into the embedded artifact metadata.
+All collected data can automatically be written to files, REST APIs, S3 buckets, or even into the embedded artifact metadata.
 
 Chalk is already used at scale in enterprises of varying sizes, including multiple Fortune 50 companies.
 
@@ -46,13 +46,13 @@ Chalk is already used at scale in enterprises of varying sizes, including multip
 - Our [getting started guide](https://chalkproject.io/docs/getting-started/) covers how to chalk mark your own binaries and Docker images.
 - See how to hook Chalk up to your build environment with [our CI/CD guide](https://chalkproject.io/docs/integration/ci-cd/).
 - You can learn more about our [automatic tracking of program execution](https://chalkproject.io/docs/use-cases/exec/).
-- *(optional)* [Set up Sigstore](https://chalkproject.io/docs/integration/attestation/) for adding full provenance attestations to container manifests.
+- _(optional)_ [Set up Sigstore](https://chalkproject.io/docs/integration/attestation/) for adding full provenance attestations to container manifests.
 
 If you’re not familiar with the in-toto format, there is an overview [here](https://docs.sigstore.dev/cosign/verifying/attestation/).
 
 ## Bugs + Feature Requests
 
-Please create a [GitHub issue](https://github.com/crashappsec/chalk/issues) for any bugs or feature requests. 
+Please create a [GitHub issue](https://github.com/crashappsec/chalk/issues) for any bugs or feature requests.
 
 ## Contributions
 
