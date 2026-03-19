@@ -10,7 +10,6 @@ from typing import Optional
 from .log import get_logger
 from .os import run, which
 
-
 logger = get_logger()
 
 

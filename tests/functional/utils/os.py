@@ -19,7 +19,6 @@ from filelock import FileLock
 from .log import get_logger
 from .text import after_match, valid_json
 
-
 logger = get_logger()
 
 

@@ -13,7 +13,6 @@ from .utils.dict import Contains, ContainsDict
 from .utils.bin import sha256
 from .utils.log import get_logger
 
-
 logger = get_logger()
 
 
