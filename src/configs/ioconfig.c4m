@@ -19,7 +19,7 @@ custom_report terminal_other_op {
   enabled:         true
   report_template: "terminal_rest"
   sink_configs:    ["json_console_out"]
-  use_when:        ["extract", "delete", "env", "heartbeat", "pull"]
+  use_when:        ["extract", "delete", "env", "pull"]
 }
 
 custom_report github_group_chalk_time {

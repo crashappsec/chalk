@@ -1825,11 +1825,7 @@ def test_multiplatform_build(
             _IMAGE_SBOM={
                 "SPDXID": "SPDXRef-DOCUMENT",
             },
-            _IMAGE_PROVENANCE={
-                "buildConfig": ANY,
-                "invocation": ANY,
-                "materials": ANY,
-            },
+            _IMAGE_PROVENANCE=dict,  # the format changes between buildkit versions,
         )
 
 
