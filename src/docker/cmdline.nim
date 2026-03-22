@@ -253,6 +253,8 @@ proc initDockerInvocation*(originalArgs: seq[string]): DockerInvocation =
 
 proc extractDockerCommand*(self: DockerInvocation): DockerCmd =
   result = self.cmd
+  if "help" in self.processedFlags:
+    return DockerCmd.other
   case self.cmd
   of DockerCmd.build:
     self.extractBuildx()

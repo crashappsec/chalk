@@ -74,6 +74,8 @@ if cmd.starts_with("dump") {
 }
 
 if cmd == "docker" or default_command == "docker" {
+  # initial docker log level
+  # cmd_docker sets its final verbosity after all configs are loaded
   log_level: "error"
 } elif cmd == "exec" or default_command == "exec" {
   if using_tty() {
