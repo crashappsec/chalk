@@ -3317,6 +3317,17 @@ problem where it had to restart the operation without chalk.
 """
   }
 
+  field docker_log_level {
+    type:     string
+    default:  "error"
+    choice:   valid_log_levels
+    shortdoc: "Docker Log Level"
+    doc: """
+Default log level to use when running docker commands.
+Standard `log_level` overwrites logging verbosity otherwise.
+"""
+  }
+
   field log_format {
     type:     string
     default:  "auto"

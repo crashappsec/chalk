@@ -141,6 +141,10 @@ docker {
       flag_yn        quiet {
         yes_aliases: ["q"]
       }
+      flag_multi_arg help {
+        optional_arg: true
+        aliases: ["h"]
+      }
     }
     command rename {
       args: (0, high())
@@ -225,6 +229,10 @@ docker {
         aliases: ["b"]  # Only in buildx, but no reason not to handle it here.
         args: (0, high())
 
+       flag_multi_arg help {
+         optional_arg: true
+         aliases: ["h"]
+       }
         flag_multi_arg add_host { }
         flag_multi_arg allow { }
         flag_multi_arg attest { }
@@ -329,6 +337,10 @@ docker {
       aliases: ["b"]  # Only in buildx, but no reason not to handle it here.
       args: (0, high())
 
+      flag_multi_arg help {
+        optional_arg: true
+        aliases: ["h"]
+      }
       flag_multi_arg add_host { }
       flag_multi_arg allow { }
       flag_multi_arg attest { }
@@ -437,6 +449,10 @@ docker {
       }
       flag_yn        quiet {
         yes_aliases: ["q"]
+      }
+      flag_multi_arg help {
+        optional_arg: true
+        aliases: ["h"]
       }
     }
    command run {

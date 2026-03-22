@@ -252,6 +252,12 @@
   (if chalk can read them) which allows to put chalk invocations within
   the context of CI scripts.
   ([#634](https://github.com/crashappsec/chalk/pull/634))
+- New config `docker_log_level` specifically to configure
+  `docker` wrapping log verbosity level.
+  Useful if needing to completely silence any chalk errors
+  when wrapping `docker` if scripts calling `docker` inspect
+  `stderr`.
+  ([#644](https://github.com/crashappsec/chalk/pull/644))
 
 ### Fixes
 

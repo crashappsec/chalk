@@ -40,6 +40,8 @@ import ".."/[
 ]
 
 proc runCmdDocker*(args: seq[string]) =
+  setLogLevel(attrGet[string]("docker_log_level"))
+
   var
     exitCode = 0
     ctx      = initDockerInvocation(args)
