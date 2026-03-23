@@ -162,15 +162,16 @@ proc readDockerHostFile*(path: string): string =
   # us to get the content of file of the docker daemon host,
   # not where chalk is running
   let
-    inner  = "/mnt" & path
-    output = runDockerGetEverything(
+    inner   = "/mnt" & path
+    busybox = attrGet[string]("docker.busybox_container")
+    output  = runDockerGetEverything(
       @[
         "run",
         "--entrypoint=cat",
         # note that --mount does not create the source path if one doesnt exist already
         # unlike --volume which creates a folder if one is not present already
         "--mount", "type=bind,source=" & path & ",target=" & inner,
-        "busybox",
+        busybox,
         inner,
       ],
       silent = false,
@@ -346,13 +347,15 @@ proc installBinFmt*() =
   once:
     # https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop
     info("docker: installing binfmt for multi-platform builds")
-    let output = runDockerGetEverything(@[
-      "run",
-      "--privileged",
-      "--rm",
-      "tonistiigi/binfmt",
-      "--install",
-      "all",
-    ])
+    let
+      binfmt = attrGet[string]("docker.binfmt_container")
+      output = runDockerGetEverything(@[
+        "run",
+        "--privileged",
+        "--rm",
+        binfmt,
+        "--install",
+        "all",
+      ])
     if output.exitCode != 0:
       raise newException(ValueError, "could not install binfmt " & output.getStderr())

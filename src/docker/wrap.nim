@@ -150,10 +150,12 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
       let (_, name) = dstLoc.splitPath()
 
       if supportsMultiStageBuilds():
-        let base = "chalk" & newPath.replace("/", "_").replace(".", "_")
+        let
+          base    = "chalk" & newPath.replace("/", "_").replace(".", "_")
+          busybox = attrGet[string]("docker.busybox_container")
         toAdd.add("COPY --from=" & base & " " & newPath & " " & newPath)
         ctx.addedPlatform[base] = @[
-          "FROM busybox AS " & base,
+          "FROM " & busybox & " AS " & base,
           "COPY " & name & " " & newPath,
           "RUN chmod " & chmod & " " & newPath,
         ]
@@ -295,7 +297,8 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
       # so we ensure we honor self config via CLI arg
       check     = if validate: "--validation" else: "--no-validation"
       config    = writeNewTempFile(getAllDumpJson())
-      base      = ctx.addByPlatform(newPath, onlyPlatform = first, image = "busybox")
+      busybox   = attrGet[string]("docker.busybox_container")
+      base      = ctx.addByPlatform(newPath, onlyPlatform = first, image = busybox)
       log_level = getLogLevel()
       verbosity = if log_level == llTrace: "trace" else: "error"
       # docker doesnt always use TARGETPLATFORM

@@ -1897,6 +1897,20 @@ https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-deskt
 """
   }
 
+  field binfmt_container {
+    type:    string
+    default: "tonistiigi/binfmt"
+    doc:     """
+Container to use for installing binfmt.
+This configuration can be used to pin to exact image version or
+to select a different QEMU version.
+
+For more information see docker docs:
+* https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop
+* https://hub.docker.com/r/tonistiigi/binfmt/tags
+"""
+  }
+
   field label_prefix {
     type:    string
     default: "run.crashoverride."
@@ -2008,6 +2022,22 @@ to copy the file into the primary docker build context. There is however no guar
 that the file will actually be copied due to `.dockerignore`.
 In order to ensure the file is copied, this setting allows chalk to mutate the
 `.dockerignore` file by explicitly allowing to copy all `*.chalk` files.
+"""
+  }
+
+  field busybox_container {
+    type:    string
+    default: "busybox"
+    doc:     """
+In some cases chalk needs to pull `busybox` image. This configuration
+specifies where to pull the image from.
+
+Currently chalk uses `busybox` to:
+
+* probe for actual docker build platform when it was not specified via CLI args
+* for older docker versions running shell commands to copy chalkmark and/or
+  chalk binary into the container
+* read docker configuration even when chalk is running in a container
 """
   }
 
