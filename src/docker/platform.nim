@@ -39,8 +39,9 @@ proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =
     let
       tmpTag     = chooseNewTag()
       envVars    = @[setEnv("DOCKER_BUILDKIT", "1")]
+      busybox    = attrGet[string]("docker.busybox_container")
       probeFile  = """
-FROM busybox
+FROM """ & busybox & """
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 RUN echo "{\"BUILDPLATFORM\": \"$BUILDPLATFORM\", \"TARGETPLATFORM\": \"$TARGETPLATFORM\"}" > /platforms.json

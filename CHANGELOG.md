@@ -258,6 +258,10 @@
   when wrapping `docker` if scripts calling `docker` inspect
   `stderr`.
   ([#644](https://github.com/crashappsec/chalk/pull/644))
+- New configurations for pinning `binfmt` and `busybox` images:
+  - `docker.busybox_container`
+  - `docker.binfmt_container`
+    ([#646](https://github.com/crashappsec/chalk/pull/646))
 
 ### Fixes
 
