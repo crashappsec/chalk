@@ -9,6 +9,7 @@
 
 import std/[
   cmdline,
+  sequtils,
 ]
 import ".."/[
   config,
@@ -663,6 +664,26 @@ proc showConfigValues*(force = false) =
     else:
       print(toOut)
 
+proc toMarkdownTable(rows: seq[seq[string]], headings: seq[string]): string =
+  ## Generates a GFM markdown table from a seq of rows.
+  ## headings provides the header row; rows provides the data.
+  proc mdCell(s: string): string =
+    # Collapse newlines and escape pipes so cells stay on one line.
+    result = s.replace("\r\n", " ").replace("\n", " ").replace("|", "\\|").strip()
+
+  let cols = headings.len()
+
+  # Header row
+  result &= "| " & headings.mapIt(mdCell(it)).join(" | ") & " |\n"
+  # Separator row
+  result &= "|" & " --- |".repeat(cols) & "\n"
+  # Data rows
+  for row in rows:
+    var cells: seq[string]
+    for i in 0 ..< cols:
+      cells.add(if i < row.len(): mdCell(row[i]) else: "")
+    result &= "| " & cells.join(" | ") & " |\n"
+
 proc runChalkDocGen*() =
   var
     f: FileStream
@@ -687,9 +708,16 @@ proc runChalkDocGen*() =
   f.write(con4mRuntime.getOutputHelp().toHtml())
   f.close()
 
-  # 4. The metadata reference
+  # 4. The metadata reference — generate a proper markdown table.
+  var transformers = TransformTableRef()
+  transformers["kind"] = FieldTransformer(kindEnumToString)
+  let keyRows = con4mRuntime.getAllInstanceDocsAsArray("keyspec",
+                                                      ["kind", "type", "doc"],
+                                                      transformers)
   f = newFileStream(keyinfo, fmWrite)
-  f.write(con4mRuntime.keyHelp().toHtml())
+  f.write(toMarkdownTable(keyRows,
+                          @["Key", "Collection Type", "Value Type",
+                            "Description"]))
   f.close()
 
   # 5. Output the reference on config builtins.
