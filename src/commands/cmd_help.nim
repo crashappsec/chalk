@@ -670,6 +670,15 @@ proc toMarkdownTable(rows: seq[seq[string]], headings: seq[string]): string =
   proc mdCell(s: string): string =
     # Collapse newlines and escape pipes so cells stay on one line.
     result = s.replace("\r\n", " ").replace("\n", " ").replace("|", "\\|").strip()
+    # Escape unmatched backticks. Con4m type variables like `x have a leading
+    # backtick with no closing one, which breaks GFM tables by starting a code
+    # span that consumes the | cell separator.
+    var backtickCount = 0
+    for c in result:
+      if c == '`': inc backtickCount
+    if backtickCount mod 2 != 0:
+      let lastPos = result.rfind('`')
+      result = result[0 ..< lastPos] & "\\`" & result[lastPos + 1 .. ^1]
 
   let cols = headings.len()
 
