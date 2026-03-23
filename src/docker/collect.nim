@@ -15,6 +15,7 @@ import std/[
 ]
 import ".."/[
   chalkjson,
+  plugins/externalTool,
   run_management,
   types,
   utils/json,
@@ -347,6 +348,7 @@ proc collectProvenance(chalk: ChalkObj) =
       chalk.setIfNeeded("_IMAGE_PROVENANCE", json)
       break
     except:
+      dumpExOnDebug()
       continue
 
 proc collectSBOM(chalk: ChalkObj) =
@@ -356,8 +358,21 @@ proc collectSBOM(chalk: ChalkObj) =
     try:
       let json = fetchSBOM(i, chalk.platform)
       chalk.setIfNeeded("_IMAGE_SBOM", json)
-      break
+      return
     except:
+      continue
+  if not isChalkingOp():
+    return
+  if not attrGet[bool]("run_sbom_tools") or not attrGet[bool]("docker.fallback_to_syft_sbom"):
+    return
+  for i in chalk.repos.listManifests:
+    try:
+      let data = runTool("syft", $i, force = true)
+      if "SBOM" in data:
+        chalk.setIfNeeded("_IMAGE_SBOM", data["SBOM"])
+        return
+    except:
+      dumpExOnDebug()
       continue
 
 proc collectLocalImage*(chalk: ChalkObj,

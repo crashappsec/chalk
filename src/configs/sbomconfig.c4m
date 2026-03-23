@@ -58,13 +58,15 @@ func syft_docker(path) {
     return
   }
   trace("find_syft: using docker for running syft")
-  return (
+  cmd := (
     docker_path + " run " +
     "--rm " +
-    "--entrypoint=" + tool.syft.syft_entrypoint + " " +
-    "-v " + path + ":" + path + " " +
-    tool.syft.syft_container
+    "--entrypoint=" + tool.syft.syft_entrypoint + " "
   )
+  if starts_with(path, "/") {
+    cmd := cmd + "-v " + path + ":" + path + " "
+  }
+  return cmd + tool.syft.syft_container
 }
 
 func syft_system() {

@@ -2041,6 +2041,17 @@ Currently chalk uses `busybox` to:
 """
   }
 
+  field fallback_to_syft_sbom {
+    type:    bool
+    default: true
+    doc:     """
+When docker buildx build native `--sbom` is not used, whether to fallback
+to collect image SBOM via `syft`.
+Most of the `syft` external tool configurations are honored, except `syft`
+is invoked on an image instead of a file-system path.
+"""
+  }
+
 }
 
 singleton zip {

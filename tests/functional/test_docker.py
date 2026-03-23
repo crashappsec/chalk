@@ -1987,10 +1987,20 @@ def test_extract(chalk: Chalk, random_hex: str):
     container_name = f"test_container_{random_hex}"
 
     # build test image
-    digests, _ = chalk.docker_build(
+    digests, build = chalk.docker_build(
         dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
         tag=tag,
         push=True,
+        config=CONFIGS / "docker_wrap.c4m",
+        env={"DOCKER_SBOM": "true"},
+    )
+
+    assert build.mark.contains(
+        {
+            # note `--sbom` is not given to docker above
+            # we expect SBOM via syft fallback
+            "_IMAGE_SBOM": {"bomFormat": "CycloneDX"},
+        }
     )
 
     # extract chalk from image id and image name
@@ -2014,6 +2024,8 @@ def test_extract(chalk: Chalk, random_hex: str):
                     }
                 }
             },
+            # syft fallback only works for insert commands
+            "_IMAGE_SBOM": MISSING,
         }
     )
 

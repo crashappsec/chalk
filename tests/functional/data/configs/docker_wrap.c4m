@@ -1,3 +1,4 @@
+run_sbom_tools = env("DOCKER_SBOM") == "true"
 docker.scan_context.run = true
 docker.prep_postexec = true
 exec.postexec.run = true
