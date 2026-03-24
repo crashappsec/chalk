@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "0.6.9-dev"
+chalk_version :=   "1.0.0"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -5198,7 +5198,7 @@ keyspec _OP_ANCESTOR_ARGVS {
     kind:           RunTimeHost
     type:           list[list[string]]
     standard:       true
-    since:          "0.6.9"
+    since:          "1.0.0"
     shortdoc: "Command-line arguments of op ancestor processes"
     doc:              """
 This field contains the full contents of the command line arguments
