@@ -261,7 +261,15 @@
 - New configurations for pinning `binfmt` and `busybox` images:
   - `docker.busybox_container`
   - `docker.binfmt_container`
-    ([#646](https://github.com/crashappsec/chalk/pull/646))
+
+  ([#646](https://github.com/crashappsec/chalk/pull/646))
+
+- When chalking an image and `_IMAGE_SBOM` is missing
+  via native `docker buildx build --sbom`, chalk can now
+  fallback to `syft` to collect image SBOM.
+  To facilitate that a configuration can be used
+  `docker.fallback_to_syft_sbom`.
+  ([#649](https://github.com/crashappsec/chalk/pull/649))
 
 ### Fixes
 

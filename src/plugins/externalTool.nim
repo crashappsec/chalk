@@ -28,10 +28,7 @@ import "."/[
   vctlGit,
 ]
 
-type
-  AlreadyRanError = object of CatchableError
-  PIInfo          = ref object
-    name: string
+type AlreadyRanError = object of CatchableError
 
 var alreadyRan = initHashSet[string]()
 
@@ -44,26 +41,26 @@ proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
     raise newException(ValueError, "missing implementation of " & $(cb))
   return unpack[T](value.get())
 
-proc runTool(info: PIInfo, path: string): ChalkDict =
-  let key = info.name & ":" & path
-  if key in alreadyRan:
+proc runTool*(tool: string, path: string, force = false): ChalkDict =
+  let key = tool & ":" & path
+  if not force and key in alreadyRan:
     raise newException(AlreadyRanError, "")
 
-  trace("Running tool: " & info.name)
+  trace("Running tool: " & tool & " - " & path)
   result = ChalkDict()
   let args = @[pack(path)]
-  let base = "tool." & info.name
+  let base = "tool." & tool
   var exe  = ensureRunCallback[string](attrGet[CallbackObj](base & ".get_tool_location"), args)
 
   if exe == "":
     let installed = ensureRunCallback[bool](attrGet[CallbackObj](base & ".attempt_install"), args)
     if not installed:
-      trace(info.name & ": could not be installed. skipping")
+      trace(tool & ": could not be installed. skipping")
       return
     exe = ensureRunCallback[string](attrGet[CallbackObj](base & ".get_tool_location"), args)
 
   if exe == "":
-    trace(info.name & ": could not be found. skipping")
+    trace(tool & ": could not be found. skipping")
     return
 
   let
@@ -75,23 +72,23 @@ proc runTool(info: PIInfo, path: string): ChalkDict =
 
   let d = ensureRunCallback[ChalkDict](attrGet[CallbackObj](base & ".produce_keys"), outs)
   if len(d) == 0:
-    trace(info.name & ": produced no keys. skipping")
+    trace(tool & ": produced no keys. skipping")
     return
   if d.contains("error"):
-    error(info.name & ": " & unpack[string](d["error"]))
+    error(tool & ": " & unpack[string](d["error"]))
     return
   if d.contains("warn"):
-    warn(info.name & ": " & unpack[string](d["warn"]))
+    warn(tool & ": " & unpack[string](d["warn"]))
     d.del("warn")
   if d.contains("info"):
-    info(info.name & ": " & unpack[string](d["info"]))
+    info(tool & ": " & unpack[string](d["info"]))
     d.del("info")
 
-  trace(info.name & ": produced keys " & $(d.keys().toSeq()))
+  trace(tool & ": produced keys " & $(d.keys().toSeq()))
   alreadyRan.incl(key)
   return d
 
-proc runOneTool(info: PIInfo, path: string): ChalkDict =
+proc runOneTool(tool: string, path: string): ChalkDict =
   # cache external tool results in GitHub Actions to avoid redundant executions
   # within the same workflow job. This optimization only works on GitHub runners
   # because they provide a job-specific RUNNER_TEMP directory that persists for
@@ -101,45 +98,45 @@ proc runOneTool(info: PIInfo, path: string): ChalkDict =
   let
     CI          = getEnv("CI")
     RUNNER_TEMP = getEnv("RUNNER_TEMP")
-    key         = info.name & "-" & path.encodeUrl()
+    key         = tool & "-" & path.encodeUrl()
     tmp         = RUNNER_TEMP.joinPath(key)
 
   result = ChalkDict()
   if CI == "" or RUNNER_TEMP == "":
-    return runTool(info, path)
+    return runTool(tool, path)
   else:
     try:
-      trace(info.name & ": acquiring exlusive tmp file " & tmp)
+      trace(tool & ": acquiring exlusive tmp file " & tmp)
       discard acquireExclusiveFile(tmp)
-      result = runTool(info, path)
+      result = runTool(tool, path)
       discard tryToWriteFile(tmp, result.toJson())
     except AlreadyExists:
       # another build already ran external tool
       let content = tryToLoadFile(tmp)
       if content == "":
         warn(
-          info.name & ": exlusive tmp file is empty. " &
+          tool & ": exlusive tmp file is empty. " &
           "Possible due to race condition as another " &
           "parallel chalk process didnt write it yet"
         )
         raise newException(AlreadyRanError, "")
       else:
         try:
-          trace(info.name & ": reading cached output from exlusive tmp file " & tmp)
+          trace(tool & ": reading cached output from exlusive tmp file " & tmp)
           result = content.extractOneChalkJson(tmp)
         except:
-          error(info.name & ": could not parse output from exclusive tmp file due to: " & getCurrentExceptionMsg())
+          error(tool & ": could not parse output from exclusive tmp file due to: " & getCurrentExceptionMsg())
           raise newException(AlreadyRanError, "")
     except:
-      error(info.name & ": could not aquire exclusive tmp file due to " & getCurrentExceptionMsg())
-      return runTool(info, path)
+      error(tool & ": could not aquire exclusive tmp file due to " & getCurrentExceptionMsg())
+      return runTool(tool, path)
 
 proc toolBase(path: string): ChalkDict =
   let resolved = path.resolvePath()
   result = ChalkDict()
 
   var
-    toolInfo = initTable[string, seq[(int, PIInfo)]]()
+    toolInfo = initTable[string, seq[(int, string)]]()
   let
     runSBOM    = attrGet[bool]("run_sbom_tools")
     runSAST    = attrGet[bool]("run_sast_tools")
@@ -158,17 +155,17 @@ proc toolBase(path: string): ChalkDict =
     if not runSAST    and kind == "sast":           continue
     if not runSecrets and kind == "secret_scanner": continue
 
-    let tool = (attrGet[int](v & ".priority"), PIInfo(name: k))
+    let tool = (attrGet[int](v & ".priority"), k)
     if kind notin toolInfo:
       toolInfo[kind] = @[tool]
     else:
       toolInfo[kind].add(tool)
 
   for k, v in toolInfo:
-    for (ignore, info) in v.sorted():
+    for (ignore, tool) in v.sorted():
       try:
         withDuration():
-          let data = info.runOneTool(resolved)
+          let data = tool.runOneTool(resolved)
         # merge multiple tools into a single structure
         # for example first tool returns:
         # { SBOM: { foo: {...} } }
@@ -176,18 +173,18 @@ proc toolBase(path: string): ChalkDict =
         # { SBOM: { bar: {...} } }
         # merged structure should be:
         # { SBOM: { foo: {...}, bar: {...} } }
-        result.merge(data.nestWith(info.name))
+        result.merge(data.nestWith(tool))
         let timing = ChalkDict()
         timing["EXTERNAL_TOOL_DURATION"] = pack(duration.inMilliseconds())
         # add duration with structure:
         # { 'EXTERNAL_TOOL_DURATION': {'<tool>': {'<path>': duration_ms}}}
-        result.merge(timing.nestWith(resolved).nestWith(info.name), deep = true)
-        if len(data) >= 0 and attrGet[bool]("tool." & info.name & ".stop_on_success"):
+        result.merge(timing.nestWith(resolved).nestWith(tool), deep = true)
+        if len(data) >= 0 and attrGet[bool]("tool." & tool & ".stop_on_success"):
           break
       except AlreadyRanError:
-        trace(info.name & ": already ran for " & resolved & ". skipping")
+        trace(tool & ": already ran for " & resolved & ". skipping")
       except:
-        error(info.name & ": " & getCurrentExceptionMsg())
+        error(tool & ": " & getCurrentExceptionMsg())
 
 proc getToolPath(path: string): string =
   let

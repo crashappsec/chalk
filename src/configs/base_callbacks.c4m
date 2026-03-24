@@ -30,8 +30,16 @@ func canonicalize_image_sbom(data: dict[string, `x]) {
     return data
   }
   result := data
+  # --------
+  # for spdx
   # contains uuid
   result := delete(result, "documentNamespace")
   # contains timestamp
   result := delete(result, "creationInfo")
+  # ------------
+  # for cyclonedx
+  result := delete(result, "version")
+  result := delete(result, "serialNumber")
+  # includes timestamp as well as component versions which are not deterministic
+  result := delete(result, "metadata")
 }
