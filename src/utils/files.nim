@@ -231,7 +231,7 @@ proc optExpandSymlink*(s: string): Option[string] =
 proc optLoadFile*(s: string): Option[string] =
   ## Get optional file content
   try:
-    let content = tryToLoadFile(s).strip()
+    let content = strings.strip(tryToLoadFile(s))
     if content != "":
       return some(content)
     return none(string)
