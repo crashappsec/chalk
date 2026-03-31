@@ -1,0 +1,2 @@
+keyspec.SBOM.only_object_store:        true
+keyspec._IMAGE_SBOM.only_object_store: true
