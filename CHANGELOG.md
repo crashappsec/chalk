@@ -38,6 +38,20 @@
   like `crayon` to inject useful metadata into the artifact which otherwise
   chalk cannot derive.
   ([#658](https://github.com/crashappsec/chalk/pull/658))
+- Docker platform probe removed `busybox` dependency
+  ([#656](https://github.com/crashappsec/chalk/pull/656))
+- Reading of docker registry certificate files only uses `busybox`
+  when chalk detects its running in a container.
+  In that case usage of `busybox` is required as its the only
+  way to read a cert file outside of the container where the
+  chalk itself is running.
+  ([#656](https://github.com/crashappsec/chalk/pull/656))
+
+### Fixes
+
+- Docker probe always failed due to a typo introduced in chalk `1.0.0`
+  in [#646](https://github.com/crashappsec/chalk/pull/646).
+  ([#656](https://github.com/crashappsec/chalk/pull/656))
 
 ## 1.0.2
 
