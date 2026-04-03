@@ -213,6 +213,7 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
               parseIpAddress(self.domain)
             except:
               parseIpAddress(getHostByName(self.domain).addrList[0])
+        trace("docker: checking if " & self.domain & " (" & $selfIp & ") is within " & $i)
         if selfIp.family != ip.family:
           continue
         if selfIp in ipRange:
@@ -228,6 +229,7 @@ iterator iterDaemonSpecificRegistryConfigs(self:         DockerImage,
             fallthrough: fallthrough,
           )
           if withHttp:
+            trace("docker: " & self.registry & " will attempt http")
             yield RegistryConfig(
               source:      "daemon",
               scheme:      "http://",
@@ -473,6 +475,7 @@ proc request(self:              DockerImage,
   let cacheKey = (self, httpMethod, path, useCase)
   if cacheKey in jsonCache:
     return jsonCache[cacheKey]
+  var registryError = ""
   for config in self.getConfigs(useCase = useCase):
     let
       normalized = (
@@ -538,8 +541,8 @@ proc request(self:              DockerImage,
         for u in useCase.uses():
           discard configByRegistry.hasKeyOrPut((u, normalized.registry), config)
           discard configByRegistry.hasKeyOrPut((u, self.registry), config)
-          if isGet:
-            jsonCache[cacheKey] = (msg, response)
+        if isGet:
+          jsonCache[cacheKey] = (msg, response)
         return (msg, response)
       except ValueError:
         # ValueError is only raised when status code fails
@@ -558,9 +561,16 @@ proc request(self:              DockerImage,
         for u in useCase.uses():
           discard configByRegistry.hasKeyOrPut((u, normalized.registry), config)
           discard configByRegistry.hasKeyOrPut((u, self.registry), config)
-        raise newException(RegistryResponseError, getCurrentExceptionMsg())
+        # cannot raise exception here directly due to loop being an inline iterator
+        # the exception is caught by the iterator inner functions
+        # therefore have to use break to exit the loop and throw exception
+        # outside the config iterator
+        registryError = getCurrentExceptionMsg()
+        break
       else:
         trace("docker: ignoring error: " & getCurrentExceptionMsg())
+  if registryError != "":
+    raise newException(RegistryResponseError, registryError)
   raise newException(ValueError, "could not find working registry configuration for " & $self)
 
 proc manifestHead*(image:    DockerImage,
