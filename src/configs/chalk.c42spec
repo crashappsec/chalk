@@ -2034,7 +2034,6 @@ specifies where to pull the image from.
 
 Currently chalk uses `busybox` to:
 
-* probe for actual docker build platform when it was not specified via CLI args
 * for older docker versions running shell commands to copy chalkmark and/or
   chalk binary into the container
 * read docker configuration even when chalk is running in a container
