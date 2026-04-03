@@ -39,14 +39,14 @@ proc dockerProbeDefaultPlatforms*(): Table[string, DockerPlatform] =
     let
       tmpTag     = chooseNewTag()
       envVars    = @[setEnv("DOCKER_BUILDKIT", "1")]
-      busybox    = attrGet[string]("docker.busybox_container")
       probeFile  = """
-FROM """ & busybox & """
+FROM scratch
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
-RUN echo "{\"BUILDPLATFORM\": \"$BUILDPLATFORM\", \"TARGETPLATFORM\": \"$TARGETPLATFORM\"}" > /platforms.json
-CMD ["cat", "/platforms.json"]
+ENV BUILDPLATFORM=$BUILDPLATFORM
+ENV TARGETPLATFORM=$TARGETPLATFORM
 """
+    trace("docker: probing platform with: \n" & probeFile)
 
     var data = ""
 
@@ -58,13 +58,12 @@ CMD ["cat", "/platforms.json"]
           warn("docker: could not probe build platforms: " & build.stderr)
           return result
 
-      let probe = runDockerGetEverything(@["run", "--rm", tmpTag])
+      let probe = runDockerGetEverything(@["image", "inspect", tmpTag])
       if probe.getExit() != 0:
         warn("docker: could not probe build platforms: " & probe.stderr)
         return result
 
       data = probe.stdout
-      trace("docker: probe for build platforms found: " & data)
 
     finally:
       discard runDockerGetEverything(@["rmi", tmpTag])
@@ -74,14 +73,32 @@ CMD ["cat", "/platforms.json"]
       warn("docker: could not probe build platforms. Got empty output")
       return result
 
-    let json = parseJson(data)
-    for k, v in json.pairs():
-      let value = v.getStr()
-      if value == "":
-        warn("docker: could not probe build platforms. Got empty value for: " & k)
-        return result
+    try:
+      let
+        inspected = (
+          parseJson(data)
+          .assertIs(JArray, "inspect result should be an array")
+          .assertHasLen("no inspect results")
+        )
+        image  = inspected[0].assertIs(JObject, "inspected image should be an object")
+        config = image{"Config"}.assertIs(JObject, "config should be an object")
+        envs   = config{"Env"}.assertIs(JArray, "env should be an array")
+      var tmp  = initTable[string, DockerPlatform]()
+      for env in envs:
+        let
+          kv     = env.getStr()
+          (k, v) = kv.splitBy("=")
+        if k.startsWith("TARGET") or k.startsWith("BUILD"):
+          trace("docker: " & kv)
+          if v != "":
+            tmp[k] = parseDockerPlatform(v)
+      if len(tmp) > 0:
+        defaultPlatforms = tmp
+        result           = tmp
       else:
-        result[k] = parseDockerPlatform(value)
+        warn("docker: could not probe docker build platforms. all args were empty")
+    except:
+      warn("docker: could not parse probe inspect results: " & getCurrentExceptionMsg())
 
 proc findDockerPlatform*(): DockerPlatform =
   return dockerProbeDefaultPlatforms().getOrDefault("TARGETPLATFORM", getSystemBuildPlatform())
