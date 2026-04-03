@@ -155,7 +155,33 @@ proc getDockerInfoSubList*(key: string): seq[string] =
       break
     result.add(line.strip())
 
+var isContainer: bool
+proc isInContainer*(): bool =
+  result = isContainer
+  once:
+    if fileExists("/.dockerenv"):
+      isContainer = true
+    elif getEnv("container") == "podman":
+      isContainer = true
+    else:
+      let mountinfo = tryToLoadFile("/proc/self/mountinfo")
+      if (
+        "docker/containers" in mountinfo or
+        "containerd/io.containerd" in mountinfo or
+        "kubepods" in mountinfo or
+        "crio-" in mountinfo
+      ):
+        isContainer = true
+    result = isContainer
+    if isContainer:
+      trace("docker: running inside container")
+
 proc readDockerHostFile*(path: string): string =
+  result = tryToLoadFile(path)
+  if result != "":
+    return
+  if not isInContainer():
+    raise newException(ValueError, "could not to read " & path)
   # note that the docker socket can be mounted to a container where
   # chalk is running from hence we attempt to get the file content
   # via a docker run and mounting source path which will allow
