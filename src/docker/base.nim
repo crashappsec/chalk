@@ -117,7 +117,8 @@ proc getAllBuildArgs*(ctx: DockerInvocation): Table[string, string] =
   for k, v in ctx.foundBuildArgs:
     result[k] = v
   for k, v in dockerProbeDefaultPlatforms():
-    result[k] = $v
+    for n, a in v.args(k):
+      result[n] = a
 
 proc getSecret*(ctx: DockerInvocation, name: string): DockerSecret =
   let empty = DockerSecret(id: "", src: "")
