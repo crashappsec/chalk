@@ -11,8 +11,9 @@ import shutil
 import tempfile
 from typing import Any, Optional
 
+import httpx
 import sqlalchemy
-from fastapi import Body, Depends, HTTPException, Request, Response, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -192,13 +193,19 @@ async def get_cosign():
     return cosign
 
 
-@app.get("/dummy/{platform}", response_class=PlainTextResponse)
-async def get_dummy_chalk(platform: str):
-    return """
-#!/bin/sh
-echo $@
-exit 0
-""".strip()
+@app.get("/dummy/chalk-{version}-{os}-{architecture}", response_class=PlainTextResponse)
+async def get_dummy_chalk(version: str, os: str, architecture: str):
+    if architecture == "arm":
+        architecture = "arm64"
+    # ignore version in the url and get latest published version of chalk
+    # as tests most of the time run on non-released version of chalk
+    version = httpx.get(
+        "https://dl.crashoverride.run/chalk/current-version.txt",
+        follow_redirects=True,
+    ).text.strip()
+    return RedirectResponse(
+        url=f"https://dl.crashoverride.run/chalk/chalk-{version}-{os}-{architecture}"
+    )
 
 
 objects: dict[str, Any] = {}

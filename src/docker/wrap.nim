@@ -15,6 +15,7 @@ import ".."/[
   sinks,
   types,
   utils/files,
+  utils/json,
 ]
 import "."/[
   base,
@@ -277,7 +278,7 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
                                  binaries: TableRef[DockerPlatform, string],
                                  newPath:  string  = "/chalk",
                                  user:     string,
-                                 move:     bool,
+                                 move:     bool    = true,
                                  chmod:    string  = "0755") =
   let
     system = getSystemBuildPlatform()
@@ -291,29 +292,13 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
         "recent version of buildx is required for copying chalk by platform into Dockerfile",
       )
     let
-      validate  = attrGet[bool]("load.validate_configs_on_load")
       binfmt    = attrGet[bool]("docker.install_binfmt")
-      # other chalks might have different config for validate_configs_on_load
-      # so we ensure we honor self config via CLI arg
-      check     = if validate: "--validation" else: "--no-validation"
-      config    = writeNewTempFile(getAllDumpJson())
-      busybox   = attrGet[string]("docker.busybox_container")
-      base      = ctx.addByPlatform(newPath, onlyPlatform = first, image = busybox)
-      log_level = getLogLevel()
-      verbosity = if log_level == llTrace: "trace" else: "error"
+      base      = ctx.addByPlatform(newPath, onlyPlatform = first)
       # docker doesnt always use TARGETPLATFORM
       # e.g. FROM --platform=<arch>
       # doesnt update TARGETPLATFORM as its not passed as CLI --platform flag
       # hence if we know exact architecture we just hardcode it
       name      = if ctx.isMultiPlatform(): "$TARGETPLATFORM" else: $first.normalize()
-    ctx.makeFileAvailableToDocker(
-      path    = config,
-      newPath = "/config.json",
-      user    = user,
-      move    = move,
-      chmod   = "0444",
-      toAdd   = ctx.addedPlatform[base],
-    )
     for platform, path in binaries:
       # ensure platform is supported by the builder as chalk adds RUN commands
       # to dockerfile and if binfmt is not installed, multi-platform build might fail
@@ -343,24 +328,6 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
       ctx.addedPlatform[base] &= @[
         "ARG TARGETPLATFORM",
       ]
-    ctx.addedPlatform[base] &= @[
-     ("RUN /" & name & " load /config.json " &
-      "--log-level=" & verbosity & " " &
-      "--log-format=" & logFormat() & " " &
-      "--skip-command-report " &
-      "--skip-custom-reports " &
-      "--skip-summary-report " &
-      "--replace " &
-      "--all " &
-      check),
-     # sanity check plus it will show chalk metadata in build logs
-     ("RUN /" & name & " version " &
-      "--log-level=" & verbosity & " " &
-      "--log-format=" & logFormat() & " " &
-      "--skip-command-report " &
-      "--skip-custom-reports " &
-      "--skip-summary-report"),
-    ]
   else:
     for _, path in binaries:
       ctx.makeFileAvailableToDocker(

@@ -2,6 +2,14 @@
 
 ## On the `main` branch
 
+### Breaking Changes
+
+- Removing `docker.arch_binary_locations` in favor of only
+  `docker.arch_binary_locations_path` to unify how chalk
+  downloads/fetches other architecture chalk binaries
+  for multi-platform builds.
+  ([#656](https://github.com/crashappsec/chalk/pull/656))
+
 ### New Features
 
 - Add `endpoint` option for sink configuration to support S3-compatible APIs.
@@ -38,8 +46,12 @@
   like `crayon` to inject useful metadata into the artifact which otherwise
   chalk cannot derive.
   ([#658](https://github.com/crashappsec/chalk/pull/658))
-- Docker platform probe removed `busybox` dependency
+- Docker `busybox` dependency is removed for:
+  - docker platform probe
+  - multi-platform builds
+
   ([#656](https://github.com/crashappsec/chalk/pull/656))
+
 - Reading of docker registry certificate files only uses `busybox`
   when chalk detects its running in a container.
   In that case usage of `busybox` is required as its the only

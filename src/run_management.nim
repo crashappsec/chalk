@@ -352,6 +352,13 @@ template withSuspendChalkCollectionFor*(plugins: seq[string], c: untyped) =
       for p in plugins:
         restoreChalkCollectionFor(p)
 
+proc isChalk*(chalk: ChalkObj): bool =
+  return (
+    chalk.extract != nil and
+    "$CHALK_IMPLEMENTATION_NAME" in chalk.extract and
+    "CHALK_VERSION" in chalk.extract
+  )
+
 proc persistInternalValues*(chalk: ChalkObj) =
   if chalk.extract == nil:
     return

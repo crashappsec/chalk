@@ -6,13 +6,20 @@
 ##
 
 import ".."/[
+  collect,
   config,
+  plugin_api,
+  plugins/system,
+  run_management,
+  selfextract,
+  subscan,
   types,
   utils/envvars,
   utils/exe,
   utils/files,
   utils/http,
   utils/json,
+  utils/uri,
 ]
 import "."/[
   dockerfile,
@@ -161,39 +168,49 @@ proc findBaseImagePlatform*(ctx: DockerInvocation): DockerPlatform =
       )
       trace("docker: found platform from pulled image " & $result)
 
-proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
+iterator platformUrls(targetPlatform: DockerPlatform): string =
   let platform = targetPlatform.normalize()
+  for config in attrGet[seq[string]]("docker.download_arch_binary_urls"):
+    yield (
+      config
+      .replace("{version}",      getChalkExeVersion())
+      .replace("{commit}",       getChalkCommitId())
+      .replace("{os}",           platform.os)
+      .replace("{architecture}", platform.architecture)
+      .replace("{variant}",      platform.variant)
+    )
+
+proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
+  let
+    platform = targetPlatform.normalize()
+    path     = attrGet[string]("docker.arch_binary_locations_path").resolvePath()
   var
     statuses: seq[string] = @[]
     urls:     seq[string] = @[]
 
+  path.createDir()
+
   # attempt to donwload from all urls in the order they are defined
-  for config in attrGet[seq[string]]("docker.download_arch_binary_urls"):
-    let url = (config
-               .replace("{version}",      getChalkExeVersion())
-               .replace("{commit}",       getChalkCommitId())
-               .replace("{os}",           platform.os)
-               .replace("{architecture}", platform.architecture))
+  for url in platform.platformUrls():
+    let name = parseUri(url).path.splitPath().tail
     urls.add(url)
     trace("docker: downloading chalk binary from: " & url)
-    let response = safeRequest(url)
-    if response.code != Http200:
-      statuses.add(response.status)
-      trace("docker: while downloading chalk binary recieved: " & response.status)
+
+    var body: string
+    try:
+      let response = safeRequest(
+        url,
+        retries = 2,
+        acceptStatusCodes = [200..200],
+      )
+      body = response.body()
+    except:
+      trace("docker: while downloading chalk binary recieved: " & getCurrentExceptionMsg())
+      statuses.add(getCurrentExceptionMsg())
       continue
 
-    let
-      base = attrGet[string]("docker.arch_binary_locations_path")
-      folder =
-        if base == "":
-          writeNewTempFile("")
-        else:
-          base.resolvePath().joinPath($platform)
-
-    folder.createDir()
-    result = folder.joinPath("chalk")
-
-    if not result.tryToWriteFile(response.body()):
+    result = path.joinPath(name)
+    if not result.tryToWriteFile(body):
       raise newException(
         ValueError,
         "Could not save fetched chalk binary to: " & result
@@ -209,62 +226,65 @@ proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
     "due to " & $statuses
   )
 
-proc findPlatformBinaries(): TableRef[DockerPlatform, string] =
-  result = newTable[DockerPlatform, string]()
+proc findExistingPlatformBinary(platform: DockerPlatform): string =
+  let base = attrGet[string]("docker.arch_binary_locations_path").resolvePath()
+  for url in platform.platformUrls():
+    let
+      name = parseUri(url).path.splitPath().tail
+      path = base.joinPath(name)
+    if path.fileExists() and path.isExecutable():
+      trace("docker: found existing chalk binary " & path & " for TARGETPLATFORM (" & $platform & ")")
+      return path
 
-  let
-    basePath = attrGet[string]("docker.arch_binary_locations_path")
-    locOpt   = attrGetOpt[TableRef[string, string]]("docker.arch_binary_locations")
-
-  if basePath != "":
-    let base = basePath.resolvePath()
-    for path in walkDirRec(base, relative = true):
-      let (platform, tail) = path.splitPath()
-      if tail != "chalk":
-        continue
-      result[parseDockerPlatform(platform)] = base.joinPath(path)
-
-  if locOpt.isNone():
-    return
-
-  # user-provided configs always take precedence of any auto discovered
-  # platforms on disk
-  let loc = locOpt.get()
-  for platform, path in locOpt.get():
-    result[parseDockerPlatform(platform)] = path.resolvePath()
+proc copyWithSelfConfig(path: string, platform: DockerPlatform): string =
+  let tmp = getNewTempDir(
+     "chalk-",
+     "-" & ($platform).replace("/", "_").replace(".", "_"),
+  ).joinPath("chalk")
+  copyFile(path, tmp)
+  setFilePermissions(tmp, {
+    # 0755
+    fpUserExec,
+    fpUserWrite,
+    fpUserRead,
+    fpGroupExec,
+    fpGroupRead,
+    fpOthersExec,
+    fpOthersRead,
+  })
+  var platformChalk: ChalkObj
+  withOnlyCodecs(getNativeCodecs(platform = platform.os)):
+    for i in runChalkSubScan(@[tmp], "extract").allChalks:
+      if not i.isChalk():
+        raise newException(ValueError, "Found chalk in " & tmp & " for TARGETPLATFORM (" & $platform & ") is not a chalk executable")
+      if i.validateMetaData() notin [vOk, vSignedOk]:
+        raise newException(ValueError, "Found chalk in " & tmp & " for TARGETPLATFORM (" & $platform & ") could not be validated")
+      platformChalk = i
+      break
+  if platformChalk == nil:
+    raise newException(ValueError, "Could not find any chalks in " & tmp & " for TARGETPLATFORM (" & $platform & ")")
+  if not selfChalk.writeSelfConfigToAnotherChalk(platformChalk):
+    raise newException(ValueError, "Could not copy self chalkmark to " & tmp & " for TARGETPLATFORM (" & $platform & ")")
+  return tmp
 
 proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): string =
-  # Mapping nim platform names to docker ones is a PITA. We need to
+  # Mapping nim platform names to docker ones is a non-trivial. We need to
   # know the default target platform whenever --platform isn't
   # explicitly provided anyway, so we just ask Docker to tell us both
   # the native build platform, and the default target platform.
-
-  # Note that docker does have some name normalization rules. For
-  # instance, I think linux/arm/v7 and linux/arm64 are supposed to be
-  # the same. We currently only ever self-identify with the later, but
-  # you can match both options to point to the same binary with the
-  # `arch_binary_locations` field.
   let buildPlatform  = getSystemBuildPlatform()
   if targetPlatform == buildPlatform:
-    return getMyAppPath()
+    return getMyAppPath().copyWithSelfConfig(targetPlatform)
 
-  let pathByPlatform = findPlatformBinaries()
-  if targetPlatform in pathByPlatform:
-    let path = pathByPlatform[targetPlatform]
-    if not path.isExecutable():
-      raise newException(
-        ValueError,
-        "chalk binary (" & result & ") for " &
-        "TARGETPLATFORM (" & $targetPlatform & ") " &
-        "is not executable."
-      )
-    return path
+  let path = findExistingPlatformBinary(targetPlatform)
+  if path != "":
+    return path.copyWithSelfConfig(targetPlatform)
 
   if attrGet[bool]("docker.download_arch_binary"):
     trace("docker: no chalk binary found for " &
           "TARGETPLATFORM (" & $targetPlatform & "). " &
           "Attempting to download chalk binary.")
-    return downloadPlatformBinary(targetPlatform)
+    return downloadPlatformBinary(targetPlatform).copyWithSelfConfig(targetPlatform)
 
   raise newException(
     ValueError,
@@ -275,7 +295,12 @@ proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): 
 proc findAllPlatformsBinaries*(ctx: DockerInvocation, platforms: seq[DockerPlatform]): TableRef[DockerPlatform, string] =
   result = newTable[DockerPlatform, string]()
   for platform in platforms:
-    result[platform] = ctx.findPlatformBinary(platform)
+    try:
+      result[platform] = ctx.findPlatformBinary(platform)
+    except:
+      error("docker: could not get chalk binary for TARGETPLATFORM (" & $platform & ") " &
+            getCurrentExceptionMsg())
+      dumpExOnDebug()
 
 proc doesBuilderSupportPlatform*(ctx: DockerInvocation, platform: DockerPlatform): bool =
   let info = ctx.getBuilderInfo()
