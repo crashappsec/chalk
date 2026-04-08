@@ -156,33 +156,13 @@ proc newConfFileError(err, tb: string): bool =
   else:
     cantLoad(err)
 
-proc writeSelfConfig*(selfChalk: ChalkObj): bool
-    {.cdecl, exportc, discardable.} =
-  selfChalk.persistInternalValues()   # Found in run_management.nim
-  # ensure we dont drop any existing metadata
-  # since for example chalk load can be running in limited
-  # environment and so we dont want to drop things like original
-  # chalk commit id, etc
-  # although as a result well be overriding any of these fields
-  # if any of the plugins find them again
-  selfChalk.persistExtractedValues()
-  collectChalkTimeHostInfo()
-
-  let lastCount = if "$CHALK_LOAD_COUNT" notin selfChalk.collectedData:
-                    -1
-                  else:
-                    unpack[int](selfChalk.collectedData["$CHALK_LOAD_COUNT"])
-
-  selfChalk.collectedData["$CHALK_LOAD_COUNT"]          = pack(lastCount  + 1)
-  selfChalk.collectedData["$CHALK_IMPLEMENTATION_NAME"] = pack(implName)
-  selfChalk.collectChalkTimeArtifactInfo(override = true)
-
+proc writeChalkConfig(selfChalk: ChalkObj, copyOnFailure = true): bool =
   trace(selfChalk.name & ": installing configuration.")
 
   let toWrite = some(selfChalk.getChalkMarkAsStr())
   selfChalk.callHandleWrite(toWrite)
 
-  if selfChalk.opFailed:
+  if selfChalk.opFailed and copyOnFailure:
     let
       (_, fname) = selfChalk.fsRef.splitPath()
       maybe      = getCurrentDir().joinPath(fname)
@@ -204,9 +184,41 @@ proc writeSelfConfig*(selfChalk: ChalkObj): bool
     else:
       selfChalk.fsRef.makeExecutable()
 
-  info("Configuration replaced in binary: " & selfChalk.fsRef)
-  selfChalk.makeNewValuesAvailable()
-  return true
+  result = not selfChalk.opFailed
+  if result:
+    info("Configuration replaced in binary: " & selfChalk.fsRef)
+    selfChalk.makeNewValuesAvailable()
+
+proc writeSelfConfig*(selfChalk: ChalkObj): bool {.cdecl, exportc, discardable.} =
+  selfChalk.persistInternalValues()   # Found in run_management.nim
+  # ensure we dont drop any existing metadata
+  # since for example chalk load can be running in limited
+  # environment and so we dont want to drop things like original
+  # chalk commit id, etc
+  # although as a result well be overriding any of these fields
+  # if any of the plugins find them again
+  selfChalk.persistExtractedValues()
+  collectChalkTimeHostInfo()
+
+  let lastCount = if "$CHALK_LOAD_COUNT" notin selfChalk.collectedData:
+                    -1
+                  else:
+                    unpack[int](selfChalk.collectedData["$CHALK_LOAD_COUNT"])
+
+  selfChalk.collectedData["$CHALK_LOAD_COUNT"]          = pack(lastCount  + 1)
+  selfChalk.collectedData["$CHALK_IMPLEMENTATION_NAME"] = pack(implName)
+  selfChalk.collectChalkTimeArtifactInfo(override = true)
+
+  return selfChalk.writeChalkConfig()
+
+proc writeSelfConfigToAnotherChalk*(selfChalk: ChalkObj, otherChalk: ChalkObj): bool =
+  if not otherChalk.isChalk():
+    raise newException(ValueError, "can only write self config to other chalk binaries")
+  selfChalk.persistExtractedValues()
+  for k, v in selfChalk.collectedData.pairs():
+    if k.startsWith("$"):
+      otherChalk.collectedData[k] = v
+  return otherChalk.writeChalkConfig(copyOnFailure = false)
 
 proc loadCachedComponents*(runtime: ConfigState, cache: OrderedTableRef[string, string]) =
   for url, src in cache:

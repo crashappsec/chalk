@@ -1,3 +1,4 @@
+docker_log_level = "trace"
 log_format = "plain"
 
 subscribe("report", "json_console_out")
