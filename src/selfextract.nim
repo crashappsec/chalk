@@ -37,6 +37,27 @@ proc getParams*(): seq[Box] =
     value    = valueOpt.get(pack(newSeq[Box]()))
   return unpack[seq[Box]](value)
 
+proc getNonSensitiveParams*(): seq[Box] =
+  let runtime = getChalkRuntime()
+  for item in getParams():
+    let
+      row       = unpack[seq[Box]](item)
+      isAttr    = unpack[bool](row[0])
+      url       = unpack[string](row[1])
+      sym       = unpack[string](row[2])
+      component = runtime.getComponentReference(url)
+      params     =
+        if isAttr:
+          component.attrParams
+        else:
+          component.varParams
+    if sym notin params:
+      continue
+    if not params[sym].sensitive.get(false):
+        result.add(item)
+    else:
+      trace("param: " & sym & " is sensitive. skipping.")
+
 proc getCache*(ignore: seq[string] = @[]): OrderedTableRef[string, string] =
   let
     valueOpt = selfChalkGetKey(cacheKey)
@@ -216,7 +237,9 @@ proc writeSelfConfigToAnotherChalk*(selfChalk: ChalkObj, otherChalk: ChalkObj): 
     raise newException(ValueError, "can only write self config to other chalk binaries")
   selfChalk.persistExtractedValues()
   for k, v in selfChalk.collectedData.pairs():
-    if k.startsWith("$"):
+    if k == paramKey:
+      otherChalk.collectedData[k] = pack(getNonSensitiveParams())
+    elif k.startsWith("$"):
       otherChalk.collectedData[k] = v
   return otherChalk.writeChalkConfig(copyOnFailure = false)
 
