@@ -6,13 +6,8 @@
 ##
 
 import ".."/[
-  collect,
   config,
-  plugin_api,
-  plugins/system,
-  run_management,
-  selfextract,
-  subscan,
+  selfcopy,
   types,
   utils/envvars,
   utils/exe,
@@ -236,37 +231,6 @@ proc findExistingPlatformBinary(platform: DockerPlatform): string =
       trace("docker: found existing chalk binary " & path & " for TARGETPLATFORM (" & $platform & ")")
       return path
 
-proc copyWithSelfConfig(path: string, platform: DockerPlatform): string =
-  let tmp = getNewTempDir(
-     "chalk-",
-     "-" & ($platform).replace("/", "_").replace(".", "_"),
-  ).joinPath("chalk")
-  copyFile(path, tmp)
-  setFilePermissions(tmp, {
-    # 0755
-    fpUserExec,
-    fpUserWrite,
-    fpUserRead,
-    fpGroupExec,
-    fpGroupRead,
-    fpOthersExec,
-    fpOthersRead,
-  })
-  var platformChalk: ChalkObj
-  withOnlyCodecs(getNativeCodecs(platform = platform.os)):
-    for i in runChalkSubScan(@[tmp], "extract").allChalks:
-      if not i.isChalk():
-        raise newException(ValueError, "Found chalk in " & tmp & " for TARGETPLATFORM (" & $platform & ") is not a chalk executable")
-      if i.validateMetaData() notin [vOk, vSignedOk]:
-        raise newException(ValueError, "Found chalk in " & tmp & " for TARGETPLATFORM (" & $platform & ") could not be validated")
-      platformChalk = i
-      break
-  if platformChalk == nil:
-    raise newException(ValueError, "Could not find any chalks in " & tmp & " for TARGETPLATFORM (" & $platform & ")")
-  if not selfChalk.writeSelfConfigToAnotherChalk(platformChalk):
-    raise newException(ValueError, "Could not copy self chalkmark to " & tmp & " for TARGETPLATFORM (" & $platform & ")")
-  return tmp
-
 proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): string =
   # Mapping nim platform names to docker ones is a non-trivial. We need to
   # know the default target platform whenever --platform isn't
@@ -274,17 +238,26 @@ proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): 
   # the native build platform, and the default target platform.
   let buildPlatform  = getSystemBuildPlatform()
   if targetPlatform == buildPlatform:
-    return getMyAppPath().copyWithSelfConfig(targetPlatform)
+    return getMyAppPath().copySelfConfigForArch(
+      os   = targetPlatform.os,
+      arch = targetPlatform.architecture,
+    )
 
   let path = findExistingPlatformBinary(targetPlatform)
   if path != "":
-    return path.copyWithSelfConfig(targetPlatform)
+    return path.copySelfConfigForArch(
+      os   = targetPlatform.os,
+      arch = targetPlatform.architecture,
+    )
 
   if attrGet[bool]("docker.download_arch_binary"):
     trace("docker: no chalk binary found for " &
           "TARGETPLATFORM (" & $targetPlatform & "). " &
           "Attempting to download chalk binary.")
-    return downloadPlatformBinary(targetPlatform).copyWithSelfConfig(targetPlatform)
+    return downloadPlatformBinary(targetPlatform).copySelfConfigForArch(
+      os   = targetPlatform.os,
+      arch = targetPlatform.architecture,
+    )
 
   raise newException(
     ValueError,

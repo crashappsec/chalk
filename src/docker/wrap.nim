@@ -11,11 +11,8 @@ import std/[
   sequtils,
 ]
 import ".."/[
-  selfextract,
-  sinks,
   types,
   utils/files,
-  utils/json,
 ]
 import "."/[
   base,

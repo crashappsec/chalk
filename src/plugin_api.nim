@@ -490,9 +490,9 @@ proc getAllCodecs*(): seq[Plugin] =
         codecs.add(item)
   return codecs
 
-proc getNativeCodecs*(platform = hostOS): seq[Plugin] =
+proc getNativeCodecs*(os = hostOS): seq[Plugin] =
   for codec in getAllCodecs():
-    if platform in codec.nativeObjPlatforms:
+    if os in codec.nativeObjPlatforms:
       result.add(codec)
 
 proc getFileCodecs*(): seq[Plugin] =
