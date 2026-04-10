@@ -19,6 +19,7 @@ import ".."/[
   config,
   plugin_api,
   run_management,
+  selfcopy,
   subscan,
   types,
   utils/exe,
@@ -176,7 +177,7 @@ proc insertChalkBinaryIntoZip(chalk: ChalkObj) =
   ## Raises an exception on failure
 
   let
-    myAppPath          = getMyAppPath()
+    myAppPath          = copySelfConfigForArch(getMyAppPath(), hostOS, hostCPU)
     chalkBinaryContent = tryToLoadFile(myAppPath)
     cache              = ZipCache(chalk.cache)
     contentDir         = cache.origD

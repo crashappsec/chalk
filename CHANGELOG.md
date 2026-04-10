@@ -25,6 +25,12 @@
   chalk itself is running.
   ([#656](https://github.com/crashappsec/chalk/pull/656))
 
+- Component parameters can be marked as `sensitive` which are
+  skipped when embedding chalk binary into an artifact
+  such as copying chalk binary into docker image
+  when entrypoint wrapping is enabled.
+  ([#656](https://github.com/crashappsec/chalk/pull/656))
+
 ### Fixes
 
 - Docker probe always failed due to a typo introduced in chalk `1.0.0`
