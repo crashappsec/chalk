@@ -22,16 +22,7 @@ proc copySelfConfigForArch*(path: string, os: string, arch: string): string =
     dir      = getNewTempDir("chalk-", "-" & os & "-" & arch)
     tmp      = dir.joinPath("chalk-" & os & "-" & arch)
   copyFile(path, tmp)
-  setFilePermissions(tmp, {
-    # 0755
-    fpUserExec,
-    fpUserWrite,
-    fpUserRead,
-    fpGroupExec,
-    fpGroupRead,
-    fpOthersExec,
-    fpOthersRead,
-  })
+  chmodFilePermissions(tmp, "0755")
   var platformChalk: ChalkObj
   withOnlyCodecs(getNativeCodecs(os = os)):
     for i in runChalkSubScan(@[tmp], "extract").allChalks:

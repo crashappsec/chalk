@@ -237,3 +237,32 @@ proc optLoadFile*(s: string): Option[string] =
     return none(string)
   except:
     return none(string)
+
+proc chmodPermissions*(octal: string): set[FilePermission] =
+  let o =
+    if len(octal) == 4:
+      octal[1..^1]
+    elif len(octal) == 3:
+      octal
+    else:
+      raise newException(ValueError, "chmod should be 3 chars long")
+
+  let
+    user  = ord(o[0]) - ord('0')
+    group = ord(o[1]) - ord('0')
+    other = ord(o[2]) - ord('0')
+
+  if (user  and 4) != 0: result.incl(fpUserRead)
+  if (user  and 2) != 0: result.incl(fpUserWrite)
+  if (user  and 1) != 0: result.incl(fpUserExec)
+  if (group and 4) != 0: result.incl(fpGroupRead)
+  if (group and 2) != 0: result.incl(fpGroupWrite)
+  if (group and 1) != 0: result.incl(fpGroupExec)
+  if (other and 4) != 0: result.incl(fpOthersRead)
+  if (other and 2) != 0: result.incl(fpOthersWrite)
+  if (other and 1) != 0: result.incl(fpOthersExec)
+
+proc chmodFilePermissions*(path: string, octal: string): string {.discardable.} =
+  result = path
+  if octal != "":
+    setFilePermissions(path, chmodPermissions(octal))
