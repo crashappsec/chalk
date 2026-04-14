@@ -1993,8 +1993,6 @@ specifies where to pull the image from.
 
 Currently chalk uses `busybox` to:
 
-* for older docker versions running shell commands to copy chalkmark and/or
-  chalk binary into the container
 * read docker daemon configuration even when chalk is running in a container
 """
   }

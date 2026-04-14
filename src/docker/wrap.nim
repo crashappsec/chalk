@@ -72,7 +72,7 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
     chmod = "0444"
 
   let chmodstr =
-    if chmod == "":
+    if chmod == "" or not supportsCopyChmod():
       ""
     else:
       "--chmod=" & chmod & " "
@@ -100,9 +100,11 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
       if move:
         trace("docker: .dockerignore is present in context. moving to tmp " & dstLoc)
         moveFile(loc, dstLoc)
+        chmodFilePermissions(dstLoc, chmod)
       else:
         trace("docker: .dockerignore is present in context. copying to tmp " & dstLoc)
-        copyFile(loc, dstLoc)
+        copyFileWithPermissions(loc, dstLoc)
+        chmodFilePermissions(dstLoc, chmod)
 
     ctx.newCmdLine.add("--build-context")
     ctx.newCmdLine.add(context & "=" & folder)
@@ -140,41 +142,17 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
     try:
       if move:
         moveFile(loc, dstLoc)
+        chmodFilePermissions(dstLoc, chmod)
         trace("docker: moved " & loc & " to " & dstLoc)
       else:
-        copyFile(loc, dstLoc)
+        copyFileWithPermissions(loc, dstLoc)
+        chmodFilePermissions(dstLoc, chmod)
         trace("docker: copied " & loc & " to " & dstLoc)
       registerTempFile(dstLoc)
-      let (_, name) = dstLoc.splitPath()
-
-      if supportsMultiStageBuilds():
-        let
-          base    = "chalk" & newPath.replace("/", "_").replace(".", "_")
-          busybox = attrGet[string]("docker.busybox_container")
-        toAdd.add("COPY --from=" & base & " " & newPath & " " & newPath)
-        ctx.addedPlatform[base] = @[
-          "FROM " & busybox & " AS " & base,
-          "COPY " & name & " " & newPath,
-          "RUN chmod " & chmod & " " & newPath,
-        ]
-      else:
-        # NOTE this can fail as we have no guarantee that
-        # RUN will work (e.g. distroless images) but we are out of
-        # options at this point as:
-        # * there is no buildx
-        # * docker is older version which doesnt support multi-stage builds
-        # and so we try our best but we cant pull a rabbit out of a hat...
-        if chmodstr != "" and supportsCopyChmod():
-          toAdd.add("COPY " & chmodstr & name & " " & newPath)
-        elif chmod != "":
-          if hasUser:
-            toAdd.add("USER 0:0")
-          toAdd.add("COPY " & name & " " & newPath)
-          toAdd.add("RUN chmod " & chmod & " " & newPath)
-          if hasUser:
-            toAdd.add("USER " & user)
-        else:
-          toAdd.add("COPY " & name & " " & newPath)
+      let
+        (_, name) = dstLoc.splitPath()
+        copy      = "COPY " & chmodstr & name & " " & newPath
+      toAdd.add(copy)
 
       if contextDir.joinPath(".dockerignore").fileExists():
         ctx.updateDockerignore = attrGet[bool]("docker.update_dockerignore")
