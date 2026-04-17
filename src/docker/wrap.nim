@@ -100,11 +100,17 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
       if move:
         trace("docker: .dockerignore is present in context. moving to tmp " & dstLoc)
         moveFile(loc, dstLoc)
-        chmodFilePermissions(dstLoc, chmod)
       else:
         trace("docker: .dockerignore is present in context. copying to tmp " & dstLoc)
         copyFileWithPermissions(loc, dstLoc)
+      try:
         chmodFilePermissions(dstLoc, chmod)
+      except:
+        if chmodstr == "":
+          trace("docker: COPY --chmod is not supported and chmod had an error - " & getCurrentExceptionMsg())
+          raise
+        else:
+          trace("docker: COPY --chmod is supported. ignoring chmod error - " & getCurrentExceptionMsg())
 
     ctx.newCmdLine.add("--build-context")
     ctx.newCmdLine.add(context & "=" & folder)
@@ -142,12 +148,18 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
     try:
       if move:
         moveFile(loc, dstLoc)
-        chmodFilePermissions(dstLoc, chmod)
         trace("docker: moved " & loc & " to " & dstLoc)
       else:
         copyFileWithPermissions(loc, dstLoc)
-        chmodFilePermissions(dstLoc, chmod)
         trace("docker: copied " & loc & " to " & dstLoc)
+      try:
+        chmodFilePermissions(dstLoc, chmod)
+      except:
+        if chmodstr == "":
+          trace("docker: COPY --chmod is not supported and chmod had an error - " & getCurrentExceptionMsg())
+          raise
+        else:
+          trace("docker: COPY --chmod is supported. ignoring chmod error - " & getCurrentExceptionMsg())
       registerTempFile(dstLoc)
       let
         (_, name) = dstLoc.splitPath()
