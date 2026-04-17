@@ -1817,8 +1817,8 @@ def test_multiplatform_build(
             DOCKER_PLATFORMS=target_platforms,
             DOCKER_FILE_CHALKED=Contains(
                 {
-                    "/$TARGETPLATFORM load /config.json",
-                    "/$TARGETPLATFORM version",
+                    "COPY --from=chalk_chalk /$TARGETPLATFORM /chalk",
+                    "COPY --from=chalk_chalk_json /$TARGETPLATFORM /chalk.json",
                 }
             ),
             _IMAGE_ENTRYPOINT=["/chalk", "exec", "--"],

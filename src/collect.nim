@@ -301,7 +301,9 @@ proc collectRunTimeHostInfo*() =
             getCurrentExceptionMsg())
       dumpExOnDebug()
 
-proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
+proc artSetupForExtract(argv:     seq[string],
+                        envVars = false,
+                        ): ArtifactIterationInfo =
   new result
 
   let
@@ -310,7 +312,7 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
 
   result.fileExclusions = @[selfPath]
   result.recurse        = attrGet[bool]("recursive")
-  result.envVars        = attrGet[bool]("env_vars")
+  result.envVars        = envVars
 
   for item in skipList:
     result.skips.add(re(item))
@@ -325,7 +327,9 @@ proc artSetupForExtract(argv: seq[string]): ArtifactIterationInfo =
     else:
       result.otherPaths.add(item)
 
-proc artSetupForInsertAndDelete(argv: seq[string], envVars = false): ArtifactIterationInfo =
+proc artSetupForInsertAndDelete(argv:     seq[string],
+                                envVars = false,
+                                ): ArtifactIterationInfo =
   new result
 
   let
@@ -352,7 +356,9 @@ proc artSetupForInsertAndDelete(argv: seq[string], envVars = false): ArtifactIte
       else:
         error(maybe & ": No such file or directory")
 
-proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
+proc artSetupForExecAndEnv(argv:     seq[string],
+                           envVars = false,
+                           ): ArtifactIterationInfo =
   # For the moment.
   new result
   result.filePaths = argv
@@ -363,7 +369,7 @@ proc artSetupForExecAndEnv(argv: seq[string]): ArtifactIterationInfo =
 
   result.fileExclusions = @[selfPath]
   result.recurse        = attrGet[bool]("recursive")
-  result.envVars        = attrGet[bool]("env_vars")
+  result.envVars        = envVars
 
   for item in skipList:
     result.skips.add(re(item))
@@ -372,19 +378,22 @@ proc resolveAll(argv: seq[string]): seq[string] =
   for item in argv:
     result.add(resolvePath(item))
 
-iterator artifacts*(argv: seq[string], notTmp=true): ChalkObj =
+iterator artifacts*(argv:     seq[string],
+                    notTmp  = true,
+                    ): ChalkObj =
   var iterInfo: ArtifactIterationInfo
+  let envVars = attrGet[bool]("env_vars")
 
   if notTmp:
     case getBaseCommandName()
     of "insert":
-      iterInfo = artSetupForInsertAndDelete(argv, envVars = attrGet[bool]("env_vars"))
+      iterInfo = artSetupForInsertAndDelete(argv, envVars = envVars)
     of "delete":
       iterInfo = artSetupForInsertAndDelete(argv)
     of "extract":
-      iterInfo = artSetupForExtract(argv)
+      iterInfo = artSetupForExtract(argv, envVars = envVars)
     of "exec", "env":
-      iterInfo = artSetupForExecAndEnv(argv)
+      iterInfo = artSetupForExecAndEnv(argv, envVars = envVars)
   else:
       iterInfo = ArtifactIterationInfo(filePaths: resolveAll(argv))
 
