@@ -82,12 +82,13 @@ the same hash.
 
 | Path                           | What                                                                                                                                                      |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/codecs/macho/`            | C library adapted from LIEF for the parser + LC_NOTE primitives. Standalone Makefile + smoke tests. Plain C23, OpenSSL libcrypto for SHA-256.             |
+| `src/codecs/macho/`            | C library adapted from LIEF for the parser + LC_NOTE primitives. Plain C23, OpenSSL libcrypto for SHA-256.                                                |
 | `src/utils/macho.nim`          | FFI bindings. Compiles the C sources via `{.compile.}` pragmas. `chalk_macho_warn` overrides the C-side weak default to route into nim's `warn` template. |
 | `src/plugins/codecMacho.nim`   | The codec itself. `scan` / `handleWrite` / `getUnchalkedHash` / `ctArtCallback` / `rtArtCallback`.                                                        |
 | `src/plugin_load.nim`          | Registers `codecMacho` ahead of `codecMacOs`.                                                                                                             |
 | `src/configs/base_plugins.c4m` | Native at priority 1; wrapper at priority 2.                                                                                                              |
 | `scripts/release-macos.sh`     | Build → strip → `chalk load default` → codesign with Developer ID → notarize → pkg → staple.                                                              |
+| `tests/unit/test_macho.nim`    | Nim unit test exercising the FFI on a committed Mach-O fixture.                                                                                           |
 
 ## Cross-platform
 
