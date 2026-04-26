@@ -344,12 +344,12 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
               accessedPaths.incl(path)
             else:
               trace("postexec: ignoring accessed non-artifact " & path)
-  
+
     finally:
       discard close(ws.watcher)
-  
+
     let codecs = attrGet[seq[string]]("exec.postexec.access_watch.scan_codecs")
-  
+
     trace("postexec: subscan for chalkmarks in " &
           $len(accessedPaths) & " accessed artifacts " &
           "out of prepped " & $len(ws.prepPaths) & " artifacts " &
@@ -366,10 +366,10 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
         chalk.collectRunTimeArtifactInfo()
         addToAllArtifacts(chalk)
     trace("postexec: subscan complete")
-  
+
     withSuspendChalkCollectionFor(getOptionalPluginNames()):
       doReporting(clearState = true)
-  
+
     # if forked exit postexec process
     if toFork:
       quitChalk()
