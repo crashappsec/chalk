@@ -51,6 +51,7 @@ loadPlugins([
   "codecDocker",
   "codecElf",
   "codecFallbackElf",
+  "codecMacho",
   "codecMacOs",
   "codecPythonPyc",
   "codecSource",

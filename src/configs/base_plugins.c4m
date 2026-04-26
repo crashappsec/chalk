@@ -688,6 +688,39 @@ This codec currently only processes files that seem to be valid UTF-8.
 """
 }
 
+plugin macho {
+    ~enabled:        true
+    codec:           true
+    pre_chalk_keys:  ["ARTIFACT_TYPE"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    priority:        1  # Try the native codec before falling back to
+                        # the script-wrapper codec at priority 2.
+    doc: """
+This is the native codec for Mach-O executables on macOS.  It marks
+binaries by inserting an `LC_NOTE` load command (with `data_owner`
+set to "chalk") and appending the chalk-mark JSON at end-of-file.
+The result is still a valid Mach-O — `dyld` ignores `LC_NOTE`,
+`codesign` covers it in the signature hash, and `strip` preserves it.
+<p>
+The codec refuses (and falls back to the script-wrapper macos
+codec at priority 2) when:
+<ol>
+<li>the file is not a Mach-O at all;
+<li>the file is a fat / universal binary (deferred to a follow-up);
+<li>the file has a real-cert (Developer ID / CMS) code signature —
+    we don't have the cert or private key to re-sign;
+<li>the binary's load-command region has no slack for the new
+    `LC_NOTE`;
+<li>the code signature is malformed.
+</ol>
+<p>
+Ad-hoc-signed binaries (`codesign -s -`, the default for arm64
+toolchain output) are handled natively: the LC_NOTE is inserted in
+place, then `codesign --force --sign -` re-applies the ad-hoc
+signature over the new layout.
+"""
+}
+
 plugin macos {
     ~enabled:        true
     codec:           true
