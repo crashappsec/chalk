@@ -2,6 +2,10 @@
 .github
 Dockerfile*
 chalk
+chalk.bck
+chalk-reports.jsonl
+chalk-tmp
+dist
 docker
 docker-compose*
 server

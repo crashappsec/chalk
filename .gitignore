@@ -55,3 +55,9 @@ profile_results.txt
 log
 .nimcache
 strace-*
+nimbledeps
+
+# carved Mach-O codec build artifacts.  *.o and build/ above already
+# catch most; these are the test executables.
+src/codecs/macho/test/macho_nim_smoke
+src/codecs/macho/test/macho_nim_smoke.dSYM/
