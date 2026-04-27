@@ -4,6 +4,9 @@
 
 ### New Features
 
+- Add `endpoint` option for sink configuration to support S3-compatible APIs.
+  ([659](https://github.com/crashappsec/chalk/pull/659))
+
 - Native support for chalking Macho binaries.
   As mac requires binaries to be signed therefore on Linux
   chalk can extract chalkmarks but only chalks macho binaries
