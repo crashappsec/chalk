@@ -90,6 +90,7 @@ sink s3 {
   ~uri:           true
   ~region:        true
   ~extra:         false
+  ~endpoint:      false
   ~on_write_msg:  false
   shortdoc:       "S3 object storage"
   doc:       """
@@ -100,8 +101,9 @@ sink s3 {
 | `secret` | `string` | true | A valid AWS auth token |
 | `token` | `string` | false | AWS session token |
 | `uri` | `string` | true | The URI for the bucket in `s3:` format; see below |
-| `region` | `string` | true | The region |
+| `region` | `string` | true | The AWS region (or any non-empty string for S3-compatible stores) |
 | `extra` | `string` | false | A prefix added to the object path within the bucket |
+| `endpoint` | `string` | false | Custom S3-compatible endpoint URL (e.g. `http://localhost:9000` for MinIO or `http://localhost:8080` for `rclone serve s3`). When omitted, the standard AWS endpoint is used. |
 
 To ensure uniqueness, each run of chalk constructs a unique object
 name. Here are the components:
@@ -121,6 +123,41 @@ this will not be checked; the operation will fail if they are not.
 
 Generally, you should not use dots in your bucket name, as this will
 thwart TLS protection of the connection.
+
+## Using with S3-compatible stores (MinIO, rclone, etc.)
+
+Set `endpoint` to the base URL of the service and keep `uri` in the
+normal `s3://bucket-name/object-path` form.  The `region` field is
+still required by the AWS SigV4 signing algorithm; for most
+S3-compatible stores any non-empty value (e.g. `"us-east-1"`) works.
+
+Example for a local MinIO instance:
+
+```
+sink_config my_minio_config {
+  enabled:  true
+  sink:     "s3"
+  endpoint: "http://localhost:9000"
+  uri:      "s3://my-bucket/chalk-reports"
+  uid:      env("MINIO_ROOT_USER")
+  secret:   env("MINIO_ROOT_PASSWORD")
+  region:   "us-east-1"
+}
+```
+
+Example for `rclone serve s3 --addr :8080`:
+
+```
+sink_config my_rclone_config {
+  enabled:  true
+  sink:     "s3"
+  endpoint: "http://localhost:8080"
+  uri:      "s3://my-bucket/chalk-reports"
+  uid:      env("RCLONE_S3_ACCESS_KEY_ID")
+  secret:   env("RCLONE_S3_SECRET_ACCESS_KEY")
+  region:   "us-east-1"
+}
+```
 """
 }
 

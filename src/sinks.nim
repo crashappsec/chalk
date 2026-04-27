@@ -8,6 +8,7 @@
 ## Chalk-specific setup and APIs around nimtuils' IO sinks.
 
 import std/[
+  os,
   uri,
   posix,
 ]
@@ -146,14 +147,19 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
       line &= "\n\tpreferBundledCerts = " & cfg.params.getOrDefault("prefer_bundled_certs", "false") & "\n"
     of "s3":
       let state = S3SinkState(cfg.private)
-      line &= "\n\turi    = " & cfg.params["uri"]
-      line &= "\n\tuid    = " & state.uid
-      line &= "\n\tregion = " & state.region
-      line &= "\n\textra  = "
+      line &= "\n\turi      = " & cfg.params["uri"]
+      line &= "\n\tuid      = " & state.uid
+      line &= "\n\tregion   = " & state.region
+      line &= "\n\textra    = "
       if state.extra == "":
-        line &= "<not provided>\n"
+        line &= "<not provided>"
       else:
-        line &= state.extra & "\n"
+        line &= state.extra
+      line &= "\n\tendpoint = "
+      if state.endpoint == "":
+        line &= "<aws default>\n"
+      else:
+        line &= state.endpoint & "\n"
     of "rotating_log", "file":
       let fname     = cfg.params["filename"]
       var log_parts = cfg.params["log_search_path"].split(":")
@@ -335,6 +341,17 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         return none(SinkConfig)
     except:
         error("Sink config '" & name & "' has an invalid URI.")
+        dumpExOnDebug()
+        return none(SinkConfig)
+    if "endpoint" in opts and opts["endpoint"] != "":
+      try:
+        let epUri = parseUri(opts["endpoint"])
+        if epUri.scheme notin ["http", "https"]:
+          error("Sink config '" & name & "' endpoint must use http or https " &
+                "(got: '" & opts["endpoint"] & "')")
+          return none(SinkConfig)
+      except:
+        error("Sink config '" & name & "' has an invalid endpoint URI.")
         dumpExOnDebug()
         return none(SinkConfig)
   of "post", "presign":
