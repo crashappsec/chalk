@@ -9,6 +9,7 @@ dump + load tested in test_config.py
 docker commands are not tested here but as part of the docker codec tests in test_docker.py
 exec commands are tested in test_exec.py as they are more involved
 """
+
 import json
 from pathlib import Path
 
@@ -20,7 +21,6 @@ from .utils.cosign import Cosign
 from .utils.dict import ANY
 from .utils.log import get_logger
 from .utils.os import run
-
 
 logger = get_logger()
 

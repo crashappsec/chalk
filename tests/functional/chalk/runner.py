@@ -20,7 +20,6 @@ from ..utils.log import get_logger
 from ..utils.os import CalledProcessError, Program, run
 from ..utils.text import valid_json
 
-
 ChalkCommand = Literal[
     "delete",
     "dump",
