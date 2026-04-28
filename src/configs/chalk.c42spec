@@ -3400,7 +3400,7 @@ By default, virtual chalk marks will get appended to the file `./virtual-chalk.j
 
   field zip_extensions {
     type:       list[string]
-    default:    ["zip", "jar", "war", "ear"]
+    default:    ["zip", "jar", "war", "ear", "pt", "pth", "keras"]
     validator:  func zip_check
     hidden:     true
     doc:        "Extensions that we assume are in ZIP format for the zip codec"

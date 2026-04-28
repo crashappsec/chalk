@@ -752,17 +752,21 @@ plugin zip {
     codec:           true
     priority:        1
     enabled:         true
-    pre_chalk_keys:  ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE"]
+    pre_chalk_keys:  ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE",
+                      "DERIVED_FROM_CHALK_ID"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     doc: """
 The `zip` codec is responsible for manipulating Chalk marks in any
 executable content packaged using the ZIP file format under the hood,
-including all common Java formats, and some popular formats for
-bundling serverless content.
+including all common Java formats, some popular formats for bundling
+serverless content, and modern PyTorch / Keras model checkpoints
+(`.pt`, `.pth`, `.keras` — both formats use ZIP archives under the
+hood since PyTorch 1.6 and Keras 3 respectively).
 <p>
 Currently the codec will only process files with a file extension
 named in the `zip_extensions` configuration field. By default, we
-process the extensions: "zip", "jar", "war" and "ear".
+process the extensions: "zip", "jar", "war", "ear", "pt", "pth", and
+"keras".
 <p>
 This codec can be configured to collect chalk marks for artifacts
 placed into the ZIP file as well, if the configuration variabe
