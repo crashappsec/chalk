@@ -62,9 +62,9 @@ def test_sidecar_insert_creates_sidecar(
     assert "CHALK_ID" in sidecar_bytes, "CHALK_ID missing from sidecar"
 
     # The artifact itself must not have been mutated.
-    assert artifact.read_bytes() == pre_bytes, (
-        "sidecar codec must leave the artifact's bytes untouched"
-    )
+    assert (
+        artifact.read_bytes() == pre_bytes
+    ), "sidecar codec must leave the artifact's bytes untouched"
 
 
 @pytest.mark.parametrize("extension", ["onnx", "bin"])
@@ -102,9 +102,7 @@ def test_sidecar_delete_removes_sidecar(
 
     chalk.delete(artifact=artifact)
     assert not sidecar.is_file(), "sidecar should be gone after chalk delete"
-    assert artifact.read_bytes() == pre_bytes, (
-        "delete must not modify the artifact"
-    )
+    assert artifact.read_bytes() == pre_bytes, "delete must not modify the artifact"
 
 
 @pytest.mark.parametrize("extension", ["onnx", "bin"])
@@ -124,9 +122,7 @@ def test_sidecar_virtual_does_not_write_sidecar(
     assert insert.report.marks_by_path.contains({str(artifact): {}})
 
     sidecar = artifact.with_suffix(artifact.suffix + ".chalk")
-    assert not sidecar.is_file(), (
-        "virtual mode should not produce a sidecar file"
-    )
+    assert not sidecar.is_file(), "virtual mode should not produce a sidecar file"
 
 
 def test_sidecar_extension_not_in_list_is_ignored(
@@ -145,6 +141,6 @@ def test_sidecar_extension_not_in_list_is_ignored(
     )
     assert insert  # ran cleanly, just produced no marks
     sidecar = artifact.with_suffix(artifact.suffix + ".chalk")
-    assert not sidecar.is_file(), (
-        "files outside sidecar_extensions must not get a sidecar"
-    )
+    assert (
+        not sidecar.is_file()
+    ), "files outside sidecar_extensions must not get a sidecar"

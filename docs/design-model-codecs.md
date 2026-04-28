@@ -178,7 +178,7 @@ don't translate:
   changes the file's bytes and format. Loaders break. The cost to
   pipelines outweighs the marking value.
 - **`--virtual` (the user-facing dry-run flag).** Exists already
-  but is a *user choice* to skip artifact mutation entirely; not a
+  but is a _user choice_ to skip artifact mutation entirely; not a
   codec-level handler for "this format can't be marked in-band."
 
 **Why not just refuse the artifact.** Returning `none(ChalkObj)`
@@ -190,7 +190,7 @@ visibility for these files as for any other — the artifact is
 known, hashed, identifiable — at the cost of a sibling file.
 
 **Why this carve-out doesn't generalize.** The argument here turns
-on a property *specific* to ML model artifacts: they are
+on a property _specific_ to ML model artifacts: they are
 non-executable, format-strict data that consumers do not tolerate
 modification of. Executable artifacts have always had an in-band
 option in chalk (the existing codecs prove this). Configuration
