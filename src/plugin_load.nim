@@ -54,6 +54,7 @@ loadPlugins([
   "codecMacho",
   "codecMacOs",
   "codecPythonPyc",
+  "codecSafetensors",
   "codecSource",
   "codecZip",
   "conffile",

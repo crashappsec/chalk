@@ -796,6 +796,33 @@ configuration variable.
 """
 }
 
+plugin safetensors {
+    codec:           true
+    priority:        1
+    enabled:         true
+    pre_chalk_keys:  ["ARTIFACT_TYPE", "DERIVED_FROM_CHALK_ID"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    doc: """
+This codec marks `.safetensors` ML model files in place.  The chalk
+mark is inserted as a string value under `__metadata__.chalk` in the
+file's JSON header — which is the location the SafeTensors format
+reserves for arbitrary user metadata.  Tensor `data_offsets` are
+relative to the data section start, so the header may grow without
+breaking offsets.
+<p>
+The unchalked hash is the SHA-256 of the file with the chalk
+key/value pair structurally removed from the JSON header (and the
+header_size field recomputed).  Re-marking with payloads of any
+length leaves the unchalked hash unchanged.
+<p>
+The codec defers to the next codec at lower priority when the file
+isn't a valid SafeTensors archive (truncated, header out of range,
+malformed JSON header).  ML model files in other formats (`.gguf`,
+`.pt`, `.pth`, `.keras`, `.onnx`, etc.) are handled by their own
+codecs or by the sidecar fallback.
+"""
+}
+
 plugin certs {
   enabled:         true
   codec:           true
