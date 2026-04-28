@@ -147,24 +147,83 @@ plugin (or a minor extension to `codecZip`'s `ctArtCallback`) emits
 torch ≥ 1.6 (or with `_use_new_zipfile_serialization=False`) are pure
 pickle, not ZIP. They land on the sidecar codec.
 
-### Sidecar fallback
+### Sidecar codec — narrow carve-out
 
-Last-resort codec for files that don't match any in-band format.
-Writes `<path>.chalk` next to the artifact containing the mark JSON,
-one line, terminated. Lower priority (lower number) than every
-format-specific codec, but still extension-gated to a configured
-`sidecar_extensions` list — the codec is not a global fallthrough,
-it's a deliberate "we recognize this as an ML model but cannot mark
-in-band" path.
+Chalk has no precedent for an external `.chalk` file next to an
+artifact. Every existing codec marks in-place: ELF section,
+Mach-O `LC_NOTE`, ZIP entry, source-comment, script wrapper,
+last-resort EOF append. The sidecar mechanism introduced here is a
+**deliberate exception** for one specific class of artifact, not a
+generalized escape hatch when an in-band codec can't claim a file.
 
-Default `sidecar_extensions`: `["onnx", "bin"]`. PyTorch legacy
-`.pt`/`.pth` pickle files are picked up if `codecZip`'s scan refuses
-them (magic mismatch).
+**Why it's needed.** ML model artifacts in formats we can't yet
+mark in-band (`.onnx` until protobuf support, `.bin` opaque blobs,
+legacy non-ZIP pickle `.pt`/`.pth`) are **non-executable data
+files** consumed by loaders that mmap them, validate format
+invariants, or run integrity checks (`onnxruntime.InferenceSession`,
+legacy `torch.load` pickle parser, `llama.cpp` GGUF reader-style
+checks). The chalk patterns that work for executable artifacts
+don't translate:
 
-Mark JSON is identical to in-band marks — same keys, same `HASH`
-semantics (sidecar's `HASH` is the natural file SHA-256, since
-nothing is mutated). Read path: `chalk extract <model.bin>` looks for
-`<path>.chalk` and parses it.
+- **Script-wrapper rewrite (à la `codecMacOs`).** Replaces the
+  binary with a shell script that re-execs after validation. ML
+  model files aren't executable; loaders fail immediately on the
+  shebang.
+- **EOF append (à la `elf_last_resort`).** Works because ELF
+  tolerates trailing junk. ONNX (protobuf), pickle, and raw `.bin`
+  do not — appending bytes either fails parse or silently corrupts
+  the loaded tensor.
+- **ZIP rewrap.** Wrapping a non-ZIP artifact inside a ZIP archive
+  with a `chalk.json` would be self-consistent inside chalk, but
+  changes the file's bytes and format. Loaders break. The cost to
+  pipelines outweighs the marking value.
+- **`--virtual` (the user-facing dry-run flag).** Exists already
+  but is a *user choice* to skip artifact mutation entirely; not a
+  codec-level handler for "this format can't be marked in-band."
+
+**Why not just refuse the artifact.** Returning `none(ChalkObj)`
+from `scan` is the standard "this codec doesn't handle X." If no
+other codec claims either, chalk silently ignores the file. That
+loses identity (CHALK_ID, HASH, extraction-by-path) for ML files
+the user clearly wants chalked. Sidecar gives chalk the same
+visibility for these files as for any other — the artifact is
+known, hashed, identifiable — at the cost of a sibling file.
+
+**Why this carve-out doesn't generalize.** The argument here turns
+on a property *specific* to ML model artifacts: they are
+non-executable, format-strict data that consumers do not tolerate
+modification of. Executable artifacts have always had an in-band
+option in chalk (the existing codecs prove this). Configuration
+files, source files, archives all have in-band options. Adding a
+sidecar to those for which an in-band option already exists would
+weaken chalk's "the mark lives with the artifact" invariant for
+no real gain. The codec is therefore strictly extension-gated to
+the small list below; expanding it is a per-format design
+decision, not a free-for-all.
+
+**Layout.**
+
+- Codec at `src/plugins/codecModelSidecar.nim`. Priority 1500
+  (below every format-specific codec; safetensors, gguf, zip
+  always get first chance).
+- Extension allowlist `sidecar_extensions` (default:
+  `onnx`, `bin`, `pt`, `pth`). PyTorch / Keras checkpoints whose
+  `.pt`/`.pth` files are ZIP-shaped will be claimed by `codecZip`
+  first; only the legacy pickle `.pt`/`.pth` files reach the
+  sidecar codec.
+- Sidecar file is `<path>.chalk`, one line of mark JSON, terminated.
+- `HASH` is the natural file SHA-256 — no canonicalization needed
+  since the artifact's bytes are never modified.
+- Extension list and allowlist semantics are documented in the
+  plugin's c4m doc string and `chalk.c42spec` field doc.
+
+**Operational notes.** A two-file invariant means moving the
+artifact without its `.chalk` produces an orphaned mark on the
+source side and an unmarked artifact on the destination. Chalk
+behaves correctly in both cases (extract-by-path on the destination
+returns no mark; the source `.chalk` becomes garbage). A future
+follow-up could publish sidecar-mark events to the egress sink so
+operators can detect drift; out of scope here.
 
 ## Repo layout
 

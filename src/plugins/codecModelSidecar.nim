@@ -27,7 +27,6 @@ import std/[
 
 import ".."/[
   chalkjson,
-  config,
   plugin_api,
   run_management,
   types,

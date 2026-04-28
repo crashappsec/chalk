@@ -18,7 +18,6 @@
 
 import std/[
   options,
-  os,
   strutils,
 ]
 
