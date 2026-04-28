@@ -3414,6 +3414,13 @@ By default, virtual chalk marks will get appended to the file `./virtual-chalk.j
     doc:        "Extensions that we assume are Python bytecode files for the python .pyc codec"
   }
 
+  field sidecar_extensions {
+    type:       list[string]
+    default:    ["onnx", "bin", "pt", "pth"]
+    hidden:     true
+    doc:        "Extensions handled by the model_sidecar codec when no in-band codec claims the file. Default covers ONNX (no protobuf parser yet), Ollama-style .bin blobs, and legacy non-ZIP PyTorch checkpoints."
+  }
+
   field con4m_pinpoint {
     type:    bool
     default: true

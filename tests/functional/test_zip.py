@@ -175,8 +175,8 @@ def test_valid(
 @pytest.mark.parametrize(
     "extension,artifact_type",
     [
-        ("pt",    "PyTorch checkpoint"),
-        ("pth",   "PyTorch checkpoint"),
+        ("pt", "PyTorch checkpoint"),
+        ("pth", "PyTorch checkpoint"),
         ("keras", "Keras model"),
     ],
 )
@@ -195,11 +195,11 @@ def test_ml_model_zip_extensions(
     extension and verifies a chalk-mark roundtrip works against the
     rebranded file with the expected ARTIFACT_TYPE.
     """
-    src      = NODEJS_LAMBDA_ZIP
+    src = NODEJS_LAMBDA_ZIP
     test_file = tmp_data_dir / f"model.{extension}"
     test_file.write_bytes(src.read_bytes())
 
-    insert  = chalk.insert(artifact=test_file)
+    insert = chalk.insert(artifact=test_file)
     assert insert.report.marks_by_path.contains(
         {str(test_file): {"ARTIFACT_TYPE": artifact_type}},
     )

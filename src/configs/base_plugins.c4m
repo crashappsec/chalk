@@ -824,6 +824,31 @@ truncated KV section).  GGUF v1 (deprecated) is refused.
 """
 }
 
+plugin model_sidecar {
+    codec:           true
+    enabled:         true
+    pre_chalk_keys:  ["ARTIFACT_TYPE", "DERIVED_FROM_CHALK_ID"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    priority:        1500
+    doc: """
+Last-resort codec for ML model files that can't be marked in-band.
+The codec writes a `<path>.chalk` sidecar file alongside the
+artifact containing the chalk-mark JSON; the artifact's bytes are
+not modified.  On extract the sidecar is read back as the mark.
+<p>
+The codec is gated on the `sidecar_extensions` config list (default:
+`onnx`, `bin`, `pt`, `pth`).  It runs at priority 1500 — below every
+format-specific codec, so safetensors / gguf / zip get first chance
+on their respective formats.  ONNX (until a protobuf-aware codec
+lands), Ollama-style raw `.bin` blobs, and legacy non-ZIP PyTorch
+checkpoints (pre-`zipfile_serialization`) end up here.
+<p>
+The unchalked hash is the natural SHA-256 of the artifact file
+itself — no canonicalization is needed because the mark lives
+outside the file.
+"""
+}
+
 plugin safetensors {
     codec:           true
     priority:        1

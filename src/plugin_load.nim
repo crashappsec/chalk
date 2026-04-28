@@ -54,6 +54,7 @@ loadPlugins([
   "codecGguf",
   "codecMacho",
   "codecMacOs",
+  "codecModelSidecar",
   "codecPythonPyc",
   "codecSafetensors",
   "codecSource",
