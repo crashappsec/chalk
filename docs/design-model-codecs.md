@@ -30,19 +30,19 @@ only, or add a new keyspec.
 The motivating crayon-side prototype today has these keys in its
 mark; column three is the audit decision.
 
-| Concept | Crayon prototype today | Decision |
-|---|---|---|
-| Magic / version / identity | `MAGIC`, `CHALK_VERSION`, `CHALK_ID`, `METADATA_ID`, `METADATA_HASH`, `HASH`, `CHALK_RAND` | Reuse — chalk's standard mark already includes these. |
-| Timestamp | `TIMESTAMP_WHEN_CHALKED` | Reuse. |
-| Host | `HOST_NODENAME_WHEN_CHALKED`, `PLATFORM_WHEN_CHALKED` | Reuse. |
-| Path | `PATH_WHEN_CHALKED` | Reuse. |
-| Re-chalking lineage | `OLD_CHALK_METADATA_HASH`, `OLD_CHALK_METADATA_ID` | Reuse. |
-| File format | `CRAYON_FILE_FORMAT` | **Drop.** Use specific `ARTIFACT_TYPE` values (see below). |
-| Model identifier (`meta-llama/Llama-2-7b`, `llama2:7b`) | `CRAYON_MODEL_ID` | **Reuse `ORIGIN_URI`** — synthesize URI per source family: `https://huggingface.co/{org}/{name}`, `ollama://{name}:{tag}`. Treats hosted-model-card semantics the way `ORIGIN_URI` already treats VCS repository origin. |
-| Source family hint (`huggingface` / `ollama` / `local`) | `CRAYON_SOURCE` | **Drop.** Derivable from `ORIGIN_URI` scheme/host at report time. |
-| Triggering process | `CRAYON_DOWNLOADER_UID`, `CRAYON_DOWNLOADER_EXE` | **Drop from on-disk mark.** Belongs in the chalk operation report, not the artifact. The `INJECTOR_*` family already covers chalk's own identity; the upstream caller is correlation context that crayon emits in its own NDJSON. |
-| Session correlation | `CRAYON_SESSION_ID` | **Drop from on-disk mark.** Crayon-internal runtime correlation; redundant with crayon's NDJSON. |
-| Conversion lineage (CHALK_ID of source after ST → GGUF) | `DERIVED_FROM` | **NEW keyspec: `DERIVED_FROM_CHALK_ID`.** Type string. Kind `ChalkTimeArtifact`. General-purpose lineage — not ML-specific; any in-place file conversion can carry it. Drafted alongside this PR set. |
+| Concept                                                 | Crayon prototype today                                                                     | Decision                                                                                                                                                                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Magic / version / identity                              | `MAGIC`, `CHALK_VERSION`, `CHALK_ID`, `METADATA_ID`, `METADATA_HASH`, `HASH`, `CHALK_RAND` | Reuse — chalk's standard mark already includes these.                                                                                                                                                                             |
+| Timestamp                                               | `TIMESTAMP_WHEN_CHALKED`                                                                   | Reuse.                                                                                                                                                                                                                            |
+| Host                                                    | `HOST_NODENAME_WHEN_CHALKED`, `PLATFORM_WHEN_CHALKED`                                      | Reuse.                                                                                                                                                                                                                            |
+| Path                                                    | `PATH_WHEN_CHALKED`                                                                        | Reuse.                                                                                                                                                                                                                            |
+| Re-chalking lineage                                     | `OLD_CHALK_METADATA_HASH`, `OLD_CHALK_METADATA_ID`                                         | Reuse.                                                                                                                                                                                                                            |
+| File format                                             | `CRAYON_FILE_FORMAT`                                                                       | **Drop.** Use specific `ARTIFACT_TYPE` values (see below).                                                                                                                                                                        |
+| Model identifier (`meta-llama/Llama-2-7b`, `llama2:7b`) | `CRAYON_MODEL_ID`                                                                          | **Reuse `ORIGIN_URI`** — synthesize URI per source family: `https://huggingface.co/{org}/{name}`, `ollama://{name}:{tag}`. Treats hosted-model-card semantics the way `ORIGIN_URI` already treats VCS repository origin.          |
+| Source family hint (`huggingface` / `ollama` / `local`) | `CRAYON_SOURCE`                                                                            | **Drop.** Derivable from `ORIGIN_URI` scheme/host at report time.                                                                                                                                                                 |
+| Triggering process                                      | `CRAYON_DOWNLOADER_UID`, `CRAYON_DOWNLOADER_EXE`                                           | **Drop from on-disk mark.** Belongs in the chalk operation report, not the artifact. The `INJECTOR_*` family already covers chalk's own identity; the upstream caller is correlation context that crayon emits in its own NDJSON. |
+| Session correlation                                     | `CRAYON_SESSION_ID`                                                                        | **Drop from on-disk mark.** Crayon-internal runtime correlation; redundant with crayon's NDJSON.                                                                                                                                  |
+| Conversion lineage (CHALK_ID of source after ST → GGUF) | `DERIVED_FROM`                                                                             | **NEW keyspec: `DERIVED_FROM_CHALK_ID`.** Type string. Kind `ChalkTimeArtifact`. General-purpose lineage — not ML-specific; any in-place file conversion can carry it. Drafted alongside this PR set.                             |
 
 **Net delta to the chalk key vocabulary: one new keyspec.** Every
 other crayon-prototype key collapses into reuse or moves to
@@ -54,13 +54,13 @@ runtime-only.
 (`"ELF"`, `"Mach-O executable"`, `"JAR"`, `"WAR"`, …). The model
 codecs follow the same pattern:
 
-| Codec | Value |
-|---|---|
-| safetensors | `"SafeTensors model"` |
-| gguf | `"GGUF model"` |
+| Codec                      | Value                  |
+| -------------------------- | ---------------------- |
+| safetensors                | `"SafeTensors model"`  |
+| gguf                       | `"GGUF model"`         |
 | codecZip on `.pt` / `.pth` | `"PyTorch checkpoint"` |
-| codecZip on `.keras` | `"Keras model"` |
-| sidecar | `"ML model"` (generic) |
+| codecZip on `.keras`       | `"Keras model"`        |
+| sidecar                    | `"ML model"` (generic) |
 
 These are added as `artType*` constants in `src/types.nim` and
 appended to the `ARTIFACT_TYPE` keyspec doc string. No new keyspec
@@ -170,19 +170,19 @@ nothing is mutated). Read path: `chalk extract <model.bin>` looks for
 
 Mirroring the Mach-O codec precedent (`docs/design-macho-codec.md`).
 
-| Path | What |
-|---|---|
-| `src/codecs/safetensors/{include,src}/` | C library (parse, mark insert/remove/extract, unchalked hash). C23, libcrypto for SHA-256. |
-| `src/codecs/gguf/{include,src}/` | Same shape, GGUF-specific. |
-| `src/utils/safetensors.nim`, `src/utils/gguf.nim` | FFI bindings, compile the C via `{.compile.}`. |
-| `src/plugins/codecSafetensors.nim`, `codecGguf.nim`, `codecModelSidecar.nim` | Codec plugins. |
-| `src/plugins/codecZip.nim` | Touched only for the `.pt`/`.pth`/`.keras` extension hook + `ARTIFACT_TYPE` differentiation. |
-| `src/plugin_load.nim` | Registers `codecSafetensors`, `codecGguf`, `codecModelSidecar`. |
-| `src/configs/base_plugins.c4m` | New `plugin safetensors`, `plugin gguf`, `plugin model_sidecar` blocks. Priority: safetensors `1`, gguf `1`, model_sidecar `1500` (below source/zip but above nothing). |
-| `src/configs/base_keyspecs.c4m` | New `keyspec DERIVED_FROM_CHALK_ID`. `ARTIFACT_TYPE` doc string extended. |
-| `src/types.nim` | New `artTypeSafetensors`, `artTypeGguf`, `artTypePytorchCheckpoint`, `artTypeKerasModel`, `artTypeMLModel`. |
-| `tests/unit/test_safetensors.nim`, `test_gguf.nim`, `test_model_sidecar.nim` | Nim unit tests on committed fixture artifacts. |
-| `tests/unit/test_codec_zip_models.nim` | Confirms `.pt` / `.pth` / `.keras` go through `codecZip` correctly. |
+| Path                                                                         | What                                                                                                                                                                    |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/codecs/safetensors/{include,src}/`                                      | C library (parse, mark insert/remove/extract, unchalked hash). C23, libcrypto for SHA-256.                                                                              |
+| `src/codecs/gguf/{include,src}/`                                             | Same shape, GGUF-specific.                                                                                                                                              |
+| `src/utils/safetensors.nim`, `src/utils/gguf.nim`                            | FFI bindings, compile the C via `{.compile.}`.                                                                                                                          |
+| `src/plugins/codecSafetensors.nim`, `codecGguf.nim`, `codecModelSidecar.nim` | Codec plugins.                                                                                                                                                          |
+| `src/plugins/codecZip.nim`                                                   | Touched only for the `.pt`/`.pth`/`.keras` extension hook + `ARTIFACT_TYPE` differentiation.                                                                            |
+| `src/plugin_load.nim`                                                        | Registers `codecSafetensors`, `codecGguf`, `codecModelSidecar`.                                                                                                         |
+| `src/configs/base_plugins.c4m`                                               | New `plugin safetensors`, `plugin gguf`, `plugin model_sidecar` blocks. Priority: safetensors `1`, gguf `1`, model_sidecar `1500` (below source/zip but above nothing). |
+| `src/configs/base_keyspecs.c4m`                                              | New `keyspec DERIVED_FROM_CHALK_ID`. `ARTIFACT_TYPE` doc string extended.                                                                                               |
+| `src/types.nim`                                                              | New `artTypeSafetensors`, `artTypeGguf`, `artTypePytorchCheckpoint`, `artTypeKerasModel`, `artTypeMLModel`.                                                             |
+| `tests/unit/test_safetensors.nim`, `test_gguf.nim`, `test_model_sidecar.nim` | Nim unit tests on committed fixture artifacts.                                                                                                                          |
+| `tests/unit/test_codec_zip_models.nim`                                       | Confirms `.pt` / `.pth` / `.keras` go through `codecZip` correctly.                                                                                                     |
 
 ## Cross-platform
 
@@ -206,8 +206,8 @@ convention and the per-codec `{.compile.}` pattern from
   format independently of `ARTIFACT_TYPE`, this is a future
   one-line addition.
 - **Trigger-context runtime keys.** If demand emerges to capture
-  which crayon-side process triggered a chalk run *inside the chalk
-  report* (vs crayon's own NDJSON), that becomes a small set of
+  which crayon-side process triggered a chalk run _inside the chalk
+  report_ (vs crayon's own NDJSON), that becomes a small set of
   `_OP_TRIGGER_*` runtime-only keys. Today crayon's NDJSON is the
   authoritative correlation, so no additions.
 - **Re-marking efficiency.** Per-format codecs all rewrite the file
