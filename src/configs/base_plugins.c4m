@@ -796,6 +796,30 @@ configuration variable.
 """
 }
 
+plugin gguf {
+    codec:           true
+    priority:        1
+    enabled:         true
+    pre_chalk_keys:  ["ARTIFACT_TYPE", "DERIVED_FROM_CHALK_ID"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    doc: """
+This codec marks `.gguf` (GGUF v2/v3) ML model files in place.  The
+chalk mark is inserted as a string KV pair `chalk.mark` in the
+metadata section.  GGUF tensor data offsets are relative to the data
+section start, so the codec recomputes the alignment padding when
+the KV section size changes — leaving offsets valid.
+<p>
+The unchalked hash is the SHA-256 of the file with the `chalk.mark`
+KV pair removed, kv_count decremented, and alignment padding
+recomputed.  Re-marking with payloads of any length leaves the
+unchalked hash unchanged.
+<p>
+The codec defers to the next codec at lower priority when the file
+isn't a valid GGUF v2 or v3 archive (bad magic, unsupported version,
+truncated KV section).  GGUF v1 (deprecated) is refused.
+"""
+}
+
 plugin safetensors {
     codec:           true
     priority:        1
