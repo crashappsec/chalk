@@ -542,6 +542,11 @@ const
   artTypeDockerContainer* = "Docker Container"
   artTypePyc*             = "Python Bytecode"
   artTypeMachO*           = "Mach-O executable"
+  artTypeSafetensors*     = "SafeTensors model"
+  artTypeGguf*            = "GGUF model"
+  artTypePytorchCkpt*     = "PyTorch checkpoint"
+  artTypeKerasModel*      = "Keras model"
+  artTypeMLModel*         = "ML model"
   artX509Cert*            = "x509 Cert"
 
 var

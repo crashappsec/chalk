@@ -564,6 +564,34 @@ For items chalked when they were in a embedded into a ZIP file, this is the
 """
 }
 
+keyspec DERIVED_FROM_CHALK_ID {
+    kind:             ChalkTimeArtifact
+    never_early:      true
+    type:             string
+    standard:         true
+    since:            "1.1.0"
+    shortdoc:         "CHALK_ID of an upstream artifact this one was derived from"
+    doc:              """
+When a chalked artifact is produced as an in-place transformation of
+another chalked artifact, this field carries the `CHALK_ID` of the
+source.
+
+The motivating case is ML model conversion — for example, a GGUF file
+produced by quantizing a SafeTensors model. The newly chalked GGUF
+records its source's `CHALK_ID` here so downstream tooling can walk
+the lineage chain back to the original artifact, even after format
+conversion has changed the file's bytes entirely.
+
+This is distinct from `CONTAINING_ARTIFACT_WHEN_CHALKED`, which
+references a chalked container the artifact lives *inside*; here the
+referenced artifact is upstream in time and no longer present.
+
+The field is set when the chalking tool can identify a source
+artifact (typically by recognizing that the same process recently
+opened a different chalked file). It is left unset otherwise.
+"""
+}
+
 keyspec ARTIFACT_TYPE {
     kind:             ChalkTimeArtifact
     never_early:      true
@@ -587,6 +615,11 @@ chalk mark was added. Values can include:
  - JAR
  - WAR
  - EAR
+ - SafeTensors model
+ - GGUF model
+ - PyTorch checkpoint
+ - Keras model
+ - ML model
 
 """
 }
