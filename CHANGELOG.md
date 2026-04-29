@@ -1,5 +1,12 @@
 # Chalk Release Notes
 
+## 1.0.2
+
+**April 29, 2026**
+
+- Fixes mac compilation issue due to a nimutils upgrade.
+  ([#662](https://github.com/crashappsec/chalk/pull/662))
+
 ## 1.0.1
 
 **April 29, 2026**
