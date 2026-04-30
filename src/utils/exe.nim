@@ -49,8 +49,7 @@ proc findExePath*(cmdName:    string,
             allChalks = subscan.getAllChalks()
             isChalk   = (
               len(allChalks) != 0 and
-              allChalks[0].extract != nil and
-             "$CHALK_IMPLEMENTATION_NAME" in allChalks[0].extract
+              allChalks[0].isChalk()
             )
           if not isChalk:
             newExes.add(location)
