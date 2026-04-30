@@ -33,6 +33,7 @@ import ".."/[
   plugin_api,
   run_management,
   types,
+  utils/fd_cache,
   utils/files,
   utils/macho,
 ]
@@ -42,8 +43,6 @@ type
     ## Per-artifact state held across scan → handleWrite calls.
     parsed:    ParsedMacho     ## Owned; freed when ChalkObj is dropped.
     sigKind:   ChalkMachoSigKind
-    rawBytes:  string          ## Original file bytes (for unchalked-hash
-                               ## fallback if anything goes wrong).
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -74,19 +73,30 @@ proc machoScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   ## Sniff Mach-O magic, parse, classify; build a ChalkObj if we can
   ## handle this binary in-place.  Otherwise none → wrapper takes over.
   trace("machoScan: entering for " & path)
-  let bytes =
-    try:
-      readFile(path)
-    except IOError, OSError:
-      trace("machoScan: readFile failed for " & path)
-      return none(ChalkObj)
 
-  if bytes.len < 4:
-    trace("machoScan: file too small for " & path)
-    return none(ChalkObj)
-  if not isMachoMagic(toOpenArray(bytes, 0, 3)):
-    trace("machoScan: not Mach-O magic for " & path)
-    return none(ChalkObj)
+  # Cheap-first: peek 4 magic bytes via a stream and bail on
+  # mismatch.  Most files chalk scans aren't Mach-O, and slurping a
+  # multi-megabyte binary just to discard it is expensive.  Only
+  # read the full file when magic actually matches.
+  var bytes: string
+  withFileStream(path, mode = fmRead, strict = false):
+    if stream == nil:
+      trace("machoScan: open failed for " & path)
+      return none(ChalkObj)
+    var magicBuffer: array[4, char]
+    try:
+      stream.peek(magicBuffer)
+    except IOError, OSError, CatchableError:
+      trace("machoScan: peek failed for " & path)
+      return none(ChalkObj)
+    if not isMachoMagic(magicBuffer):
+      trace("machoScan: not Mach-O magic for " & path)
+      return none(ChalkObj)
+    try:
+      bytes = stream.readAll()
+    except IOError, OSError, CatchableError:
+      trace("machoScan: readAll failed for " & path)
+      return none(ChalkObj)
 
   let parsed = parseMacho(bytes)
   if parsed == nil:
@@ -117,9 +127,8 @@ proc machoScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   # Build a ChalkObj.  If a chalk note is already present, extract
   # its payload as the existing chalk mark.
   let cache = MachoCache(
-    parsed:   parsed,
-    sigKind:  sigKind,
-    rawBytes: bytes,
+    parsed:  parsed,
+    sigKind: sigKind,
   )
 
   var dict: ChalkDict
