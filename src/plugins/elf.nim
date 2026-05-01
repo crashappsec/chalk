@@ -554,11 +554,11 @@ proc parseSectionTable(self: ElfFile): bool =
     var sectionHeader = self.parseSectionHeader(offset)
     var sectionOffset = sectionHeader.offset.value
     var sectionSize   = sectionHeader.size.value
-    if sectionOffset > dataLen:
-      self.errors.add(ERR_SECTION_OUT_OF_RANGE)
-      self.logInvalidSection(sectionHeader, len(sectionHeaders))
-      return false
     if sectionHeader.headerType.value != uint32(SHT_NOBITS):
+      if sectionOffset > dataLen:
+        self.errors.add(ERR_SECTION_OUT_OF_RANGE)
+        self.logInvalidSection(sectionHeader, len(sectionHeaders))
+        return false
       if sectionSize > dataLen:
         self.errors.add(ERR_SECTION_OUT_OF_RANGE)
         self.logInvalidSection(sectionHeader, len(sectionHeaders))

@@ -1,5 +1,24 @@
 # Chalk Release Notes
 
+## 1.0.2
+
+**April 29, 2026**
+
+- Fixes mac compilation issue due to a nimutils upgrade.
+  ([#662](https://github.com/crashappsec/chalk/pull/662))
+
+## 1.0.1
+
+**April 29, 2026**
+
+- Fixes secrets scanning causing chalk fatal error.
+  The root was was then trufflehog was returning raw secrets
+  less than 4 chars long chalk reduction wasn't handling it
+  correctly due to a `slice()` bug in con4m.
+  ([#134](https://github.com/crashappsec/con4m/pull/134))
+- Improves ELF codec to handle invalid ELFs which contain EOF sections.
+  ([#660](https://github.com/crashappsec/chalk/pull/660))
+
 ## 1.0.0
 
 **March 24, 2026**
