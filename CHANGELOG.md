@@ -1,5 +1,13 @@
 # Chalk Release Notes
 
+## On the `main` branch
+
+- Native support for chalking Macho binaries.
+  As mac requires binaries to be signed therefore on Linux
+  chalk can only extract chalkmarks but chalk macho binaries
+  as that binary will not be runnable on macs anymore.
+  ([657](https://github.com/crashappsec/chalk/pull/657))
+
 ## 1.0.2
 
 **April 29, 2026**
