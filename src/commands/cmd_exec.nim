@@ -280,95 +280,100 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   if state.isNone():
     return
 
-  let toFork = attrGet[bool]("exec.postexec.fork")
-  if toFork:
-    let pid = fork()
-    if pid != 0:
-      # parent process
-      return
-
-  let
-    ws            = state.get()
-    niceValue     = attrGet[int]("exec.postexec.nice")
-  var
-    accessedPaths = initHashSet[string]()
-
-  trace("postexec: using nice " & $niceValue)
-  discard nice(cint(niceValue))
-
-  try:
-    setFullCommandName("postexec")
-    initCollection()
-    if detach:
-      detachFromParent()
+  # The postexec watch loop uses inotify, which only exists on Linux.
+  # initPostExecWatch returns none() on non-Linux, so the early-return
+  # above already covers runtime.  This when-gate keeps the compiler
+  # from type-checking inotify primitives on other platforms.
+  when hostOS == "linux":
+    let toFork = attrGet[bool]("exec.postexec.fork")
+    if toFork:
+      let pid = fork()
+      if pid != 0:
+        # parent process
+        return
 
     let
-      pollInMicroSec     = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_poll_time"))
-      intervalInMicroSec = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_poll_interval"))
-      pollMs             = int(pollInMicroSec / 1000)
-      intervalMs         = int(intervalInMicroSec / 1000)
-      start              = getMonoTime()
+      ws            = state.get()
+      niceValue     = attrGet[int]("exec.postexec.nice")
+    var
+      accessedPaths = initHashSet[string]()
 
-    trace("postexec: polling " & $pollMs & "ms every " & $intervalMs & "ms")
-    while (getMonoTime() - start).inMilliseconds <= pollMs:
-      sleep(intervalMs)
-      var buffer = newSeq[byte](8192)
-      while (
-        let n = read(ws.watcher, buffer[0].addr, 8192)
-        n
-      ) > 0:
-        for e in inotify_events(buffer[0].addr, n):
-          let wd = e[].wd
-          if wd notin ws.watching:
-            error("postexec: inotify notified for non-watched wd")
-            continue
-          let
-            w = ws.watching[wd]
-            path =
-              case w.target
-              of file:
-                w.id
-              of dir:
-                let filename = $cast[cstring](addr e[].name)
-                w.id.joinPath(filename)
-          if path in ws.prepPaths or path in ws.fileMountPaths:
-            trace("postexec: found accessed artifact " & path)
-            accessedPaths.incl(path)
-          else:
-            trace("postexec: ignoring accessed non-artifact " & path)
+    trace("postexec: using nice " & $niceValue)
+    discard nice(cint(niceValue))
 
-  finally:
-    discard close(ws.watcher)
+    try:
+      setFullCommandName("postexec")
+      initCollection()
+      if detach:
+        detachFromParent()
 
-  let codecs = attrGet[seq[string]]("exec.postexec.access_watch.scan_codecs")
+      let
+        pollInMicroSec     = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_poll_time"))
+        intervalInMicroSec = int(attrGet[Con4mDuration]("exec.postexec.access_watch.initial_poll_interval"))
+        pollMs             = int(pollInMicroSec / 1000)
+        intervalMs         = int(intervalInMicroSec / 1000)
+        start              = getMonoTime()
 
-  trace("postexec: subscan for chalkmarks in " &
-        $len(accessedPaths) & " accessed artifacts " &
-        "out of prepped " & $len(ws.prepPaths) & " artifacts " &
-        "and mounted " & $len(ws.fileMountPaths) & " files")
-  withOnlyCodecs(getPluginsByName(codecs)):
-    for chalk in runChalkSubScan(ws.prepPaths & ws.fileMountPaths, "extract").allChalks:
-      chalk.accessed = some(chalk.fsRef in accessedPaths)
-      chalk.mounted  = some(chalk.fsRef in ws.fileMountPaths)
-      if chalk.accessed.get():
-        trace(chalk.fsRef & ": chalkmark accessed")
-      else:
-        trace(chalk.fsRef & ": chalkmark not accessed")
-      # as its a subscan, artifact info is not collected hence needs to be manually triggered
-      chalk.collectRunTimeArtifactInfo()
-      addToAllArtifacts(chalk)
-  trace("postexec: subscan complete")
+      trace("postexec: polling " & $pollMs & "ms every " & $intervalMs & "ms")
+      while (getMonoTime() - start).inMilliseconds <= pollMs:
+        sleep(intervalMs)
+        var buffer = newSeq[byte](8192)
+        while (
+          let n = read(ws.watcher, buffer[0].addr, 8192)
+          n
+        ) > 0:
+          for e in inotify_events(buffer[0].addr, n):
+            let wd = e[].wd
+            if wd notin ws.watching:
+              error("postexec: inotify notified for non-watched wd")
+              continue
+            let
+              w = ws.watching[wd]
+              path =
+                case w.target
+                of file:
+                  w.id
+                of dir:
+                  let filename = $cast[cstring](addr e[].name)
+                  w.id.joinPath(filename)
+            if path in ws.prepPaths or path in ws.fileMountPaths:
+              trace("postexec: found accessed artifact " & path)
+              accessedPaths.incl(path)
+            else:
+              trace("postexec: ignoring accessed non-artifact " & path)
 
-  withSuspendChalkCollectionFor(getOptionalPluginNames()):
-    doReporting(clearState = true)
+    finally:
+      discard close(ws.watcher)
 
-  # if forked exit postexec process
-  if toFork:
-    quitChalk()
-  # else restore previous nice as chalk can be doing things after postexec
-  else:
-    trace("postexec: reverting nice " & $niceValue)
-    discard nice(cint(niceValue * -1))
+    let codecs = attrGet[seq[string]]("exec.postexec.access_watch.scan_codecs")
+
+    trace("postexec: subscan for chalkmarks in " &
+          $len(accessedPaths) & " accessed artifacts " &
+          "out of prepped " & $len(ws.prepPaths) & " artifacts " &
+          "and mounted " & $len(ws.fileMountPaths) & " files")
+    withOnlyCodecs(getPluginsByName(codecs)):
+      for chalk in runChalkSubScan(ws.prepPaths & ws.fileMountPaths, "extract").allChalks:
+        chalk.accessed = some(chalk.fsRef in accessedPaths)
+        chalk.mounted  = some(chalk.fsRef in ws.fileMountPaths)
+        if chalk.accessed.get():
+          trace(chalk.fsRef & ": chalkmark accessed")
+        else:
+          trace(chalk.fsRef & ": chalkmark not accessed")
+        # as its a subscan, artifact info is not collected hence needs to be manually triggered
+        chalk.collectRunTimeArtifactInfo()
+        addToAllArtifacts(chalk)
+    trace("postexec: subscan complete")
+
+    withSuspendChalkCollectionFor(getOptionalPluginNames()):
+      doReporting(clearState = true)
+
+    # if forked exit postexec process
+    if toFork:
+      quitChalk()
+    # else restore previous nice as chalk can be doing things after postexec
+    else:
+      trace("postexec: reverting nice " & $niceValue)
+      discard nice(cint(niceValue * -1))
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):

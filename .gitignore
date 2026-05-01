@@ -55,3 +55,4 @@ profile_results.txt
 log
 .nimcache
 strace-*
+nimbledeps

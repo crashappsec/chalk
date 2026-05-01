@@ -10,7 +10,9 @@ endif
 
 _DOCKER_ARGS=
 _DOCKER=docker compose run --rm $(_DOCKER_ARGS) chalk
+ifneq "$(shell which docker 2> /dev/null)" ""
 DOCKER?=$(_DOCKER)
+endif
 
 SOURCES=$(wildcard *.nims)
 SOURCES+=$(wildcard *.nimble)
