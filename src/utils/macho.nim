@@ -303,14 +303,10 @@ proc unchalkedHash*(self: ParsedMacho): string =
     return ""
 
   var hex = newString(64)
-  # The C side writes 64 hex chars + NUL into out_hex; pre-size the
-  # string so cstring(hex) points at writable storage of >=65 bytes.
-  hex.setLen(65)
   let st = chalk_macho_unchalked_hash(self.bin, hex.cstring)
   if not st.isOk:
     return ""
 
-  hex.setLen(64)
   result = hex
 
 proc getMutatedBytes*(self: ParsedMacho): string =

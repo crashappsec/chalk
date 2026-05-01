@@ -23,8 +23,6 @@
 
 import std/[
   options,
-  os,
-  osproc,
   strutils,
 ]
 
@@ -33,6 +31,7 @@ import ".."/[
   plugin_api,
   run_management,
   types,
+  utils/exe,
   utils/fd_cache,
   utils/files,
   utils/macho,
@@ -48,19 +47,32 @@ type
 # Helpers
 # ---------------------------------------------------------------------------
 
+var codesignPath = ""
+proc getCodesignPath(): string =
+  once:
+    try:
+      codesignPath = exe.findExePath("codesign").get("")
+      if codesignPath == "":
+        warn("No codesign command found in PATH")
+    except:
+      discard
+  return codesignPath
+
 proc adhocResign(path: string): bool =
   ## Restore an ad-hoc signature on a binary we just mutated.
   ## Returns true on success.  Emits a warn on failure.
-  if findExe("codesign") == "":
-    warn("codesign not found in PATH — cannot re-sign " & path &
-         " (was ad-hoc-signed before chalking)")
-    return false
-
-  let (output, exitCode) = execCmdEx("codesign --force --sign - " &
-                                      quoteShell(path))
-  if exitCode != 0:
+  let output = runCmdGetEverything(
+    getCodesignPath(),
+    @[
+      "--force",
+      "--sign",
+      "-",
+      path
+    ]
+  )
+  if output.exitCode != 0:
     warn("codesign --force --sign - failed for " & path & ": " &
-         output.strip())
+         output.stderr.strip())
     return false
 
   return true
@@ -132,11 +144,9 @@ proc machoScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   )
 
   var dict: ChalkDict
-  var marked = false
 
   if hasChalkNote:
     dict   = extractOneChalkJson(existing, path)
-    marked = dict != nil
   elif existing != "":
     warn(path & ": chalk LC_NOTE present but missing magic; " &
          "treating as unmarked")
@@ -148,7 +158,6 @@ proc machoScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     resourceType = {ResourceFile},
     cache        = cache,
     extract      = dict,
-    marked       = marked,
   )
 
   return some(chalk)
@@ -204,6 +213,10 @@ proc machoHandleWrite*(self: Plugin, chalk: ChalkObj,
     warn(chalk.name & ": malformed code signature; refusing to mutate")
     chalk.opFailed = true
     return
+  if getCodesignPath() == "":
+    warn(chalk.name & ": codesign not found in PATH — refusing to mutate")
+    chalk.opFailed = true
+    return
 
   # Compute the unchalked hash BEFORE mutating, so subsequent
   # mutation can't invalidate our view of the canonical bytes.
@@ -257,9 +270,8 @@ proc machoHandleWrite*(self: Plugin, chalk: ChalkObj,
   # arm64 binary won't run on macOS.  Re-applying ad-hoc keeps the
   # binary executable; a release pipeline can re-sign with
   # Developer ID downstream.
-  if cache.sigKind != csNone:
-    if not adhocResign(chalk.fsRef):
-      chalk.opFailed = true
+  if not adhocResign(chalk.fsRef):
+    chalk.opFailed = true
 
 # ---------------------------------------------------------------------------
 # Metadata callbacks
@@ -282,13 +294,10 @@ proc machoGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj,
 proc loadCodecMacho*() =
   newCodec(
     "macho",
-    # Listed as native on macOS so `chalk load <config>` self-marks
-    # via this codec when run on a Mac.  Also native on Linux because
-    # chalk on Linux can usefully mark cross-compiled Mac binaries.
-    nativeObjPlatforms = @["macosx", "linux"],
-    scan             = ScanCb(machoScan),
-    handleWrite      = HandleWriteCb(machoHandleWrite),
-    getUnchalkedHash = UnchalkedHashCb(machoGetUnchalkedHash),
-    ctArtCallback    = ChalkTimeArtifactCb(machoGetChalkTimeArtifactInfo),
-    rtArtCallback    = RunTimeArtifactCb(machoGetRunTimeArtifactInfo),
+    nativeObjPlatforms = @["macosx"],
+    scan               = ScanCb(machoScan),
+    handleWrite        = HandleWriteCb(machoHandleWrite),
+    getUnchalkedHash   = UnchalkedHashCb(machoGetUnchalkedHash),
+    ctArtCallback      = ChalkTimeArtifactCb(machoGetChalkTimeArtifactInfo),
+    rtArtCallback      = RunTimeArtifactCb(machoGetRunTimeArtifactInfo),
   )

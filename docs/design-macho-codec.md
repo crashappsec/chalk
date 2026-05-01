@@ -93,13 +93,12 @@ the same hash.
 ## Cross-platform
 
 The C library has no macOS-only dependencies (libcrypto for
-SHA-256, plain POSIX for file I/O). The codec is registered as
-native on both macOS and Linux, so chalk on Linux can:
+SHA-256, plain POSIX for file I/O). The codec can operate
+from linux:
 
 - Read both wrapper and native chalk marks on Mac binaries.
-- Write native marks on unsigned Mach-Os (warns about no
-  `codesign` in PATH; binary won't run on macOS without re-signing
-  there).
+- Write native marks on unsigned Mach-Os but will reject ad-hoc
+  binaries as otherwise binary will refuse to run on most macs.
 
 ## Open follow-ups
 

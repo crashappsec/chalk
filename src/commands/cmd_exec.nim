@@ -284,10 +284,7 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
   # initPostExecWatch returns none() on non-Linux, so the early-return
   # above already covers runtime.  This when-gate keeps the compiler
   # from type-checking inotify primitives on other platforms.
-  when hostOS != "linux":
-    return
-
-  else:
+  when hostOS == "linux":
     let toFork = attrGet[bool]("exec.postexec.fork")
     if toFork:
       let pid = fork()
