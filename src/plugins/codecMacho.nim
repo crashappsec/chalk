@@ -52,26 +52,50 @@ proc getCodesignPath(): string =
   once:
     try:
       codesignPath = exe.findExePath("codesign").get("")
-      if codesignPath == "":
-        warn("No codesign command found in PATH")
     except:
       discard
   return codesignPath
 
+# downloaded from https://github.com/indygreg/apple-platform-rs/releases
+var rcodesignPath = ""
+proc getRcodesignPath(): string =
+  once:
+    try:
+      rcodesignPath = exe.findExePath("rcodesign").get("")
+    except:
+      discard
+  return rcodesignPath
+
 proc adhocResign(path: string): bool =
   ## Restore an ad-hoc signature on a binary we just mutated.
   ## Returns true on success.  Emits a warn on failure.
-  let output = runCmdGetEverything(
-    getCodesignPath(),
-    @[
+  var
+    cmd:  string
+    args: seq[string]
+
+  if getCodesignPath() != "":
+    cmd  = getCodesignPath()
+    args = @[
       "--force",
       "--sign",
       "-",
       path
     ]
-  )
+  elif getRcodesignPath() != "":
+    cmd  = getRcodesignPath()
+    args = @[
+      "sign",
+      path
+    ]
+
+  if cmd == "":
+    warn(path & ": neither codesign or rcodesign is availabe to adhoc sign")
+    return false
+
+  trace(cmd & " " & args.join(" "))
+  let output = runCmdGetEverything(cmd, args)
   if output.exitCode != 0:
-    warn("codesign --force --sign - failed for " & path & ": " &
+    warn(path & ": failed to adhoc sign via: " & cmd & " " & args.join(" ") & " - " &
          output.stderr.strip())
     return false
 
@@ -203,20 +227,24 @@ proc machoHandleWrite*(self: Plugin, chalk: ChalkObj,
 
   # Real-cert / malformed signatures: scan claimed the artifact for
   # extract, but we can't re-sign after mutation.  Refuse the write.
-  if cache.sigKind == csRealCert:
+  case cache.sigKind
+  of csRealCert:
     warn(chalk.name & ": cannot mutate Developer-ID-signed binary " &
          "(no cert / private key); use `codesign --remove-signature` " &
          "first or run chalk before signing")
     chalk.opFailed = true
     return
-  if cache.sigKind == csMalformed:
+  of csMalformed:
     warn(chalk.name & ": malformed code signature; refusing to mutate")
     chalk.opFailed = true
     return
-  if getCodesignPath() == "":
-    warn(chalk.name & ": codesign not found in PATH — refusing to mutate")
-    chalk.opFailed = true
-    return
+  of csAdhoc:
+    if getCodesignPath() == "" and getRcodesignPath() == "":
+      warn(chalk.name & ": did not find either codesign or rcodesign to adhoc sign - refusing to mutate")
+      chalk.opFailed = true
+      return
+  of csNone:
+    discard # nothing to do
 
   # Compute the unchalked hash BEFORE mutating, so subsequent
   # mutation can't invalidate our view of the canonical bytes.
@@ -265,13 +293,14 @@ proc machoHandleWrite*(self: Plugin, chalk: ChalkObj,
     chalk.opFailed = true
     return
 
-  # Sign the mutated binary.  We always re-sign unconditionally:
-  # stripSignature dropped whatever sig was there, and an unsigned
-  # arm64 binary won't run on macOS.  Re-applying ad-hoc keeps the
-  # binary executable; a release pipeline can re-sign with
-  # Developer ID downstream.
-  if not adhocResign(chalk.fsRef):
-    chalk.opFailed = true
+  if cache.sigKind == csAdhoc:
+    # Sign the mutated binary.  We always re-sign unconditionally:
+    # stripSignature dropped whatever sig was there, and an unsigned
+    # arm64 binary won't run on macOS.  Re-applying ad-hoc keeps the
+    # binary executable; a release pipeline can re-sign with
+    # Developer ID downstream.
+    if not adhocResign(chalk.fsRef):
+      chalk.opFailed = true
 
 # ---------------------------------------------------------------------------
 # Metadata callbacks

@@ -2,10 +2,13 @@
 
 ## On the `main` branch
 
+### New Features
+
 - Native support for chalking Macho binaries.
   As mac requires binaries to be signed therefore on Linux
-  chalk can only extract chalkmarks but chalk macho binaries
-  as that binary will not be runnable on macs anymore.
+  chalk can extract chalkmarks but only chalks macho binaries
+  when either `codesign` or `rcodesign` is available.
+  Otherwise binary will not be runnable on macs anymore.
   ([657](https://github.com/crashappsec/chalk/pull/657))
 
 ## 1.0.2
