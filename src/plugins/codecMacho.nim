@@ -160,6 +160,20 @@ proc machoScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       discard
     return none(ChalkObj)
 
+  # if the intent is to chalk a binary and its not already wrapped
+  # via the LD_NOTE, if the binary is already signed, make
+  # sure we can adhoc sign it later. if not the chalking will
+  # fail in which case better to defer to wrapper codec
+  if (
+    isChalkingOp() and
+    not hasChalkNote and
+    sigKind == csAdhoc and
+    getCodesignPath() == "" and
+    getRcodesignPath() == ""
+  ):
+    warn(path & ": did not find either codesign or rcodesign to adhoc sign - deferring to wrapper")
+    return none(ChalkObj)
+
   # Build a ChalkObj.  If a chalk note is already present, extract
   # its payload as the existing chalk mark.
   let cache = MachoCache(
