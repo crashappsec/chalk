@@ -108,9 +108,7 @@ def test_match_status_no_hashes_in_mark(tmp_data_dir: Path, chalk: Chalk):
     )
 
 
-def test_mismatch_surfaces_both_hashes_and_warns(
-    tmp_data_dir: Path, chalk: Chalk
-):
+def test_mismatch_surfaces_both_hashes_and_warns(tmp_data_dir: Path, chalk: Chalk):
     """status=mismatch: both hashes present, warn logged, op succeeds."""
     artifact = _write_artifact(tmp_data_dir)
     sha_observed = _good_sha(artifact)
@@ -138,9 +136,7 @@ def test_mismatch_surfaces_both_hashes_and_warns(
     assert sha_observed in insert.logs
 
 
-def test_untracked_attestation_aggregates_in_report(
-    tmp_data_dir: Path, chalk: Chalk
-):
+def test_untracked_attestation_aggregates_in_report(tmp_data_dir: Path, chalk: Chalk):
     """A per-path entry whose path chalk didn't process lands in the
     host-level CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO with a warn."""
     artifact = _write_artifact(tmp_data_dir)
@@ -156,9 +152,7 @@ def test_untracked_attestation_aggregates_in_report(
     insert = chalk.insert(artifact=artifact, env=_attestation_env(envelope))
 
     # The matched artifact's mark gets a status=match entry as usual.
-    insert.mark.contains(
-        {"CALLER_ATTESTED_ARTIFACT_INFO": {"status": "match"}}
-    )
+    insert.mark.contains({"CALLER_ATTESTED_ARTIFACT_INFO": {"status": "match"}})
 
     # The unmatched path lands at host-level — no status wrapper there,
     # since chalk never observed the file.
@@ -193,9 +187,7 @@ def test_file_channel_equivalent_to_env(tmp_data_dir: Path, chalk: Chalk):
         artifact=artifact,
         env={"CHALK_CALLER_ATTESTATION_FILE": str(envelope_path)},
     )
-    insert.mark.contains(
-        {"CALLER_ATTESTED_ARTIFACT_INFO": {"status": "match"}}
-    )
+    insert.mark.contains({"CALLER_ATTESTED_ARTIFACT_INFO": {"status": "match"}})
     insert.report.contains({"CALLER_ATTESTED_INFO": {"channel": "file"}})
 
 
@@ -212,9 +204,7 @@ def test_no_envelope_is_a_no_op(tmp_data_dir: Path, chalk: Chalk):
         "CALLER_ATTESTED_BUILD_INFO",
         "CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO",
     ):
-        assert k not in insert.report, (
-            f"{k} should be absent in no-envelope insert"
-        )
+        assert k not in insert.report, f"{k} should be absent in no-envelope insert"
 
 
 @pytest.mark.parametrize(
@@ -229,8 +219,7 @@ def test_no_envelope_is_a_no_op(tmp_data_dir: Path, chalk: Chalk):
             "must be a JSON object",
         ),
         (
-            '{"version": 1, "CALLER_ATTESTED_ARTIFACT_INFO": {"/p":'
-            ' {"info":{}}}}',
+            '{"version": 1, "CALLER_ATTESTED_ARTIFACT_INFO": {"/p":' ' {"info":{}}}}',
             "missing required string 'sha256'",
         ),
         (
@@ -260,9 +249,9 @@ def test_validation_failure_discards_envelope(
         # otherwise treat any error in the report as a test failure.
         ignore_errors=True,
     )
-    assert any(err_substr in e for e in insert.errors), (
-        f"expected an error containing '{err_substr}'; got: {insert.errors}"
-    )
+    assert any(
+        err_substr in e for e in insert.errors
+    ), f"expected an error containing '{err_substr}'; got: {insert.errors}"
     # Envelope was rejected as a whole — none of the keys land,
     # neither in the per-artifact mark nor the host-level report.
     assert "CALLER_ATTESTED_ARTIFACT_INFO" not in insert.mark
@@ -274,9 +263,7 @@ def test_validation_failure_discards_envelope(
         assert k not in insert.report
 
 
-def test_x_prefixed_top_level_silently_accepted(
-    tmp_data_dir: Path, chalk: Chalk
-):
+def test_x_prefixed_top_level_silently_accepted(tmp_data_dir: Path, chalk: Chalk):
     """X-* unknown top-level keys are reserved for caller experimentation;
     they pass through silently, with no warn log."""
     artifact = _write_artifact(tmp_data_dir)
@@ -292,9 +279,7 @@ def test_x_prefixed_top_level_silently_accepted(
     # No warning about the X-* key (mismatch warns can still appear from
     # other tests; we only check absence of the unknown-key warn here).
     assert "unknown top-level key" not in insert.logs
-    insert.mark.contains(
-        {"CALLER_ATTESTED_ARTIFACT_INFO": {"status": "match"}}
-    )
+    insert.mark.contains({"CALLER_ATTESTED_ARTIFACT_INFO": {"status": "match"}})
 
 
 def test_other_unknown_top_level_warns(tmp_data_dir: Path, chalk: Chalk):
@@ -311,6 +296,4 @@ def test_other_unknown_top_level_warns(tmp_data_dir: Path, chalk: Chalk):
     }
     insert = chalk.insert(artifact=artifact, env=_attestation_env(envelope))
     assert "unknown top-level key 'WHATEVER'" in insert.logs
-    insert.mark.contains(
-        {"CALLER_ATTESTED_ARTIFACT_INFO": {"status": "match"}}
-    )
+    insert.mark.contains({"CALLER_ATTESTED_ARTIFACT_INFO": {"status": "match"}})

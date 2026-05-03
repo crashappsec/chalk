@@ -44,14 +44,14 @@ message is logged. This is the common case for direct-CLI use.
 {
   "version": 1,
 
-  "CALLER_ATTESTED_INFO":         { "...": "about the attestor" },
-  "CALLER_ATTESTED_HOST_INFO":    { "...": "about the host" },
-  "CALLER_ATTESTED_BUILD_INFO":   { "...": "about the build" },
+  "CALLER_ATTESTED_INFO": { "...": "about the attestor" },
+  "CALLER_ATTESTED_HOST_INFO": { "...": "about the host" },
+  "CALLER_ATTESTED_BUILD_INFO": { "...": "about the build" },
 
   "CALLER_ATTESTED_ARTIFACT_INFO": {
     "/abs/realpath/to/artifact": {
       "sha256": "<lowercase hex>",
-      "info":   { "...": "free-form, opaque to chalk" }
+      "info": { "...": "free-form, opaque to chalk" }
     }
   }
 }
@@ -146,6 +146,7 @@ No status wrapper — chalk never observed the file, so there is
 nothing to compare. Each untracked entry emits a `warn` log line.
 
 Common reasons a path lands here:
+
 - The caller hashed a file and chalk didn't end up scanning it
   (filtered by ignore list, removed mid-flight, etc.).
 - The caller's path didn't survive realpath on the chalk side
@@ -182,11 +183,11 @@ artifact's host-level keys.
 The non-artifact buckets are proxied to top-level chalk keys, name
 preserved:
 
-| Caller envelope key                | Chalk key (host-level)             |
-| ---------------------------------- | ---------------------------------- |
-| `CALLER_ATTESTED_INFO`             | `CALLER_ATTESTED_INFO`             |
-| `CALLER_ATTESTED_HOST_INFO`        | `CALLER_ATTESTED_HOST_INFO`        |
-| `CALLER_ATTESTED_BUILD_INFO`       | `CALLER_ATTESTED_BUILD_INFO`       |
+| Caller envelope key          | Chalk key (host-level)       |
+| ---------------------------- | ---------------------------- |
+| `CALLER_ATTESTED_INFO`       | `CALLER_ATTESTED_INFO`       |
+| `CALLER_ATTESTED_HOST_INFO`  | `CALLER_ATTESTED_HOST_INFO`  |
+| `CALLER_ATTESTED_BUILD_INFO` | `CALLER_ATTESTED_BUILD_INFO` |
 
 Each is a free-form object; chalk does not destructure, validate, or
 transform.
@@ -205,11 +206,13 @@ the existing pattern used for nested data):
 Mark templates take the four chalk-time keys (the `RunTimeHost`
 `CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO` is collected after marks
 are written and so cannot land in a mark by construction):
+
 - `mark_default` (covers all chalking ops, including docker — chalk
   uses one mark template across the board)
 - `mark_all` and `mark_large`
 
 Report templates take all five keys:
+
 - `report_default`
 - `insertion_default`
 - `report_all` and `report_large`
@@ -243,6 +246,7 @@ appear in the mark or report.
 ## Plugin shape
 
 A single new plugin, `caller_attestation`:
+
 - Reads + parses + validates the envelope on first invocation.
 - Caches the parsed result for the lifetime of the chalk process.
 - `ctHostCallback` emits the three top-level buckets and (after
