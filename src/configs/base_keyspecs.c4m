@@ -405,6 +405,97 @@ chalk time.
 """
 }
 
+keyspec CALLER_ATTESTED_INFO {
+    kind:             ChalkTimeHost
+    type:             `x
+    standard:         true
+    since:            "1.1.0"
+    shortdoc:         "Identifying info about the attestor process"
+    doc:              """
+Free-form metadata about the process that supplied the attestation
+envelope to chalk (typically a system-spawned endpoint agent such as
+Crayon).  The value is whatever the caller passes under
+`CALLER_ATTESTED_INFO` in `CHALK_CALLER_ATTESTATION` /
+`CHALK_CALLER_ATTESTATION_FILE`; chalk does not destructure or
+validate the inner shape.
+
+See `docs/design-caller-attestation.md` for the protocol.
+"""
+}
+
+keyspec CALLER_ATTESTED_HOST_INFO {
+    kind:             ChalkTimeHost
+    type:             `x
+    standard:         true
+    since:            "1.1.0"
+    shortdoc:         "Free-form host attestation from the caller"
+    doc:              """
+Free-form host-level attestation passed in by the caller via
+`CHALK_CALLER_ATTESTATION` / `CHALK_CALLER_ATTESTATION_FILE`.  The
+inner shape is opaque to chalk; chalk proxies it through unchanged.
+
+See `docs/design-caller-attestation.md` for the protocol.
+"""
+}
+
+keyspec CALLER_ATTESTED_BUILD_INFO {
+    kind:             ChalkTimeHost
+    type:             `x
+    standard:         true
+    since:            "1.1.0"
+    shortdoc:         "Free-form build attestation from the caller"
+    doc:              """
+Free-form build-level attestation passed in by the caller via
+`CHALK_CALLER_ATTESTATION` / `CHALK_CALLER_ATTESTATION_FILE`.  The
+inner shape is opaque to chalk; chalk proxies it through unchanged.
+
+See `docs/design-caller-attestation.md` for the protocol.
+"""
+}
+
+keyspec CALLER_ATTESTED_ARTIFACT_INFO {
+    kind:             ChalkTimeArtifact
+    type:             `x
+    standard:         true
+    since:            "1.1.0"
+    shortdoc:         "Caller's per-artifact attestation, status-wrapped"
+    doc:              """
+Caller-supplied attestation for the specific artifact this key
+appears under, wrapped with chalk's verification status.  Shape:
+
+```json
+{ "status": "match",      "info": { ... } }
+{ "status": "mismatch",   "attested_sha256": "...",
+                          "observed_sha256": "...", "info": { ... } }
+{ "status": "unverified", "attested_sha256": "...", "info": { ... } }
+```
+
+`attested_sha256` and `observed_sha256` only surface on `mismatch`
+or `unverified`; on `match` chalk has independently confirmed the
+attested hash and there is no value in echoing it.
+
+See `docs/design-caller-attestation.md` for the protocol.
+"""
+}
+
+keyspec CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO {
+    kind:             RunTimeHost
+    type:             `x
+    standard:         true
+    since:            "1.1.0"
+    shortdoc:         "Caller attestations for paths chalk did not track"
+    doc:              """
+Aggregate of caller-supplied per-artifact attestations whose paths
+were not matched against any artifact chalk processed during this
+operation.  Keys are paths, values are the raw `{sha256, info}`
+objects from the caller envelope (no status wrapper, since chalk
+never observed the file).
+
+Each entry that lands here also generates a `warn`-level log line.
+See `docs/design-caller-attestation.md`.
+"""
+}
+
 keyspec TENANT_ID_WHEN_CHALKED {
     kind:             ChalkTimeHost
     type:             string

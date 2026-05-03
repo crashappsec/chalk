@@ -93,6 +93,29 @@ such as the overall chalk run time.
 }
 
 
+plugin caller_attestation {
+    ~enabled:         true
+    pre_run_keys:     ["CALLER_ATTESTED_INFO",
+                       "CALLER_ATTESTED_HOST_INFO",
+                       "CALLER_ATTESTED_BUILD_INFO"]
+    pre_chalk_keys:   ["CALLER_ATTESTED_ARTIFACT_INFO"]
+    post_run_keys:    ["CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO"]
+    ~priority:        200
+    doc: """
+Ingests a caller-supplied attestation envelope from the spawning
+process — `CHALK_CALLER_ATTESTATION` env var, falling back to a file
+path in `CHALK_CALLER_ATTESTATION_FILE` for payloads that won't fit
+in `ARG_MAX`.  Validates the envelope's outer shape, distributes
+host/build/process buckets to top-level keys, status-wraps each
+matched per-artifact attestation against chalk's own unchalked
+hash, and aggregates unmatched paths into
+`CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO` with a `warn` log.
+
+See `docs/design-caller-attestation.md` for the protocol.
+"""
+}
+
+
 # Probably should add file time of artifact, date of branch
 # and any tag associated.
 plugin vctl_git {
