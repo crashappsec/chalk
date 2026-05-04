@@ -10,6 +10,31 @@
   when either `codesign` or `rcodesign` is available.
   Otherwise binary will not be runnable on macs anymore.
   ([657](https://github.com/crashappsec/chalk/pull/657))
+- New codecs:
+  - `gguf` - This codec marks `.gguf` (GGUF v2/v3) ML model files in place. The
+    chalk mark is inserted as a string KV pair `chalk.mark` in the
+    metadata section. GGUF tensor data offsets are relative to the data
+    section start, so the codec recomputes the alignment padding when
+    the KV section size changes — leaving offsets valid.
+  - `safetensors` - This codec marks `.safetensors` ML model files in place. The chalk
+    mark is inserted as a string value under `__metadata__.chalk` in the
+    file's JSON header — which is the location the SafeTensors format
+    reserves for arbitrary user metadata. Tensor `data_offsets` are
+    relative to the data section start, so the header may grow without
+    breaking offsets.
+  - `sidecar` - Last-resort codec for ML model files that can't be marked in-band.
+    The codec writes a `<path>.chalk` sidecar file alongside the
+    artifact containing the chalk-mark JSON; the artifact's bytes are
+    not modified. On extract the sidecar is read back as the mark.
+
+  ([#658](https://github.com/crashappsec/chalk/pull/658))
+
+- New caller attestation plugin. The plugin ingests a JSON envelope from the
+  spawning process — either inline via `CHALK_CALLER_ATTESTATION` or from a
+  file path in `CHALK_CALLER_ATTESTATION_FILE`. It allows a trusted system daemon
+  like `crayon` to inject useful metadata into the artifact which otherwise
+  chalk cannot derive.
+  ([#658](https://github.com/crashappsec/chalk/pull/658))
 
 ## 1.0.2
 

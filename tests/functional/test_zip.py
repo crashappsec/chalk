@@ -172,6 +172,44 @@ def test_valid(
         assert contains_chalk_binary(test_file)
 
 
+@pytest.mark.parametrize(
+    "extension,artifact_type",
+    [
+        ("pt", "PyTorch checkpoint"),
+        ("pth", "PyTorch checkpoint"),
+        ("keras", "Keras model"),
+    ],
+)
+def test_ml_model_zip_extensions(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    extension: str,
+    artifact_type: str,
+):
+    """Modern PyTorch (.pt/.pth) and Keras (.keras) checkpoints are
+    ZIP archives.  The codec extension list now covers them and the
+    ARTIFACT_TYPE callback differentiates them from plain .zip /
+    .jar / etc.
+
+    This test rebrands an existing ZIP fixture to the model
+    extension and verifies a chalk-mark roundtrip works against the
+    rebranded file with the expected ARTIFACT_TYPE.
+    """
+    src = NODEJS_LAMBDA_ZIP
+    test_file = tmp_data_dir / f"model.{extension}"
+    test_file.write_bytes(src.read_bytes())
+
+    insert = chalk.insert(artifact=test_file)
+    assert insert.report.marks_by_path.contains(
+        {str(test_file): {"ARTIFACT_TYPE": artifact_type}},
+    )
+
+    extract = chalk.extract(artifact=test_file)
+    assert extract.report.marks_by_path.contains(
+        {str(test_file): {"_OP_ARTIFACT_TYPE": artifact_type}},
+    )
+
+
 @pytest.mark.slow()
 @pytest.mark.parametrize(
     "copy_files",

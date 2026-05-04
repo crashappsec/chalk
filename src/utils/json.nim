@@ -15,12 +15,16 @@ export json
 proc assertIs*(self: JsonNode,
                kind: JsonNodeKind,
                msg = "JsonNode kind doesnt match expected",
+               allowNil = false,
                ): JsonNode {.discardable.} =
   if self == nil:
-    raise newException(
-      ValueError,
-      msg & ": nil"
-    )
+    if allowNil:
+      return self
+    else:
+      raise newException(
+        ValueError,
+        msg & ": nil"
+      )
   if self.kind != kind:
     raise newException(
       ValueError,
@@ -34,6 +38,15 @@ proc assertHasLen*(self: JsonNode,
   if len(self) == 0:
     raise newException(ValueError, msg)
   return self
+
+proc assertHasKey*(self: JsonNode,
+                   key: string,
+                   msg = "is missing",
+                  ): JsonNode {.discardable.} =
+  self.assertIs(JObject)
+  if not self.hasKey(key):
+    raise newException(ValueError, key & ": " & msg)
+  return self[key]
 
 proc update*(self: JsonNode, other: JsonNode): JsonNode {.discardable.} =
   if self == nil:

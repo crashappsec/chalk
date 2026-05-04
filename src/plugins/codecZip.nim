@@ -40,10 +40,12 @@ proc artifactType(obj: ChalkObj): string =
   let extension = obj.fsRef.splitFile().ext.toLowerAscii()
   result =
     case extension
-    of ".jar": artTypeJAR
-    of ".war": artTypeWAR
-    of ".ear": artTypeEAR
-    else:      artTypeZip
+    of ".jar":          artTypeJAR
+    of ".war":          artTypeWAR
+    of ".ear":          artTypeEAR
+    of ".pt", ".pth":   artTypePytorchCkpt
+    of ".keras":        artTypeKerasModel
+    else:               artTypeZip
 
 proc hashZipPath(path: string): string =
   var

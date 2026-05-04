@@ -93,6 +93,29 @@ such as the overall chalk run time.
 }
 
 
+plugin caller_attestation {
+    ~enabled:         true
+    pre_run_keys:     ["CALLER_ATTESTED_INFO",
+                       "CALLER_ATTESTED_HOST_INFO",
+                       "CALLER_ATTESTED_BUILD_INFO"]
+    pre_chalk_keys:   ["CALLER_ATTESTED_ARTIFACT_INFO"]
+    post_run_keys:    ["CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO"]
+    ~priority:        200
+    doc: """
+Ingests a caller-supplied attestation envelope from the spawning
+process — `CHALK_CALLER_ATTESTATION` env var, falling back to a file
+path in `CHALK_CALLER_ATTESTATION_FILE` for payloads that won't fit
+in `ARG_MAX`.  Validates the envelope's outer shape, distributes
+host/build/process buckets to top-level keys, status-wraps each
+matched per-artifact attestation against chalk's own unchalked
+hash, and aggregates unmatched paths into
+`CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO` with a `warn` log.
+
+See `docs/design-caller-attestation.md` for the protocol.
+"""
+}
+
+
 # Probably should add file time of artifact, date of branch
 # and any tag associated.
 plugin vctl_git {
@@ -752,17 +775,21 @@ plugin zip {
     codec:           true
     priority:        1
     enabled:         true
-    pre_chalk_keys:  ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE"]
+    pre_chalk_keys:  ["EMBEDDED_CHALK", "EMBEDDED_TMPDIR", "ARTIFACT_TYPE",
+                      "DERIVED_FROM_CHALK_ID"]
     post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
     doc: """
 The `zip` codec is responsible for manipulating Chalk marks in any
 executable content packaged using the ZIP file format under the hood,
-including all common Java formats, and some popular formats for
-bundling serverless content.
+including all common Java formats, some popular formats for bundling
+serverless content, and modern PyTorch / Keras model checkpoints
+(`.pt`, `.pth`, `.keras` — both formats use ZIP archives under the
+hood since PyTorch 1.6 and Keras 3 respectively).
 <p>
 Currently the codec will only process files with a file extension
 named in the `zip_extensions` configuration field. By default, we
-process the extensions: "zip", "jar", "war" and "ear".
+process the extensions: "zip", "jar", "war", "ear", "pt", "pth", and
+"keras".
 <p>
 This codec can be configured to collect chalk marks for artifacts
 placed into the ZIP file as well, if the configuration variabe
@@ -793,6 +820,82 @@ as source, but are distributed as python byte code (.pyc files).
 <p>
 Accepted file extensions can be set using the `pyc_extensions`
 configuration variable.
+"""
+}
+
+plugin gguf {
+    codec:           true
+    priority:        1
+    enabled:         true
+    pre_chalk_keys:  ["ARTIFACT_TYPE", "DERIVED_FROM_CHALK_ID"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    doc: """
+This codec marks `.gguf` (GGUF v2/v3) ML model files in place.  The
+chalk mark is inserted as a string KV pair `chalk.mark` in the
+metadata section.  GGUF tensor data offsets are relative to the data
+section start, so the codec recomputes the alignment padding when
+the KV section size changes — leaving offsets valid.
+<p>
+The unchalked hash is the SHA-256 of the file with the `chalk.mark`
+KV pair removed, kv_count decremented, and alignment padding
+recomputed.  Re-marking with payloads of any length leaves the
+unchalked hash unchanged.
+<p>
+The codec defers to the next codec at lower priority when the file
+isn't a valid GGUF v2 or v3 archive (bad magic, unsupported version,
+truncated KV section).  GGUF v1 (deprecated) is refused.
+"""
+}
+
+plugin model_sidecar {
+    codec:           true
+    enabled:         true
+    pre_chalk_keys:  ["ARTIFACT_TYPE", "DERIVED_FROM_CHALK_ID"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    priority:        1500
+    doc: """
+Last-resort codec for ML model files that can't be marked in-band.
+The codec writes a `<path>.chalk` sidecar file alongside the
+artifact containing the chalk-mark JSON; the artifact's bytes are
+not modified.  On extract the sidecar is read back as the mark.
+<p>
+The codec is gated on the `sidecar_extensions` config list (default:
+`onnx`, `bin`, `pt`, `pth`).  It runs at priority 1500 — below every
+format-specific codec, so safetensors / gguf / zip get first chance
+on their respective formats.  ONNX (until a protobuf-aware codec
+lands), Ollama-style raw `.bin` blobs, and legacy non-ZIP PyTorch
+checkpoints (pre-`zipfile_serialization`) end up here.
+<p>
+The unchalked hash is the natural SHA-256 of the artifact file
+itself — no canonicalization is needed because the mark lives
+outside the file.
+"""
+}
+
+plugin safetensors {
+    codec:           true
+    priority:        1
+    enabled:         true
+    pre_chalk_keys:  ["ARTIFACT_TYPE", "DERIVED_FROM_CHALK_ID"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE"]
+    doc: """
+This codec marks `.safetensors` ML model files in place.  The chalk
+mark is inserted as a string value under `__metadata__.chalk` in the
+file's JSON header — which is the location the SafeTensors format
+reserves for arbitrary user metadata.  Tensor `data_offsets` are
+relative to the data section start, so the header may grow without
+breaking offsets.
+<p>
+The unchalked hash is the SHA-256 of the file with the chalk
+key/value pair structurally removed from the JSON header (and the
+header_size field recomputed).  Re-marking with payloads of any
+length leaves the unchalked hash unchanged.
+<p>
+The codec defers to the next codec at lower priority when the file
+isn't a valid SafeTensors archive (truncated, header out of range,
+malformed JSON header).  ML model files in other formats (`.gguf`,
+`.pt`, `.pth`, `.keras`, `.onnx`, etc.) are handled by their own
+codecs or by the sidecar fallback.
 """
 }
 

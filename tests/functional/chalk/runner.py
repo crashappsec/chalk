@@ -43,14 +43,28 @@ logger = get_logger()
 
 
 def artifact_type(path: Path) -> str:
-    if path.suffix == ".py":
+    suffix = path.suffix
+    if suffix == ".py":
         return "python"
-    elif path.suffix == ".sh":
+    elif suffix == ".sh":
         return "sh"
-    elif path.suffix == ".zip":
+    elif suffix == ".zip":
         return "ZIP"
-    elif path.suffix == ".pem":
+    elif suffix == ".pem":
         return "x509 Cert"
+    # ML model formats — ARTIFACT_TYPE values must match what each
+    # codec emits (codecZip / codecModelSidecar / codecSafetensors /
+    # codecGguf):
+    elif suffix in (".pt", ".pth"):
+        return "PyTorch checkpoint"
+    elif suffix == ".keras":
+        return "Keras model"
+    elif suffix in (".onnx", ".bin"):
+        return "ML model"
+    elif suffix == ".safetensors":
+        return "SafeTensors model"
+    elif suffix == ".gguf":
+        return "GGUF model"
     else:
         return "ELF"
 

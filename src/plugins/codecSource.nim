@@ -76,6 +76,13 @@ proc detectCache(path: string): SourceCache =
     ext = ext[1 .. ^1] # No need for the period.
     if ext in attrGet[seq[string]]("source_marks.text_only_extensions"):
       return SourceCache(nil)
+    # Defer ML-model extensions to codecModelSidecar.  Source codec is
+    # permissive on extract/delete by design (`only_mark_shebangs` /
+    # `only_mark_when_execute_set` deliberately do not gate extraction),
+    # which would otherwise claim these files and prevent the sibling
+    # `<path>.chalk` from being read.
+    if ext in attrGet[seq[string]]("sidecar_extensions"):
+      return SourceCache(nil)
 
     let exts = attrGet[TableRef[string, string]]("source_marks.extensions_to_languages_map")
     if ext in exts:
