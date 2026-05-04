@@ -147,19 +147,19 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
       line &= "\n\tpreferBundledCerts = " & cfg.params.getOrDefault("prefer_bundled_certs", "false") & "\n"
     of "s3":
       let state = S3SinkState(cfg.private)
-      line &= "\n\turi      = " & cfg.params["uri"]
-      line &= "\n\tuid      = " & state.uid
-      line &= "\n\tregion   = " & state.region
-      line &= "\n\textra    = "
-      if state.extra == "":
-        line &= "<not provided>"
-      else:
-        line &= state.extra
+      line &= "\n\turi    = " & cfg.params["uri"]
+      line &= "\n\tuid    = " & state.uid
+      line &= "\n\tregion = " & state.region
+      line &= "\n\textra  = "
       line &= "\n\tendpoint = "
       if state.endpoint == "":
-        line &= "<aws default>\n"
+        line &= "<aws default>"
       else:
-        line &= state.endpoint & "\n"
+        line &= state.endpoint
+      if state.extra == "":
+        line &= "<not provided>\n"
+      else:
+        line &= state.extra & "\n"
     of "rotating_log", "file":
       let fname     = cfg.params["filename"]
       var log_parts = cfg.params["log_search_path"].split(":")
