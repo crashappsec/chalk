@@ -455,7 +455,7 @@ See `docs/design-caller-attestation.md` for the protocol.
 
 keyspec CALLER_ATTESTED_ARTIFACT_INFO {
     kind:             ChalkTimeArtifact
-    type:             `x
+    type:             dict[string, `x]
     standard:         true
     since:            "1.1.0"
     shortdoc:         "Caller's per-artifact attestation, status-wrapped"
@@ -480,7 +480,7 @@ See `docs/design-caller-attestation.md` for the protocol.
 
 keyspec CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO {
     kind:             RunTimeHost
-    type:             `x
+    type:             dict[string, `x]
     standard:         true
     since:            "1.1.0"
     shortdoc:         "Caller attestations for paths chalk did not track"

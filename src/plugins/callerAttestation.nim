@@ -50,26 +50,16 @@ const
   recognizedTopLevel = [keyInfo, keyHostInfo, keyBuildInfo, keyArtifactInfo]
 
 type
-  ArtifactEntry* = object
+  ArtifactEntry = ref object
     sha256*: string
     info*:   JsonNode  # may be nil if caller omitted `info`
 
-  EnvelopeState* = object
-    valid*:       bool
+  EnvelopeState = ref object of RootRef
     info*:        JsonNode
     hostInfo*:    JsonNode
     buildInfo*:   JsonNode
     artifacts*:   TableRef[string, ArtifactEntry]
     matchedKeys*: HashSet[string]
-
-  ValidationResult* = object
-    state*:    EnvelopeState
-    errMsg*:   string       # non-empty → envelope rejected
-    warnings*: seq[string]  # passes that succeeded but want a warn log
-
-var
-  loaded = false
-  state: EnvelopeState
 
 # ---------------------------------------------------------------------------
 # Envelope read / validate
@@ -86,12 +76,9 @@ proc readEnvelopeBytes(): string =
     error(envFile & "=" & path &
           ": file not found; ignoring caller attestation")
     return ""
-  try:
-    return readFile(path)
-  except IOError, OSError:
-    error(envFile & "=" & path & ": " & getCurrentExceptionMsg() &
-          "; ignoring caller attestation")
-    return ""
+  result = tryToLoadFile(path)
+  if result == "":
+    error(envFile & "=" & path & ": does not contain chalk attestation")
 
 proc isHex64(s: string): bool =
   if s.len != 64:
@@ -101,113 +88,83 @@ proc isHex64(s: string): bool =
       return false
   return true
 
-proc parseAndValidate*(raw: string): ValidationResult =
+proc parseAndValidate(raw: string): EnvelopeState =
   ## Pure parser/validator over the caller-attestation envelope.  The
   ## procedure has no side effects: it returns errMsg/warnings the
   ## caller is responsible for logging.  Exposed so the unit-test
   ## suite can exercise the validation logic without dragging in the
   ## chalk plugin runtime.
-  result.state.valid       = false
-  result.state.artifacts   = newTable[string, ArtifactEntry]()
-  result.state.matchedKeys = initHashSet[string]()
-  result.warnings          = @[]
+  new result
+  result.artifacts   = newTable[string, ArtifactEntry]()
+  result.matchedKeys = initHashSet[string]()
 
   if raw.len == 0:
     return
 
-  var node: JsonNode
-  try:
-    node = parseJson(raw)
-  except JsonParsingError:
-    result.errMsg = "malformed JSON: " & getCurrentExceptionMsg()
-    return
+  let
+    node     = parseJson(raw).assertIs(JObject, "top-level must be a JSON object")
+    version  = node.assertHasKey(keyVersion)[keyVersion].assertIs(JInt).getInt()
 
-  if node.kind != JObject:
-    result.errMsg = "top-level must be a JSON object"
-    return
-
-  if not node.hasKey(keyVersion):
-    result.errMsg = "missing required `" & keyVersion & "` field"
-    return
-  let verNode = node[keyVersion]
-  if verNode.kind != JInt or verNode.getInt() != protocolVersion:
-    result.errMsg = "unsupported `" & keyVersion & "` (expected " &
-                    $protocolVersion & ")"
-    return
+  if version != protocolVersion:
+    raise newException(
+      ValueError,
+      "unsupported `" & keyVersion & "` (expected " & $protocolVersion & ")"
+    )
 
   for k, _ in node.pairs():
     if k == keyVersion or k in recognizedTopLevel:
       continue
     if k.startsWith("X-"):
       continue
-    result.warnings.add("unknown top-level key '" & k & "' (ignored)")
+    warn("unknown top-level key '" & k & "' (ignored)")
 
   for k in [keyInfo, keyHostInfo, keyBuildInfo]:
-    if node.hasKey(k) and node[k].kind != JObject:
-      result.errMsg = "'" & k & "' must be a JSON object"
-      return
+    if node.hasKey(k):
+      node[k].assertIs(JObject, "'" & k & "' must be a JSON object")
 
-  if node.hasKey(keyInfo):      result.state.info      = node[keyInfo]
-  if node.hasKey(keyHostInfo):  result.state.hostInfo  = node[keyHostInfo]
-  if node.hasKey(keyBuildInfo): result.state.buildInfo = node[keyBuildInfo]
+  result.info      = node{keyInfo}.assertIs(JObject,      keyInfo,      allowNil = true)
+  result.hostInfo  = node{keyHostInfo}.assertIs(JObject,  keyHostInfo,  allowNil = true)
+  result.buildInfo = node{keyBuildInfo}.assertIs(JObject, keyBuildInfo, allowNil = true)
 
   if node.hasKey(keyArtifactInfo):
-    let artNode = node[keyArtifactInfo]
-    if artNode.kind != JObject:
-      result.errMsg = "'" & keyArtifactInfo & "' must be a JSON object"
-      return
+    let artNode = node[keyArtifactInfo].assertIs(JObject, keyArtifactInfo)
     for path, entry in artNode.pairs():
-      if entry.kind != JObject:
-        result.errMsg = "entry for '" & path & "' must be an object"
-        return
-      if not entry.hasKey("sha256") or entry["sha256"].kind != JString:
-        result.errMsg = "entry for '" & path &
-                        "' is missing required string 'sha256'"
-        return
+      entry.assertIs(JObject, "entry for '" & path & "' must be an object")
+      entry.assertHasKey("sha256", "entry for '" & path & "' is missing required 'sha256'").assertIs(JString)
       let sha = entry["sha256"].getStr().toLowerAscii()
       if not sha.isHex64():
-        result.errMsg = "entry for '" & path &
-                        "' has invalid 'sha256' (expected 64-char " &
-                        "lowercase hex)"
-        return
+        raise newException(
+          ValueError,
+          "entry for '" & path &
+          "' has invalid 'sha256' (expected 64-char " &
+          "lowercase hex)"
+        )
       for fk, _ in entry.pairs():
         if fk != "sha256" and fk != "info":
-          result.errMsg = "entry for '" & path &
-                          "' has unexpected field '" & fk & "'"
-          return
-      var infoNode: JsonNode = nil
-      if entry.hasKey("info"):
-        infoNode = entry["info"]
-      result.state.artifacts[path] = ArtifactEntry(sha256: sha, info: infoNode)
+          raise newException(
+            ValueError,
+            "entry for '" & path &
+            "' has unexpected field '" & fk & "'"
+          )
+      let infoNode = entry{"info"}
+      result.artifacts[path] = ArtifactEntry(sha256: sha, info: infoNode)
 
-  result.state.valid = true
-
-proc loadEnvelopeOnce() =
-  if loaded:
-    return
-  loaded = true
-  let
-    raw = readEnvelopeBytes()
-    res = parseAndValidate(raw)
-  if res.errMsg.len > 0:
-    error("caller attestation: " & res.errMsg & "; envelope discarded")
-    return
-  for w in res.warnings:
-    warn("caller attestation: " & w)
-  state = res.state
-  if state.valid:
+proc loadEnvelope(self: Plugin): EnvelopeState =
+  if self.internalState != nil:
+    return EnvelopeState(self.internalState)
+  try:
+    let raw = readEnvelopeBytes()
+    result = parseAndValidate(raw)
+    self.internalState = RootRef(result)
     trace("caller_attestation: envelope loaded (" &
-          $state.artifacts.len & " artifact entries)")
+          $result.artifacts.len & " artifact entries)")
+  except:
+    error("caller attestation: " & getCurrentExceptionMsg() & "; envelope discarded")
+    return nil
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-proc realpath(p: string): string =
-  try:
-    return expandFilename(p)
-  except OSError:
-    return ""
 
 proc infoOrEmpty(n: JsonNode): JsonNode =
   ## `info` is optional in the protocol; chalk emits `{}` when the
@@ -215,46 +172,49 @@ proc infoOrEmpty(n: JsonNode): JsonNode =
   if n == nil: newJObject() else: n
 
 proc statusJson(status:      string,
-                attestedSha: string,
-                observedSha: string,
-                info:        JsonNode): JsonNode =
-  result = newJObject()
-  result["status"] = newJString(status)
+                info:        JsonNode,
+                attestedSha: string = "",
+                observedSha: string = "",
+                ): JsonNode =
+  result = %*({
+    "status": status,
+    "info":   infoOrEmpty(info),
+  })
   if status != "match":
     if attestedSha.len > 0:
       result["attested_sha256"] = newJString(attestedSha)
     if observedSha.len > 0:
       result["observed_sha256"] = newJString(observedSha)
-  result["info"] = infoOrEmpty(info)
 
 proc untrackedEntryJson(entry: ArtifactEntry): JsonNode =
-  result = newJObject()
-  result["sha256"] = newJString(entry.sha256)
-  result["info"]   = infoOrEmpty(entry.info)
+  return %*({
+    "sha256": entry.sha256,
+    "info":   infoOrEmpty(entry.info),
+  })
 
 # ---------------------------------------------------------------------------
 # Callbacks
 # ---------------------------------------------------------------------------
 
-proc callerAttestGetCtHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
+proc callerAttestGetCtHostInfo(self: Plugin): ChalkDict {.cdecl.} =
   result = ChalkDict()
-  loadEnvelopeOnce()
-  if not state.valid:
+  let state = self.loadEnvelope()
+  if state == nil:
     return
   if state.info != nil:
-    result.setIfNeeded(keyInfo, state.info.nimJsonToBox())
+    result.setIfNeeded(keyInfo,      state.info.nimJsonToBox())
   if state.hostInfo != nil:
-    result.setIfNeeded(keyHostInfo, state.hostInfo.nimJsonToBox())
+    result.setIfNeeded(keyHostInfo,  state.hostInfo.nimJsonToBox())
   if state.buildInfo != nil:
     result.setIfNeeded(keyBuildInfo, state.buildInfo.nimJsonToBox())
 
-proc callerAttestGetCtArtifactInfo*(self: Plugin, obj: ChalkObj):
+proc callerAttestGetCtArtifactInfo(self: Plugin, obj: ChalkObj):
                                     ChalkDict {.cdecl.} =
   result = ChalkDict()
-  loadEnvelopeOnce()
-  if not state.valid or state.artifacts.len == 0:
+  let state = self.loadEnvelope()
+  if state == nil or state.artifacts.len == 0:
     return
-  let resolved = realpath(obj.fsRef)
+  let resolved = obj.fsRef.resolvePath()
   if resolved.len == 0 or resolved notin state.artifacts:
     return
   state.matchedKeys.incl(resolved)
@@ -266,27 +226,42 @@ proc callerAttestGetCtArtifactInfo*(self: Plugin, obj: ChalkObj):
          "available; attestation recorded with status \"unverified\".")
     result.setIfNeeded(
       keyArtifactInfo,
-      statusJson("unverified", entry.sha256, "", entry.info).nimJsonToBox())
+      statusJson(
+        status      = "unverified",
+        attestedSha = entry.sha256,
+        info        = entry.info,
+      ).nimJsonToBox()
+    )
     return
 
   let observed = observedOpt.get().toLowerAscii()
   if observed == entry.sha256:
     result.setIfNeeded(
       keyArtifactInfo,
-      statusJson("match", "", "", entry.info).nimJsonToBox())
+      statusJson(
+        status = "match",
+        info   = entry.info,
+      ).nimJsonToBox()
+    )
   else:
     warn(obj.fsRef & ": caller-attested hash mismatch (attested " &
          entry.sha256 & ", observed " & observed &
          "); attestation recorded with status \"mismatch\".")
     result.setIfNeeded(
       keyArtifactInfo,
-      statusJson("mismatch", entry.sha256, observed, entry.info).nimJsonToBox())
+      statusJson(
+        status      = "mismatch",
+        attestedSha = entry.sha256,
+        observedSha = observed,
+        info        = entry.info,
+      ).nimJsonToBox()
+    )
 
-proc callerAttestGetRtHostInfo*(self: Plugin, objs: seq[ChalkObj]):
+proc callerAttestGetRtHostInfo(self: Plugin, objs: seq[ChalkObj]):
                                 ChalkDict {.cdecl.} =
   result = ChalkDict()
-  loadEnvelopeOnce()
-  if not state.valid or state.artifacts.len == 0:
+  let state = self.loadEnvelope()
+  if state == nil or state.artifacts.len == 0:
     return
   let untracked = newJObject()
   for path, entry in state.artifacts.pairs():
@@ -295,12 +270,14 @@ proc callerAttestGetRtHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     warn(path & ": caller attested but artifact was not processed by " &
          "chalk; moved to " & keyUntracked & ".")
     untracked[path] = untrackedEntryJson(entry)
-  if untracked.len > 0:
-    result.setIfNeeded(keyUntracked, untracked.nimJsonToBox())
+  result.setIfNeeded(keyUntracked, untracked.nimJsonToBox())
 
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
+
+proc clearCallback(self: Plugin) {.cdecl.} =
+  self.internalState = RootRef(nil)
 
 proc loadCallerAttestation*() =
   newPlugin(
@@ -308,4 +285,5 @@ proc loadCallerAttestation*() =
     ctHostCallback = ChalkTimeHostCb(callerAttestGetCtHostInfo),
     ctArtCallback  = ChalkTimeArtifactCb(callerAttestGetCtArtifactInfo),
     rtHostCallback = RunTimeHostCb(callerAttestGetRtHostInfo),
+    clearCallback  = PluginClearCb(clearCallback),
   )
