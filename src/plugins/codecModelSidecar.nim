@@ -42,15 +42,6 @@ const sidecarSuffix = ".chalk"
 proc sidecarPath(path: string): string =
   path & sidecarSuffix
 
-proc readSidecar(path: string): string =
-  let sp = sidecarPath(path)
-  if not fileExists(sp):
-    return ""
-  try:
-    result = readFile(sp).strip()
-  except IOError, OSError:
-    result = ""
-
 proc extensionMatches(path: string): bool =
   let ext = path.splitFile().ext.toLowerAscii()
   if ext.len < 2:
@@ -76,16 +67,14 @@ proc sidecarScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   if not fileExists(path):
     return none(ChalkObj)
 
-  let existing = readSidecar(path)
   var dict: ChalkDict
-  var marked = false
-
-  if existing != "":
-    if existing.find(magicUTF8) == -1:
-      warn(path & ": sidecar present but missing magic; treating as unmarked")
-    else:
-      dict   = extractOneChalkJson(existing, path)
-      marked = dict != nil
+  let sp = sidecarPath(path)
+  withFileStream(sp, mode = fmRead, strict = false):
+    if stream != nil:
+      try:
+        dict = extractOneChalkJson(stream, path)
+      except:
+        warn(path & ": sidecar present but could not parse; treating as unmarked")
 
   let chalk = newChalk(
     name         = path,
@@ -93,7 +82,6 @@ proc sidecarScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     codec        = self,
     resourceType = {ResourceFile},
     extract      = dict,
-    marked       = marked,
   )
 
   return some(chalk)
@@ -109,12 +97,12 @@ proc sidecarGetUnchalkedHash*(self: Plugin, chalk: ChalkObj):
   ## needed.
   if chalk.cachedUnchalkedHash != "":
     return some(chalk.cachedUnchalkedHash)
-  let bytes =
+  let fss =
     try:
-      readFile(chalk.fsRef)
-    except IOError, OSError:
+      newFileStringStream(chalk.fsRef)
+    except:
       return none(string)
-  let hex = bytes.sha256Hex()
+  let hex = fss.sha256Hex()
   chalk.cachedUnchalkedHash = hex
   return some(hex)
 
@@ -166,7 +154,6 @@ proc sidecarGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj,
 proc loadCodecModelSidecar*() =
   newCodec(
     "model_sidecar",
-    nativeObjPlatforms = @["macosx", "linux"],
     scan             = ScanCb(sidecarScan),
     handleWrite      = HandleWriteCb(sidecarHandleWrite),
     getUnchalkedHash = UnchalkedHashCb(sidecarGetUnchalkedHash),

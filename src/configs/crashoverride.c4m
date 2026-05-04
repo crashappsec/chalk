@@ -289,6 +289,13 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.DOCKER_BASE_IMAGE_CONFIG_DIGEST.use     = true
   ~key.DOCKER_BASE_IMAGES.use                  = true
   ~key.DOCKER_COPY_IMAGES.use                  = true
+
+  ~key.CALLER_ATTESTED_INFO.use                    = true
+  ~key.CALLER_ATTESTED_HOST_INFO.use               = true
+  ~key.CALLER_ATTESTED_BUILD_INFO.use              = true
+  ~key.CALLER_ATTESTED_ARTIFACT_INFO.use           = true
+  ~key.CALLER_ATTESTED_UNTRACKED_ARTIFACT_INFO.use = true
+
   ~key._OP_ARTIFACT_TYPE.use                   = true
   ~key._OP_ARTIFACT_CONTEXT.use                = true
   ~key._OP_ARTIFACT_PATH.use                   = true

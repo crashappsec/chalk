@@ -154,10 +154,8 @@ proc unchalkedHash*(self: ParsedGguf): string =
   ## across re-marks.  "" on error.
   if self == nil or self.handle == nil:
     return ""
-  var hex = newString(65)
-  hex.setLen(65)
+  var hex = newString(64)
   let st = chalk_gguf_unchalked_hash(self.handle, hex.cstring)
   if not st.isOk:
     return ""
-  hex.setLen(64)
   result = hex

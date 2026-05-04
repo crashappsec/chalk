@@ -42,13 +42,21 @@ proc ggufScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   if not path.toLowerAscii().endsWith(GgufExt):
     return none(ChalkObj)
 
-  let bytes =
+  var bytes: string
+  withFileStream(path, mode = fmRead, strict = false):
+    if stream == nil:
+      return none(ChalkObj)
     try:
-      readFile(path)
-    except IOError, OSError:
+      if stream.peekStr(GgufMagic.len) != GgufMagic:
+        return none(ChalkObj)
+    except:
+      return none(ChalkObj)
+    try:
+      bytes = stream.readAll()
+    except:
       return none(ChalkObj)
 
-  if bytes.len < 24 or bytes[0 .. 3] != GgufMagic:
+  if bytes.len < 24:
     return none(ChalkObj)
 
   let parsed = parseGguf(bytes)
@@ -57,9 +65,7 @@ proc ggufScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     return none(ChalkObj)
 
   let cache = GgufCache(parsed: parsed)
-
   var dict: ChalkDict
-  var marked = false
 
   let existing = parsed.getChalkPayload()
   if existing != "":
@@ -67,8 +73,7 @@ proc ggufScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       warn(path & ": chalk.mark KV present but missing magic; " &
            "treating as unmarked")
     else:
-      dict   = extractOneChalkJson(existing, path)
-      marked = dict != nil
+      dict = extractOneChalkJson(existing, path)
 
   let chalk = newChalk(
     name         = path,
@@ -77,7 +82,6 @@ proc ggufScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     resourceType = {ResourceFile},
     cache        = cache,
     extract      = dict,
-    marked       = marked,
   )
 
   return some(chalk)
@@ -163,7 +167,6 @@ proc ggufGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj,
 proc loadCodecGguf*() =
   newCodec(
     "gguf",
-    nativeObjPlatforms = @["macosx", "linux"],
     scan             = ScanCb(ggufScan),
     handleWrite      = HandleWriteCb(ggufHandleWrite),
     getUnchalkedHash = UnchalkedHashCb(ggufGetUnchalkedHash),

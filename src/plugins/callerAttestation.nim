@@ -103,7 +103,7 @@ proc parseAndValidate(raw: string): EnvelopeState =
 
   let
     node     = parseJson(raw).assertIs(JObject, "top-level must be a JSON object")
-    version  = node.assertHasKey(keyVersion)[keyVersion].assertIs(JInt).getInt()
+    version  = node.assertHasKey(keyVersion).assertIs(JInt).getInt()
 
   if version != protocolVersion:
     raise newException(

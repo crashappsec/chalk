@@ -33,8 +33,7 @@ import ".."/[
 type
   StCache = ref object of RootRef
     ## Per-artifact state held across scan → handleWrite calls.
-    parsed:  ParsedSafetensors
-    rawSize: int
+    parsed: ParsedSafetensors
 
 # ---------------------------------------------------------------------------
 # scan
@@ -44,10 +43,13 @@ proc stScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
   if not path.toLowerAscii().endsWith(SafetensorsExt):
     return none(ChalkObj)
 
-  let bytes =
+  var bytes: string
+  withFileStream(path, mode = fmRead, strict = false):
+    if stream == nil:
+      return none(ChalkObj)
     try:
-      readFile(path)
-    except IOError, OSError:
+      bytes = stream.readAll()
+    except:
       return none(ChalkObj)
 
   if bytes.len < 8:
@@ -58,13 +60,8 @@ proc stScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     trace(path & ": SafeTensors parse failed; deferring to fallback codec")
     return none(ChalkObj)
 
-  let cache = StCache(
-    parsed:  parsed,
-    rawSize: bytes.len,
-  )
-
+  let cache = StCache(parsed: parsed)
   var dict: ChalkDict
-  var marked = false
 
   let existing = parsed.getChalkPayload()
   if existing != "":
@@ -72,8 +69,7 @@ proc stScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
       warn(path & ": __metadata__.chalk present but missing magic; " &
            "treating as unmarked")
     else:
-      dict   = extractOneChalkJson(existing, path)
-      marked = dict != nil
+      dict = extractOneChalkJson(existing, path)
 
   let chalk = newChalk(
     name         = path,
@@ -82,7 +78,6 @@ proc stScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     resourceType = {ResourceFile},
     cache        = cache,
     extract      = dict,
-    marked       = marked,
   )
 
   return some(chalk)
@@ -169,7 +164,6 @@ proc stGetRunTimeArtifactInfo*(self: Plugin, chalk: ChalkObj,
 proc loadCodecSafetensors*() =
   newCodec(
     "safetensors",
-    nativeObjPlatforms = @["macosx", "linux"],
     scan             = ScanCb(stScan),
     handleWrite      = HandleWriteCb(stHandleWrite),
     getUnchalkedHash = UnchalkedHashCb(stGetUnchalkedHash),
