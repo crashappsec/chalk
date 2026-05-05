@@ -80,11 +80,10 @@ proc loadAttestation*(forceLoad = false, withPrivateKey = false) =
 
   let
     cmd = getBaseCommandName()
-    loadPrivateKey = cmd in ["insert"] or withPrivateKey
+    loadPrivateKey = cmd in ["insert", "load"] or withPrivateKey
   if not forceLoad and cmd in [
     "setup",
     "help",
-    "load",
     "dump",
     "version",
     "env",
