@@ -6,6 +6,8 @@
 
 Chalk gives you a cryptographically verifiable chain of custody from build through production, with minimal configuration, and no changes to how your software is run.
 
+![demo](./demo.gif)
+
 ### Overview
 
 Chalk seamlessly handles provenance and attestation for production software, collecting detailed environmental info about software being built or run, cradle to grave.
