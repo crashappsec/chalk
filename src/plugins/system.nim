@@ -77,7 +77,7 @@ proc validateMetaData*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
   try:
     if obj.canVerifyByHash():
       result = obj.verifyByHash(computedHash)
-    if obj.canVerifyBySigStore():
+    elif obj.canVerifyBySigStore():
       let (isValid, _) = obj.verifyBySigStore()
       result = isValid
     trace("signature validation: " & $result)

@@ -238,6 +238,7 @@ proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): 
   # the native build platform, and the default target platform.
   let buildPlatform  = getSystemBuildPlatform()
   if targetPlatform == buildPlatform:
+    trace("docker: copying self as for TARGETPLATFORM (" & $targetPlatform & ")")
     return getMyAppPath().copySelfConfigForArch(
       os   = targetPlatform.os,
       arch = targetPlatform.architecture,
@@ -274,6 +275,7 @@ proc findAllPlatformsBinaries*(ctx: DockerInvocation, platforms: seq[DockerPlatf
       error("docker: could not get chalk binary for TARGETPLATFORM (" & $platform & ") " &
             getCurrentExceptionMsg())
       dumpExOnDebug()
+      raise
 
 proc doesBuilderSupportPlatform*(ctx: DockerInvocation, platform: DockerPlatform): bool =
   let info = ctx.getBuilderInfo()

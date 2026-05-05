@@ -267,6 +267,8 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
                                  user:     string,
                                  move:     bool    = true,
                                  chmod:    string  = "0755") =
+  if len(binaries) == 0:
+    raise newException(ValueError, "docker: cannot copy chalk into the container as no binary platforms were found")
   let
     system = getSystemBuildPlatform()
     first  = binaries.keys().toSeq()[0]
