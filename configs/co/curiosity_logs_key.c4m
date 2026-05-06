@@ -8,11 +8,18 @@ func curiosity_logs(contexts) {
   if command_name() != "env" {
     return ""
   }
+  run_id := env("GITHUB_RUN_ID")
+  job := env("GITHUB_JOB")
+  attempt := env("GITHUB_RUN_ATTEMPT")
+  if run_id == "" or attempt == "" {
+    return ""
+  }
+
   # this is a compressed archive of any coredumps that are found,
   # as well as the corresponding host_server.log info, if a crash is detected
   # it is generated conditionally (based on the presence of a crash) by
   # the post action of setup-chalk-build-observables
-  path := "/mnt/curiosity/curiosity_logs.bundle"
+  path := "/mnt/curiosity/" + run_id + "-" + job + "-" + attempt + "-curiosity_logs.bundle"
   if not is_file(path) {
     return ""
   }
