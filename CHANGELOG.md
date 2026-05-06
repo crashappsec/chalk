@@ -71,6 +71,11 @@
   in [#646](https://github.com/crashappsec/chalk/pull/646).
   ([#656](https://github.com/crashappsec/chalk/pull/656))
 
+- `chalk load` will break chalk binary signature if it
+  already contained one via `chalk setup` as it would
+  not be updated after loading new configuration file.
+  ([#656](https://github.com/crashappsec/chalk/pull/656))
+
 ## 1.0.2
 
 **April 29, 2026**
