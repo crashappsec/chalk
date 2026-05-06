@@ -185,7 +185,7 @@ proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
 
   path.createDir()
 
-  # attempt to donwload from all urls in the order they are defined
+  # attempt to download from all urls in the order they are defined
   for url in platform.platformUrls():
     let name = parseUri(url).path.splitPath().tail
     urls.add(url)
@@ -200,7 +200,7 @@ proc downloadPlatformBinary(targetPlatform: DockerPlatform): string =
       )
       body = response.body()
     except:
-      trace("docker: while downloading chalk binary recieved: " & getCurrentExceptionMsg())
+      trace("docker: while downloading chalk binary received: " & getCurrentExceptionMsg())
       statuses.add(getCurrentExceptionMsg())
       continue
 
@@ -232,7 +232,7 @@ proc findExistingPlatformBinary(platform: DockerPlatform): string =
       return path
 
 proc findPlatformBinary(ctx: DockerInvocation, targetPlatform: DockerPlatform): string =
-  # Mapping nim platform names to docker ones is a non-trivial. We need to
+  # Mapping nim platform names to docker ones is non-trivial. We need to
   # know the default target platform whenever --platform isn't
   # explicitly provided anyway, so we just ask Docker to tell us both
   # the native build platform, and the default target platform.

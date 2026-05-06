@@ -178,7 +178,6 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
 
 proc addByPlatform(ctx:          DockerInvocation,
                    newPath:      string,
-                   onlyPlatform: DockerPlatform,
                    image       = "scratch",
                    ): string =
   # in order to copy file by platform, we need to create
@@ -195,11 +194,15 @@ proc addByPlatform(ctx:          DockerInvocation,
   # COPY --from=chalk_base /$TARGETPLATFORM /chalk.json
   let
     base = "chalk" & newPath.replace("/", "_").replace(".", "_")
+    # docker doesnt always use TARGETPLATFORM
+    # e.g. FROM --platform=<arch>
+    # doesnt update TARGETPLATFORM as its not passed as CLI --platform flag
+    # hence if we know exact architecture we just hardcode it
     path =
       if ctx.isMultiPlatform():
         "/$TARGETPLATFORM"
       else:
-        "/" & $onlyPlatform.normalize()
+        "/" & $ctx.onlyPlatform().normalize()
     arg  = "ARG TARGETPLATFORM"
     copy = "COPY --from=" & base & " " & path & " " & newPath
   if base notin ctx.addedPlatform:
@@ -230,7 +233,7 @@ proc makeFileAvailableToDocker*(ctx:        DockerInvocation,
       user    = user,
       move    = move,
       chmod   = chmod,
-      toAdd   = ctx.addedPlatform[ctx.addByPlatform(newPath, platform)],
+      toAdd   = ctx.addedPlatform[ctx.addByPlatform(newPath)],
     )
   else:
     ctx.makeFileAvailableToDocker(
@@ -271,40 +274,33 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
     raise newException(ValueError, "docker: cannot copy chalk into the container as no binary platforms were found")
   let
     system = getSystemBuildPlatform()
-    first  = binaries.keys().toSeq()[0]
-  # even if not multi-platform, when target platform doesnt match
-  # system platform we have to ensure copied chalk has identical configs
-  if len(binaries) > 1 or first != system:
+    binfmt = attrGet[bool]("docker.install_binfmt")
+
+  for platform, path in binaries:
+    # ensure platform is supported by the builder as chalk adds RUN commands
+    # to dockerfile and if binfmt is not installed, multi-platform build might fail
+    # where original dockerfile might not have any RUN commands which would
+    # succeed the build otherwise
+    if hasBuildX() and not ctx.doesBuilderSupportPlatform(platform):
+      if binfmt:
+        installBinFmt()
+      else:
+        error(
+          "No support for " & $platform & " was detected in buildx builder. " &
+          "To automatically add support via QEMU enable 'docker.install_binfmt' configuration. " &
+          "Alternatively manually install binfmt as per " &
+          "https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop"
+        )
+
+  if len(binaries) > 1:
     if not ctx.supportsBuildContextFlag():
       raise newException(
         ValueError,
         "recent version of buildx is required for copying chalk by platform into Dockerfile",
       )
-    let
-      binfmt    = attrGet[bool]("docker.install_binfmt")
-      base      = ctx.addByPlatform(newPath, onlyPlatform = first)
-      # docker doesnt always use TARGETPLATFORM
-      # e.g. FROM --platform=<arch>
-      # doesnt update TARGETPLATFORM as its not passed as CLI --platform flag
-      # hence if we know exact architecture we just hardcode it
-      name      = if ctx.isMultiPlatform(): "$TARGETPLATFORM" else: $first.normalize()
+    let base = ctx.addByPlatform(newPath)
     for platform, path in binaries:
-      # ensure platform is supported by the builder as chalk adds RUN commands
-      # to dockerfile and if binfmt is not installed, multi-platform build might fail
-      # where original dockerfile might not have any RUN commands which would
-      # succeed the build otherwise
-      if not ctx.doesBuilderSupportPlatform(platform):
-        if binfmt:
-          installBinFmt()
-        else:
-          raise newException(
-            ValueError,
-            "No support for " & $platform & " was detected in buildx builder. " &
-            "To automatically add support via QEMU enable 'docker.install_binfmt' configuration. " &
-            "Alternatively manually install binfmt as per " &
-            "https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop"
-          )
-      info("docker: wrapping image with this chalk binary: " & path & " (" & $platform & ")")
+      info("docker: wrapping image with chalk binary: " & path & " (" & $platform & ")")
       ctx.makeFileAvailableToDocker(
         path    = path,
         newPath = "/" & $platform.normalize(),
@@ -313,12 +309,9 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
         chmod   = chmod,
         toAdd   = ctx.addedPlatform[base],
       )
-    if ctx.isMultiPlatform():
-      ctx.addedPlatform[base] &= @[
-        "ARG TARGETPLATFORM",
-      ]
   else:
-    for _, path in binaries:
+    for platform, path in binaries:
+      info("docker: wrapping image with chalk binary: " & path & " (" & $platform & ")")
       ctx.makeFileAvailableToDocker(
         path    = path,
         newPath = newPath,

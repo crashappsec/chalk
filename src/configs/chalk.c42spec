@@ -1845,8 +1845,7 @@ can lookup already downloaded binary.
     default: true
     shortdoc: "Automatically installed binfmt (QEMU)"
     doc:      """
-For multi-platform builds chalk adds RUN commands to Dockerfile.
-As a result if binfmt is not installed for QEMU, the build
+For multi-platform builds when the `binfmt` is not installed for QEMU, the build
 can fail therefore falling back to non-chalked builds.
 This option allows to automatically install binfmt (QEMU)
 to allow chalked build to work.

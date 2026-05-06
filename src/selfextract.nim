@@ -46,7 +46,7 @@ proc getNonSensitiveParams*(): seq[Box] =
       url       = unpack[string](row[1])
       sym       = unpack[string](row[2])
       component = runtime.getComponentReference(url)
-      params     =
+      params    =
         if isAttr:
           component.attrParams
         else:
@@ -54,7 +54,7 @@ proc getNonSensitiveParams*(): seq[Box] =
     if sym notin params:
       continue
     if not params[sym].sensitive.get(false):
-        result.add(item)
+      result.add(item)
     else:
       trace("param: " & sym & " is sensitive. skipping.")
 

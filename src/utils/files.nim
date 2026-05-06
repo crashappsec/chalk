@@ -245,7 +245,7 @@ proc chmodPermissions*(octal: string): set[FilePermission] =
     elif len(octal) == 3:
       octal
     else:
-      raise newException(ValueError, "chmod should be 3 chars long")
+      raise newException(ValueError, "chmod should be 3 char octal (e.g. 644), optionally with 0 prefix (e.g. 0644)")
 
   let
     user  = ord(o[0]) - ord('0')

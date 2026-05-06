@@ -181,7 +181,7 @@ proc readDockerHostFile*(path: string): string =
   if result != "":
     return
   if not isInContainer():
-    raise newException(ValueError, "could not to read " & path)
+    raise newException(ValueError, "could not read " & path)
   # note that the docker socket can be mounted to a container where
   # chalk is running from hence we attempt to get the file content
   # via a docker run and mounting source path which will allow
