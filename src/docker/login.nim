@@ -42,20 +42,22 @@ proc loginToRegistries*() =
         let auth  = authOpt.get()
         headers   = auth.implementation.injectHeaders(auth, headers)
       try:
+        let response = safeRequest(
+          url               = loginUri,
+          httpMethod        = HttpGet,
+          timeout           = timeout,
+          headers           = headers,
+          retries           = 2,
+          firstRetryDelayMs = 100,
+        )
+        trace("docker: login get url: " & $loginUri)
+        trace("docker: login get status code: " & response.status)
         let
-          response = safeRequest(
-            url               = loginUri,
-            httpMethod        = HttpGet,
-            timeout           = timeout,
-            headers           = headers,
-            retries           = 2,
-            firstRetryDelayMs = 100,
-          )
           parsed   = parseJson(response.body()).assertIs(JObject)
-          username = parsed{"username"}.getStr()
-          password = parsed{"password"}.getStr()
-          registry = parsed{"registry"}.getStr(registryUri)
-          repo     = parsed{"repository"}.getStr(registry)
+          username = parsed{"username"}.assertIs(JString).assertHasLen("username is required").getStr()
+          password = parsed{"password"}.assertIs(JString).assertHasLen("password is required").getStr()
+          registry = parsed{"registry"}.getStr().elseWhenEmpty(registryUri)
+          repo     = parsed{"repository"}.getStr().elseWhenEmpty(registry)
           args     = @[
             "login",
             "-u", username,
@@ -66,9 +68,10 @@ proc loginToRegistries*() =
             # and just logs in to the overall registry
             repo,
           ]
-        trace("docker: login get url: " & $loginUri)
-        trace("docker: login get status code: " & response.status)
         trace("docker " & args.join(" "))
-        discard runDockerGetEverything(args, stdin = password)
+        let login = runDockerGetEverything(args, stdin = password)
+        if login.exitCode != 0:
+          trace("docker: " & login.stderr)
       except:
-        error("docker: could not docker login to registry - " & getCurrentExceptionMsg())
+        error("docker: could not login to registry " & registryUri & " - " & getCurrentExceptionMsg())
+        dumpExOnDebug()
