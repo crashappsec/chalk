@@ -108,6 +108,13 @@ proc getUsableDockerContexts*(ctx: DockerInvocation): seq[string] =
 proc isMultiPlatform*(ctx: DockerInvocation): bool =
   return len(ctx.foundPlatforms) > 1
 
+proc onlyPlatform*(ctx: DockerInvocation): DockerPlatform =
+  if len(ctx.foundPlatforms) > 1:
+    raise newException(ValueError, "this is a multi-platform build")
+  elif len(ctx.foundPlatforms) == 0:
+    raise newException(ValueError, "did not find any build platforms")
+  return ctx.foundPlatforms[0]
+
 proc getAllBuildArgs*(ctx: DockerInvocation): Table[string, string] =
   ## get all build args (manually passed ones and system defaults)
   ## docker automatically assings some args for buildx build
@@ -117,7 +124,8 @@ proc getAllBuildArgs*(ctx: DockerInvocation): Table[string, string] =
   for k, v in ctx.foundBuildArgs:
     result[k] = v
   for k, v in dockerProbeDefaultPlatforms():
-    result[k] = $v
+    for n, a in v.args(k):
+      result[n] = a
 
 proc getSecret*(ctx: DockerInvocation, name: string): DockerSecret =
   let empty = DockerSecret(id: "", src: "")

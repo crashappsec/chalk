@@ -127,6 +127,23 @@ proc `$`*(items: seq[DockerPlatform]): seq[string] =
   for i in items:
     result.add($i)
 
+proc args*(self: DockerPlatform, prefix: string): Table[string, string] =
+  let
+    s = self.normalize()
+    p =
+      if prefix.startsWith("TARGET"):
+        "TARGET"
+      elif prefix.startsWith("BUILD"):
+        "BUILD"
+      else:
+        raise newException(ValueError, "invalid platform args prefix")
+  return {
+    p & "PLATFORM": $s,
+    p & "OS":       s.os,
+    p & "ARCH":     s.architecture,
+    p & "VARIANT":  s.variant,
+  }.toTable()
+
 proc `==`*(self, other: DockerPlatform): bool =
   if isNil(self) or isNil(other):
     return isNil(self) == isNil(other)

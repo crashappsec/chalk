@@ -119,8 +119,6 @@ proc rewriteEntryPoint*(ctx:        DockerInvocation,
       binaries = binaries,
       newPath  = "/chalk",
       user     = user,
-      move     = false, # preserve original file
-      chmod    = "0755",
   )
 
   var toAdd: seq[string] = @[]

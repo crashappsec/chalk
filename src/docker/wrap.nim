@@ -11,8 +11,6 @@ import std/[
   sequtils,
 ]
 import ".."/[
-  selfextract,
-  sinks,
   types,
   utils/files,
 ]
@@ -74,7 +72,7 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
     chmod = "0444"
 
   let chmodstr =
-    if chmod == "":
+    if chmod == "" or not supportsCopyChmod():
       ""
     else:
       "--chmod=" & chmod & " "
@@ -104,7 +102,15 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
         moveFile(loc, dstLoc)
       else:
         trace("docker: .dockerignore is present in context. copying to tmp " & dstLoc)
-        copyFile(loc, dstLoc)
+        copyFileWithPermissions(loc, dstLoc)
+      try:
+        chmodFilePermissions(dstLoc, chmod)
+      except:
+        if chmodstr == "":
+          trace("docker: COPY --chmod is not supported and chmod had an error - " & getCurrentExceptionMsg())
+          raise
+        else:
+          trace("docker: COPY --chmod is supported. ignoring chmod error - " & getCurrentExceptionMsg())
 
     ctx.newCmdLine.add("--build-context")
     ctx.newCmdLine.add(context & "=" & folder)
@@ -144,39 +150,21 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
         moveFile(loc, dstLoc)
         trace("docker: moved " & loc & " to " & dstLoc)
       else:
-        copyFile(loc, dstLoc)
+        copyFileWithPermissions(loc, dstLoc)
         trace("docker: copied " & loc & " to " & dstLoc)
-      registerTempFile(dstLoc)
-      let (_, name) = dstLoc.splitPath()
-
-      if supportsMultiStageBuilds():
-        let
-          base    = "chalk" & newPath.replace("/", "_").replace(".", "_")
-          busybox = attrGet[string]("docker.busybox_container")
-        toAdd.add("COPY --from=" & base & " " & newPath & " " & newPath)
-        ctx.addedPlatform[base] = @[
-          "FROM " & busybox & " AS " & base,
-          "COPY " & name & " " & newPath,
-          "RUN chmod " & chmod & " " & newPath,
-        ]
-      else:
-        # NOTE this can fail as we have no guarantee that
-        # RUN will work (e.g. distroless images) but we are out of
-        # options at this point as:
-        # * there is no buildx
-        # * docker is older version which doesnt support multi-stage builds
-        # and so we try our best but we cant pull a rabbit out of a hat...
-        if chmodstr != "" and supportsCopyChmod():
-          toAdd.add("COPY " & chmodstr & name & " " & newPath)
-        elif chmod != "":
-          if hasUser:
-            toAdd.add("USER 0:0")
-          toAdd.add("COPY " & name & " " & newPath)
-          toAdd.add("RUN chmod " & chmod & " " & newPath)
-          if hasUser:
-            toAdd.add("USER " & user)
+      try:
+        chmodFilePermissions(dstLoc, chmod)
+      except:
+        if chmodstr == "":
+          trace("docker: COPY --chmod is not supported and chmod had an error - " & getCurrentExceptionMsg())
+          raise
         else:
-          toAdd.add("COPY " & name & " " & newPath)
+          trace("docker: COPY --chmod is supported. ignoring chmod error - " & getCurrentExceptionMsg())
+      registerTempFile(dstLoc)
+      let
+        (_, name) = dstLoc.splitPath()
+        copy      = "COPY " & chmodstr & name & " " & newPath
+      toAdd.add(copy)
 
       if contextDir.joinPath(".dockerignore").fileExists():
         ctx.updateDockerignore = attrGet[bool]("docker.update_dockerignore")
@@ -190,7 +178,6 @@ proc makeFileAvailableToDocker(ctx:        DockerInvocation,
 
 proc addByPlatform(ctx:          DockerInvocation,
                    newPath:      string,
-                   onlyPlatform: DockerPlatform,
                    image       = "scratch",
                    ): string =
   # in order to copy file by platform, we need to create
@@ -207,11 +194,15 @@ proc addByPlatform(ctx:          DockerInvocation,
   # COPY --from=chalk_base /$TARGETPLATFORM /chalk.json
   let
     base = "chalk" & newPath.replace("/", "_").replace(".", "_")
+    # docker doesnt always use TARGETPLATFORM
+    # e.g. FROM --platform=<arch>
+    # doesnt update TARGETPLATFORM as its not passed as CLI --platform flag
+    # hence if we know exact architecture we just hardcode it
     path =
       if ctx.isMultiPlatform():
         "/$TARGETPLATFORM"
       else:
-        "/" & $onlyPlatform.normalize()
+        "/" & $ctx.onlyPlatform().normalize()
     arg  = "ARG TARGETPLATFORM"
     copy = "COPY --from=" & base & " " & path & " " & newPath
   if base notin ctx.addedPlatform:
@@ -242,7 +233,7 @@ proc makeFileAvailableToDocker*(ctx:        DockerInvocation,
       user    = user,
       move    = move,
       chmod   = chmod,
-      toAdd   = ctx.addedPlatform[ctx.addByPlatform(newPath, platform)],
+      toAdd   = ctx.addedPlatform[ctx.addByPlatform(newPath)],
     )
   else:
     ctx.makeFileAvailableToDocker(
@@ -277,60 +268,39 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
                                  binaries: TableRef[DockerPlatform, string],
                                  newPath:  string  = "/chalk",
                                  user:     string,
-                                 move:     bool,
+                                 move:     bool    = true,
                                  chmod:    string  = "0755") =
+  if len(binaries) == 0:
+    raise newException(ValueError, "docker: cannot copy chalk into the container as no binary platforms were found")
   let
     system = getSystemBuildPlatform()
-    first  = binaries.keys().toSeq()[0]
-  # even if not multi-platform, when target platform doesnt match
-  # system platform we have to ensure copied chalk has identical configs
-  if len(binaries) > 1 or first != system:
+    binfmt = attrGet[bool]("docker.install_binfmt")
+
+  for platform, path in binaries:
+    # ensure platform is supported by the builder as chalk adds RUN commands
+    # to dockerfile and if binfmt is not installed, multi-platform build might fail
+    # where original dockerfile might not have any RUN commands which would
+    # succeed the build otherwise
+    if hasBuildX() and not ctx.doesBuilderSupportPlatform(platform):
+      if binfmt:
+        installBinFmt()
+      else:
+        error(
+          "No support for " & $platform & " was detected in buildx builder. " &
+          "To automatically add support via QEMU enable 'docker.install_binfmt' configuration. " &
+          "Alternatively manually install binfmt as per " &
+          "https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop"
+        )
+
+  if len(binaries) > 1:
     if not ctx.supportsBuildContextFlag():
       raise newException(
         ValueError,
         "recent version of buildx is required for copying chalk by platform into Dockerfile",
       )
-    let
-      validate  = attrGet[bool]("load.validate_configs_on_load")
-      binfmt    = attrGet[bool]("docker.install_binfmt")
-      # other chalks might have different config for validate_configs_on_load
-      # so we ensure we honor self config via CLI arg
-      check     = if validate: "--validation" else: "--no-validation"
-      config    = writeNewTempFile(getAllDumpJson())
-      busybox   = attrGet[string]("docker.busybox_container")
-      base      = ctx.addByPlatform(newPath, onlyPlatform = first, image = busybox)
-      log_level = getLogLevel()
-      verbosity = if log_level == llTrace: "trace" else: "error"
-      # docker doesnt always use TARGETPLATFORM
-      # e.g. FROM --platform=<arch>
-      # doesnt update TARGETPLATFORM as its not passed as CLI --platform flag
-      # hence if we know exact architecture we just hardcode it
-      name      = if ctx.isMultiPlatform(): "$TARGETPLATFORM" else: $first.normalize()
-    ctx.makeFileAvailableToDocker(
-      path    = config,
-      newPath = "/config.json",
-      user    = user,
-      move    = move,
-      chmod   = "0444",
-      toAdd   = ctx.addedPlatform[base],
-    )
+    let base = ctx.addByPlatform(newPath)
     for platform, path in binaries:
-      # ensure platform is supported by the builder as chalk adds RUN commands
-      # to dockerfile and if binfmt is not installed, multi-platform build might fail
-      # where original dockerfile might not have any RUN commands which would
-      # succeed the build otherwise
-      if not ctx.doesBuilderSupportPlatform(platform):
-        if binfmt:
-          installBinFmt()
-        else:
-          raise newException(
-            ValueError,
-            "No support for " & $platform & " was detected in buildx builder. " &
-            "To automatically add support via QEMU enable 'docker.install_binfmt' configuration. " &
-            "Alternatively manually install binfmt as per " &
-            "https://docs.docker.com/build/building/multi-platform/#qemu-without-docker-desktop"
-          )
-      info("docker: wrapping image with this chalk binary: " & path & " (" & $platform & ")")
+      info("docker: wrapping image with chalk binary: " & path & " (" & $platform & ")")
       ctx.makeFileAvailableToDocker(
         path    = path,
         newPath = "/" & $platform.normalize(),
@@ -339,30 +309,9 @@ proc makeChalkAvailableToDocker*(ctx:      DockerInvocation,
         chmod   = chmod,
         toAdd   = ctx.addedPlatform[base],
       )
-    if ctx.isMultiPlatform():
-      ctx.addedPlatform[base] &= @[
-        "ARG TARGETPLATFORM",
-      ]
-    ctx.addedPlatform[base] &= @[
-     ("RUN /" & name & " load /config.json " &
-      "--log-level=" & verbosity & " " &
-      "--log-format=" & logFormat() & " " &
-      "--skip-command-report " &
-      "--skip-custom-reports " &
-      "--skip-summary-report " &
-      "--replace " &
-      "--all " &
-      check),
-     # sanity check plus it will show chalk metadata in build logs
-     ("RUN /" & name & " version " &
-      "--log-level=" & verbosity & " " &
-      "--log-format=" & logFormat() & " " &
-      "--skip-command-report " &
-      "--skip-custom-reports " &
-      "--skip-summary-report"),
-    ]
   else:
-    for _, path in binaries:
+    for platform, path in binaries:
+      info("docker: wrapping image with chalk binary: " & path & " (" & $platform & ")")
       ctx.makeFileAvailableToDocker(
         path    = path,
         newPath = newPath,

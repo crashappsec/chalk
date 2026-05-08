@@ -77,10 +77,14 @@ proc validateMetaData*(obj: ChalkObj): ValidateResult {.cdecl, exportc.} =
   try:
     if obj.canVerifyByHash():
       result = obj.verifyByHash(computedHash)
-    if obj.canVerifyBySigStore():
+      trace("signature validation: " & $result)
+    elif obj.canVerifyBySigStore():
       let (isValid, _) = obj.verifyBySigStore()
       result = isValid
-    trace("signature validation: " & $result)
+      trace("signature validation: " & $result)
+    else:
+      result = vOk
+      trace("signature cannot be validated. defaulting to: " & $result)
   except:
     error("could not successfully validate signature due to: " & getCurrentExceptionMsg())
     return vNoAttestation
@@ -293,7 +297,7 @@ proc attestationGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
       forceChalkKeys(["SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"])
     except:
       error("Cannot sign " & obj.name & ": " & getCurrentExceptionMsg())
-  if obj.willSignBySigStore():
+  elif obj.willSignBySigStore():
       # the artifact might not be attested but as sigstore attestations
       # are done post-chalk-insertion, pubkey should be forced into
       # chalkmark as its required to validate the signature

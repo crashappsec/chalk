@@ -9,4 +9,3 @@ exec.heartbeat.rate: <<1 seconds>>
 docker.wrap_entrypoint: true
 docker.wrap_cmd: true
 docker.custom_labels: {"HELLO": "CRASH_OVERRIDE_TEST_LABEL"}
-docker.arch_binary_locations: {"linux/amd64": "/tmp/chalk"}
