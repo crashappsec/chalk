@@ -94,6 +94,8 @@
   }
   ```
 
+  ([#664](https://github.com/crashappsec/chalk/pull/664))
+
 ### Fixes
 
 - Docker probe always failed due to a typo introduced in chalk `1.0.0`
@@ -104,6 +106,10 @@
   already contained one via `chalk setup` as it would
   not be updated after loading new configuration file.
   ([#656](https://github.com/crashappsec/chalk/pull/656))
+
+- `chalk load` correctly caches any previously
+  loaded component parameters.
+  ([#664](https://github.com/crashappsec/chalk/pull/664))
 
 ## 1.0.2
 
