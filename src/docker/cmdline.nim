@@ -11,6 +11,9 @@
 ## is in configs/dockercmd.c4m), so we really just need to look at
 ## the command and flag info returned.
 
+import std/[
+  parsecsv,
+]
 import ".."/[
   types,
   utils/envvars,
@@ -44,8 +47,11 @@ proc extractTarget(ctx: DockerInvocation) =
 
 proc extractTags(ctx: DockerInvocation) =
   ctx.foundTags = @[]
+  ctx.allTags   = @[]
   if "tag" in ctx.processedFlags:
-    ctx.foundTags = parseImages(unpack[seq[string]](ctx.processedFlags["tag"].getValue()))
+    let tags = parseImages(unpack[seq[string]](ctx.processedFlags["tag"].getValue()))
+    ctx.foundTags = tags
+    ctx.allTags   = tags
 
 proc extractPlatforms*(ctx: DockerInvocation) =
   var platforms: seq[string] = @[]
@@ -144,6 +150,47 @@ proc extractSecrets(ctx: DockerInvocation) =
         ctx.foundSecrets[id] = DockerSecret(id: id, src: src)
         id = ""
         src = ""
+
+proc extractPush(ctx: DockerInvocation) =
+  if "push" in ctx.processedFlags:
+    let target = unpack[bool](ctx.processedFlags["push"].getValue())
+    ctx.foundPush = target
+
+proc extractLoad(ctx: DockerInvocation) =
+  if "load" in ctx.processedFlags:
+    let target = unpack[bool](ctx.processedFlags["load"].getValue())
+    ctx.foundLoad = target
+
+proc extractOutputs(ctx: DockerInvocation) =
+  if "output" in ctx.processedFlags:
+    for i in unpack[seq[string]](ctx.processedFlags["output"].getValue()):
+      var
+        kv = newOrderedTable[string, string]()
+        p:   CsvParser
+      let s = newStringStream(i)
+      p.open(s, "output", separator = ',', quote = '"')
+      try:
+        if p.readRow():
+          for field in p.row:
+            let (k, v) = field.splitBy("=")
+            kv[k] = v
+          ctx.foundOutputs.add(kv)
+          case kv.getOrDefault("type")
+          of "registry":
+            trace("docker: found --push equivalent with --output=" & i)
+            ctx.foundPush = true
+          of "image":
+            if kv.getOrDefault("push") == "true" or kv.getOrDefault("push-by-digest") == "true":
+              trace("docker: found --push equivalent with --output=" & i)
+              ctx.foundPush = true
+            if kv.getOrDefault("name") != "":
+              ctx.allTags.add(parseImage(kv.getOrDefault("name")))
+          of "docker":
+            trace("docker: found --load equivalent with --output=" & i)
+            ctx.foundLoad = true
+      finally:
+        p.close()
+        s.close()
 
 proc extractContext(ctx: DockerInvocation) =
   # Con4m "ignoring unknown flags" jams them into the command line.
@@ -271,6 +318,9 @@ proc extractDockerCommand*(self: DockerInvocation): DockerCmd =
     self.extractPlatforms()
     self.extractTags()
     self.extractSecrets()
+    self.extractPush()
+    self.extractLoad()
+    self.extractOutputs()
     # set any other non-automatically initialized attributes to avoid segfaults
     self.addedPlatform = newOrderedTable[string, seq[string]]()
     self.dfDirectives  = newOrderedTable[string, string]()

@@ -261,6 +261,7 @@ docker {
         flag_multi_arg no_cache_filter { }
         flag_multi_arg output {
           aliases: ["o"]
+          comma_delimited: false
         }
         flag_multi_arg platform { }
         flag_multi_arg progress { }
@@ -368,6 +369,7 @@ docker {
       flag_multi_arg no_cache_filter { }
       flag_multi_arg output {
         aliases: ["o"]
+        comma_delimited: false
       }
       flag_multi_arg platform { }
       flag_multi_arg progress { }

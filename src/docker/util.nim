@@ -6,12 +6,16 @@
 ##
 
 import std/[
+  re,
   unicode,
 ]
 import ".."/[
   types,
   utils/json,
   utils/strings,
+]
+import "."/[
+  ids,
 ]
 
 template withAtomicAdds*(ctx: DockerInvocation, code: untyped) =
@@ -116,17 +120,16 @@ proc formatChalkExec*(args: JsonNode = newJArray()): string =
     arr &= args[1..^1]
   return $(arr)
 
-proc getChalkKey*(chalk: ChalkObj, k: string): string =
-  if len(k) == 1:
-    warn("docker: " & k & ": Invalid; key to pull into ENV var must not be empty.")
+proc getChalkKey*(chalk: ChalkObj, key: string): string =
+  if len(key) == 0:
+    warn("docker: " & key & ": Invalid key; cannot use empty key-name.")
     return ""
-  let key = k[1 .. ^1]
 
   if key.startsWith("_"):
     raise newException(KeyError, "Invalid key; cannot use run-time keys, only chalk-time keys.")
 
   if key notin getContents(attrGetObject("keyspec")):
-    raise newException(KeyError, "Invalid for env var; Chalk key doesn't exist.")
+    raise newException(KeyError, "Invalid chalk key; Chalk key doesn't exist.")
 
   if key in hostInfo:
     return $(hostInfo[key])
@@ -134,9 +137,61 @@ proc getChalkKey*(chalk: ChalkObj, k: string): string =
   if key in chalk.collectedData:
     return $(chalk.collectedData[key])
 
-  raise newException(KeyError, "key could not be collected. Skipping environment variable.")
+  raise newException(KeyError, "key could not be collected")
+
+proc applySubstitutions*(s: string, chalk: ChalkObj): string =
+  var
+    key   = ""
+    inKey = false
+  for c in s:
+    if c == '{':
+      if inKey:
+        raise newException(ValueError, s & ": invalid format string. '{' is repeated without closing previous occurance")
+      inKey = true
+      key   = ""
+      continue
+    elif c == '}':
+      if not inKey:
+        raise newException(ValueError, s & ":invalid format string. '{' is occurring without matching '{'")
+      inKey = false
+      if key != "":
+        result &= chalk.getChalkKey(key.toUpperAscii())
+      continue
+    if inKey:
+      key.add(c)
+    else:
+      result.add(c)
 
 proc getValue*(secret: DockerSecret): string =
   if secret.src != "":
     return tryToLoadFile(secret.src)
   return ""
+
+iterator iterPushTags*(chalk: ChalkObj): string =
+  for registryName in getChalkSubsections("docker.docker_registry"):
+    let
+      registrySection = "docker.docker_registry." & registryName
+      registryUri     = attrGet[string](registrySection & ".uri").removeSuffix('/')
+    for pushName in getChalkSubsections(registrySection & ".docker_push"):
+      let pushSection = registrySection & ".docker_push." & pushName
+      if not sectionExists(pushSection):
+        continue
+      let
+        pushEnabled = attrGet[bool](pushSection & ".enabled")
+        pushRepo    = attrGet[string](pushSection & ".repository").removePrefix('/')
+        pushTags    = attrGet[seq[string]](pushSection & ".tags")
+      if not pushEnabled:
+        continue
+      for tag in pushTags:
+        try:
+          let
+            renderedTag = (
+              tag.applySubstitutions(chalk)
+              .replace(re"[^a-zA-Z0-9_.\-]", "-")
+            )
+            image = registryUri & "/" & pushRepo & ":" & renderedTag
+          if renderedTag == "":
+            continue
+          yield image
+        except:
+          warn("docker: " & getCurrentExceptionMsg())

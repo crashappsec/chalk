@@ -11,10 +11,14 @@ import ".."/[
   run_management,
   types,
   utils/exec,
+  utils/subproc,
 ]
 import "."/[
   base,
+  exe,
+  login,
   scan,
+  util,
 ]
 
 proc dockerPush*(ctx: DockerInvocation): int =
@@ -41,6 +45,10 @@ proc dockerPush*(ctx: DockerInvocation): int =
       suspendChalkCollectionFor("attestation")
       suspendChalkCollectionFor("docker")
 
+    # login to any registries before any collection
+    # as auth provided by auth might be required
+    loginToRegistries()
+
     initCollection()
     chalk.addToAllChalks()
     chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("push")
@@ -48,5 +56,30 @@ proc dockerPush*(ctx: DockerInvocation): int =
 
     result = setExitCode(ctx.runMungedDockerInvocation())
 
-    chalk.collectRunTimeArtifactInfo()
-    collectRunTimeHostInfo()
+    var imagesToPrune = newSeq[string]()
+    if result == 0:
+      for image in chalk.iterPushTags():
+        trace("docker: pushing to - " & image)
+        try:
+          let retag = runDockerGetEverything(@["tag", chalk.name, image])
+          if retag.exitCode != 0:
+            trace("docker: " & retag.stderr)
+            continue
+          imagesToPrune.add(image)
+        except:
+          continue
+        try:
+          discard runCmdNoOutputCapture(getDockerExeLocation(), @["push", image])
+        except:
+          continue
+
+    try:
+      chalk.collectRunTimeArtifactInfo()
+      collectRunTimeHostInfo()
+
+    finally:
+      for i in imagesToPrune:
+        try:
+          discard runDockerGetEverything(@["rmi", i])
+        except:
+          discard

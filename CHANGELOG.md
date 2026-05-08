@@ -65,6 +65,35 @@
   when entrypoint wrapping is enabled.
   ([#656](https://github.com/crashappsec/chalk/pull/656))
 
+- Docker registry push support. Chalk can now be configured to automatically
+  log in to and push images to additional registries during
+  `chalk docker build` and `chalk docker push`.
+
+  New configuration sections:
+  - `docker.docker_registry` — declares a registry with its URI and login method
+  - `docker.docker_registry.<name>.docker_login_get` — fetches credentials via
+    HTTP GET and runs `docker login` before any build or push
+  - `docker.docker_registry.<name>.docker_push` — declares repositories and
+    tags to push the built or pushed image to, with tag values supporting
+    `{CHALK_KEY}` substitution
+
+  ```
+  docker {
+    docker_registry my_registry {
+      uri: "registry.example.com"
+      login_method: "get"
+      docker_login_get {
+        uri: "https://auth.example.com/v1/docker-creds"
+        auth: "my_auth"
+      }
+      docker_push my_app {
+        repository: "my-org/my-app"
+        tags: ["latest", "{BRANCH}", "{TAG}"]
+      }
+    }
+  }
+  ```
+
 ### Fixes
 
 - Docker probe always failed due to a typo introduced in chalk `1.0.0`
