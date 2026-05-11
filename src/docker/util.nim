@@ -172,6 +172,9 @@ iterator iterPushTags*(chalk: ChalkObj): string =
     let
       registrySection = "docker.docker_registry." & registryName
       registryUri     = attrGet[string](registrySection & ".uri").removeSuffix('/')
+      registryEnabled = attrGet[bool](registrySection & ".enabled")
+    if not registryEnabled:
+      continue
     for pushName in getChalkSubsections(registrySection & ".docker_push"):
       let pushSection = registrySection & ".docker_push." & pushName
       if not sectionExists(pushSection):

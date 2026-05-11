@@ -21,8 +21,11 @@ proc loginToRegistries*() =
   for registryName in getChalkSubsections("docker.docker_registry"):
     let
       registrySection = "docker.docker_registry." & registryName
+      registryEnabled = attrGet[bool](registrySection & ".enabled")
       registryUri     = attrGet[string](registrySection & ".uri").removeSuffix('/')
       loginMethod     = attrGet[string](registrySection & ".login_method")
+    if not registryEnabled:
+      continue
     case loginMethod
     of "":
       continue

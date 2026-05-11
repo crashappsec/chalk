@@ -2110,6 +2110,14 @@ See `docker_login_get` and `docker_push` for all supported configuration fields.
   allow docker_login_get
   allow docker_push
 
+  field enabled {
+    type:    bool
+    default: true
+    doc:     """
+Whether this registry configuration is active.
+"""
+  }
+
   field login_method {
     type:    string
     choice:  docker_login_types
