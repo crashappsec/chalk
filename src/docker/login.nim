@@ -72,6 +72,8 @@ proc loginToRegistries*() =
         let login = runDockerGetEverything(args, stdin = password)
         if login.exitCode != 0:
           trace("docker: " & login.stderr)
+        else:
+          resetDockerAuthConfig()
       except:
         error("docker: could not login to registry " & registryUri & " - " & getCurrentExceptionMsg())
         dumpExOnDebug()

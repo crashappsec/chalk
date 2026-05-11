@@ -7,7 +7,7 @@ export uri
 
 proc parseUriDefaultScheme*(url: string, defaultScheme = "https"): Uri =
   result = parseUri(url)
-  if result.scheme == "":
+  if result.scheme == "" or result.hostname == "":
     result = parseUri(defaultScheme & "://" & url)
 
 proc withPort*(self: Uri): Uri =

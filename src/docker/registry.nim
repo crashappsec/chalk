@@ -107,6 +107,8 @@ proc withAuth(self: RegistryConfig): RegistryConfig =
     config     = getDockerAuthConfig()
   if config == nil:
     return
+  if "auths" notin config:
+    return
   try:
     for k, v in config{"auths"}.assertIs(JObject, "bad auths type").pairs():
       let authUri = parseUriDefaultScheme(k).withDefaultPort(uri.port)

@@ -29,6 +29,7 @@ from .conf import (
     MAGIC,
     MARKS,
     REGISTRY,
+    REGISTRY_AUTH,
     REGISTRY_PROXY,
     REGISTRY_TLS,
     REGISTRY_TLS_INSECURE,
@@ -1438,6 +1439,7 @@ def test_build_and_push(
     buildkit: bool,
     buildx: bool,
     cosign: Cosign,
+    server_http: str,
 ):
     chalk_copy.setup(cosign=cosign)
 
@@ -1451,6 +1453,7 @@ def test_build_and_push(
         # generates BUILD_CONTACT which is a list
         # which can break METADATA_ID computation between build/push
         "GITHUB_ACTOR": "octocat",
+        "CHALK_SERVER": server_http,
     }
 
     digests, build_result = chalk_copy.docker_build(
@@ -1463,6 +1466,7 @@ def test_build_and_push(
         # and some registries (ECR) doesnt allow to push images without layers
         run_docker=buildkit and registry.startswith(IP),
         env=env,
+        config=CONFIGS / "docker_wrap.c4m",
     )
 
     build_digests = digests
@@ -1478,17 +1482,20 @@ def test_build_and_push(
             buildkit=buildkit,
             env=env,
             digests=digests,
+            config=CONFIGS / "docker_wrap.c4m",
         )
 
-    signatures = [
-        {
-            "payload": str,
-            "payloadType": "application/vnd.in-toto+json",
-            "signatures": [
-                {"sig": str},
-            ],
-        }
-    ]
+    signatures = Contains(
+        [
+            {
+                "payload": str,
+                "payloadType": "application/vnd.in-toto+json",
+                "signatures": [
+                    {"sig": str},
+                ],
+            }
+        ]
+    )
 
     assert build_result.mark.lifted.has(
         CHALK_ID=ANY,
@@ -1529,7 +1536,17 @@ def test_build_and_push(
         _REPO_DIGESTS={
             registry: {
                 name: [digests.registry_digest],
-            }
+            },
+            REGISTRY_AUTH: {
+                "mirror": [digests.registry_digest],
+            },
+        },
+        _REPO_TAGS={
+            REGISTRY_AUTH: {
+                "mirror": {
+                    f"mirror-{build_result.mark["CHALK_RAND"]}": digests.registry,
+                }
+            },
         },
         _IMAGE_LAYERS=Length(1, operator.ge),
         INJECTOR_PUBLIC_KEY=cosign.public,

@@ -5,3 +5,18 @@ exec.postexec.run = true
 docker.wrap_entrypoint = true
 docker.download_arch_binary_urls = [env("CHALK_SERVER") + "/dummy/chalk-{version}-{os}-{architecture}"]
 docker.arch_binary_locations_path = env("CHALK_TMP")
+
+docker {
+  docker_registry local {
+    uri: env("IP") + ":5048"
+    login_method: "get"
+    docker_login_get {
+      uri: env("CHALK_SERVER") + "/registry/auth"
+    }
+    docker_push mirror {
+      enabled: env_exists("CHALK_SERVER")
+      repository: "mirror"
+      tags: ["mirror:{chalk_rand}"]
+    }
+  }
+}

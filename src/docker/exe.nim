@@ -308,19 +308,23 @@ proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
       frontendVersion = some(parseVersion("0"))
   return frontendVersion
 
-var dockerAuth = JsonNode(nil)
+var dockerAuth: Option[JsonNode]
 proc getDockerAuthConfig*(): JsonNode =
-  once:
+  if dockerAuth.isNone():
+    dockerAuth = some(newJObject())
     let path = "~/.docker/config.json"
     try:
       let data = tryToLoadFile(path.resolvePath())
       if data != "":
-        dockerAuth = parseJson(data).assertIs(JObject, "bad docker runner config type")
+        dockerAuth = some(parseJson(data).assertIs(JObject, "bad docker runner config type"))
       else:
         trace("docker: no auth config file at " & path)
     except:
       trace("docker: could not read docker auth config file " & path & " due to: " & getCurrentExceptionMsg())
-  return dockerAuth
+  return dockerAuth.get()
+
+proc resetDockerAuthConfig*() =
+  dockerAuth = none(JsonNode)
 
 proc supportsBuildContextFlag*(ctx: DockerInvocation): bool =
   # https://github.com/docker/buildx/releases/tag/v0.8.0

@@ -808,9 +808,11 @@ class Chalk:
         buildkit: bool = True,
         env: Optional[dict[str, str]] = None,
         digests: Optional[DockerDigests] = None,
+        config: Optional[Path] = None,
     ) -> tuple[DockerDigests, ChalkProgram]:
         push = self.run(
             params=["docker", "push", image],
+            config=config,
             env={
                 **Docker.build_env(buildkit=buildkit),
                 **(env or {}),
