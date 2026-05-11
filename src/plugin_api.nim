@@ -355,12 +355,11 @@ iterator scanArtifactLocationsWith*(state:  ArtifactIterationInfo,
           break
 
 proc simpleHash(self: Plugin, chalk: ChalkObj): Option[string] =
-  # The default if the stream can't be acquired.
   result = none(string)
-
-  withFileStream(chalk.fsRef, mode = fmRead, strict = false):
-    if stream != nil:
-      result = some(stream.readAll().sha256Hex())
+  try:
+    result = some(newFileStringStream(chalk.fsRef).sha256Hex())
+  except:
+    discard
 
 proc defUnchalkedHash(self: Plugin, obj: ChalkObj): Option[string] {.cdecl.} =
   ## This is called in computing the CHALK_ID. If the artifact already
