@@ -152,7 +152,7 @@ proc applySubstitutions*(s: string, chalk: ChalkObj): string =
       continue
     elif c == '}':
       if not inKey:
-        raise newException(ValueError, s & ":invalid format string. '{' is occurring without matching '{'")
+        raise newException(ValueError, s & ": invalid format string. '{' is occurring without matching '{'")
       inKey = false
       if key != "":
         result &= chalk.getChalkKey(key.toUpperAscii())

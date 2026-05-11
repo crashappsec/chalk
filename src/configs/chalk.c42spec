@@ -2191,6 +2191,7 @@ a full image reference: `<registry_uri>/<repository>:<tag>`.
 
 Tags support `{KEY}` template substitution using any chalk-time key.
 For example, `"myapp-{BRANCH}"` substitutes the `BRANCH` chalk key.
+Key names are case-insensitive - `{BRANCH}` and `{branch}` are equivalent.
 Any characters in the substituted value that are not alphanumeric, `.`,
 `_`, or `-` are replaced with `-` to produce a valid Docker tag.
 """
