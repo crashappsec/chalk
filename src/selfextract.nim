@@ -467,7 +467,10 @@ proc handleConfigLoad*(inpath: string): bool =
       withUse = if useLine in lines:
                   newEmbedded
                 else:
-                  newEmbedded & "\n" & useLine
+                  if newEmbedded.len == 0:
+                    useLine
+                  else:
+                    newEmbedded & "\n" & useLine
     newEmbedded = withUse.strip()
 
   if paramsViaStdin:
