@@ -62,6 +62,7 @@ loadPlugins([
   "codecZip",
   "conffile",
   "externalTool",
+  "k8s",
   "network",
   "ownerAuthors",
   "ownerGithub",

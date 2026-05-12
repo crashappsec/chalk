@@ -6668,6 +6668,203 @@ AWS where imdsv2 is available.
 """
 }
 
+keyspec _EXEC_DEPLOYMENT_ID {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Deployment ID computed at exec time"
+  doc:      """
+A SHA-256 hash that uniquely identifies a specific deployment of a container
+at runtime. It is computed from the following inputs:
+
+* The chalk mark `METADATA_ID` of the running image.
+* The cluster ID, namespace, and container name, ensuring that the same image
+  deployed in different clusters, namespaces, or under different container
+  names produces distinct deployment IDs.
+* The process argv.
+* Hashes of all env var values declared in the container spec
+  (see `_K8S_CONTAINER_ENV_VAR_HASHES`).
+* Hashes of all configMap and secret volume mount file contents
+  (see `_K8S_CONTAINER_VOLUME_MOUNT_HASHES`).
+* The list of declared container ports (see `_K8S_CONTAINER_PORTS`).
+
+Downward API env vars and projected volumes are excluded from the calculation
+as their values are ephemeral and not representative of the deployment intent.
+Additional env vars and volume mount paths can be excluded via
+`exec.exec_deployment.ignored_env_vars` and
+`exec.exec_deployment.ignored_volume_mounts`.
+"""
+}
+
+keyspec _OP_DEPLOYMENT_ID_INPUT {
+  kind:     RunTimeHost
+  type:     dict[string, `x]
+  standard: true
+  since:    "1.1.0"
+  doc:      """
+TODO
+"""
+}
+
+keyspec _K8S_CLUSTER_ID {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes cluster UID"
+  doc:      """
+The unique identifier (UID) of the Kubernetes cluster in which the container
+is running.
+"""
+}
+
+keyspec _K8S_CLUSTER_NAME {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes cluster name"
+  doc:      """
+The name of the Kubernetes cluster in which the container is running.
+"""
+}
+
+keyspec _K8S_CLUSTER_ENDPOINT {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes cluster API endpoint"
+  doc:      """
+The API server endpoint URL of the Kubernetes cluster in which the container
+is running.
+"""
+}
+
+keyspec _K8S_POD_NAMESPACE {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes pod namespace"
+  doc:      """
+The namespace of the pod in which the container is running.
+"""
+}
+
+keyspec _K8S_POD_NAME {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes pod name"
+  doc:      """
+The name of the pod in which the container is running.
+"""
+}
+
+keyspec _K8S_POD_LABELS {
+  kind:     RunTimeHost
+  type:     dict[string, string]
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes pod labels"
+  doc:      """
+The labels attached to the pod in which the container is running.
+"""
+}
+
+keyspec _K8S_POD_ANNOTATIONS {
+  kind:     RunTimeHost
+  type:     dict[string, string]
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes pod annotations"
+  doc:      """
+The annotations attached to the pod in which the container is running.
+"""
+}
+
+keyspec _K8S_POD_CONTAINER_NAME {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes container name"
+  doc:      """
+The name of the container within the pod as defined in the pod spec.
+"""
+}
+
+keyspec _K8S_POD_MANIFEST {
+  kind:     RunTimeHost
+  type:     dict[string, `x]
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Full Kubernetes pod manifest"
+  doc:      """
+The full pod manifest JSON as returned by the Chalk operator's pod info
+endpoint, including both the pod metadata and spec. The endpoint
+intentionally strips all container env vars from the manifest before
+returning it, so that sensitive values are never included in the report.
+"""
+}
+
+keyspec _K8S_CONTAINER_ENV_VAR_HASHES {
+  kind:     RunTimeHost
+  type:     dict[string, string]
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Hashes of container env var values"
+  doc:      """
+A map of environment variable name to SHA-256 hash of its value for all env
+vars declared in the container spec. Downward API env vars (populated from
+pod/node fields) are excluded as their values are ephemeral. For templated
+env vars that embed a downward API value (e.g. `DESTINATION: $(NODE_IP):8080`),
+the embedded value is replaced with its template placeholder before hashing
+so that the stable parts of the value still contribute to the deployment ID.
+
+Additional env vars can be excluded via
+`exec.exec_deployment.ignored_env_vars`.
+"""
+}
+
+keyspec _K8S_CONTAINER_VOLUME_MOUNT_HASHES {
+  kind:     RunTimeHost
+  type:     dict[string, string]
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Hashes of container volume mount file contents"
+  doc:      """
+A map of file path to SHA-256 hash of its contents for all files sourced from
+configMap and secret volume mounts declared in the container spec. Downward
+API and projected volumes are excluded as their contents are ephemeral.
+
+Keys are the absolute file path within the container:
+- For a subPath mount the key is the mountPath itself.
+- For an items-filtered mount the key is mountPath/<item.path>.
+- For a full directory mount the key is the path of each file in the directory.
+
+Additional volume mounts can be excluded via
+`exec.exec_deployment.ignored_volume_mounts`.
+"""
+}
+
+keyspec _K8S_CONTAINER_PORTS {
+  kind:     RunTimeHost
+  type:     list[string]
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Container ports declared in the pod spec"
+  doc:      """
+A list of ports declared in the container spec, formatted as
+`<port>/<protocol>` following the standard Unix /etc/services convention
+(e.g. `8080/TCP`, `53/UDP`). Protocol defaults to TCP when omitted in the
+pod spec.
+"""
+}
+
 keyspec _NETWORK_PARTIAL_TRACEROUTE_IPS {
     kind:             RunTimeHost
     type:             dict[string, list[string]]

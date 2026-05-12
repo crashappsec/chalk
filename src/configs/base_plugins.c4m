@@ -553,6 +553,27 @@ Captures metadata from the environment variables in AWS Lambda function.
 """
 }
 
+plugin k8s {
+    enabled:         true
+    post_run_keys:   ["_EXEC_DEPLOYMENT_ID",
+                      "_K8S_CLUSTER_ID",
+                      "_K8S_CLUSTER_NAME",
+                      "_K8S_CLUSTER_ENDPOINT",
+                      "_K8S_POD_NAMESPACE",
+                      "_K8S_POD_NAME",
+                      "_K8S_POD_LABELS",
+                      "_K8S_POD_ANNOTATIONS",
+                      "_K8S_POD_CONTAINER_NAME",
+                      "_K8S_POD_MANIFEST",
+                      "_K8S_CONTAINER_ENV_VAR_HASHES",
+                      "_K8S_CONTAINER_VOLUME_MOUNT_HASHES",
+                      "_K8S_CONTAINER_PORTS"
+                      ]
+    doc: """
+TODO
+"""
+}
+
 # This plugin takes values from the conf file, whether they're static
 # values, or callbacks. By default, these are of the lowest priority
 # of anything that can conflict.

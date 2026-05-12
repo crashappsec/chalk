@@ -1,3 +1,4 @@
+log_level = "trace"
 docker_log_level = "trace"
 log_format = "plain"
 

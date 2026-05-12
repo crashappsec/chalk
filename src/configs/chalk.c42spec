@@ -2414,6 +2414,7 @@ well.
 
   allow postexec
   allow heartbeat
+  allow exec_deployment
 
   field command_name {
     type:     string
@@ -2546,6 +2547,51 @@ When true, if the 'chalk exec' command has any arguments passed, they will repla
 When this is true, the PATH environment variable will be searched for your executable (skipping this executable, in case you want to rename it for convenience).
 
 If it is NOT true, set exec.searchpath to provide any locations Chalk should check for the executable to exec.
+"""
+  }
+
+}
+
+singleton exec_deployment {
+  user_def_ok: false
+  doc: """
+Configuration for how Chalk computes the deployment ID during `chalk exec`.
+
+The deployment ID is a SHA-256 hash of the container's identity and runtime
+configuration: the image chalk mark METADATA_ID, cluster ID, namespace,
+container name, process argv, env var values, volume mount file contents,
+and declared ports. It is used to uniquely identify a specific deployment
+of an image across environments.
+
+Fields here allow certain env vars or volume mounts to be excluded from that
+calculation when their values are known to be non-deterministic across
+equivalent deployments (e.g. a sidecar-injected env var containing a dynamic
+lease ID, or a secret mount that rotates independently of the deployment).
+"""
+
+  field ignored_env_vars {
+    type:     list[string]
+    default:  []
+    shortdoc: "Deployment ID: env vars to exclude"
+    doc: """
+List of environment variable names to exclude from the deployment ID
+calculation. Use this for env vars whose values are expected to differ
+across equivalent deployments and should not affect the deployment ID.
+
+Example: a sidecar injecting a per-instance lease token as an env var.
+"""
+  }
+
+  field ignored_volume_mounts {
+    type:     list[string]
+    default:  []
+    shortdoc: "Deployment ID: volume mount paths to exclude"
+    doc: """
+List of volume mount paths to exclude from the deployment ID calculation.
+Use this for mounts whose contents are expected to differ across equivalent
+deployments and should not affect the deployment ID.
+
+Example: a sidecar injecting a per-instance credentials file as a secret mount.
 """
   }
 

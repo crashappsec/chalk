@@ -12,6 +12,13 @@ import std/[
 
 export json
 
+proc default*(self: JsonNode,
+              default: JsonNode,
+              ): JsonNode =
+  if self == nil:
+    return default
+  return self
+
 proc assertIs*(self: JsonNode,
                kind: JsonNodeKind,
                msg = "JsonNode kind doesnt match expected",
