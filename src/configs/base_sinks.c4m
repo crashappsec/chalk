@@ -29,10 +29,10 @@ sink file {
 
 The log file consists of rows of JSON objects (the `jsonl` format).
 
-The `log_search_path` is a Unix style path (colon separated) that the
-system will march down, trying to find a place where it can open the
-named, skipping directories where there isn't write permission. In no
-value is provided, the default is `["/var/log/", "~/log/", "."]`.
+The `log_search_path` is a list of paths that the system will march
+down, trying to find a place where it can open the named sink,
+skipping directories where there isn't write permission. If no value
+is provided, the default is `["/var/log/", "~/log/", "."]`.
 
 If the `filename` parameter has a slash in it, it will always be tried
 first, before the search path is checked.
@@ -95,15 +95,15 @@ sink s3 {
   shortdoc:       "S3 object storage"
   doc:       """
 
-| Parameter | Type | Required | Description |
-|-----------|------|---------|--------------|
-| `uid` | `string` | true | A valid AWS access identifier |
-| `secret` | `string` | true | A valid AWS auth token |
-| `token` | `string` | false | AWS session token |
-| `uri` | `string` | true | The URI for the bucket in `s3:` format; see below |
-| `region` | `string` | true | The AWS region (or any non-empty string for S3-compatible stores) |
-| `extra` | `string` | false | A prefix added to the object path within the bucket |
-| `endpoint` | `string` | false | Custom S3-compatible endpoint URL (e.g. `http://localhost:9000` for MinIO or `http://localhost:8080` for `rclone serve s3`). When omitted, the standard AWS endpoint is used. |
+| Parameter  | Type     | Required | Description                                                                                                                                                                   |
+|------------|----------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `uid`      | `string` | true     | A valid AWS access key ID                                                                                                                                                     |
+| `secret`   | `string` | true     | A valid AWS secret access key                                                                                                                                                 |
+| `token`    | `string` | false    | AWS session token                                                                                                                                                             |
+| `uri`      | `string` | true     | The URI for the bucket in `s3:` format; see below                                                                                                                             |
+| `region`   | `string` | true     | The AWS region (or any non-empty string for S3-compatible stores)                                                                                                             |
+| `extra`    | `string` | false    | A prefix added to the object path within the bucket                                                                                                                           |
+| `endpoint` | `string` | false    | Custom S3-compatible endpoint URL (e.g. `http://localhost:9000` for MinIO or `http://localhost:8080` for `rclone serve s3`). When omitted, the standard AWS endpoint is used. |
 
 To ensure uniqueness, each run of chalk constructs a unique object
 name. Here are the components:
@@ -174,16 +174,16 @@ sink post {
   shortdoc:              "HTTP/HTTPS POST"
   doc:       """
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `uri` | true | The full URI to the endpoint to which the POST should be made. |
-| `content_type` | false | The value to pass for the "content-type" header |
-| `headers` | false | A dictionary of additional mime headers |
-| `disallow_http` | false | Do not allow HTTP connections, only HTTPS |
-| `timeout` | false | Connection timeout in ms |
-| `pinned_cert_file` | false | TLS certificate file |
-| `prefer_bundled_certs` | false | Whether to prefer chalk bundled root CA certs |
-| `auth` | false | Auth configuration for the API |
+| Parameter              |                        | Required | Description                                                    |
+|------------------------|------------------------|----------|----------------------------------------------------------------|
+| `uri`                  | `string`               | true     | The full URI to the endpoint to which the POST should be made. |
+| `content_type`         | `string`               | false    | The value to pass for the "content-type" header                |
+| `headers`              | `dict[string, string]` | false    | A dictionary of additional mime headers                        |
+| `disallow_http`        | `bool`                 | false    | Do not allow HTTP connections, only HTTPS                      |
+| `timeout`              | `Duration`             | false    | Connection timeout in ms                                       |
+| `pinned_cert_file`     | `string`               | false    | TLS certificate file                                           |
+| `prefer_bundled_certs` | `bool`                 | false    | Whether to prefer chalk bundled root CA certs                  |
+| `auth`                 | `string`               | false    | Auth configuration for the API                                 |
 
 The post will always be a single JSON object, and the default
 content-type field will be `application/json`. Changing this value
