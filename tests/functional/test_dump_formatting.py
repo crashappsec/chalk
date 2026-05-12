@@ -8,7 +8,7 @@ Test for issue #652: Bad formatting in `chalk dump` for multiple `use` entries
 """
 
 from pathlib import Path
-import pytest
+
 from .chalk.runner import Chalk
 from .conf import CONFIGS
 
