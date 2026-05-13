@@ -1078,7 +1078,11 @@ def test_wrap_entrypoint(
         _IMAGE_ENTRYPOINT=chalk_entrypoint,
         _IMAGE_CMD=cmd,
     )
-    _, chalk_output = Docker.run(digests.id, expected_success=runnable)
+    _, chalk_output = Docker.run(
+        digests.id,
+        expected_success=runnable,
+        env={"LOG_LEVEL": "none"},
+    )
     assert docker_output == chalk_output
 
 

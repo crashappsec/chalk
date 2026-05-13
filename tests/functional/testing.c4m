@@ -1,4 +1,8 @@
-log_level = "trace"
+if env_exists("LOG_LEVEL") {
+  log_level = env("LOG_LEVEL")
+} else {
+  log_level = "trace"
+}
 docker_log_level = "trace"
 log_format = "plain"
 
