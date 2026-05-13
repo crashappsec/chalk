@@ -40,12 +40,18 @@ def test_dump_multiple_use_statements_formatting(tmp_data_dir: Path, chalk_copy:
 
     # Check that use statements are properly separated
     # Each "use" keyword should be on its own line (preceded by newline or start of file)
-    use_lines = [line for line in dumped_content.splitlines() if line.strip().startswith("use ")]
+    use_lines = [
+        line for line in dumped_content.splitlines() if line.strip().startswith("use ")
+    ]
 
     # Should have at least 2 use statements from valid_1.c4m
-    assert len(use_lines) >= 2, f"Expected at least 2 use statements, got {len(use_lines)}"
+    assert (
+        len(use_lines) >= 2
+    ), f"Expected at least 2 use statements, got {len(use_lines)}"
 
     # Verify no concatenation by checking that "use" doesn't appear twice on the same line
     for line in dumped_content.splitlines():
         use_count = line.count("use ")
-        assert use_count <= 1, f"Found {use_count} 'use' statements on a single line: {line}"
+        assert (
+            use_count <= 1
+        ), f"Found {use_count} 'use' statements on a single line: {line}"
