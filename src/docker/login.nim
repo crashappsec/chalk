@@ -52,6 +52,7 @@ proc loginToRegistries*() =
           headers           = headers,
           retries           = 2,
           firstRetryDelayMs = 100,
+          acceptStatusCodes = @[200..200],
         )
         trace("docker: login get url: " & $loginUri)
         trace("docker: login get status code: " & response.status)
@@ -74,7 +75,7 @@ proc loginToRegistries*() =
         trace("docker " & args.join(" "))
         let login = runDockerGetEverything(args, stdin = password)
         if login.exitCode != 0:
-          trace("docker: " & login.stderr)
+          error("docker: could not login to registry " & registryUri & " - " & login.stderr)
         else:
           resetDockerAuthConfig()
       except:

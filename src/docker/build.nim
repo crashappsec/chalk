@@ -375,10 +375,12 @@ proc setPushTags(ctx: DockerInvocation, chalk: ChalkObj): seq[string] =
     trace("docker: adding tag to the build - " & image)
     if len(ctx.foundTags) > 0 or not ctx.foundBuildx:
       ctx.newCmdLine &= @["-t", image]
+      result.add(image)
     else:
+      # --output directly pushes to the registry. no need to add to result
+      # as those images are pruned later on
       ctx.newCmdLine &= @["--output", "type=image,push=true,name=" & image]
     ctx.allTags.add(parseImage(image))
-    result.add(image)
 
 proc launchDockerSubchalk(ctx:     DockerInvocation,
                           contexts: seq[string]): Box =

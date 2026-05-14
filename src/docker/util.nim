@@ -152,7 +152,7 @@ proc applySubstitutions*(s: string, chalk: ChalkObj): string =
       continue
     elif c == '}':
       if not inKey:
-        raise newException(ValueError, s & ": invalid format string. '{' is occurring without matching '{'")
+        raise newException(ValueError, s & ": invalid format string. '{' is occurring without matching '}'")
       inKey = false
       if key != "":
         result &= chalk.getChalkKey(key.toUpperAscii())
@@ -176,10 +176,8 @@ iterator iterPushTags*(chalk: ChalkObj): string =
     if not registryEnabled:
       continue
     for pushName in getChalkSubsections(registrySection & ".docker_push"):
-      let pushSection = registrySection & ".docker_push." & pushName
-      if not sectionExists(pushSection):
-        continue
       let
+        pushSection = registrySection & ".docker_push." & pushName
         pushEnabled = attrGet[bool](pushSection & ".enabled")
         pushRepo    = attrGet[string](pushSection & ".repository").removePrefix('/')
         pushTags    = attrGet[seq[string]](pushSection & ".tags")

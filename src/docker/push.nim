@@ -63,7 +63,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
         try:
           let retag = runDockerGetEverything(@["tag", chalk.name, image])
           if retag.exitCode != 0:
-            trace("docker: " & retag.stderr)
+            error("docker: could not tag as " & image & ". ignoring error - " & retag.stderr)
             continue
           imagesToPrune.add(image)
         except:
@@ -71,7 +71,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
         try:
           discard runCmdNoOutputCapture(getDockerExeLocation(), @["push", image])
         except:
-          continue
+          error("docker: could not push image " & image & ". ignoring error")
 
     try:
       chalk.collectRunTimeArtifactInfo()
