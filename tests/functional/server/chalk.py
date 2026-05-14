@@ -268,3 +268,11 @@ async def object_create(key: str, request: Request):
             raise HTTPException(status_code=400)
     else:
         objects[key] = body
+
+
+@app.get("/registry/auth")
+async def registry_auth():
+    return {
+        "username": "user",
+        "password": "password",
+    }

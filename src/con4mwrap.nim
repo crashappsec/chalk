@@ -54,9 +54,10 @@ proc attrGetObject*(fqn: string): AttrScope =
 iterator getChalkSubsections*(s: string): string =
   ## Walks the contents of the given chalk config section, and yields the
   ## names of the subsections.
-  for k, v in attrGetObject(s).contents:
-    if v.isA(AttrScope):
-      yield k
+  if sectionExists(s):
+    for k, v in attrGetObject(s).contents:
+      if v.isA(AttrScope):
+        yield k
 
 proc con4mAttrSet*(ctx: ConfigState, fqn: string, value: Box) =
   ## Sets the value of the `fqn` attribute in `ctx.attrs` to `value`, raising

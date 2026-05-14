@@ -35,7 +35,14 @@ proc assertIs*(self: JsonNode,
 proc assertHasLen*(self: JsonNode,
                    msg = "JsonNode len() == 0",
                    ): JsonNode {.discardable.} =
-  if len(self) == 0:
+  let l =
+    # json string lenth always returns 0
+    case self.kind
+    of JString:
+      len(self.getStr())
+    else:
+      len(self)
+  if l == 0:
     raise newException(ValueError, msg)
   return self
 

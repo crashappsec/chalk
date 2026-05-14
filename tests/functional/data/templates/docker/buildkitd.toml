@@ -13,3 +13,5 @@ debug = true
   insecure = true
 [registry."${IP}:5047"]
   http = true
+[registry."${IP}:5048"]
+  http = true

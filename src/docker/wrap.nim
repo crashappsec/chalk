@@ -7,9 +7,6 @@
 
 ## Dockerfile wrapping logic
 
-import std/[
-  sequtils,
-]
 import ".."/[
   types,
   utils/files,
@@ -207,6 +204,8 @@ proc addByPlatform(ctx:          DockerInvocation,
     copy = "COPY --from=" & base & " " & path & " " & newPath
   if base notin ctx.addedPlatform:
     ctx.addedPlatform[base] = @["FROM " & image & " AS " & base]
+  if arg notin ctx.addedPlatform[base] and ctx.isMultiPlatform():
+    ctx.addedPlatform[base].add(arg)
   if arg notin ctx.addedInstructions and ctx.isMultiPlatform():
     ctx.addedInstructions.add(arg)
   if copy notin ctx.addedInstructions:

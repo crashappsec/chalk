@@ -45,6 +45,7 @@ if __name__ == "__main__":
             f"{IP}:5044",
             f"{IP}:5046",
             f"{IP}:5047",
+            f"{IP}:5048",
         }
     )
     updated["registry-mirrors"] = sorted(

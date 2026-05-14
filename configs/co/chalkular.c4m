@@ -1,0 +1,45 @@
+func validate_jwt(token) {
+  if not is_jwt_valid(token) {
+    return "Invalid JWT token for retrieving chalkular docker login creds from CrashOverride"
+  }
+  return ""
+}
+
+parameter auth_config.crashoverride_chalkular.token {
+  shortdoc:  "Crash Override Chalkular JWT token"
+  doc:       "Token for retrieving chalkular docker login creds from CrashOverride"
+  default:   ""
+  validator: func validate_jwt(string) -> string
+  sensitive: true
+}
+
+parameter docker.docker_registry.chalkular.uri {
+  shortdoc: "Chalkular registry URI"
+  doc:      "Full registry URI where to push built images for chalkular integration"
+}
+
+parameter docker.docker_registry.chalkular.docker_login_get.uri {
+  shortdoc: "Chalkular creds endpoint"
+  doc:      "Endpoint to fetch chalkular registry creds to use for docker login"
+}
+
+parameter docker.docker_registry.chalkular.docker_push.chalkular.repository {
+  shortdoc: "Chalkular repository name"
+  doc:      "Repository within the registry where to push docker builds"
+}
+
+auth_config crashoverride_chalkular {
+  ~auth:  "jwt"
+}
+
+docker {
+  docker_registry chalkular {
+    ~login_method: "get"
+    docker_login_get {
+      ~auth: "crashoverride_chalkular"
+    }
+    docker_push chalkular {
+      ~tags: ["{CHALK_RAND}"]
+    }
+  }
+}

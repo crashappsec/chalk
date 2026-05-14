@@ -1,10 +1,14 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
+import std/[
+  net,
+  re,
+]
 import ".."/[
   chalkjson,
   collect,
@@ -29,6 +33,7 @@ import "."/[
   ids,
   image,
   inspect,
+  login,
   platform,
   registry,
   scan,
@@ -212,7 +217,7 @@ proc addEnvVars(ctx: DockerInvocation, chalk: ChalkObj) =
       continue
     if v.startsWith("@"):
       try:
-        value = chalk.getChalkKey(v)
+        value = chalk.getChalkKey(v[1..^1])
       except:
         warn("docker: ENV VAR " & k & " NOT added due to:" & getCurrentExceptionMsg())
         continue
@@ -363,6 +368,20 @@ proc readMetadataFile(ctx: DockerInvocation) =
     data = "{}"
   ctx.metadataFile = data.tryParseMetadataFile()
 
+proc setPushTags(ctx: DockerInvocation, chalk: ChalkObj): seq[string] =
+  if not ctx.foundPush:
+    return
+  for image in chalk.iterPushTags():
+    trace("docker: adding tag to the build - " & image)
+    if len(ctx.foundTags) > 0 or not ctx.foundBuildx:
+      ctx.newCmdLine &= @["-t", image]
+      result.add(image)
+    else:
+      # --output directly pushes to the registry. no need to add to result
+      # as those images are pruned later on
+      ctx.newCmdLine &= @["--output", "type=image,push=true,name=" & image]
+    ctx.allTags.add(parseImage(image))
+
 proc launchDockerSubchalk(ctx:     DockerInvocation,
                           contexts: seq[string]): Box =
   if len(contexts) == 0:
@@ -423,7 +442,7 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_PLATFORMS",                  $(ctx.platforms.normalize()))
   dict.setIfNeeded("DOCKER_LABELS",                     ctx.foundLabels)
   dict.setIfNeeded("DOCKER_ANNOTATIONS",                ctx.foundAnnotations)
-  dict.setIfNeeded("DOCKER_TAGS",                       ctx.foundTags.asRepoTag())
+  dict.setIfNeeded("DOCKER_TAGS",                       ctx.allTags.asRepoTag())
   dict.setIfNeeded("DOCKER_BASE_IMAGE",                 $(baseSection.image))
   dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO",            baseSection.image.repo)
   dict.setIfNeeded("DOCKER_BASE_IMAGE_REGISTRY",        baseSection.image.registry)
@@ -462,7 +481,7 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
     if not isDockerOverlayFS():
       configDigest        = iidFile
     localId               = iidFile
-    repos                 = ctx.foundTags.withDigest(iidFile)
+    repos                 = ctx.allTags.withDigest(iidFile)
 
   elif isDockerOverlayFS():
     case CONTENT_TYPE_MAPPING.getOrDefault(descMediaType, DockerManifestType.layer)
@@ -477,7 +496,7 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       configDigest        = metadataConfig
     listOrImageDigest     = metadataImage
     localId               = listOrImageDigest
-    repos                 = (ctx.foundTags & metadataNames).withDigest(listOrImageDigest)
+    repos                 = (ctx.allTags & metadataNames).withDigest(listOrImageDigest)
 
   else:
     # iidfile can be one of in order of precedence:
@@ -494,12 +513,12 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       else:
         # otherwise this is list digest therefore we need to check registry
         listOrImageDigest = metadataImage
-        repos             = (ctx.foundTags & metadataNames).withDigest(listOrImageDigest)
+        repos             = (ctx.allTags & metadataNames).withDigest(listOrImageDigest)
     else:
       configDigest        = iidFile
       localId             = iidFile
       listOrImageDigest   = metadataImage
-      repos               = (ctx.foundTags & metadataNames).withDigest(listOrImageDigest)
+      repos               = (ctx.allTags & metadataNames).withDigest(listOrImageDigest)
 
   if dockerImageExists(localId):
     trace("docker: built image is loaded locally")
@@ -561,6 +580,10 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   # force DOCKER_PLATFORM to be included in chalk normalization
   # which is required to compute unique METADATA_* keys
   forceChalkKeys(["DOCKER_PLATFORM"])
+
+  # login to any registries before any collection
+  # as auth provided by auth might be required
+  loginToRegistries()
 
   trace("docker: collecting pre-build metadata")
   initCollection()
@@ -663,13 +686,20 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   ctx.setIidFile()
   ctx.setMetadataFile()
 
-  let updatedDockerignore = ctx.updateDockerignoreFile()
+  let
+    imagesToPrune       = ctx.setPushTags(oneChalk)
+    updatedDockerignore = ctx.updateDockerignoreFile()
 
   try:
     result = setExitCode(ctx.runMungedDockerInvocation())
   finally:
     if updatedDockerignore:
       ctx.revertDockerignoreFile()
+    for i in imagesToPrune:
+      try:
+        discard runDockerGetEverything(@["rmi", i])
+      except:
+        discard
 
   if result != 0:
     raise newException(

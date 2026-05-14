@@ -1741,6 +1741,7 @@ the console (when running `chalk docker`).
 """
   allow getopts
   allow scan_context
+  allow docker_registry
 
   field wrap_entrypoint {
     type:    bool
@@ -2007,6 +2008,194 @@ is invoked on an image instead of a file-system path.
 """
   }
 
+}
+
+docker_login_types := ["", "get"]
+
+singleton docker_login_get {
+  user_def_ok:   true
+  doc:           """
+Docker login provider which fetches registry credentials via HTTP GET request.
+Service must return a JSON response of the form:
+
+```
+{
+  "username": "...",
+  "password": "...",
+  "registry": "...",
+  "repository": "..."
+}
+```
+
+The `registry` field is optional and defaults to the parent `docker_registry.uri`.
+The `repository` field is optional and defaults to the value of `registry`.
+Chalk will invoke `docker login` using the returned credentials against the
+repository URL (or registry URL if no repository is provided).
+
+The registry URI is automatically appended as a `registry` query parameter
+to the configured `uri` when making the request.
+"""
+
+  field uri {
+    type:     string
+    require:  true
+    shortdoc: "URL of the Docker credential provider API service"
+    doc: """
+URL of the credential provider service to call via HTTP GET.
+The parent registry URI is automatically appended as a `registry` query
+parameter so the service can return appropriate credentials per registry.
+"""
+  }
+
+  field auth {
+    type:     string
+    default:  ""
+    validator: func auth_check
+    shortdoc: "Authentication config to use when calling the credential provider"
+    doc: """
+Authentication config as configured via `auth_config` to use for
+making the HTTP GET request to fetch Docker login credentials.
+"""
+  }
+
+  field timeout {
+    type:    Duration
+    default: << 3 sec >>
+    shortdoc: "HTTP timeout for request to the credential provider service"
+    doc: """
+If the timeout is exceeded and the request fails, chalk will log an error
+and skip logging in to the registry.
+"""
+  }
+}
+
+object docker_registry {
+  user_def_ok:   true
+  doc:           """
+Configuration for a Docker registry that chalk should interact with during
+`chalk docker build` and `chalk docker push`.
+
+Registries are configured under the `docker` singleton and allow chalk to:
+
+* Authenticate to the registry before building or pushing via a configurable login provider.
+* Push built images to specific repositories and tags within the registry.
+
+Multiple registries can be configured, each with their own login method and
+push targets. For example:
+
+```
+docker {
+  docker_registry my_registry {
+    uri: "registry.example.com"
+    login_method: "get"
+    docker_login_get {
+      uri: "https://auth.example.com/v1/docker-creds"
+    }
+    docker_push my_app {
+      repository: "my-org/my-app"
+      tags: ["latest", "v1.2.3"]
+    }
+  }
+}
+```
+
+Supported login methods are:
+
+* `""` - no authentication (default)
+* `"get"` - fetch credentials via HTTP GET using `docker_login_get` configuration
+
+See `docker_login_get` and `docker_push` for all supported configuration fields.
+"""
+
+  allow docker_login_get
+  allow docker_push
+
+  field enabled {
+    type:    bool
+    default: true
+    doc:     """
+Whether this registry configuration is active.
+"""
+  }
+
+  field login_method {
+    type:    string
+    choice:  docker_login_types
+    default: ""
+    doc:     "What provider to use for fetching docker login creds"
+  }
+
+  field uri {
+    type:      string
+    require:   true
+    shortdoc:  "Registry URI"
+    doc:       """
+The base URI of the Docker registry (e.g. `registry.example.com`).
+Used as the base for constructing image references in `docker_push` sections
+and passed to the login provider as the registry to authenticate against.
+"""
+  }
+
+}
+
+object docker_push {
+  user_def_ok:   true
+  doc:           """
+Configuration for pushing a Docker image to a repository within
+the parent `docker_registry`.
+
+Each `docker_push` section defines a repository and set of tags to push
+the built image to. Multiple `docker_push` sections can be configured
+within a single `docker_registry` to push to different repositories or
+with different tag sets.
+
+**During `chalk docker build`:** if no explicit `-t` tags were given, chalk
+uses `--output type=image,push=true,name=<image>` to push directly from
+the buildkit cache; otherwise the image tags are appended to the build
+command via `-t`. After the build, any images added solely by chalk are
+pruned locally.
+
+**During `chalk docker push`:** after the original push succeeds, chalk
+retags the image and runs `docker push` for each configured image reference.
+Any locally-created tags are pruned once all pushes are complete.
+"""
+
+  field enabled {
+    type:    bool
+    default: true
+    doc:     """
+Whether this push configuration is active. Set to `false` to temporarily
+disable pushing to this repository without removing the configuration.
+"""
+  }
+
+  field repository {
+    type: string
+    require:  true
+    shortdoc: "Repository path within the registry"
+    doc:      """
+The repository path within the parent registry to push the image to.
+Combined with the parent `docker_registry.uri` and each tag to form
+the full image reference: `<registry_uri>/<repository>:<tag>`.
+"""
+  }
+
+  field tags {
+    type:     list[string]
+    require:  true
+    shortdoc: "List of tags to push the image with"
+    doc:      """
+List of tags to apply when pushing the image to the repository.
+Each tag is combined with the registry URI and repository to produce
+a full image reference: `<registry_uri>/<repository>:<tag>`.
+
+Tags support `{KEY}` template substitution using any chalk-time key.
+For example, `"myapp-{BRANCH}"` substitutes the `BRANCH` chalk key.
+Key names are case-insensitive - `{BRANCH}` and `{branch}` are equivalent.
+Any characters in the substituted value that are not alphanumeric, `.`,
+`_`, or `-` are replaced with `-` to produce a valid Docker tag.
+"""
+  }
 }
 
 singleton zip {

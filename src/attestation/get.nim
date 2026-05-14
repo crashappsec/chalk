@@ -34,7 +34,8 @@ proc request(self: Get, query = ""): JsonNode =
                            headers           = authHeaders,
                            timeout           = self.timeout,
                            retries           = 2,
-                           firstRetryDelayMs = 100)
+                           firstRetryDelayMs = 100,
+                           acceptStatusCodes = @[200..200])
 
     trace("Signing Key Provider Service URL: " & url)
     trace("Signing Key Provider Service status code: " & response.status)

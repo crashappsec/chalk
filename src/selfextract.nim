@@ -31,11 +31,16 @@ proc getConfig*(): string =
     value    = valueOpt.get(pack(defaultConfig))
   return unpack[string](value)
 
-proc getParams*(): seq[Box] =
+proc getParams*(ignore: seq[string] = @[]): seq[Box] =
   let
     valueOpt = selfChalkGetKey(paramKey)
     value    = valueOpt.get(pack(newSeq[Box]()))
-  return unpack[seq[Box]](value)
+  for item in unpack[seq[Box]](value):
+    let
+      row = unpack[seq[Box]](item)
+      url = unpack[string](row[1])
+    if url notin ignore:
+      result.add(item)
 
 proc getNonSensitiveParams*(): seq[Box] =
   let runtime = getChalkRuntime()
@@ -504,7 +509,7 @@ proc handleConfigLoad*(inpath: string): bool =
   # Load any saved parameters; we will pass them off to any testing
   var
     componentsToTest = runtime.programRoot.getUsedComponents(paramOnly = true)
-    paramsToTest:    seq[Box]
+    paramsToTest     = getParams(ignore = @[component.url])
 
   for item in newComponents:
     if item notin componentsToTest:

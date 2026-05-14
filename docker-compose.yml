@@ -171,6 +171,8 @@ services:
         condition: service_healthy
       registry-proxy:
         condition: service_healthy
+      registry-auth:
+        condition: service_healthy
       server:
         condition: service_healthy
       server-tls:
@@ -268,5 +270,32 @@ services:
       test:
         - CMD-SHELL
         - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 5047"
+      start_period: 30s
+      interval: 1s
+
+  registry-auth:
+    image: registry:3
+    ports:
+      - "5048:5048"
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - |
+        apk add --no-cache apache2-utils
+        mkdir -p /auth
+        htpasswd -Bbn ${REGISTRY_AUTH_USERNAME:-user} ${REGISTRY_AUTH_PASSWORD:-password} > /auth/htpasswd
+        exec /entrypoint.sh /etc/distribution/config.yml
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5048
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: Registry Realm
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+    networks:
+      - chalk
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - sh -c "echo 'GET / HTTP/1.1' | nc -v localhost 5048"
       start_period: 30s
       interval: 1s

@@ -446,10 +446,14 @@ type
       foundSecrets*:          TableRef[string, DockerSecret]
       foundTarget*:           string
       foundBuilder*:          string
+      foundPush*:             bool
+      foundLoad*:             bool
+      foundOutputs*:          seq[OrderedTableRef[string, string]]
 
       platforms*:             seq[DockerPlatform]
       gitContext*:            DockerGitContext
 
+      allTags*:               seq[DockerImage]
       iidFilePath*:           string
       iidFile*:               string
       metadataFilePath*:      string
