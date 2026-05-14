@@ -96,6 +96,31 @@
 
   ([#664](https://github.com/crashappsec/chalk/pull/664))
 
+- Chalk operator integration for richer Kubernetes metadata during `chalk exec`.
+  When the chalk operator injects the required environment variables, chalk can
+  now fetch the pod manifest and collect pod labels, annotations, container
+  ports, environment variable hashes, and volume mount hashes. This information
+  is also used to compute a stable deployment ID (`_EXEC_DEPLOYMENT_ID`) that
+  uniquely identifies a specific workload configuration, enabling accurate
+  deployment tracking across pod restarts and environment promotions.
+
+  New keys:
+  - `_K8S_CLUSTER_ID` — unique identifier of the cluster
+  - `_K8S_CLUSTER_NAME` — name of the cluster
+  - `_K8S_CLUSTER_ENDPOINT` — API endpoint of the cluster
+  - `_K8S_POD_NAMESPACE` — namespace the pod is running in
+  - `_K8S_POD_NAME` — name of the pod
+  - `_K8S_POD_CONTAINER_NAME` — name of the container within the pod
+  - `_K8S_POD_LABELS` — labels attached to the pod
+  - `_K8S_POD_ANNOTATIONS` — annotations attached to the pod
+  - `_K8S_POD_MANIFEST` — full pod manifest as returned by the chalk operator
+  - `_K8S_CONTAINER_ENV_VAR_HASHES` — hashes of the container's env var values
+  - `_K8S_CONTAINER_VOLUME_MOUNT_HASHES` — hashes of mounted config and secret file contents
+  - `_K8S_CONTAINER_PORTS` — declared container ports in `<port>/<protocol>` format
+  - `_EXEC_DEPLOYMENT_ID` — stable hash identifying the workload deployment configuration
+
+  ([#665](https://github.com/crashappsec/chalk/pull/665))
+
 ### Fixes
 
 - Docker probe always failed due to a typo introduced in chalk `1.0.0`
