@@ -1369,7 +1369,7 @@ def test_k8s(chalk_copy: Chalk, server_http: str, tmp_path: Path):
             "CHALK_K8S_POD_NAMESPACE": K8S_NAMESPACE,
             "CHALK_K8S_POD_NAME": K8S_POD_NAME,
             "CHALK_K8S_POD_CONTAINER_NAME": K8S_CONTAINER_NAME,
-            "CHALK_K8S_PODINFO_URL": server_http,
+            "CHALK_K8S_PODINFO_URL": f"{server_http}/v1/podinfo/{K8S_NAMESPACE}/{K8S_POD_NAME}",
             "CHALK_K8S_PODINFO_TOKEN_PATH": "/var/run/secrets/k8s-token",
             "SLEEP": "10",
         },

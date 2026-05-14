@@ -290,19 +290,18 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
     return
 
   let
-    podMetadataUrl       = getEnv("CHALK_K8S_PODINFO_URL")
+    podManifestUrl       = getEnv("CHALK_K8S_PODINFO_URL")
     podMetadataTokenPath = getEnv("CHALK_K8S_PODINFO_TOKEN_PATH")
-  if podMetadataUrl == "" or containerName == "" or podMetadataTokenPath == "":
+  if podManifestUrl == "" or containerName == "" or podMetadataTokenPath == "":
     return
   let token = tryToLoadFile(podMetadataTokenPath)
   if token == "":
     return
-  let podInfoUrl = podMetadataUrl & "/v1/podinfo/" & namespace & "/" & podName
-  trace("k8s: fetching pod manifest from " & podInfoUrl)
+  trace("k8s: fetching pod manifest from " & podManifestUrl)
   var podManifest: JsonNode
   try:
     let response = safeRequest(
-      url               = podInfoUrl,
+      url               = podManifestUrl,
       retries           = 2,
       firstRetryDelayMs = 100,
       acceptStatusCodes = @[200..200],

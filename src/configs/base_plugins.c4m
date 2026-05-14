@@ -570,7 +570,44 @@ plugin k8s {
                       "_K8S_CONTAINER_PORTS"
                       ]
     doc: """
-TODO
+Collects Kubernetes runtime metadata when chalk is running inside a k8s pod.
+Metadata is sourced from environment variables injected by the chalk operator
+and an optional pod manifest endpoint.
+
+Expected environment variables:
+
+  CHALK_K8S_METADATA (required)
+    JSON object injected by the chalk operator containing cluster-level info:
+      { "cluster": { "uid": "...", "name": "...", "endpoint": "..." } }
+    Populates: _K8S_CLUSTER_ID, _K8S_CLUSTER_NAME, _K8S_CLUSTER_ENDPOINT.
+
+  CHALK_K8S_POD_NAMESPACE (required)
+    The namespace the pod is running in.
+    Populates: _K8S_POD_NAMESPACE.
+
+  CHALK_K8S_POD_NAME (required)
+    The name of the pod.
+    Populates: _K8S_POD_NAME.
+
+  CHALK_K8S_POD_CONTAINER_NAME (required)
+    The name of the container within the pod. Used to select the right
+    container spec when parsing the pod manifest.
+    Populates: _K8S_POD_CONTAINER_NAME.
+
+  CHALK_K8S_PODINFO_URL (optional)
+    Fully constructed URL to the chalk operator's pod manifest endpoint.
+    When set, chalk fetches the pod manifest and populates:
+      - _K8S_POD_MANIFEST
+      - _K8S_POD_LABELS
+      - _K8S_POD_ANNOTATIONS
+      - _K8S_CONTAINER_ENV_VAR_HASHES
+      - _K8S_CONTAINER_VOLUME_MOUNT_HASHES
+      - _K8S_CONTAINER_PORTS
+      - _EXEC_DEPLOYMENT_ID (exec operations only)
+
+  CHALK_K8S_PODINFO_TOKEN_PATH (optional)
+    Path to a file containing the bearer token used to authenticate requests
+    to the CHALK_K8S_PODINFO_URL endpoint.
 """
 }
 

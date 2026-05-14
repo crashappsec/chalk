@@ -79,16 +79,20 @@ POD_MANIFEST = {
         "containers": [
             {
                 "name": "app",
-                # env is stripped by the chalk operator before returning the
-                # manifest so that sensitive values are never reported
+                # the chalk operator normalizes env var values before returning
+                # the manifest: static values are replaced with the literal
+                # string "string" so that sensitive values are never reported;
+                # valueFrom references are passed through as-is
                 "env": [
                     {
                         "name": "APP_ENV",
-                        "value": "production",
+                        # normalized to "string" by the chalk operator
+                        "value": "string",
                     },
                     {
                         "name": "LOG_LEVEL",
-                        "value": "info",
+                        # normalized to "string" by the chalk operator
+                        "value": "string",
                     },
                     {
                         "name": "DB_HOST",

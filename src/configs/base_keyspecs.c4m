@@ -6697,16 +6697,6 @@ Additional env vars and volume mount paths can be excluded via
 """
 }
 
-keyspec _OP_DEPLOYMENT_ID_INPUT {
-  kind:     RunTimeHost
-  type:     dict[string, `x]
-  standard: true
-  since:    "1.1.0"
-  doc:      """
-TODO
-"""
-}
-
 keyspec _K8S_CLUSTER_ID {
   kind:     RunTimeHost
   type:     string
