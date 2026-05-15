@@ -72,7 +72,9 @@
   New configuration sections:
   - `docker.docker_registry` — declares a registry with its URI and login method
   - `docker.docker_registry.<name>.docker_login_get` — fetches credentials via
-    HTTP GET and runs `docker login` before any build or push
+    HTTP GET and runs `docker login` before any build or push; supports an
+    `enabled` field (default `true`) to disable login without removing the
+    configuration
   - `docker.docker_registry.<name>.docker_push` — declares repositories and
     tags to push the built or pushed image to, with tag values supporting
     `{CHALK_KEY}` substitution
@@ -94,7 +96,8 @@
   }
   ```
 
-  ([#664](https://github.com/crashappsec/chalk/pull/664))
+  ([#664](https://github.com/crashappsec/chalk/pull/664),
+  [#665](https://github.com/crashappsec/chalk/pull/665))
 
 - Chalk operator integration for richer Kubernetes metadata during `chalk exec`.
   When the chalk operator injects the required environment variables, chalk can

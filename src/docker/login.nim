@@ -34,6 +34,9 @@ proc loginToRegistries*() =
       if not sectionExists(loginSection):
         error("docker: login method is referencing non-existing configuration " & loginSection)
         continue
+      let loginEnabled = attrGet[bool](loginSection & ".enabled")
+      if not loginEnabled:
+        continue
       let
         loginBase = parseUri(attrGet[string](loginSection & ".uri"))
         loginUri  = loginBase.withQueryPair("registry", registryUri)

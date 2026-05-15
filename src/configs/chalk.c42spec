@@ -2036,6 +2036,14 @@ The registry URI is automatically appended as a `registry` query parameter
 to the configured `uri` when making the request.
 """
 
+  field enabled {
+    type:    bool
+    default: true
+    doc:     """
+Whether to login to the registry via `docker login`.
+"""
+  }
+
   field uri {
     type:     string
     require:  true
