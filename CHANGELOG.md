@@ -111,6 +111,7 @@
   - `_K8S_CLUSTER_ID` — unique identifier of the cluster
   - `_K8S_CLUSTER_NAME` — name of the cluster
   - `_K8S_CLUSTER_ENDPOINT` — API endpoint of the cluster
+  - `_K8S_CLUSTER_CLOUD_METADATA` — cloud provider metadata (keys vary by provider)
   - `_K8S_POD_NAMESPACE` — namespace the pod is running in
   - `_K8S_POD_NAME` — name of the pod
   - `_K8S_POD_CONTAINER_NAME` — name of the container within the pod

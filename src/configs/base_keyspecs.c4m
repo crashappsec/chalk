@@ -6732,6 +6732,21 @@ is running.
 """
 }
 
+keyspec _K8S_CLUSTER_CLOUD_METADATA {
+  kind:     RunTimeHost
+  type:     dict[string, `x]
+  standard: true
+  since:    "1.1.0"
+  shortdoc: "Kubernetes cloud provider metadata"
+  doc:      """
+Cloud provider metadata for the Kubernetes cluster, sourced from the `cloud`
+field of the `CHALK_K8S_METADATA` environment variable injected by the chalk
+operator. The keys and value types vary by cloud provider. For example, on AWS
+this includes `provider`, `region`, and `vpc_id`, but other providers may
+supply a different set of fields.
+"""
+}
+
 keyspec _K8S_POD_NAMESPACE {
   kind:     RunTimeHost
   type:     string

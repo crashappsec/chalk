@@ -268,7 +268,7 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
     rawK8sMetadata = getEnv("CHALK_K8S_METADATA")
     namespace      = getEnv("CHALK_K8S_POD_NAMESPACE")
     podName        = getEnv("CHALK_K8S_POD_NAME")
-    containerName  = getEnv("CHALK_K8S_POD_CONTAINER_NAME")
+    containerName  = getEnv("CHALK_K8S_CONTAINER_NAME")
   if rawK8sMetadata == "" or namespace == "" or podName == "":
     return
 
@@ -279,19 +279,20 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
       k8sMetadata     = parseJson(rawK8sMetadata).assertIs(JObject)
       clusterMetadata = k8sMetadata{"cluster"}.assertIs(JObject)
     clusterId = clusterMetadata{"uid"}.getStr()
-    result.setIfNeeded("_K8S_CLUSTER_ID",         clusterId)
-    result.setIfNeeded("_K8S_CLUSTER_NAME",       clusterMetadata{"name"}.getStr())
-    result.setIfNeeded("_K8S_CLUSTER_ENDPOINT",   clusterMetadata{"endpoint"}.getStr())
-    result.setIfNeeded("_K8S_POD_NAMESPACE",      namespace)
-    result.setIfNeeded("_K8S_POD_CONTAINER_NAME", containerName)
+    result.setIfNeeded("_K8S_CLUSTER_ID",                clusterId)
+    result.setIfNeeded("_K8S_CLUSTER_NAME",              clusterMetadata{"name"}.getStr())
+    result.setIfNeeded("_K8S_CLUSTER_ENDPOINT",          clusterMetadata{"endpoint"}.getStr())
+    result.setIfNeeded("_K8S_POD_NAMESPACE",             namespace)
+    result.setIfNeeded("_K8S_POD_CONTAINER_NAME",        containerName)
+    result.trySetIfNeeded("_K8S_CLUSTER_CLOUD_METADATA", k8sMetadata{"cloud"}.default(newJObject()).assertIs(JObject).nimJsonToBox())
   except:
     trace("k8s: could not parse cluster metadata: " & getCurrentExceptionMsg())
     dumpExOnDebug()
     return
 
   let
-    podManifestUrl       = getEnv("CHALK_K8S_PODINFO_URL")
-    podMetadataTokenPath = getEnv("CHALK_K8S_PODINFO_TOKEN_PATH")
+    podManifestUrl       = getEnv("CHALK_K8S_PODMANIFEST_URL")
+    podMetadataTokenPath = getEnv("CHALK_K8S_PODMANIFEST_TOKEN_PATH")
   if podManifestUrl == "" or containerName == "" or podMetadataTokenPath == "":
     return
   let token = tryToLoadFile(podMetadataTokenPath)

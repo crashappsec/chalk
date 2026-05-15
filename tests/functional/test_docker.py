@@ -27,6 +27,7 @@ from .conf import (
     DOCKER_TOKEN_REPO,
     GHCR_REPO,
     IP,
+    K8S_CLOUD,
     K8S_CLUSTER,
     K8S_CONTAINER_NAME,
     K8S_NAMESPACE,
@@ -1365,12 +1366,14 @@ def test_k8s(chalk_copy: Chalk, server_http: str, tmp_path: Path):
         },
         networks=["chalk_chalk"],
         env={
-            "CHALK_K8S_METADATA": json.dumps({"cluster": K8S_CLUSTER}),
+            "CHALK_K8S_METADATA": json.dumps(
+                {"cluster": K8S_CLUSTER, "cloud": K8S_CLOUD}
+            ),
             "CHALK_K8S_POD_NAMESPACE": K8S_NAMESPACE,
             "CHALK_K8S_POD_NAME": K8S_POD_NAME,
-            "CHALK_K8S_POD_CONTAINER_NAME": K8S_CONTAINER_NAME,
-            "CHALK_K8S_PODINFO_URL": f"{server_http}/v1/podinfo/{K8S_NAMESPACE}/{K8S_POD_NAME}",
-            "CHALK_K8S_PODINFO_TOKEN_PATH": "/var/run/secrets/k8s-token",
+            "CHALK_K8S_CONTAINER_NAME": K8S_CONTAINER_NAME,
+            "CHALK_K8S_PODMANIFEST_URL": f"{server_http}/v1/podinfo/{K8S_NAMESPACE}/{K8S_POD_NAME}",
+            "CHALK_K8S_PODMANIFEST_TOKEN_PATH": "/var/run/secrets/k8s-token",
             "SLEEP": "10",
         },
     )
@@ -1382,6 +1385,7 @@ def test_k8s(chalk_copy: Chalk, server_http: str, tmp_path: Path):
         _K8S_CLUSTER_ID=K8S_CLUSTER["uid"],
         _K8S_CLUSTER_NAME=K8S_CLUSTER["name"],
         _K8S_CLUSTER_ENDPOINT=K8S_CLUSTER["endpoint"],
+        _K8S_CLUSTER_CLOUD_METADATA=K8S_CLOUD,
         _K8S_POD_NAMESPACE=K8S_NAMESPACE,
         _K8S_POD_NAME=K8S_POD_NAME,
         _K8S_POD_CONTAINER_NAME=K8S_CONTAINER_NAME,

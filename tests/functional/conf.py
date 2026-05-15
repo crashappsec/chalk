@@ -80,6 +80,11 @@ K8S_CLUSTER = {
     "name": "test-cluster",
     "endpoint": "https://test-cluster.example.com",
 }
+K8S_CLOUD = {
+    "provider": "aws",
+    "region": "us-east-1",
+    "vpc_id": "vpc-0123456789abcdef0",
+}
 
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")

@@ -502,6 +502,7 @@ report and subtract from it.
   key._K8S_CLUSTER_ID.use                     = true
   key._K8S_CLUSTER_NAME.use                   = true
   key._K8S_CLUSTER_ENDPOINT.use               = true
+  key._K8S_CLUSTER_CLOUD_METADATA.use         = true
   key._K8S_POD_NAMESPACE.use                  = true
   key._K8S_POD_NAME.use                       = true
   key._K8S_POD_CONTAINER_NAME.use             = true
@@ -704,6 +705,7 @@ doc: """
   key._K8S_CLUSTER_ID.use                            = true
   key._K8S_CLUSTER_NAME.use                          = true
   key._K8S_CLUSTER_ENDPOINT.use                      = true
+  key._K8S_CLUSTER_CLOUD_METADATA.use                = true
   key._K8S_POD_NAMESPACE.use                         = true
   key._K8S_POD_NAME.use                              = true
   key._K8S_POD_CONTAINER_NAME.use                    = true
@@ -1272,6 +1274,7 @@ container.
   key._K8S_CLUSTER_ID.use                            = true
   key._K8S_CLUSTER_NAME.use                          = true
   key._K8S_CLUSTER_ENDPOINT.use                      = true
+  key._K8S_CLUSTER_CLOUD_METADATA.use                = true
   key._K8S_POD_NAMESPACE.use                         = true
   key._K8S_POD_NAME.use                              = true
   key._K8S_POD_CONTAINER_NAME.use                    = true
@@ -1809,6 +1812,7 @@ and keep the run-time key.
   key._K8S_CLUSTER_ID.use                            = true
   key._K8S_CLUSTER_NAME.use                          = true
   key._K8S_CLUSTER_ENDPOINT.use                      = true
+  key._K8S_CLUSTER_CLOUD_METADATA.use                = true
   key._K8S_POD_NAMESPACE.use                         = true
   key._K8S_POD_NAME.use                              = true
   key._K8S_POD_CONTAINER_NAME.use                    = true

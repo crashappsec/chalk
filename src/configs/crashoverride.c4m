@@ -159,6 +159,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._K8S_CLUSTER_ID.use                            = true
   ~key._K8S_CLUSTER_NAME.use                          = true
   ~key._K8S_CLUSTER_ENDPOINT.use                      = true
+  ~key._K8S_CLUSTER_CLOUD_METADATA.use                = true
   ~key._K8S_POD_NAMESPACE.use                         = true
   ~key._K8S_POD_NAME.use                              = true
   ~key._K8S_POD_CONTAINER_NAME.use                    = true
