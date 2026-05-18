@@ -610,11 +610,22 @@ Expected environment variables:
       - _K8S_CONTAINER_ENV_VAR_HASHES
       - _K8S_CONTAINER_VOLUME_MOUNT_HASHES
       - _K8S_CONTAINER_PORTS
-      - _EXEC_DEPLOYMENT_ID (exec operations only)
+      - _EXEC_DEPLOYMENT_ID (see note below)
 
   CHALK_K8S_PODMANIFEST_TOKEN_PATH (optional)
     Path to a file containing the bearer token used to authenticate requests
     to the CHALK_K8S_PODMANIFEST_URL endpoint.
+
+Note on _EXEC_DEPLOYMENT_ID:
+
+  This key is only computed during `chalk exec` when the running container
+  carries a chalk mark (i.e. the image was chalked at build time and the
+  chalk mark contains a METADATA_ID). Both conditions must hold: if chalk
+  is not running an exec operation, or if the container image is unchalked,
+  the deployment ID is not computed and the key will not be present in the
+  report. This is intentional — the deployment ID incorporates the image's
+  METADATA_ID to tie a specific build artifact to a specific runtime
+  configuration, which is only meaningful when the image identity is known.
 """
 }
 

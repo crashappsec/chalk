@@ -44,9 +44,9 @@ proc getContainerInfo(
     return
 
   let
-    env                 = container{"env"}.assertIs(JArray)
-    volumeMounts        = container{"volumeMounts"}.assertIs(JArray)
-    ports               = container{"ports"}.assertIs(JArray)
+    env                 = container{"env"}.default(newJArray()).assertIs(JArray)
+    volumeMounts        = container{"volumeMounts"}.default(newJArray()).assertIs(JArray)
+    ports               = container{"ports"}.default(newJArray()).assertIs(JArray)
     ignoredEnvVars      = attrGet[seq[string]]("exec.exec_deployment.ignored_env_vars")
     ignoredVolumeMounts = attrGet[seq[string]]("exec.exec_deployment.ignored_volume_mounts")
     downwardEnvVars     = newTable[string, string]()
@@ -269,21 +269,21 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
     namespace      = getEnv("CHALK_K8S_POD_NAMESPACE")
     podName        = getEnv("CHALK_K8S_POD_NAME")
     containerName  = getEnv("CHALK_K8S_CONTAINER_NAME")
-  if rawK8sMetadata == "" or namespace == "" or podName == "":
+  if rawK8sMetadata == "" or namespace == "" or podName == "" or containerName == "":
     return
 
-  result.setIfNeeded("_K8S_POD_NAME", podName)
+  result.setIfNeeded("_K8S_POD_NAMESPACE",      namespace)
+  result.setIfNeeded("_K8S_POD_NAME",           podName)
+  result.setIfNeeded("_K8S_POD_CONTAINER_NAME", containerName)
   var clusterId = ""
   try:
     let
       k8sMetadata     = parseJson(rawK8sMetadata).assertIs(JObject)
       clusterMetadata = k8sMetadata{"cluster"}.assertIs(JObject)
-    clusterId = clusterMetadata{"uid"}.getStr()
+    clusterId         = clusterMetadata{"uid"}.getStr()
     result.setIfNeeded("_K8S_CLUSTER_ID",                clusterId)
     result.setIfNeeded("_K8S_CLUSTER_NAME",              clusterMetadata{"name"}.getStr())
     result.setIfNeeded("_K8S_CLUSTER_ENDPOINT",          clusterMetadata{"endpoint"}.getStr())
-    result.setIfNeeded("_K8S_POD_NAMESPACE",             namespace)
-    result.setIfNeeded("_K8S_POD_CONTAINER_NAME",        containerName)
     result.trySetIfNeeded("_K8S_CLUSTER_CLOUD_METADATA", k8sMetadata{"cloud"}.default(newJObject()).assertIs(JObject).nimJsonToBox())
   except:
     trace("k8s: could not parse cluster metadata: " & getCurrentExceptionMsg())
@@ -293,7 +293,7 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
   let
     podManifestUrl       = getEnv("CHALK_K8S_PODMANIFEST_URL")
     podMetadataTokenPath = getEnv("CHALK_K8S_PODMANIFEST_TOKEN_PATH")
-  if podManifestUrl == "" or containerName == "" or podMetadataTokenPath == "":
+  if podManifestUrl == "" or podMetadataTokenPath == "":
     return
   let token = tryToLoadFile(podMetadataTokenPath)
   if token == "":

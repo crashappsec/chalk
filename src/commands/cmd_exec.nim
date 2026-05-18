@@ -151,8 +151,7 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
         codec        = getPluginByName("docker"),
       )
 
-      execChalk.addToAllChalks()
-
+    execChalk.addToAllChalks()
     result = some(execChalk)
 
 proc getChildExitStatus(pid: Pid): bool =
