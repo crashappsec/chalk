@@ -1,0 +1,20 @@
+parameter sink_config.crashoverride_pull.uri {
+  shortdoc: "Reporting URL where to send pull reports"
+  doc:      "Reporting URL where to send pull reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/pull"
+}
+
+sink_config crashoverride_pull {
+  ~enabled:              true
+  ~sink:                 "presign"
+  ~priority:             999999
+  ~auth:                 "crashoverride_reporting"
+  ~prefer_bundled_certs: true
+}
+
+custom_report crashoverride_pull {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride_pull"]
+  ~use_when:        ["pull"]
+}
