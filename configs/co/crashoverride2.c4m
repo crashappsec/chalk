@@ -1,0 +1,143 @@
+func validate_jwt(token) {
+  if not is_jwt_valid(token) {
+    return "Invalid JWT token for reporting reports back to CrashOverride"
+  }
+  return ""
+}
+
+parameter auth_config.crashoverride_reporting.token {
+  shortdoc:  "Crash Override API token"
+  doc:       "Token sending reports to CrashOverride"
+  default:   ""
+  validator: func validate_jwt(string) -> string
+}
+
+parameter sink_config.crashoverride_insert.uri {
+  shortdoc: "Reporting URL where to send insert reports"
+  doc:      "Reporting URL where to send insert reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/insert"
+}
+
+parameter sink_config.crashoverride_extract.uri {
+  shortdoc: "Reporting URL where to send extract reports"
+  doc:      "Reporting URL where to send extract reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/extract"
+}
+
+parameter sink_config.crashoverride_build.uri {
+  shortdoc: "Reporting URL where to send build reports"
+  doc:      "Reporting URL where to send build reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/build"
+}
+
+parameter sink_config.crashoverride_push.uri {
+  shortdoc: "Reporting URL where to send push reports"
+  doc:      "Reporting URL where to send push reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/push"
+}
+
+parameter sink_config.crashoverride_exec.uri {
+  shortdoc: "Reporting URL where to send exec reports"
+  doc:      "Reporting URL where to send exec reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/exec"
+}
+
+parameter sink_config.crashoverride_env.uri {
+  shortdoc: "Reporting URL where to send env reports"
+  doc:      "Reporting URL where to send env reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/env"
+}
+
+auth_config crashoverride_reporting {
+  ~auth:  "jwt"
+}
+
+sink_config crashoverride_insert {
+  ~enabled:         true
+  ~sink:            "presign"
+  ~priority:        999999
+  ~auth:            "crashoverride_reporting"
+}
+
+sink_config crashoverride_extract {
+  ~enabled:         true
+  ~sink:            "presign"
+  ~priority:        999999
+  ~auth:            "crashoverride_reporting"
+}
+
+sink_config crashoverride_build {
+  ~enabled:         true
+  ~sink:            "presign"
+  ~priority:        999999
+  ~auth:            "crashoverride_reporting"
+}
+
+sink_config crashoverride_push {
+  ~enabled:         true
+  ~sink:            "presign"
+  ~priority:        999999
+  ~auth:            "crashoverride_reporting"
+}
+
+sink_config crashoverride_exec {
+  ~enabled:         true
+  ~sink:            "presign"
+  ~priority:        999999
+  ~auth:            "crashoverride_reporting"
+}
+
+sink_config crashoverride_env {
+  ~enabled:         true
+  ~sink:            "presign"
+  ~priority:        999999
+  ~auth:            "crashoverride_reporting"
+}
+
+custom_report crashoverride_insert {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride_insert"]
+  ~use_when:        ["insert"]
+}
+
+custom_report crashoverride_extract {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride_extract"]
+  ~use_when:        ["extract"]
+}
+
+custom_report crashoverride_build {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride_build"]
+  ~use_when:        ["build"]
+}
+
+custom_report crashoverride_push {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride_push"]
+  ~use_when:        ["push"]
+}
+
+custom_report crashoverride_exec {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride_exec"]
+  ~use_when:        ["exec"]
+}
+
+custom_report crashoverride_env {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride_env"]
+  ~use_when:        ["env"]
+}
+
+# requirements for crashoverride integration
+~chalk_log_level             = "trace"
+~exec.command_name_from_args = true
+
+info("Crash Override integration is enabled and chalk reports will be sent to https://crashoverride.run")
