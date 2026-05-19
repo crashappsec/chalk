@@ -553,6 +553,82 @@ Captures metadata from the environment variables in AWS Lambda function.
 """
 }
 
+plugin k8s {
+    enabled:         true
+    post_run_keys:   ["_EXEC_DEPLOYMENT_ID",
+                      "_K8S_CLUSTER_ID",
+                      "_K8S_CLUSTER_NAME",
+                      "_K8S_CLUSTER_ENDPOINT",
+                      "_K8S_CLUSTER_CLOUD_METADATA",
+                      "_K8S_POD_NAMESPACE",
+                      "_K8S_POD_NAME",
+                      "_K8S_POD_LABELS",
+                      "_K8S_POD_ANNOTATIONS",
+                      "_K8S_POD_CONTAINER_NAME",
+                      "_K8S_POD_MANIFEST",
+                      "_K8S_CONTAINER_ENV_VAR_HASHES",
+                      "_K8S_CONTAINER_VOLUME_MOUNT_HASHES",
+                      "_K8S_CONTAINER_PORTS"
+                      ]
+    doc: """
+Collects Kubernetes runtime metadata when chalk is running inside a k8s pod.
+Metadata is sourced from environment variables injected by the chalk operator
+and an optional pod manifest endpoint.
+
+Expected environment variables:
+
+  CHALK_K8S_METADATA (required)
+    JSON object injected by the chalk operator. Must contain a `cluster`
+    subkey and may contain an optional `cloud` subkey with cloud provider
+    metadata (keys vary by provider):
+      {
+        "cluster": { "uid": "...", "name": "...", "endpoint": "..." },
+        "cloud":   { "provider": "...", "region": "...", ... }
+      }
+    Populates: _K8S_CLUSTER_ID, _K8S_CLUSTER_NAME, _K8S_CLUSTER_ENDPOINT,
+               _K8S_CLUSTER_CLOUD_METADATA (when `cloud` is present).
+
+  CHALK_K8S_POD_NAMESPACE (required)
+    The namespace the pod is running in.
+    Populates: _K8S_POD_NAMESPACE.
+
+  CHALK_K8S_POD_NAME (required)
+    The name of the pod.
+    Populates: _K8S_POD_NAME.
+
+  CHALK_K8S_CONTAINER_NAME (required)
+    The name of the container within the pod. Used to select the right
+    container spec when parsing the pod manifest.
+    Populates: _K8S_POD_CONTAINER_NAME.
+
+  CHALK_K8S_PODMANIFEST_URL (optional)
+    Fully constructed URL to the chalk operator's pod manifest endpoint.
+    When set, chalk fetches the pod manifest and populates:
+      - _K8S_POD_MANIFEST
+      - _K8S_POD_LABELS
+      - _K8S_POD_ANNOTATIONS
+      - _K8S_CONTAINER_ENV_VAR_HASHES
+      - _K8S_CONTAINER_VOLUME_MOUNT_HASHES
+      - _K8S_CONTAINER_PORTS
+      - _EXEC_DEPLOYMENT_ID (see note below)
+
+  CHALK_K8S_PODMANIFEST_TOKEN_PATH (optional)
+    Path to a file containing the bearer token used to authenticate requests
+    to the CHALK_K8S_PODMANIFEST_URL endpoint.
+
+Note on _EXEC_DEPLOYMENT_ID:
+
+  This key is only computed during `chalk exec` when the running container
+  carries a chalk mark (i.e. the image was chalked at build time and the
+  chalk mark contains a METADATA_ID). Both conditions must hold: if chalk
+  is not running an exec operation, or if the container image is unchalked,
+  the deployment ID is not computed and the key will not be present in the
+  report. This is intentional — the deployment ID incorporates the image's
+  METADATA_ID to tie a specific build artifact to a specific runtime
+  configuration, which is only meaningful when the image identity is known.
+"""
+}
+
 # This plugin takes values from the conf file, whether they're static
 # values, or callbacks. By default, these are of the lowest priority
 # of anything that can conflict.

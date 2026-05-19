@@ -155,6 +155,21 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   ~key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
 
+  # k8s
+  ~key._K8S_CLUSTER_ID.use                            = true
+  ~key._K8S_CLUSTER_NAME.use                          = true
+  ~key._K8S_CLUSTER_ENDPOINT.use                      = true
+  ~key._K8S_CLUSTER_CLOUD_METADATA.use                = true
+  ~key._K8S_POD_NAMESPACE.use                         = true
+  ~key._K8S_POD_NAME.use                              = true
+  ~key._K8S_POD_CONTAINER_NAME.use                    = true
+  ~key._K8S_POD_LABELS.use                            = true
+  ~key._K8S_POD_ANNOTATIONS.use                       = true
+  ~key._K8S_POD_MANIFEST.use                          = true
+  ~key._K8S_CONTAINER_ENV_VAR_HASHES.use              = true
+  ~key._K8S_CONTAINER_VOLUME_MOUNT_HASHES.use         = true
+  ~key._K8S_CONTAINER_PORTS.use                       = true
+  ~key._EXEC_DEPLOYMENT_ID.use                        = true
 
   # Artifact keys
   ~key._PROCESS_DETAIL.use                     = false

@@ -71,6 +71,21 @@ HELLO_GO_PATH = shutil.which("hello_go")
 GDB_PATH = shutil.which("gdb")
 
 
+K8S_TOKEN = "test-k8s-token"
+K8S_NAMESPACE = "default"
+K8S_POD_NAME = "test-pod"
+K8S_CONTAINER_NAME = "app"
+K8S_CLUSTER = {
+    "uid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "test-cluster",
+    "endpoint": "https://test-cluster.example.com",
+}
+K8S_CLOUD = {
+    "provider": "aws",
+    "region": "us-east-1",
+    "vpc_id": "vpc-0123456789abcdef0",
+}
+
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
 AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 AWS_SESSION_TOKEN = os.environ.get("AWS_SESSION_TOKEN", "")

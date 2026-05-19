@@ -1,0 +1,47 @@
+~docker.prep_postexec    = true
+~exec.postexec.run       = true
+
+parameter sink_config.crashoverride_postexec.uri {
+  shortdoc: "Reporting URL where to send postexec reports"
+  doc:      "Reporting URL where to send postexec reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/postexec"
+}
+
+sink_config crashoverride_insert {
+  ~prefer_bundled_certs: true
+}
+
+sink_config crashoverride_extract {
+  ~prefer_bundled_certs: true
+}
+
+sink_config crashoverride_build {
+  ~prefer_bundled_certs: true
+}
+
+sink_config crashoverride_push {
+  ~prefer_bundled_certs: true
+}
+
+sink_config crashoverride_exec {
+  ~prefer_bundled_certs: true
+}
+
+sink_config crashoverride_env {
+  ~prefer_bundled_certs: true
+}
+
+sink_config crashoverride_postexec {
+  ~enabled:             true
+  ~sink:                "presign"
+  ~priority:            999999
+  ~auth:                "crashoverride_reporting"
+  ~prefer_bundled_certs: true
+}
+
+custom_report crashoverride_postexec {
+  ~enabled:         true
+  ~report_template: "crashoverride"
+  ~sink_configs:    ["crashoverride_postexec"]
+  ~use_when:        ["postexec"]
+}

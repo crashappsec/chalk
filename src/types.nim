@@ -573,6 +573,7 @@ var
   dockerInvocation*:        DockerInvocation # ca be nil
   chalkExeSize*             = 0
   toCopyReportTemplateKeys* = TableRef[string, seq[string]]()
+  execChalk*                : ChalkObj
 
 template dumpExOnDebug*() =
   when not defined(release):

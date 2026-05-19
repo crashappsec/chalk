@@ -343,6 +343,7 @@ class Docker:
         volumes: Optional[dict[Path, Path | str]] = None,
         cwd: Optional[Path] = None,
         env: Optional[dict[str, str]] = None,
+        networks: Optional[list[str]] = None,
     ):
         cmd = ["docker", "create"]
         if name:
@@ -361,6 +362,8 @@ class Docker:
             cmd += ["-w", str(cwd)]
         for k, v in (env or {}).items():
             cmd += ["-e", f"{k}={v}"]
+        for i in networks or []:
+            cmd += ["--network", i]
         cmd += [image]
         cmd += params or []
         container_id = run(cmd).text

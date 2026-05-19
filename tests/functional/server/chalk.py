@@ -18,6 +18,7 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ..utils.log import get_logger
+from . import k8s  # noqa
 from .app import app
 from .db import models, schemas
 from .db.database import SessionLocal, engine

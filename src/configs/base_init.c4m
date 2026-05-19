@@ -16,6 +16,7 @@ exec {
   postexec {
     access_watch {}
   }
+  exec_deployment {}
 }
 
 # TODO Remove all sections below

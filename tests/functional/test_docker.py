@@ -3,6 +3,7 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import itertools
+import json
 import operator
 import os
 import platform
@@ -26,6 +27,12 @@ from .conf import (
     DOCKER_TOKEN_REPO,
     GHCR_REPO,
     IP,
+    K8S_CLOUD,
+    K8S_CLUSTER,
+    K8S_CONTAINER_NAME,
+    K8S_NAMESPACE,
+    K8S_POD_NAME,
+    K8S_TOKEN,
     MAGIC,
     MARKS,
     REGISTRY,
@@ -1072,7 +1079,11 @@ def test_wrap_entrypoint(
         _IMAGE_ENTRYPOINT=chalk_entrypoint,
         _IMAGE_CMD=cmd,
     )
-    _, chalk_output = Docker.run(digests.id, expected_success=runnable)
+    _, chalk_output = Docker.run(
+        digests.id,
+        expected_success=runnable,
+        env={"LOG_LEVEL": "none"},
+    )
     assert docker_output == chalk_output
 
 
@@ -1326,6 +1337,80 @@ def test_postexec(chalk_copy: Chalk, server_cert: Path):
                 "_OP_ARTIFACT_MOUNTED": False,
             },
         }
+    )
+
+
+def test_k8s(chalk_copy: Chalk, server_http: str, tmp_path: Path):
+    chalk_copy.load(CONFIGS / "docker_wrap.c4m", use_embedded=True, replace=False)
+
+    digests, _ = chalk_copy.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "sleep" / "Dockerfile",
+    )
+
+    token_file = tmp_path / "k8s-token"
+    token_file.write_text(K8S_TOKEN)
+
+    # mount a real file at the subPath volume mount path so that
+    # _K8S_CONTAINER_VOLUME_MOUNT_HASHES can be verified
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("db_host: postgres.default.svc.cluster.local\n")
+
+    sha256 = re.compile(r"^[a-f0-9]{64}$")
+
+    _, result = Docker.run(
+        image=digests.id,
+        check=False,
+        volumes={
+            token_file: "/var/run/secrets/k8s-token",
+            config_file: "/etc/config/config.yaml",
+        },
+        networks=["chalk_chalk"],
+        env={
+            "CHALK_K8S_METADATA": json.dumps(
+                {"cluster": K8S_CLUSTER, "cloud": K8S_CLOUD}
+            ),
+            "CHALK_K8S_POD_NAMESPACE": K8S_NAMESPACE,
+            "CHALK_K8S_POD_NAME": K8S_POD_NAME,
+            "CHALK_K8S_CONTAINER_NAME": K8S_CONTAINER_NAME,
+            "CHALK_K8S_PODMANIFEST_URL": f"{server_http}/v1/podinfo/{K8S_NAMESPACE}/{K8S_POD_NAME}",
+            "CHALK_K8S_PODMANIFEST_TOKEN_PATH": "/var/run/secrets/k8s-token",
+            "SLEEP": "10",
+        },
+    )
+    chalk_result = ChalkProgram.from_program(result)
+    exec_report = chalk_result.first_report
+
+    assert exec_report["_OPERATION"] == "exec"
+    assert exec_report.has(
+        _K8S_CLUSTER_ID=K8S_CLUSTER["uid"],
+        _K8S_CLUSTER_NAME=K8S_CLUSTER["name"],
+        _K8S_CLUSTER_ENDPOINT=K8S_CLUSTER["endpoint"],
+        _K8S_CLUSTER_CLOUD_METADATA=K8S_CLOUD,
+        _K8S_POD_NAMESPACE=K8S_NAMESPACE,
+        _K8S_POD_NAME=K8S_POD_NAME,
+        _K8S_POD_CONTAINER_NAME=K8S_CONTAINER_NAME,
+        _K8S_POD_LABELS={"app": "test-app", "version": "v1"},
+        _K8S_POD_ANNOTATIONS={"deployment.kubernetes.io/revision": "1"},
+        _K8S_POD_MANIFEST={
+            "metadata": {"name": K8S_POD_NAME, "namespace": K8S_NAMESPACE},
+            "spec": ANY,
+        },
+        # ports declared in the container spec
+        _K8S_CONTAINER_PORTS={"8080/TCP", "9090/TCP"},
+        # NODE_IP is a downward API var and must be excluded from hashes
+        _K8S_CONTAINER_ENV_VAR_HASHES={
+            "NODE_IP": MISSING,
+            "APP_ENV": sha256,
+            "LOG_LEVEL": sha256,
+            "DB_HOST": sha256,
+            "DB_PASSWORD": sha256,
+            "SLEEP": MISSING,  # only k8s vars are reported
+        },
+        # only the subPath mount has a real file in the test container
+        _K8S_CONTAINER_VOLUME_MOUNT_HASHES={
+            "/etc/config/config.yaml": sha256,
+        },
+        _EXEC_DEPLOYMENT_ID=sha256,
     )
 
 

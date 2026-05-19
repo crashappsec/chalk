@@ -497,6 +497,23 @@ report and subtract from it.
   key._AWS_RESERVATION_ID.use                 = true
   key._AWS_SPOT_INSTANCE_ACTION.use           = true
   key._AWS_SPOT_TERMINATION_TIME.use          = true
+
+  # k8s
+  key._K8S_CLUSTER_ID.use                     = true
+  key._K8S_CLUSTER_NAME.use                   = true
+  key._K8S_CLUSTER_ENDPOINT.use               = true
+  key._K8S_CLUSTER_CLOUD_METADATA.use         = true
+  key._K8S_POD_NAMESPACE.use                  = true
+  key._K8S_POD_NAME.use                       = true
+  key._K8S_POD_CONTAINER_NAME.use             = true
+  key._K8S_POD_LABELS.use                     = true
+  key._K8S_POD_ANNOTATIONS.use                = true
+  key._K8S_POD_MANIFEST.use                   = true
+  key._K8S_CONTAINER_ENV_VAR_HASHES.use       = true
+  key._K8S_CONTAINER_VOLUME_MOUNT_HASHES.use  = true
+  key._K8S_CONTAINER_PORTS.use                = true
+  key._EXEC_DEPLOYMENT_ID.use                 = true
+
   key._X509_VERSION.use                       = true
   key._X509_SUBJECT.use                       = true
   key._X509_SUBJECT_ALTERNATIVE_NAME .use     = true
@@ -683,6 +700,22 @@ doc: """
   key._AWS_IAM_INFO.use                              = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
+
+  # k8s
+  key._K8S_CLUSTER_ID.use                            = true
+  key._K8S_CLUSTER_NAME.use                          = true
+  key._K8S_CLUSTER_ENDPOINT.use                      = true
+  key._K8S_CLUSTER_CLOUD_METADATA.use                = true
+  key._K8S_POD_NAMESPACE.use                         = true
+  key._K8S_POD_NAME.use                              = true
+  key._K8S_POD_CONTAINER_NAME.use                    = true
+  key._K8S_POD_LABELS.use                            = true
+  key._K8S_POD_ANNOTATIONS.use                       = true
+  key._K8S_POD_MANIFEST.use                          = true
+  key._K8S_CONTAINER_ENV_VAR_HASHES.use              = true
+  key._K8S_CONTAINER_VOLUME_MOUNT_HASHES.use         = true
+  key._K8S_CONTAINER_PORTS.use                       = true
+  key._EXEC_DEPLOYMENT_ID.use                        = true
 
   # Artifact keys.
   key.DATE_CHALKED.use                        = true
@@ -1237,6 +1270,21 @@ container.
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
 
+  # k8s
+  key._K8S_CLUSTER_ID.use                            = true
+  key._K8S_CLUSTER_NAME.use                          = true
+  key._K8S_CLUSTER_ENDPOINT.use                      = true
+  key._K8S_CLUSTER_CLOUD_METADATA.use                = true
+  key._K8S_POD_NAMESPACE.use                         = true
+  key._K8S_POD_NAME.use                              = true
+  key._K8S_POD_CONTAINER_NAME.use                    = true
+  key._K8S_POD_LABELS.use                            = true
+  key._K8S_POD_ANNOTATIONS.use                       = true
+  key._K8S_POD_MANIFEST.use                          = true
+  key._K8S_CONTAINER_ENV_VAR_HASHES.use              = true
+  key._K8S_CONTAINER_VOLUME_MOUNT_HASHES.use         = true
+  key._K8S_CONTAINER_PORTS.use                       = true
+  key._EXEC_DEPLOYMENT_ID.use                        = true
 
   # Artifact keys
   key._PROCESS_DETAIL.use                     = false
@@ -1760,6 +1808,21 @@ and keep the run-time key.
   key._AWS_IDENTITY_CREDENTIALS_EC2_INFO.use         = true
   key._AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE.use = true
 
+  # k8s
+  key._K8S_CLUSTER_ID.use                            = true
+  key._K8S_CLUSTER_NAME.use                          = true
+  key._K8S_CLUSTER_ENDPOINT.use                      = true
+  key._K8S_CLUSTER_CLOUD_METADATA.use                = true
+  key._K8S_POD_NAMESPACE.use                         = true
+  key._K8S_POD_NAME.use                              = true
+  key._K8S_POD_CONTAINER_NAME.use                    = true
+  key._K8S_POD_LABELS.use                            = true
+  key._K8S_POD_ANNOTATIONS.use                       = true
+  key._K8S_POD_MANIFEST.use                          = true
+  key._K8S_CONTAINER_ENV_VAR_HASHES.use              = true
+  key._K8S_CONTAINER_VOLUME_MOUNT_HASHES.use         = true
+  key._K8S_CONTAINER_PORTS.use                       = true
+  key._EXEC_DEPLOYMENT_ID.use                        = true
 
   # Artifact keys
   key._PROCESS_DETAIL.use                     = false

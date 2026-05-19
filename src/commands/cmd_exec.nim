@@ -65,7 +65,6 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     n:        array[PATH_MAX, char]
     exe1path: string = ""
     info:     Stat
-    chalk:    ChalkObj
     extract:  ChalkDict
 
   when hostOS == "macosx":
@@ -95,22 +94,24 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
         return none(ChalkObj)
       extract = stream.extractOneChalkJson(cid)
 
-    chalk         = newChalk(name         = exe1path,
-                             fsRef        = exe1path,
-                             containerId  = cidOpt.getOrElse(""),
-                             pid          = some(pid),
-                             resourceType = {ResourcePid, ResourceFile},
-                             extract      = extract,
-                             codec        = getPluginByName("docker"))
+    execChalk = newChalk(
+      name         = exe1path,
+      fsRef        = exe1path,
+      containerId  = cidOpt.getOrElse(""),
+      pid          = some(pid),
+      resourceType = {ResourcePid, ResourceFile},
+      extract      = extract,
+      codec        = getPluginByName("docker"),
+    )
 
-    for k, v in chalk.extract:
-      chalk.collectedData[k] = v
+    for k, v in execChalk.extract:
+      execChalk.collectedData[k] = v
 
-    if chalk.containerId != "":
-      chalk.resourceType = chalk.resourceType + {ResourceContainer}
+    if execChalk.containerId != "":
+      execChalk.resourceType.incl(ResourceContainer)
 
-    result = some(chalk)
-    chalk.addToAllChalks()
+    result = some(execChalk)
+    execChalk.addToAllChalks()
 
   else:
     trace("Could not find a container chalk mark at " & chalkPath)
@@ -125,11 +126,11 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
     # in this path.
 
     for item in artifacts(@[exe1path]):
-      chalk     = item
-      chalk.pid = some(pid)
+      execChalk     = item
+      execChalk.pid = some(pid)
       break
 
-    if chalk == nil:
+    if execChalk == nil:
       # If we got here, the executable is unmarked.  It won't
       # have a CHALK_ID.
       #
@@ -142,16 +143,16 @@ proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
       # For now, we assume we're running in a container just because
       # we won't try file system IO.
 
-      chalk = newChalk(name         = exe1path,
-                       fsRef        = exe1path,
-                       resourceType = {ResourceFile},
-                       codec        = getPluginByName("docker"))
+      execChalk = newChalk(
+        name         = exe1path,
+        fsRef        = exe1path,
+        resourceType = {ResourceFile},
+        pid          = some(pid),
+        codec        = getPluginByName("docker"),
+      )
 
-      chalk.addToAllChalks()
-
-    result = some(chalk)
-
-    chalk.pid = some(pid)
+    execChalk.addToAllChalks()
+    result = some(execChalk)
 
 proc getChildExitStatus(pid: Pid): bool =
   var stat_loc: cint
