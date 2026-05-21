@@ -140,6 +140,12 @@
   loaded component parameters.
   ([#664](https://github.com/crashappsec/chalk/pull/664))
 
+- Reset reporting state before each heartbeat report
+  after the heartbeat interval sleep.
+  This fixes timestamp reported during the heartbeat.
+  Previously it would report timestamp from a previous heartbeat.
+  ([#668](https://github.com/crashappsec/chalk/issues/668))
+
 ## 1.0.2
 
 **April 29, 2026**
