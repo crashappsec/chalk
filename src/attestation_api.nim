@@ -27,7 +27,6 @@ import "./attestation"/[
 import "./docker"/[
   ids,
   manifest,
-  registry,
 ]
 
 export canVerifyByHash, canVerifyBySigStore # from utils
@@ -277,20 +276,6 @@ proc signBySigStore*(chalk: ChalkObj,
   except:
     discard
 
-  var manifest: DockerManifest
-  let spec = image.asOciAttestation()
-  try:
-    manifest = spec.fetchListManifest(fetchManifests = true)
-    trace("attestation: adding to existing manifest list")
-  except RegistryResponseError:
-    manifest = DockerManifest(
-      name: spec,
-      kind: DockerManifestType.list,
-      mediaType: "application/vnd.oci.image.index.v1+json",
-      manifests: @[],
-    )
-    trace("attestation: creating new manifest list")
-
   let
     mark    = parseJson(chalk.getChalkMarkAsStr())
     subject = image.fetchImageManifest(chalk.platform)
@@ -341,7 +326,7 @@ proc signBySigStore*(chalk: ChalkObj,
       "dsseEnvelope": dsse,
     })
   result.setIfNotEmpty("_SIGNATURES", %(@[dsse]))
-  manifest.add(
+  subject.asImage().appendToAttestationManifestList(
     DockerManifest(
       kind:         DockerManifestType.image,
       mediaType:    "application/vnd.oci.image.manifest.v1+json",
@@ -366,8 +351,6 @@ proc signBySigStore*(chalk: ChalkObj,
       ],
     ),
   )
-  info("attestation: pushing attestation for " & $image & " to " & $spec)
-  manifest.put()
 
 proc signBySigStore*(chalk: ChalkObj): ChalkDict =
   result = ChalkDict()

@@ -4859,6 +4859,114 @@ For example:
 """
 }
 
+keyspec _REPO_BUILD_CONTEXTS {
+    kind:             RunTimeArtifact
+    type:             dict[string, dict[string, dict[string, string]]]
+    standard:         true
+    doc: """
+When chalk uploads Docker build contexts as OCI attestations, records the
+digest of each uploaded attestation manifest. The structure is as follows:
+
+* normalized registry name (domain and port if any)
+* repository name
+* context name (`"."` for the main context, named value for `--build-context` extras)
+* attestation manifest digest (without `sha256:` prefix)
+
+For example:
+
+```json
+{
+  "_REPO_BUILD_CONTEXTS": {
+    "registry-1.docker.io": {
+      "my-org/my-app": {
+        ".":    "a1b2c3d4...",
+        "libs": "e5f6a7b8..."
+      }
+    }
+  }
+}
+```
+"""
+}
+
+keyspec DOCKER_BUILD_CONTEXT_SNAPSHOTS {
+    kind:             ChalkTimeArtifact
+    type:             dict[string, dict[string, dict[string, dict[string, string]]]]
+    standard:         true
+    doc: """
+Intermediate state used when `chalk docker build` and `chalk docker push` are
+invoked as separate commands with `upload_context: true` configured.
+
+At build time Chalk stores per-push-config, per-context information with the
+same structure as `_REPO_BUILD_CONTEXTS`:
+
+* normalized registry name (domain and port if any)
+* repository name
+* context name (`"."` for the main context, named value for `--build-context` extras)
+* strategy-specific fields (`strategy`, `blob_digest`, `blob_size`, `tar_path`, `context_path`)
+
+At push time Chalk reads this key from the chalk mark to complete the context
+attestation upload.
+
+For example, with the `registry` strategy and a named extra context:
+
+```json
+{
+  "DOCKER_BUILD_CONTEXT_SNAPSHOTS": {
+    "registry.example.com": {
+      "my-org/my-app": {
+        ".": {
+          "strategy":    "registry",
+          "blob_digest": "a1b2c3d4...",
+          "blob_size":   "123456"
+        },
+        "libs": {
+          "strategy":    "registry",
+          "blob_digest": "e5f6a7b8...",
+          "blob_size":   "654321"
+        }
+      }
+    }
+  }
+}
+```
+
+With the `local` strategy:
+
+```json
+{
+  "DOCKER_BUILD_CONTEXT_SNAPSHOTS": {
+    "registry.example.com": {
+      "my-org/my-app": {
+        ".": {
+          "strategy":  "local",
+          "tar_path":  "/tmp/chalk-build-contexts/2025-01-15T14-32-07/my-app-1234567890.tar.gz"
+        }
+      }
+    }
+  }
+}
+```
+
+With the `disk` strategy:
+
+```json
+{
+  "DOCKER_BUILD_CONTEXT_SNAPSHOTS": {
+    "registry.example.com": {
+      "my-org/my-app": {
+        ".": {
+          "strategy":     "disk",
+          "context_path": "/path/to/build/context"
+        }
+      }
+    }
+  }
+}
+```
+"""
+}
+
 keyspec _REPO_URLS {
     kind:             RunTimeArtifact
     type:             dict[string, dict[string, string]]

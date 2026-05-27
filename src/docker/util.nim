@@ -6,6 +6,7 @@
 ##
 
 import std/[
+  os,
   re,
   unicode,
 ]
@@ -14,9 +15,27 @@ import ".."/[
   utils/json,
   utils/strings,
 ]
-import "."/[
-  ids,
-]
+
+proc isCI*(): bool =
+  ## Return true when running inside a known CI environment.
+  const ciEnvVars = [
+    "CI",                     # generic (GitHub Actions, GitLab CI, CircleCI, Travis CI, etc.)
+    "GITHUB_ACTIONS",         # GitHub Actions
+    "GITLAB_CI",              # GitLab CI
+    "JENKINS_URL",            # Jenkins
+    "CIRCLECI",               # CircleCI
+    "TRAVIS",                 # Travis CI
+    "BUILDKITE",              # Buildkite
+    "DRONE",                  # Drone CI
+    "SEMAPHORE",              # Semaphore CI
+    "TEAMCITY_VERSION",       # TeamCity
+    "BITBUCKET_BUILD_NUMBER", # Bitbucket Pipelines
+    "CODEBUILD_BUILD_ID",     # AWS CodeBuild
+  ]
+  for v in ciEnvVars:
+    if getEnv(v) != "":
+      return true
+  return false
 
 template withAtomicAdds*(ctx: DockerInvocation, code: untyped) =
   withAtomicVar(ctx.addedPlatform):
@@ -166,6 +185,38 @@ proc getValue*(secret: DockerSecret): string =
   if secret.src != "":
     return tryToLoadFile(secret.src)
   return ""
+
+iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
+  ## Yields a fully-resolved DockerContextUploadConfig for each docker_push
+  ## config that has upload_context = true and at least one tag.
+  for registryName in getChalkSubsections("docker.docker_registry"):
+    let
+      registrySection = "docker.docker_registry." & registryName
+      registryUri     = attrGet[string](registrySection & ".uri").removeSuffix('/')
+      registryEnabled = attrGet[bool](registrySection & ".enabled")
+    if not registryEnabled:
+      continue
+    for pushName in getChalkSubsections(registrySection & ".docker_push"):
+      let
+        pushSection   = registrySection & ".docker_push." & pushName
+        pushEnabled   = attrGet[bool](pushSection & ".enabled")
+        uploadContext = attrGet[bool](pushSection & ".upload_context")
+        pushTags      = attrGet[seq[string]](pushSection & ".tags")
+        pushRepo      = attrGet[string](pushSection & ".repository").removePrefix('/')
+        rawStrategy   = attrGet[string](pushSection & ".upload_context_strategy")
+        strategy      = if rawStrategy != "auto": rawStrategy
+                        elif isCI():              "registry"
+                        else:                     "local"
+        sizeThreshold = int(attrGet[Con4mSize](pushSection & ".upload_context_size_threshold"))
+      if not pushEnabled or not uploadContext or len(pushTags) == 0:
+        continue
+      yield DockerContextUploadConfig(
+        registryUri:   registryUri,
+        repoPath:      pushRepo,
+        tags:          pushTags,
+        strategy:      strategy,
+        sizeThreshold: sizeThreshold,
+      )
 
 iterator iterPushTags*(chalk: ChalkObj): string =
   for registryName in getChalkSubsections("docker.docker_registry"):

@@ -2008,6 +2008,20 @@ is invoked on an image instead of a file-system path.
 """
   }
 
+  field build_context_cache_max_age {
+    type:     Duration
+    default:  << 1 hrs >>
+    shortdoc: "Max age of cached build context tarballs"
+    doc:      """
+When `upload_context_strategy` is `local` or `auto` (and the build is not in
+CI), Chalk saves the build context as a `.tar.gz` under
+`<tmpdir>/chalk-build-contexts/`. This setting controls how long those cached
+tarballs are kept before being deleted.
+
+The cleanup runs at `chalk docker build` time, before new tarballs are created.
+"""
+  }
+
 }
 
 docker_login_types := ["", "get"]
@@ -2202,6 +2216,69 @@ For example, `"myapp-{BRANCH}"` substitutes the `BRANCH` chalk key.
 Key names are case-insensitive - `{BRANCH}` and `{branch}` are equivalent.
 Any characters in the substituted value that are not alphanumeric, `.`,
 `_`, or `-` are replaced with `-` to produce a valid Docker tag.
+"""
+  }
+
+  field upload_context {
+    type:     bool
+    default:  false
+    shortdoc: "Upload the build context as an OCI attestation"
+    doc:      """
+When `true` and `tags` is non-empty, Chalk uploads the Docker build context
+as a `.tar.gz` OCI artifact attached to the pushed image.  The artifact uses
+`artifactType: application/vnd.crashoverride.chalk.build-context.v1` and is
+stored at the attestation tag `sha256-<image-manifest-digest>`.
+
+The upload strategy (when the tarball is created and when the manifest is
+pushed) is controlled by `upload_context_strategy`.
+"""
+  }
+
+  field upload_context_mode {
+    type:    string
+    default: "full"
+    choices: ["full"]
+    shortdoc: "Build context upload mode"
+    doc:     """
+Controls which parts of the build context are uploaded.  Currently only
+`"full"` is supported, which archives the entire context directory.
+"""
+  }
+
+  field upload_context_strategy {
+    type:    string
+    default: "auto"
+    choices: ["auto", "registry", "local", "disk"]
+    shortdoc: "Strategy for build context upload timing"
+    doc:     """
+Controls when the build context tarball is created and uploaded relative to
+`chalk docker build` and `chalk docker push`:
+
+* `auto` — uses `registry` in CI environments (where `CI`, `GITHUB_ACTIONS`,
+  `GITLAB_CI`, `JENKINS_URL`, or similar env vars are set) and `local`
+  otherwise.
+* `registry` — at build time, upload the context blob to the target registry
+  immediately; at push time, create the attestation manifest referencing the
+  already-uploaded blob.
+* `local` — at build time, save the context as a `.tar.gz` under
+  `<tmpdir>/chalk-build-contexts/`; at push time, upload the blob and create
+  the attestation manifest.
+* `disk` — at push time, read the context directory from disk (using the path
+  recorded at build time), create a tarball, upload, and push the manifest.
+  Users who choose this strategy accept the risk that the context directory
+  may have been modified between build and push.
+"""
+  }
+
+  field upload_context_size_threshold {
+    type:     Size
+    default:  <<100mb>>
+    shortdoc: "Skip context upload when tarball exceeds this size"
+    doc:      """
+Maximum size of the build context `.tar.gz` archive to upload, in bytes.
+If the tarball exceeds this threshold, the context upload is skipped and
+the failure is recorded in `_OP_FAILED_KEYS` via the failed-key mechanism.
+A value of `0` disables the check and always uploads regardless of size.
 """
   }
 }
@@ -4745,6 +4822,7 @@ func object_store_check(path, val) {
     return "No such object store configured: '" + val + "'"
   }
 }
+
 
 func auth_object_check(path) {
   result := ""

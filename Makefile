@@ -60,6 +60,7 @@ endif
 	mv $(BINARY) $@
 	cp $@ $(BINARY)
 	ls -la $(BINARY) $@
+	touch $(WATCH_DONE)
 
 debug: DEBUG=true
 $(BUILDS):

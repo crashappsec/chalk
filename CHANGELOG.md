@@ -28,10 +28,10 @@
     chalk mark is inserted as a string KV pair `chalk.mark` in the
     metadata section. GGUF tensor data offsets are relative to the data
     section start, so the codec recomputes the alignment padding when
-    the KV section size changes — leaving offsets valid.
+    the KV section size changes - leaving offsets valid.
   - `safetensors` - This codec marks `.safetensors` ML model files in place. The chalk
     mark is inserted as a string value under `__metadata__.chalk` in the
-    file's JSON header — which is the location the SafeTensors format
+    file's JSON header - which is the location the SafeTensors format
     reserves for arbitrary user metadata. Tensor `data_offsets` are
     relative to the data section start, so the header may grow without
     breaking offsets.
@@ -43,7 +43,7 @@
   ([#658](https://github.com/crashappsec/chalk/pull/658))
 
 - New caller attestation plugin. The plugin ingests a JSON envelope from the
-  spawning process — either inline via `CHALK_CALLER_ATTESTATION` or from a
+  spawning process - either inline via `CHALK_CALLER_ATTESTATION` or from a
   file path in `CHALK_CALLER_ATTESTATION_FILE`. It allows a trusted system daemon
   like `crayon` to inject useful metadata into the artifact which otherwise
   chalk cannot derive.
@@ -67,19 +67,27 @@
   when entrypoint wrapping is enabled.
   ([#656](https://github.com/crashappsec/chalk/pull/656))
 
-- Docker registry push support. Chalk can now be configured to automatically
-  log in to and push images to additional registries during
-  `chalk docker build` and `chalk docker push`.
+- Docker registry push and build context upload support. Chalk can now
+  be configured to automatically log in to and push images to additional
+  registries during `chalk docker build` and `chalk docker push`.
+  Additionally, the build context can be uploaded as an OCI attestation
+  attached to the image, enabling downstream tools such as Ocular to
+  inspect the exact sources used to produce it.
 
   New configuration sections:
-  - `docker.docker_registry` — declares a registry with its URI and login method
-  - `docker.docker_registry.<name>.docker_login_get` — fetches credentials via
+  - `docker.docker_registry` - declares a registry with its URI and login method
+  - `docker.docker_registry.<name>.docker_login_get` - fetches credentials via
     HTTP GET and runs `docker login` before any build or push; supports an
     `enabled` field (default `true`) to disable login without removing the
     configuration
-  - `docker.docker_registry.<name>.docker_push` — declares repositories and
-    tags to push the built or pushed image to, with tag values supporting
-    `{CHALK_KEY}` substitution
+  - `docker.docker_registry.<name>.docker_push` - declares repositories,
+    tags, and context upload options. Key fields:
+    - `repository`, `tags` - where and how to tag the pushed image
+    - `upload_context` - enable build context upload as an OCI attestation
+    - `upload_context_strategy` - `registry`, `local`, `disk`, or `auto`
+    - `upload_context_size_threshold` - skip upload when tarball exceeds
+      this size (default: 100mb); failure reported in `_OP_FAILED_KEYS`
+      with code `CONTEXT_TOO_LARGE`; set to `0` to disable
 
   ```
   docker {
@@ -93,10 +101,39 @@
       docker_push my_app {
         repository: "my-org/my-app"
         tags: ["latest", "{BRANCH}", "{TAG}"]
+        upload_context: true
+        upload_context_strategy: "auto"
       }
     }
   }
   ```
+
+  Upload strategies for `upload_context_strategy`:
+  - `registry` - uploads the blob at build time; only the manifest is
+    created at push time (recommended for CI)
+  - `local` - saves the tarball to `/tmp` at build time and uploads at
+    push time (default for non-CI environments)
+  - `disk` - records the context path at build time and reads from disk
+    at push time (single-machine workflows only)
+  - `auto` - selects `registry` when a CI environment is detected,
+    otherwise `local`
+
+  Git URL contexts are intentionally skipped - their content is already
+  captured in git state. Both the main context and any extra contexts
+  added via `--build-context name=path` are supported for local
+  directory contexts.
+
+  New chalk keys:
+  - `DOCKER_BUILD_CONTEXT_SNAPSHOTS` (chalk-time) - intermediate upload
+    state embedded in the chalk mark, consumed at push time
+  - `_REPO_BUILD_CONTEXTS` (runtime) - map of attestation manifest
+    digests keyed by registry -> repo -> context name
+
+  New configuration field on `docker`:
+  - `build_context_cache_max_age` - maximum age of cached tarballs
+    under `/tmp/chalk-build-contexts/` (default: 1 hour)
+
+  See `docs/design-docker-registry.md` for full details.
 
   ([#664](https://github.com/crashappsec/chalk/pull/664),
   [#665](https://github.com/crashappsec/chalk/pull/665))
@@ -110,20 +147,20 @@
   deployment tracking across pod restarts and environment promotions.
 
   New keys:
-  - `_K8S_CLUSTER_ID` — unique identifier of the cluster
-  - `_K8S_CLUSTER_NAME` — name of the cluster
-  - `_K8S_CLUSTER_ENDPOINT` — API endpoint of the cluster
-  - `_K8S_CLUSTER_CLOUD_METADATA` — cloud provider metadata (keys vary by provider)
-  - `_K8S_POD_NAMESPACE` — namespace the pod is running in
-  - `_K8S_POD_NAME` — name of the pod
-  - `_K8S_POD_CONTAINER_NAME` — name of the container within the pod
-  - `_K8S_POD_LABELS` — labels attached to the pod
-  - `_K8S_POD_ANNOTATIONS` — annotations attached to the pod
-  - `_K8S_POD_MANIFEST` — full pod manifest as returned by the chalk operator
-  - `_K8S_CONTAINER_ENV_VAR_HASHES` — hashes of the container's env var values
-  - `_K8S_CONTAINER_VOLUME_MOUNT_HASHES` — hashes of mounted config and secret file contents
-  - `_K8S_CONTAINER_PORTS` — declared container ports in `<port>/<protocol>` format
-  - `_EXEC_DEPLOYMENT_ID` — stable hash identifying the workload deployment configuration
+  - `_K8S_CLUSTER_ID` - unique identifier of the cluster
+  - `_K8S_CLUSTER_NAME` - name of the cluster
+  - `_K8S_CLUSTER_ENDPOINT` - API endpoint of the cluster
+  - `_K8S_CLUSTER_CLOUD_METADATA` - cloud provider metadata (keys vary by provider)
+  - `_K8S_POD_NAMESPACE` - namespace the pod is running in
+  - `_K8S_POD_NAME` - name of the pod
+  - `_K8S_POD_CONTAINER_NAME` - name of the container within the pod
+  - `_K8S_POD_LABELS` - labels attached to the pod
+  - `_K8S_POD_ANNOTATIONS` - annotations attached to the pod
+  - `_K8S_POD_MANIFEST` - full pod manifest as returned by the chalk operator
+  - `_K8S_CONTAINER_ENV_VAR_HASHES` - hashes of the container's env var values
+  - `_K8S_CONTAINER_VOLUME_MOUNT_HASHES` - hashes of mounted config and secret file contents
+  - `_K8S_CONTAINER_PORTS` - declared container ports in `<port>/<protocol>` format
+  - `_EXEC_DEPLOYMENT_ID` - stable hash identifying the workload deployment configuration
 
   ([#665](https://github.com/crashappsec/chalk/pull/665))
 
@@ -1363,7 +1400,7 @@
     For `docker build` its either `build` or `base`.
   - `DOCKER_BASE_IMAGE_REGISTRY` - just registry of the base image
   - `DOCKER_BASE_IMAGE_NAME` - repo name within the registry
-  - `DOCKER_BASE_IMAGE_ID` - image id (config digest) of the base image
+  - `DOCKER_BASE_IMAGE_ID` - image id (config digest) of the base image
   - `DOCKER_BASE_IMAGE_METADATA_ID` - id of the base image chalkmark
   - `DOCKER_BASE_IMAGE_CHALK`` - full chalkmark of base image
   - `_COLLECTED_ARTIFACTS` - similar to `_CHALKS` but reports collected

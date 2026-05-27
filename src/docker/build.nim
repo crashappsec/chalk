@@ -7,7 +7,6 @@
 
 import std/[
   net,
-  re,
 ]
 import ".."/[
   chalkjson,
@@ -26,6 +25,7 @@ import ".."/[
 import "."/[
   base,
   collect,
+  context_upload,
   dockerfile,
   entrypoint,
   exe,
@@ -576,10 +576,10 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   ctx.processCmdLine()
   ctx.evalAndExtractDockerfile(ctx.getAllBuildArgs())
 
-  forceReportKeys(["_REPO_TAGS", "_REPO_DIGESTS"])
+  forceReportKeys(["_REPO_TAGS", "_REPO_DIGESTS", "_REPO_BUILD_CONTEXTS"])
   # force DOCKER_PLATFORM to be included in chalk normalization
   # which is required to compute unique METADATA_* keys
-  forceChalkKeys(["DOCKER_PLATFORM"])
+  forceChalkKeys(["DOCKER_PLATFORM", "DOCKER_BUILD_CONTEXT_SNAPSHOTS"])
 
   # login to any registries before any collection
   # as auth provided by auth might be required
@@ -615,6 +615,21 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   ctx.pinBuildSectionBaseImages()
 
   trace("docker: preparing chalk marks for build")
+  cleanBuildContextCache()
+  # Upload context blobs / create local tarballs on baseChalk before
+  # copyPerPlatform so all platform copies inherit the snapshot state.
+  for config in baseChalk.iterContextUploadRepos():
+    try:
+      baseChalk.collectedData.merge(
+        uploadBuildContextsAtBuildTime(
+          ctx    = ctx,
+          config = config,
+        ),
+        deep = true,
+      )
+    except:
+      error("docker: build context upload failed: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
   var oneChalk         = baseChalk
   let chalksByPlatform = baseChalk.copyPerPlatform(ctx.platforms)
   # chalk time artifact info determines metadata id/etc
@@ -736,6 +751,19 @@ proc dockerBuild*(ctx: DockerInvocation): int =
       warn("docker: " & getCurrentExceptionMsg())
       dumpExOnDebug()
       return
+
+    # If the image was pushed to a registry during this build, we have image
+    # digests now and can complete the attestation manifest immediately.
+    # For separate build+push workflows the manifest is completed at push time.
+    for _, chalk in chalksByPlatform:
+      chalk.withErrorContext():
+        try:
+          chalk.collectedData.merge(chalk.completeBuildContextUploads(
+            source = chalk.collectedData,
+          ))
+        except:
+          error("docker: build context attestation failed: " & getCurrentExceptionMsg())
+          dumpExOnDebug()
 
   trace("docker: collecting post-build runtime data")
   withSuspendChalkCollectionFor(suspendPlugins):

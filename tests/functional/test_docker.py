@@ -2259,3 +2259,74 @@ def test_version_bare(chalk_default: Chalk):
         params=["version"],
     )
     assert run
+
+
+@pytest.mark.parametrize(
+    "strategy, push",
+    [
+        # separate build + push: all strategies are meaningfully different
+        ("registry", False),
+        ("local", False),
+        ("disk", False),
+        # combined --push: strategies collapse to same behaviour; test one
+        ("local", True),
+    ],
+)
+def test_build_context_upload(
+    chalk_copy: Chalk,
+    strategy: str,
+    push: bool,
+    random_hex: str,
+    server_http: str,
+):
+    name = f"context_upload_{random_hex}"
+    repo = f"{REGISTRY}/{name}"
+    tag = f"{repo}:latest"
+    env = {
+        "CHALK_SERVER": server_http,
+        "CONTEXT_STRATEGY": strategy,
+    }
+
+    digests, build_result = chalk_copy.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
+        tag=tag,
+        push=push,
+        run_docker=False,
+        config=CONFIGS / "docker_context.c4m",
+        env=env,
+        buildx=True,
+    )
+
+    if not push:
+        _, push_result = chalk_copy.docker_push(
+            tag,
+            env=env,
+            digests=digests,
+            config=CONFIGS / "docker_context.c4m",
+        )
+    else:
+        push_result = build_result
+
+    # snapshots are embedded in the chalk mark at build time
+    assert build_result.mark.has(
+        DOCKER_BUILD_CONTEXT_SNAPSHOTS={
+            REGISTRY_AUTH: {
+                "context": {
+                    ".": {
+                        "strategy": strategy,
+                    },
+                },
+            },
+        },
+    )
+
+    # completed context attestation digest reported at push time
+    assert push_result.mark.has(
+        _REPO_BUILD_CONTEXTS={
+            REGISTRY_AUTH: {
+                "context": {
+                    ".": re.compile(r"^[a-f0-9]{64}$"),
+                },
+            },
+        },
+    )
