@@ -289,7 +289,8 @@ proc completeBuildContextUpload(
         subject = subject,
         layer   = layer,
       )
-    return image.appendToAttestationManifestList(ctxManifest).digest.extractDockerHash()
+    discard image.appendToAttestationManifestList(ctxManifest)
+    return ctxManifest.digest.extractDockerHash()
 
   of "local":
     let tarPath = snapshot{"tar_path"}.getStr("")
@@ -308,7 +309,8 @@ proc completeBuildContextUpload(
       subject = subject,
       layer   = layer,
     )
-    return image.appendToAttestationManifestList(ctxManifest).digest.extractDockerHash()
+    discard image.appendToAttestationManifestList(ctxManifest)
+    return ctxManifest.digest.extractDockerHash()
 
   of "disk":
     let contextPath = snapshot{"context_path"}.getStr("")
@@ -346,7 +348,8 @@ proc completeBuildContextUpload(
         subject = subject,
         layer   = layer,
       )
-      return image.appendToAttestationManifestList(ctxManifest).digest.extractDockerHash()
+      discard image.appendToAttestationManifestList(ctxManifest)
+      return ctxManifest.digest.extractDockerHash()
     finally:
       removeFile(tarPath)
 

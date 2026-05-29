@@ -4865,12 +4865,16 @@ keyspec _REPO_BUILD_CONTEXTS {
     standard:         true
     doc: """
 When chalk uploads Docker build contexts as OCI attestations, records the
-digest of each uploaded attestation manifest. The structure is as follows:
+digest of each uploaded context manifest. The structure is as follows:
 
 * normalized registry name (domain and port if any)
 * repository name
 * context name (`"."` for the main context, named value for `--build-context` extras)
-* attestation manifest digest (without `sha256:` prefix)
+* context manifest digest (without `sha256:` prefix)
+
+The digest points to the individual OCI image manifest with
+`artifactType: application/vnd.crashoverride.chalk.build-context.v1`,
+not to the attestation manifest list that contains it.
 
 For example:
 

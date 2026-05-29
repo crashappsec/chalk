@@ -523,28 +523,14 @@ class Docker:
         repo: str,
         attest_digest: str,
     ) -> list[str]:
-        """Fetch the build-context tar layer from an attestation manifest.
+        """Fetch the build-context tar layer from a context manifest digest.
 
-        Resolves the layer blob digest from the attestation manifest at
-        ``registry/repo@sha256:<attest_digest>``, downloads the blob via
-        ``crane blob``, and returns the list of member paths inside the
-        tar archive.
+        Downloads the layer blob from the context manifest at
+        ``registry/repo@sha256:<attest_digest>`` via ``crane blob``
+        and returns the list of member paths inside the tar archive.
         """
         ref = f"{registry}/{repo}@sha256:{attest_digest}"
-        top = run(["crane", "manifest", "--insecure", ref]).json()
-        # _REPO_BUILD_CONTEXTS stores the manifest-list digest; resolve the
-        # individual build-context manifest within it first.
-        if "manifests" in top:
-            ctx_digest = next(
-                m["digest"]
-                for m in top["manifests"]
-                if m.get("artifactType")
-                == "application/vnd.crashoverride.chalk.build-context.v1"
-            )
-            inner_ref = f"{registry}/{repo}@{ctx_digest}"
-            manifest = run(["crane", "manifest", "--insecure", inner_ref]).json()
-        else:
-            manifest = top
+        manifest = run(["crane", "manifest", "--insecure", ref]).json()
         layer_digest = manifest["layers"][0]["digest"].split(":", 1)[1]
         blob_ref = f"{registry}/{repo}@sha256:{layer_digest}"
         blob_bytes = run(["crane", "blob", "--insecure", blob_ref], binary=True).stdout

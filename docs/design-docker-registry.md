@@ -118,6 +118,11 @@ same `sha256-<digest>` tag. Chalk fetches any existing manifest list
 before appending to it, so multiple attestation types coexist without
 overwriting each other.
 
+`_REPO_BUILD_CONTEXTS` stores the digest of the **context image manifest**
+itself (the entry with `artifactType: application/vnd.crashoverride.chalk.build-context.v1`),
+not the digest of the enclosing manifest list. Consumers can fetch the
+context manifest directly without resolving through the list.
+
 ### Upload Strategies
 
 Because `chalk docker build` and `chalk docker push` can run as
@@ -278,10 +283,10 @@ completes the attestation manifest creation.
 
 ### Chalk Keys
 
-| Key                              | Kind       | Type                                                          | Description                                                                         |
-| -------------------------------- | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `DOCKER_BUILD_CONTEXT_SNAPSHOTS` | chalk-time | `dict[string, dict[string, dict[string, dict[string, \`x]]]]` | Intermediate upload state: `registry -> repo -> context name -> strategy config`    |
-| `_REPO_BUILD_CONTEXTS`           | runtime    | `dict[string, dict[string, dict[string, string]]}`            | Attestation manifest digests: `registry -> repo -> context name -> manifest digest` |
+| Key                              | Kind       | Type                                                          | Description                                                                                                 |
+| -------------------------------- | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `DOCKER_BUILD_CONTEXT_SNAPSHOTS` | chalk-time | `dict[string, dict[string, dict[string, dict[string, \`x]]]]` | Intermediate upload state: `registry -> repo -> context name -> strategy config`                            |
+| `_REPO_BUILD_CONTEXTS`           | runtime    | `dict[string, dict[string, dict[string, string]]}`            | Context manifest digests: `registry -> repo -> context name -> context manifest digest (no sha256: prefix)` |
 
 ### Limitations
 
