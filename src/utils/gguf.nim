@@ -21,7 +21,10 @@ import pkg/[
 const
   ggufIncDir = currentSourcePath.parentDir.parentDir &
                "/codecs/gguf/include"
-  ggufCFlags = "-std=c23 -I" & ggufIncDir
+  # c23 is the ratified name; c2x is the pre-ratification alias accepted
+  # by older clang (< 18, e.g. Apple clang on macOS 13 runners).
+  cStd      = when defined(macosx): "-std=c2x" else: "-std=c23"
+  ggufCFlags = cStd & " -I" & ggufIncDir
 
 {.passc: "-I" & ggufIncDir.}
 

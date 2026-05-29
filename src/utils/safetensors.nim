@@ -31,7 +31,10 @@ import pkg/[
 const
   stIncDir = currentSourcePath.parentDir.parentDir &
              "/codecs/safetensors/include"
-  stCFlags = "-std=c23 -I" & stIncDir
+  # c23 is the ratified name; c2x is the pre-ratification alias accepted
+  # by older clang (< 18, e.g. Apple clang on macOS 13 runners).
+  cStd    = when defined(macosx): "-std=c2x" else: "-std=c23"
+  stCFlags = cStd & " -I" & stIncDir
 
 {.passc: "-I" & stIncDir.}
 
