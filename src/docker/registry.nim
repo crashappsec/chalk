@@ -10,6 +10,7 @@
 ## https://docker-docs.uclv.cu/registry/spec/manifest-v2-2/
 ## https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
 ## https://docs.docker.com/build/buildkit/toml-configuration/
+## https://github.com/opencontainers/distribution-spec/blob/main/spec.md
 
 import std/[
   nativesockets,
@@ -538,13 +539,13 @@ proc request(self:              DockerImage,
         if body != "":
           if contentType != "":
             headers["Content-Type"] = contentType
-          # only include content-range header not chunked uploads
-          # e.g. ghcr doesnt accept content-range for monolithic uploads
+          # OCI distribution spec requires "{first}-{last}" format (no "bytes " prefix,
+          # no "/{total}" suffix). See:
+          # https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-blobs
+          # Only include for chunked uploads; omit for monolithic uploads because
+          # some registries (e.g. ghcr) reject Content-Range on monolithic PUT.
           if range.a > 0 or range.b > 0 and range.b - range.a + 1 != size:
-            var contentRange = "bytes " & $range.a & "-" & $range.b
-            if size > 0:
-              contentRange &= "/" & $size
-            headers["Content-Range"] = contentRange
+            headers["Content-Range"] = $range.a & "-" & $range.b
           headers["Content-Length"] = $len(body)
         for k, v in headers.pairs():
           msg &= " " & k & ":" & v

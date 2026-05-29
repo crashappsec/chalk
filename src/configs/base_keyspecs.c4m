@@ -4891,19 +4891,21 @@ For example:
 
 keyspec DOCKER_BUILD_CONTEXT_SNAPSHOTS {
     kind:             ChalkTimeArtifact
-    type:             dict[string, dict[string, dict[string, dict[string, string]]]]
+    type:             dict[string, dict[string, dict[string, dict[string, `x]]]]
     standard:         true
     doc: """
 Intermediate state used when `chalk docker build` and `chalk docker push` are
 invoked as separate commands with `upload_context: true` configured.
 
-At build time Chalk stores per-push-config, per-context information with the
-same structure as `_REPO_BUILD_CONTEXTS`:
+At build time Chalk stores per-push-config, per-context information keyed by:
 
 * normalized registry name (domain and port if any)
 * repository name
 * context name (`"."` for the main context, named value for `--build-context` extras)
-* strategy-specific fields (`strategy`, `blob_digest`, `blob_size`, `tar_path`, `context_path`)
+
+The leaf object holds strategy-specific fields whose values may be strings,
+integers, booleans, or arrays (e.g. `exclude_patterns` is a list of strings,
+`honor_dockerignore` is a boolean).
 
 At push time Chalk reads this key from the chalk mark to complete the context
 attestation upload.
@@ -4918,12 +4920,12 @@ For example, with the `registry` strategy and a named extra context:
         ".": {
           "strategy":    "registry",
           "blob_digest": "a1b2c3d4...",
-          "blob_size":   "123456"
+          "blob_size":   123456
         },
         "libs": {
           "strategy":    "registry",
           "blob_digest": "e5f6a7b8...",
-          "blob_size":   "654321"
+          "blob_size":   654321
         }
       }
     }
@@ -4939,8 +4941,8 @@ With the `local` strategy:
     "registry.example.com": {
       "my-org/my-app": {
         ".": {
-          "strategy":  "local",
-          "tar_path":  "/tmp/chalk-build-contexts/2025-01-15T14-32-07/my-app-1234567890.tar.gz"
+          "strategy": "local",
+          "tar_path": "/tmp/chalk-build-contexts/2025-01-15T14-32-07/my-app-1234567890.tar.gz"
         }
       }
     }
@@ -4956,8 +4958,11 @@ With the `disk` strategy:
     "registry.example.com": {
       "my-org/my-app": {
         ".": {
-          "strategy":     "disk",
-          "context_path": "/path/to/build/context"
+          "strategy":           "disk",
+          "context_path":       "/path/to/build/context",
+          "size_threshold":     104857600,
+          "exclude_patterns":   [".git"],
+          "honor_dockerignore": true
         }
       }
     }

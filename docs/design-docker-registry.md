@@ -42,15 +42,17 @@ defines a repository and tag set to mirror the built image to.
 
 **Fields:**
 
-| Field                           | Type           | Default     | Description                                               |
-| ------------------------------- | -------------- | ----------- | --------------------------------------------------------- |
-| `enabled`                       | `bool`         | `true`      | Enable or disable this push configuration                 |
-| `repository`                    | `string`       | (required)  | Repository path within the parent registry                |
-| `tags`                          | `list[string]` | (required)  | Tags to push; supports `{KEY}` substitution               |
-| `upload_context`                | `bool`         | `false`     | Upload the build context as an OCI attestation            |
-| `upload_context_mode`           | `string`       | `"full"`    | Context upload mode; only `"full"` is supported           |
-| `upload_context_strategy`       | `string`       | `"auto"`    | Strategy for context upload (see below)                   |
-| `upload_context_size_threshold` | `Size`         | `<<100mb>>` | Skip upload when tarball exceeds this size (0 = no limit) |
+| Field                               | Type           | Default     | Description                                               |
+| ----------------------------------- | -------------- | ----------- | --------------------------------------------------------- |
+| `enabled`                           | `bool`         | `true`      | Enable or disable this push configuration                 |
+| `repository`                        | `string`       | (required)  | Repository path within the parent registry                |
+| `tags`                              | `list[string]` | (required)  | Tags to push; supports `{KEY}` substitution               |
+| `upload_context`                    | `bool`         | `false`     | Upload the build context as an OCI attestation            |
+| `upload_context_mode`               | `string`       | `"full"`    | Context upload mode; only `"full"` is supported           |
+| `upload_context_strategy`           | `string`       | `"auto"`    | Strategy for context upload (see below)                   |
+| `upload_context_size_threshold`     | `Size`         | `<<100mb>>` | Skip upload when tarball exceeds this size (0 = no limit) |
+| `upload_context_exclude_patterns`   | `list[string]` | `[".git"]`  | Glob patterns to exclude from the context tarball         |
+| `upload_context_honor_dockerignore` | `bool`         | `true`      | Apply `.dockerignore` patterns when creating the tarball  |
 
 ### Tag Template Substitution
 
@@ -135,7 +137,11 @@ and the blob uploaded during `chalk docker build`, so the blob is
 already in the registry when `chalk docker push` runs. Only the
 manifest creation is deferred to push time.
 
-**`local` strategy** is the default for non-CI environments. The
+**`local` strategy** is the default for non-CI environments. CI is detected
+by the presence of any of the following environment variables: `CI`,
+`GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, `TRAVIS`,
+`BUILDKITE`, `DRONE`, `SEMAPHORE`, `TEAMCITY_VERSION`,
+`BITBUCKET_BUILD_NUMBER`, `CODEBUILD_BUILD_ID`. The
 tarball is written to a date-stamped subdirectory under
 `<tmpdir>/chalk-build-contexts/` and uploaded at push time. This
 avoids requiring registry credentials at build time.
@@ -145,6 +151,71 @@ time. This is suitable for single-machine workflows where the context
 directory has not changed between build and push. Users who choose
 this strategy accept the risk that the context may differ from what
 was actually used in the build.
+
+### Context Filtering
+
+When creating the `.tar.gz` archive, Chalk applies an ordered list of glob
+patterns to decide which files and directories to include. Two sources of
+patterns are combined:
+
+1. **`.dockerignore`** - read from the root of the build context when
+   `upload_context_honor_dockerignore` is `true` (the default). This ensures
+   the uploaded context matches what Docker itself would have used.
+2. **`upload_context_exclude_patterns`** - explicitly configured patterns,
+   applied after `.dockerignore` so they take final precedence (default
+   `[".git"]`).
+
+Because patterns are evaluated in order with **last-match-wins** semantics, the
+chalk configuration always has the final say over what is included or excluded.
+
+When a directory matches an exclusion pattern, Chalk still recurses into it so
+that negation patterns can re-include individual files inside it. For example,
+`logs/` excludes the directory entry itself but a later `!logs/*.log` can still
+re-include matching files within it. Only the directory header is suppressed;
+recursion is unconditional.
+
+#### Pattern syntax
+
+Patterns follow the same rules as `.dockerignore` and `tar --exclude`:
+
+| Syntax | Meaning                                               |
+| ------ | ----------------------------------------------------- |
+| `*`    | Any sequence of characters except `/`                 |
+| `?`    | Any single character except `/`                       |
+| `**`   | Any sequence of characters including `/` (path cross) |
+| `!pat` | Negate: re-include files matched by a previous rule   |
+
+Patterns **without** a `/` are matched against every path component
+individually (so `.git` excludes any directory named `.git` at any depth).
+Patterns **with** a `/` are matched against the full path relative to the
+context root.
+
+Leading `/` characters are stripped from patterns read from `.dockerignore`
+since all paths are relative to the context root. Blank lines and lines
+beginning with `#` are ignored.
+
+#### Precedence example
+
+Given `.dockerignore`:
+
+```
+logs/
+!logs/important.log
+```
+
+And `upload_context_exclude_patterns: ["*.tmp", "!keep.tmp"]`, the effective
+pattern list is:
+
+```
+logs/              # from .dockerignore - excludes logs/ directory
+!logs/important.log  # from .dockerignore - re-includes one file
+*.tmp              # from chalk config - excludes .tmp files
+!keep.tmp          # from chalk config - re-includes keep.tmp
+```
+
+Because chalk config patterns come last, `!keep.tmp` overrides any earlier
+exclusion of `keep.tmp`, and `*.tmp` overrides `.dockerignore` rules for
+`.tmp` files.
 
 ### Size Threshold
 
@@ -196,21 +267,21 @@ The context name is `"."` for the main build context and the declared
 name for each `--build-context` extra. The per-context config object
 carries strategy-specific fields:
 
-| Strategy   | Fields                                       |
-| ---------- | -------------------------------------------- |
-| `registry` | `strategy`, `blob_digest`, `blob_size`       |
-| `local`    | `strategy`, `tar_path`                       |
-| `disk`     | `strategy`, `context_path`, `size_threshold` |
+| Strategy   | Fields                                                                                 |
+| ---------- | -------------------------------------------------------------------------------------- |
+| `registry` | `strategy`, `blob_digest`, `blob_size`                                                 |
+| `local`    | `strategy`, `tar_path`                                                                 |
+| `disk`     | `strategy`, `context_path`, `size_threshold`, `exclude_patterns`, `honor_dockerignore` |
 
 At push time, Chalk reads this key from the image's chalk mark and
 completes the attestation manifest creation.
 
 ### Chalk Keys
 
-| Key                              | Kind       | Type                                                             | Description                                                                         |
-| -------------------------------- | ---------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `DOCKER_BUILD_CONTEXT_SNAPSHOTS` | chalk-time | `dict[string, dict[string, dict[string, dict[string, string]]]]` | Intermediate upload state: `registry -> repo -> context name -> strategy config`    |
-| `_REPO_BUILD_CONTEXTS`           | runtime    | `dict[string, dict[string, dict[string, string]]}`               | Attestation manifest digests: `registry -> repo -> context name -> manifest digest` |
+| Key                              | Kind       | Type                                                          | Description                                                                         |
+| -------------------------------- | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `DOCKER_BUILD_CONTEXT_SNAPSHOTS` | chalk-time | `dict[string, dict[string, dict[string, dict[string, \`x]]]]` | Intermediate upload state: `registry -> repo -> context name -> strategy config`    |
+| `_REPO_BUILD_CONTEXTS`           | runtime    | `dict[string, dict[string, dict[string, string]]}`            | Attestation manifest digests: `registry -> repo -> context name -> manifest digest` |
 
 ### Limitations
 

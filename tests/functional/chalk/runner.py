@@ -694,6 +694,7 @@ class Chalk:
         show_config: bool = False,
         labels: Optional[dict[str, str]] = None,
         annotations: Optional[dict[str, str]] = None,
+        named_contexts: Optional[dict[str, Path | str]] = None,
     ) -> tuple[DockerDigests, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
@@ -720,6 +721,7 @@ class Chalk:
                 sbom=sbom,
                 labels=labels,
                 annotations=annotations,
+                named_contexts=named_contexts,
             )
 
         with Docker.build_cmd(
@@ -740,6 +742,7 @@ class Chalk:
             sbom=sbom,
             labels=labels,
             annotations=annotations,
+            named_contexts=named_contexts,
         ) as (params, stdin):
             digests, result = Docker.with_digests(
                 self.run(

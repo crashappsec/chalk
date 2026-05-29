@@ -2278,10 +2278,47 @@ def test_build_context_upload(
     push: bool,
     random_hex: str,
     server_http: str,
+    tmp_data_dir: Path,
 ):
+    # Use subdirectories as build contexts so the chalk binary placed in
+    # tmp_data_dir by the chalk_copy fixture is not included in any tar.
+    context_dir = tmp_data_dir / "context"
+    context_dir.mkdir()
+    libs_dir = tmp_data_dir / "libs"
+    libs_dir.mkdir()
+
+    # Primary context: a git repo with source files, a .dockerignore,
+    # and files that should be excluded by each mechanism.
+    (context_dir / "app.py").write_text("print('hello')\n")
+    (context_dir / "src").mkdir()
+    (context_dir / "src" / "main.py").write_text("def main(): pass\n")
+    (context_dir / "README.md").write_text("# test\n")
+    # files excluded/re-included via .dockerignore
+    (context_dir / "logs").mkdir()
+    (context_dir / "logs" / "debug.log").write_text("log output\n")
+    (context_dir / "logs" / "app.log").write_text("app output\n")
+    (context_dir / "logs" / "temp.tmp").write_text("scratch\n")
+    (context_dir / "secrets").mkdir()
+    (context_dir / "secrets" / "api_key.txt").write_text("s3cr3t\n")
+    (context_dir / ".dockerignore").write_text(
+        "\n".join(
+            [
+                "logs/",
+                "!logs/*.log",
+                "secrets/",
+            ]
+        )
+    )
+    (Git(context_dir).init().add().commit("init"))
+
+    # Named extra context "libs": simple directory with a library file.
+    (libs_dir / "utils.py").write_text("def helper(): pass\n")
+    (libs_dir / "vendor").mkdir()
+    (libs_dir / "vendor" / "dep.py").write_text("# vendored\n")
+    (Git(libs_dir).init().add().commit("init"))
+
     name = f"context_upload_{random_hex}"
-    repo = f"{REGISTRY}/{name}"
-    tag = f"{repo}:latest"
+    tag = f"{REGISTRY}/{name}:latest"
     env = {
         "CHALK_SERVER": server_http,
         "CONTEXT_STRATEGY": strategy,
@@ -2289,6 +2326,8 @@ def test_build_context_upload(
 
     digests, build_result = chalk_copy.docker_build(
         dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
+        context=context_dir,
+        named_contexts={"libs": libs_dir},
         tag=tag,
         push=push,
         run_docker=False,
@@ -2307,12 +2346,19 @@ def test_build_context_upload(
     else:
         push_result = build_result
 
-    # snapshots are embedded in the chalk mark at build time
+    # snapshots are embedded in the chalk mark at build time;
+    # "context" is the repository name from docker_context.c4m
     assert build_result.mark.has(
+        DOCKER_ADDITIONAL_CONTEXTS={
+            "libs": re.compile(r".+"),
+        },
         DOCKER_BUILD_CONTEXT_SNAPSHOTS={
             REGISTRY_AUTH: {
                 "context": {
                     ".": {
+                        "strategy": strategy,
+                    },
+                    "libs": {
                         "strategy": strategy,
                     },
                 },
@@ -2320,13 +2366,54 @@ def test_build_context_upload(
         },
     )
 
-    # completed context attestation digest reported at push time
+    # completed context attestation digests reported at push time
     assert push_result.mark.has(
         _REPO_BUILD_CONTEXTS={
             REGISTRY_AUTH: {
                 "context": {
                     ".": re.compile(r"^[a-f0-9]{64}$"),
+                    "libs": re.compile(r"^[a-f0-9]{64}$"),
                 },
             },
         },
     )
+
+    # --- primary context (".") ---
+    attest_digest = push_result.mark["_REPO_BUILD_CONTEXTS"][REGISTRY_AUTH]["context"][
+        "."
+    ]
+    context_files = Docker.list_files_in_tar_layer(
+        registry=REGISTRY_AUTH,
+        repo="context",
+        attest_digest=attest_digest,
+    )
+
+    # source files must be present
+    assert "app.py" in context_files
+    assert "src/main.py" in context_files
+    assert "README.md" in context_files
+
+    # .git directory must be excluded (default upload_context_exclude_patterns)
+    assert not any(f == ".git" or f.startswith(".git/") for f in context_files)
+
+    # logs/ is excluded but logs/*.log is re-included via wildcard negation
+    assert "logs/debug.log" in context_files
+    assert "logs/app.log" in context_files
+    assert "logs/temp.tmp" not in context_files
+
+    # secrets/ is excluded entirely
+    assert not any(f == "secrets" or f.startswith("secrets/") for f in context_files)
+
+    # --- named context ("libs") ---
+    libs_attest_digest = push_result.mark["_REPO_BUILD_CONTEXTS"][REGISTRY_AUTH][
+        "context"
+    ]["libs"]
+    libs_files = Docker.list_files_in_tar_layer(
+        registry=REGISTRY_AUTH,
+        repo="context",
+        attest_digest=libs_attest_digest,
+    )
+
+    assert "utils.py" in libs_files
+    assert "vendor/dep.py" in libs_files
+    assert not any(f == ".git" or f.startswith(".git/") for f in libs_files)

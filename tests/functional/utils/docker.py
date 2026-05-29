@@ -2,7 +2,9 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import io
 import re
+import tarfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
@@ -112,6 +114,7 @@ class Docker:
         sbom: bool = False,
         labels: Optional[dict[str, str]] = None,
         annotations: Optional[dict[str, str]] = None,
+        named_contexts: Optional[dict[str, Path | str]] = None,
     ):
         stdin = b""
         tags = tags or []
@@ -156,6 +159,11 @@ class Docker:
                 cmd += [f"--annotation={k}={v}"]
         if builder and buildx:
             cmd += [f"--builder={builder}"]
+        if named_contexts:
+            if not buildx:
+                raise ValueError("--build-context only works with buildx")
+            for name, path in named_contexts.items():
+                cmd += [f"--build-context={name}={path}"]
         cmd += [str(context or ".")]
         yield cmd, stdin
 
@@ -182,6 +190,7 @@ class Docker:
         env: Optional[dict[str, str]] = None,
         labels: Optional[dict[str, str]] = None,
         annotations: Optional[dict[str, str]] = None,
+        named_contexts: Optional[dict[str, Path | str]] = None,
     ) -> tuple[DockerDigests, Program]:
         """
         run docker build with parameters
@@ -204,6 +213,7 @@ class Docker:
             sbom=sbom,
             labels=labels,
             annotations=annotations,
+            named_contexts=named_contexts,
         ) as (params, stdin):
             return Docker.with_digests(
                 run(
@@ -506,6 +516,40 @@ class Docker:
             check=False,
             log_level="debug",
         )
+
+    @staticmethod
+    def list_files_in_tar_layer(
+        registry: str,
+        repo: str,
+        attest_digest: str,
+    ) -> list[str]:
+        """Fetch the build-context tar layer from an attestation manifest.
+
+        Resolves the layer blob digest from the attestation manifest at
+        ``registry/repo@sha256:<attest_digest>``, downloads the blob via
+        ``crane blob``, and returns the list of member paths inside the
+        tar archive.
+        """
+        ref = f"{registry}/{repo}@sha256:{attest_digest}"
+        top = run(["crane", "manifest", "--insecure", ref]).json()
+        # _REPO_BUILD_CONTEXTS stores the manifest-list digest; resolve the
+        # individual build-context manifest within it first.
+        if "manifests" in top:
+            ctx_digest = next(
+                m["digest"]
+                for m in top["manifests"]
+                if m.get("artifactType")
+                == "application/vnd.crashoverride.chalk.build-context.v1"
+            )
+            inner_ref = f"{registry}/{repo}@{ctx_digest}"
+            manifest = run(["crane", "manifest", "--insecure", inner_ref]).json()
+        else:
+            manifest = top
+        layer_digest = manifest["layers"][0]["digest"].split(":", 1)[1]
+        blob_ref = f"{registry}/{repo}@sha256:{layer_digest}"
+        blob_bytes = run(["crane", "blob", "--insecure", blob_ref], binary=True).stdout
+        with tarfile.open(fileobj=io.BytesIO(blob_bytes), mode="r:gz") as tf:
+            return [m.name for m in tf.getmembers()]
 
     @staticmethod
     def is_overlayfs() -> bool:

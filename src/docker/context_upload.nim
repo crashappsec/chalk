@@ -13,18 +13,18 @@ import std/[
   os,
   times,
 ]
-import pkg/zippy/tarballs as zippyTarballs
 import ".."/[
+  chalkjson,
   run_management,
   types,
   utils/files,
   utils/json,
-  utils/strings,
 ]
 import "."/[
   base,
   ids,
   manifest,
+  tar,
 ]
 
 const
@@ -35,14 +35,7 @@ const
   CONTEXT_CACHE_DIR_FMT  = "yyyy-MM-dd'T'HH-mm-ss"
 
 type
-  ContextSnapshotEntry = OrderedTableRef[string, string]
-  ContextSnapshots     = OrderedTableRef[
-    string,
-    OrderedTableRef[
-      string,
-      OrderedTableRef[string, ContextSnapshotEntry],
-    ],
-  ]
+  ContextSnapshotEntry = JsonNode  ## JObject with strategy-specific fields
   ContextResults       = OrderedTableRef[
     string,
     OrderedTableRef[
@@ -77,17 +70,39 @@ proc cleanBuildContextCache*() =
             getCurrentExceptionMsg())
       dumpExOnDebug()
 
-proc contextToTarGz*(contextPath: string): string =
+proc readDockerignorePatterns(contextPath: string): seq[string] =
+  let path = contextPath / ".dockerignore"
+  if not fileExists(path):
+    return @[]
+  result = @[]
+  for line in tryToLoadFile(path).splitLines():
+    let p = line.strip()
+    if p.len == 0 or p.startsWith('#'):
+      continue
+    if p.startsWith('!'):
+      # Preserve '!' for negation; strip any leading '/' from the pattern part.
+      result.add('!' & p[1 .. ^1].removePrefix('/'))
+    else:
+      result.add(p.removePrefix('/'))
+
+proc contextToTarGz*(
+    contextPath:       string,
+    excludePatterns:   seq[string],
+    honorDockerignore: bool = false,
+): string =
   ## Archive a context directory to a temp .tar.gz and return its path.
+  ## Files and directories matching any pattern in excludePatterns are omitted.
+  ## When honorDockerignore is true, patterns from .dockerignore are also applied.
   let
     base    = lastPathPart(contextPath)
     dateDir = contextCacheDir() / now().utc.format(CONTEXT_CACHE_DIR_FMT)
   createDir(dateDir)
-  let
-    outPath = dateDir / (base & "-" & $int(epochTime()) & ".tar.gz")
-    tb      = Tarball()
-  tb.addDir(contextPath)
-  tb.writeTarball(outPath)
+  var patterns: seq[string]
+  if honorDockerignore:
+    patterns.add(readDockerignorePatterns(contextPath))
+  patterns.add(excludePatterns)
+  let outPath = dateDir / (base & "-" & $int(epochTime()) & ".tar.gz")
+  writeTarGz(outPath, contextPath, patterns)
   return outPath
 
 proc newContextManifest(
@@ -161,7 +176,7 @@ proc uploadBuildContextsAtBuildTime*(
   let
     repoImage = parseImage(config.registryUri & "/" & config.repoPath)
     registry  = repoImage.registry
-    snapshots = ContextSnapshots()
+  var snapshots = newJObject()
   for contextName, contextPath in contexts:
     var entry: ContextSnapshotEntry = nil
     case config.strategy
@@ -169,7 +184,11 @@ proc uploadBuildContextsAtBuildTime*(
       # Upload blob now so it is present in the registry at push time.
       trace("docker: uploading build context blob for '" & contextName &
             "' to " & $repoImage & " (registry strategy)")
-      let tarPath = contextToTarGz(contextPath)
+      let tarPath = contextToTarGz(
+        contextPath       = contextPath,
+        excludePatterns   = config.excludePatterns,
+        honorDockerignore = config.honorDockerignore,
+      )
       try:
         if not checkContextSize(
           tarPath       = tarPath,
@@ -185,51 +204,53 @@ proc uploadBuildContextsAtBuildTime*(
           fileStream: newFileStringStream(tarPath),
         )
         layer.put()
-        entry = newOrderedTable[string, string]({
+        entry = %*{
           "strategy":    "registry",
           "blob_digest": layer.digest.extractDockerHash(),
-          "blob_size":   $layer.size,
-        })
-        trace("docker: build context blob uploaded: sha256:" & entry["blob_digest"])
+          "blob_size":   layer.size,
+        }
+        trace("docker: build context blob uploaded: sha256:" & entry["blob_digest"].getStr())
       finally:
         removeFile(tarPath)
 
     of "local":
       # Save tarball for upload at push time.
-      let tarPath = contextToTarGz(contextPath)
+      let tarPath = contextToTarGz(
+        contextPath       = contextPath,
+        excludePatterns   = config.excludePatterns,
+        honorDockerignore = config.honorDockerignore,
+      )
       if not checkContextSize(tarPath, contextName, contextPath, config.sizeThreshold):
         removeFile(tarPath)
         continue
-      entry = newOrderedTable[string, string]({
+      entry = %*{
         "strategy": "local",
         "tar_path": tarPath,
-      })
+      }
       trace("docker: build context tarball cached at: " & tarPath)
 
     of "disk":
       # Record the context path; push time will read from disk.
-      entry = newOrderedTable[string, string]({
-        "strategy":       "disk",
-        "context_path":   contextPath,
-        "size_threshold": $config.sizeThreshold,
-      })
+      entry = %*{
+        "strategy":           "disk",
+        "context_path":       contextPath,
+        "size_threshold":     config.sizeThreshold,
+        "exclude_patterns":   config.excludePatterns,
+        "honor_dockerignore": config.honorDockerignore,
+      }
       trace("docker: build context disk strategy: path=" & contextPath)
 
     else:
       warn("docker: unknown upload_context_strategy: " & config.strategy)
 
     if entry != nil:
-      discard snapshots.hasKeyOrPut(
-        registry,
-        newOrderedTable[string, OrderedTableRef[string, ContextSnapshotEntry]](),
-      )
-      discard snapshots[registry].hasKeyOrPut(
-        config.repoPath,
-        newOrderedTable[string, ContextSnapshotEntry](),
-      )
+      if registry notin snapshots:
+        snapshots[registry] = newJObject()
+      if config.repoPath notin snapshots[registry]:
+        snapshots[registry][config.repoPath] = newJObject()
       snapshots[registry][config.repoPath][contextName] = entry
 
-  result.setIfNeeded("DOCKER_BUILD_CONTEXT_SNAPSHOTS", snapshots)
+  result.setIfNeeded("DOCKER_BUILD_CONTEXT_SNAPSHOTS", snapshots.nimJsonToBox())
 
 proc completeBuildContextUpload(
     chalk:       ChalkObj,
@@ -241,15 +262,15 @@ proc completeBuildContextUpload(
   ## Returns the attestation manifest digest (without sha256: prefix) on success,
   ## "" on failure.
   let
-    strategy = snapshot.getOrDefault("strategy", "")
+    strategy = snapshot{"strategy"}.getStr("")
     platform = if chalk.platform != nil: chalk.platform else: DockerPlatform()
     subject  = image.fetchImageManifest(platform)
 
   case strategy
   of "registry":
     let
-      blobDigest = snapshot.getOrDefault("blob_digest", "")
-      blobSize   = parseInt(snapshot.getOrDefault("blob_size", "0"))
+      blobDigest = snapshot{"blob_digest"}.getStr("")
+      blobSize   = snapshot{"blob_size"}.getInt(0)
     if blobDigest == "":
       warn("docker: context snapshot missing blobDigest for registry strategy")
       return ""
@@ -271,7 +292,7 @@ proc completeBuildContextUpload(
     return image.appendToAttestationManifestList(ctxManifest).digest.extractDockerHash()
 
   of "local":
-    let tarPath = snapshot.getOrDefault("tar_path", "")
+    let tarPath = snapshot{"tar_path"}.getStr("")
     if tarPath == "" or not fileExists(tarPath):
       warn("docker: context tarball not found at push time: " & tarPath)
       return ""
@@ -290,15 +311,21 @@ proc completeBuildContextUpload(
     return image.appendToAttestationManifestList(ctxManifest).digest.extractDockerHash()
 
   of "disk":
-    let contextPath = snapshot.getOrDefault("context_path", "")
+    let contextPath = snapshot{"context_path"}.getStr("")
     if contextPath == "" or not dirExists(contextPath):
       warn("docker: disk strategy: context dir not found at push time: " & contextPath)
       return ""
     warn("docker: disk strategy: context dir may have changed since build: " &
          contextPath)
     let
-      sizeThreshold = parseInt(snapshot.getOrDefault("size_threshold", "0"))
-      tarPath       = contextToTarGz(contextPath)
+      sizeThreshold      = snapshot{"size_threshold"}.getInt(0)
+      excludePatterns    = snapshot{"exclude_patterns"}.getStrElems()
+      honorDockerignore  = snapshot{"honor_dockerignore"}.getBool(false)
+      tarPath            = contextToTarGz(
+        contextPath       = contextPath,
+        excludePatterns   = excludePatterns,
+        honorDockerignore = honorDockerignore,
+      )
     try:
       if not checkContextSize(
         tarPath       = tarPath,
@@ -338,17 +365,17 @@ proc completeBuildContextUploads*(
   if "DOCKER_BUILD_CONTEXT_SNAPSHOTS" notin source:
     return
 
-  let snapshots = unpack[ContextSnapshots](source["DOCKER_BUILD_CONTEXT_SNAPSHOTS"])
+  let snapshots = parseJson(source["DOCKER_BUILD_CONTEXT_SNAPSHOTS"].boxToJson())
 
   var buildContexts = ContextResults()
 
   for image in chalk.repos.manifests:
     if image.registry notin snapshots:
       continue
-    for repoPath, contexts in snapshots[image.registry]:
+    for repoPath, contexts in snapshots[image.registry].pairs:
       if repoPath != image.name:
         continue
-      for contextName, snapshot in contexts:
+      for contextName, snapshot in contexts.pairs:
         try:
           let attestDigest = chalk.completeBuildContextUpload(
             image       = image,

@@ -203,19 +203,23 @@ iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
         uploadContext = attrGet[bool](pushSection & ".upload_context")
         pushTags      = attrGet[seq[string]](pushSection & ".tags")
         pushRepo      = attrGet[string](pushSection & ".repository").removePrefix('/')
-        rawStrategy   = attrGet[string](pushSection & ".upload_context_strategy")
-        strategy      = if rawStrategy != "auto": rawStrategy
-                        elif isCI():              "registry"
-                        else:                     "local"
-        sizeThreshold = int(attrGet[Con4mSize](pushSection & ".upload_context_size_threshold"))
+        rawStrategy         = attrGet[string](pushSection & ".upload_context_strategy")
+        strategy            = if rawStrategy != "auto": rawStrategy
+                              elif isCI():              "registry"
+                              else:                     "local"
+        sizeThreshold       = int(attrGet[Con4mSize](pushSection & ".upload_context_size_threshold"))
+        excludePatterns     = attrGet[seq[string]](pushSection & ".upload_context_exclude_patterns")
+        honorDockerignore   = attrGet[bool](pushSection & ".upload_context_honor_dockerignore")
       if not pushEnabled or not uploadContext or len(pushTags) == 0:
         continue
       yield DockerContextUploadConfig(
-        registryUri:   registryUri,
-        repoPath:      pushRepo,
-        tags:          pushTags,
-        strategy:      strategy,
-        sizeThreshold: sizeThreshold,
+        registryUri:       registryUri,
+        repoPath:          pushRepo,
+        tags:              pushTags,
+        strategy:          strategy,
+        sizeThreshold:     sizeThreshold,
+        excludePatterns:   excludePatterns,
+        honorDockerignore: honorDockerignore,
       )
 
 iterator iterPushTags*(chalk: ChalkObj): string =

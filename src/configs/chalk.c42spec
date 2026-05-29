@@ -2281,6 +2281,42 @@ the failure is recorded in `_OP_FAILED_KEYS` via the failed-key mechanism.
 A value of `0` disables the check and always uploads regardless of size.
 """
   }
+
+  field upload_context_honor_dockerignore {
+    type:     bool
+    default:  true
+    shortdoc: "Apply .dockerignore patterns when creating the context tarball"
+    doc:      """
+When `true`, Chalk reads the `.dockerignore` file from the build context
+directory (if present) and adds its patterns to the exclusion list used when
+creating the context `.tar.gz` archive.  This ensures the uploaded context
+matches what Docker itself would have used for the build.
+
+Negation patterns (lines beginning with `!`) are supported: they re-include
+files that were previously matched by an earlier exclusion rule, with the last
+matching pattern winning.  All standard `.dockerignore` glob syntax is honored,
+including `**` path wildcards.
+"""
+  }
+
+  field upload_context_exclude_patterns {
+    type:     list[string]
+    default:  [".git"]
+    shortdoc: "Glob patterns to exclude from the context tarball"
+    doc:      """
+List of glob patterns for files and directories to exclude when creating
+the build context `.tar.gz` archive.  The syntax follows `tar --exclude`
+conventions: patterns without a `/` are matched against each path
+component individually (so `.git` excludes any `.git` directory at any
+depth); patterns containing `/` are matched against the full relative
+path from the context root.  `*` matches any run of non-separator
+characters, `?` matches a single non-separator character, and `**`
+matches across path separators.
+
+The default `[".git"]` excludes the Git repository metadata directory,
+which is typically not needed in the uploaded context and can be large.
+"""
+  }
 }
 
 singleton zip {
