@@ -50,3 +50,10 @@ WORKDIR /chalk
 COPY *.nimble /chalk/
 
 RUN nimble install --depsOnly --verbose
+
+# Build any static deps not bundled in nimutils' pre-built package directory.
+# Uses the local nimutils tree (mounted as a build context) so that changes to
+# buildlibs.sh (e.g. ensure_zlib) take effect without a nimutils release.
+# COPY --from=nimutils bin/buildlibs.sh /tmp/nimutils-local/buildlibs.sh
+# COPY --from=nimutils files/deps /tmp/nimutils-local/deps
+# RUN bash /tmp/nimutils-local/buildlibs.sh /tmp/nimutils-local/deps

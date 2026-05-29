@@ -70,7 +70,7 @@ for arg; do
 done
 
 tag=$1
-name=$(echo "$tag" | cut -d: -f1-2)
+name=$(echo "$tag" | cut -d@ -f1 | cut -d: -f1-2)
 
 if [ -n "$show_image" ]; then
     echo "IMAGE" > /dev/stderr

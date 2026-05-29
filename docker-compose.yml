@@ -15,8 +15,11 @@ services:
     build:
       context: .
       target: deps
+      additional_contexts:
+        nimutils: ../nimutils
       args:
         BASE: ${BASE:-alpine}
+    # platform: linux/arm64
     command: nimble ${CHALK_BUILD:-release}
     init: true
     working_dir: $PWD
