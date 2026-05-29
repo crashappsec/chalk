@@ -111,6 +111,14 @@ The manifest has:
 - `config.mediaType`: `application/vnd.oci.empty.v1+json`
 - one layer with `mediaType`: `application/vnd.oci.image.layer.v1.tar+gzip`
 - `subject`: the image manifest descriptor (registry-resolved)
+- `annotations`:
+  - `org.opencontainers.image.created` — RFC3339 timestamp of the upload
+  - `dev.crashoverride.chalk.build-context.name` — context name (`"."` for
+    the main context, the declared name for `--build-context` extras)
+
+The same annotations appear on the manifest's descriptor entry inside the
+attestation manifest list, allowing consumers to identify and select the
+correct entry without fetching each manifest individually.
 
 Multiple attestation manifests for the same image (e.g., a sigstore
 signature and a build context) are stored in a manifest list at the

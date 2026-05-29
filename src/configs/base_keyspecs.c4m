@@ -4874,7 +4874,11 @@ digest of each uploaded context manifest. The structure is as follows:
 
 The digest points to the individual OCI image manifest with
 `artifactType: application/vnd.crashoverride.chalk.build-context.v1`,
-not to the attestation manifest list that contains it.
+not to the attestation manifest list that contains it. The manifest
+carries two annotations that can be used to identify it within the list:
+
+* `org.opencontainers.image.created` - RFC3339 upload timestamp
+* `dev.crashoverride.chalk.build-context.name` - context name
 
 For example:
 

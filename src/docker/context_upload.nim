@@ -28,11 +28,13 @@ import "."/[
 ]
 
 const
-  CONTEXT_ARTIFACT_TYPE* = "application/vnd.crashoverride.chalk.build-context.v1"
-  CONTEXT_LAYER_TYPE*    = "application/vnd.oci.image.layer.v1.tar+gzip"
-  CONTEXT_CONFIG_TYPE*   = "application/vnd.oci.empty.v1+json"
-  CONTEXT_CACHE_SUBDIR   = "chalk-build-contexts"
-  CONTEXT_CACHE_DIR_FMT  = "yyyy-MM-dd'T'HH-mm-ss"
+  CONTEXT_ARTIFACT_TYPE*   = "application/vnd.crashoverride.chalk.build-context.v1"
+  CONTEXT_LAYER_TYPE*      = "application/vnd.oci.image.layer.v1.tar+gzip"
+  CONTEXT_CONFIG_TYPE*     = "application/vnd.oci.empty.v1+json"
+  CONTEXT_CACHE_SUBDIR     = "chalk-build-contexts"
+  CONTEXT_CACHE_DIR_FMT    = "yyyy-MM-dd'T'HH-mm-ss"
+  ANNOTATION_CREATED       = "org.opencontainers.image.created"
+  ANNOTATION_CONTEXT_NAME* = "dev.crashoverride.chalk.build-context.name"
 
 type
   ContextSnapshotEntry = JsonNode  ## JObject with strategy-specific fields
@@ -106,9 +108,10 @@ proc contextToTarGz*(
   return outPath
 
 proc newContextManifest(
-    image:   DockerImage,
-    subject: DockerManifest,
-    layer:   DockerManifest,
+    image:       DockerImage,
+    subject:     DockerManifest,
+    layer:       DockerManifest,
+    contextName: string,
 ): DockerManifest =
   ## Build an OCI image manifest wrapping a context tarball layer.
   DockerManifest(
@@ -117,6 +120,10 @@ proc newContextManifest(
     mediaType:    "application/vnd.oci.image.manifest.v1+json",
     artifactType: CONTEXT_ARTIFACT_TYPE,
     subject:      subject,
+    annotations:  %*({
+      ANNOTATION_CREATED:      now().utc.format("yyyy-MM-dd'T'HH:mm:ss'.'fff'Z'"),
+      ANNOTATION_CONTEXT_NAME: contextName,
+    }),
     config: DockerManifest(
       kind:      DockerManifestType.config,
       name:      image,
@@ -285,9 +292,10 @@ proc completeBuildContextUpload(
         isFetched: true,  # blob already uploaded at build time; skip put()
       )
       ctxManifest = newContextManifest(
-        image   = image,
-        subject = subject,
-        layer   = layer,
+        image       = image,
+        subject     = subject,
+        layer       = layer,
+        contextName = contextName,
       )
     discard image.appendToAttestationManifestList(ctxManifest)
     return ctxManifest.digest.extractDockerHash()
@@ -305,9 +313,10 @@ proc completeBuildContextUpload(
     )
     layer.put()
     let ctxManifest = newContextManifest(
-      image   = image,
-      subject = subject,
-      layer   = layer,
+      image       = image,
+      subject     = subject,
+      layer       = layer,
+      contextName = contextName,
     )
     discard image.appendToAttestationManifestList(ctxManifest)
     return ctxManifest.digest.extractDockerHash()
@@ -344,9 +353,10 @@ proc completeBuildContextUpload(
       )
       layer.put()
       let ctxManifest = newContextManifest(
-        image   = image,
-        subject = subject,
-        layer   = layer,
+        image       = image,
+        subject     = subject,
+        layer       = layer,
+        contextName = contextName,
       )
       discard image.appendToAttestationManifestList(ctxManifest)
       return ctxManifest.digest.extractDockerHash()
