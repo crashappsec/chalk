@@ -45,6 +45,13 @@ type
       OrderedTableRef[string, string],
     ],
   ]
+  SizeResults          = OrderedTableRef[
+    string,
+    OrderedTableRef[
+      string,
+      OrderedTableRef[string, int],
+    ],
+  ]
 
 proc contextCacheDir*(): string =
   return getTempDir() / CONTEXT_CACHE_SUBDIR
@@ -264,10 +271,11 @@ proc completeBuildContextUpload(
     image:       DockerImage,
     snapshot:    ContextSnapshotEntry,
     contextName: string,
-): string =
+): (string, int) =
   ## Complete a single context upload by creating the attestation manifest.
-  ## Returns the attestation manifest digest (without sha256: prefix) on success,
-  ## "" on failure.
+  ## Returns (digest, tarSize) where digest is the context manifest digest
+  ## (without sha256: prefix) and tarSize is the tarball size in bytes.
+  ## Returns ("", 0) on failure.
   let
     strategy = snapshot{"strategy"}.getStr("")
     platform = if chalk.platform != nil: chalk.platform else: DockerPlatform()
@@ -280,7 +288,7 @@ proc completeBuildContextUpload(
       blobSize   = snapshot{"blob_size"}.getInt(0)
     if blobDigest == "":
       warn("docker: context snapshot missing blobDigest for registry strategy")
-      return ""
+      return ("", 0)
     # Layer is already in the registry; mark as fetched so put() is skipped.
     let
       layer = DockerManifest(
@@ -298,19 +306,21 @@ proc completeBuildContextUpload(
         contextName = contextName,
       )
     discard image.appendToAttestationManifestList(ctxManifest)
-    return ctxManifest.digest.extractDockerHash()
+    return (ctxManifest.digest.extractDockerHash(), blobSize)
 
   of "local":
     let tarPath = snapshot{"tar_path"}.getStr("")
     if tarPath == "" or not fileExists(tarPath):
       warn("docker: context tarball not found at push time: " & tarPath)
-      return ""
-    let layer = DockerManifest(
-      kind:       DockerManifestType.layer,
-      name:       image,
-      mediaType:  CONTEXT_LAYER_TYPE,
-      fileStream: newFileStringStream(tarPath),
-    )
+      return ("", 0)
+    let
+      tarSize = int(getFileSize(tarPath))
+      layer   = DockerManifest(
+        kind:       DockerManifestType.layer,
+        name:       image,
+        mediaType:  CONTEXT_LAYER_TYPE,
+        fileStream: newFileStringStream(tarPath),
+      )
     layer.put()
     let ctxManifest = newContextManifest(
       image       = image,
@@ -319,13 +329,13 @@ proc completeBuildContextUpload(
       contextName = contextName,
     )
     discard image.appendToAttestationManifestList(ctxManifest)
-    return ctxManifest.digest.extractDockerHash()
+    return (ctxManifest.digest.extractDockerHash(), tarSize)
 
   of "disk":
     let contextPath = snapshot{"context_path"}.getStr("")
     if contextPath == "" or not dirExists(contextPath):
       warn("docker: disk strategy: context dir not found at push time: " & contextPath)
-      return ""
+      return ("", 0)
     warn("docker: disk strategy: context dir may have changed since build: " &
          contextPath)
     let
@@ -344,13 +354,15 @@ proc completeBuildContextUpload(
         contextPath   = contextPath,
         sizeThreshold = sizeThreshold,
       ):
-        return ""
-      let layer = DockerManifest(
-        kind:       DockerManifestType.layer,
-        name:       image,
-        mediaType:  CONTEXT_LAYER_TYPE,
-        fileStream: newFileStringStream(tarPath),
-      )
+        return ("", 0)
+      let
+        tarSize = int(getFileSize(tarPath))
+        layer   = DockerManifest(
+          kind:       DockerManifestType.layer,
+          name:       image,
+          mediaType:  CONTEXT_LAYER_TYPE,
+          fileStream: newFileStringStream(tarPath),
+        )
       layer.put()
       let ctxManifest = newContextManifest(
         image       = image,
@@ -359,13 +371,13 @@ proc completeBuildContextUpload(
         contextName = contextName,
       )
       discard image.appendToAttestationManifestList(ctxManifest)
-      return ctxManifest.digest.extractDockerHash()
+      return (ctxManifest.digest.extractDockerHash(), tarSize)
     finally:
       removeFile(tarPath)
 
   else:
     warn("docker: unknown strategy in build context snapshot: " & strategy)
-    return ""
+    return ("", 0)
 
 proc completeBuildContextUploads*(
     chalk:  ChalkObj,
@@ -380,7 +392,9 @@ proc completeBuildContextUploads*(
 
   let snapshots = parseJson(source["DOCKER_BUILD_CONTEXT_SNAPSHOTS"].boxToJson())
 
-  var buildContexts = ContextResults()
+  var
+    buildContexts = ContextResults()
+    sizeResults   = SizeResults()
 
   for image in chalk.repos.manifests:
     if image.registry notin snapshots:
@@ -390,7 +404,7 @@ proc completeBuildContextUploads*(
         continue
       for contextName, snapshot in contexts.pairs:
         try:
-          let attestDigest = chalk.completeBuildContextUpload(
+          let (attestDigest, tarSize) = chalk.completeBuildContextUpload(
             image       = image,
             snapshot    = snapshot,
             contextName = contextName,
@@ -406,6 +420,15 @@ proc completeBuildContextUploads*(
             newOrderedTable[string, string](),
           )
           buildContexts[image.registry][repoPath][contextName] = attestDigest
+          discard sizeResults.hasKeyOrPut(
+            image.registry,
+            newOrderedTable[string, OrderedTableRef[string, int]](),
+          )
+          discard sizeResults[image.registry].hasKeyOrPut(
+            repoPath,
+            newOrderedTable[string, int](),
+          )
+          sizeResults[image.registry][repoPath][contextName] = tarSize
           info("docker: build context '" & contextName & "' uploaded for " &
                image.registry & "/" & repoPath &
                " image digest " & image.digest)
@@ -414,3 +437,4 @@ proc completeBuildContextUploads*(
           dumpExOnDebug()
 
   result.setIfNeeded("_REPO_BUILD_CONTEXTS", buildContexts)
+  result.setIfNeeded("_REPO_BUILD_CONTEXT_TAR_SIZES", sizeResults)

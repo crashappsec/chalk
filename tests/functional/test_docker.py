@@ -49,6 +49,7 @@ from .utils.dict import (
     MISSING,
     Contains,
     IfExists,
+    IntCompare,
     Iso8601,
     Length,
     Values,
@@ -2417,3 +2418,15 @@ def test_build_context_upload(
     assert "utils.py" in libs_files
     assert "vendor/dep.py" in libs_files
     assert not any(f == ".git" or f.startswith(".git/") for f in libs_files)
+
+    # tar sizes are positive integers for each uploaded context
+    assert push_result.mark.has(
+        _REPO_BUILD_CONTEXT_TAR_SIZES={
+            REGISTRY_AUTH: {
+                "context": {
+                    ".": IntCompare(0, operator.gt),
+                    "libs": IntCompare(0, operator.gt),
+                },
+            },
+        },
+    )

@@ -56,6 +56,26 @@ class Length:
         return self.op(len(other), self.size)
 
 
+class IntCompare:
+    pretty = {
+        "eq": "==",
+        "gt": ">",
+        "ge": ">=",
+        "lt": "<",
+        "le": "<=",
+    }
+
+    def __init__(self, value: int, op: Callable[[Any, Any], bool] = operator.eq):
+        self.value = value
+        self.op = op
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.pretty.get(self.op.__name__, '')}{self.value})"
+
+    def __eq__(self, other: Any):
+        return self.op(other, self.value)
+
+
 class Values:
     def __init__(self, values: Any):
         self.values = values
@@ -145,7 +165,7 @@ class SubsetCompare:
         elif isinstance(self.expected, re.Pattern):
             assert isinstance(value, str), self._message_ne(value)
             assert self.expected.search(value), self._message_ne(value)
-        elif isinstance(self.expected, (Length, Contains)):
+        elif isinstance(self.expected, (Length, IntCompare, Contains)):
             try:
                 eq = self.expected == value
             except AssertionError as e:
@@ -227,6 +247,13 @@ class ContainsMixin:
         Traceback (most recent call last):
         ...
         AssertionError: ['foo']: ['bar'] != Length(>1)
+
+        >>> ContainsDict({"foo": 42}).contains({"foo": IntCompare(0, operator.gt)})
+        True
+        >>> ContainsDict({"foo": 0}).contains({"foo": IntCompare(0, operator.gt)})
+        Traceback (most recent call last):
+        ...
+        AssertionError: ['foo']: 0 != IntCompare(>0)
 
         >>> ContainsDict({"foo": "bar"}).contains({"bar": IfExists("bar")})
         True

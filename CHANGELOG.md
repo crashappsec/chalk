@@ -126,8 +126,10 @@
   New chalk keys:
   - `DOCKER_BUILD_CONTEXT_SNAPSHOTS` (chalk-time) - intermediate upload
     state embedded in the chalk mark, consumed at push time
-  - `_REPO_BUILD_CONTEXTS` (runtime) - map of attestation manifest
-    digests keyed by registry -> repo -> context name
+  - `_REPO_BUILD_CONTEXTS` (runtime) - map of context manifest digests
+    keyed by registry -> repo -> context name
+  - `_REPO_BUILD_CONTEXT_TAR_SIZES` (runtime) - tarball sizes in bytes
+    keyed by registry -> repo -> context name
 
   New configuration field on `docker`:
   - `build_context_cache_max_age` - maximum age of cached tarballs
