@@ -23,6 +23,7 @@ tool semgrep {
   semgrep_container:      "semgrep/semgrep"
   semgrep_entrypoint:     "semgrep"
   semgrep_prefer_docker:  false
+  semgrep_timeout:        "300"
   doc: """
 This runs the semgrep static analyizer.  If it doesn't exist in the
 path, chalk will:
@@ -47,6 +48,10 @@ semgrep_format:         The output format flag to pass.
                         Defaults to  'sarif'.
 semgrep_metrics:        Whether to ping semgrep. 'on' or 'off'.
                         Defaults to 'on' to be compatible with config=auto
+semgrep_timeout:        Maximum time to allow semgrep to run, in seconds.
+                        When non-empty and the `timeout` executable is present,
+                        the invocation is wrapped with `timeout <value>`.
+                        Defaults to "300" (5 minutes). Set to "" to disable.
 """
 }
 
@@ -97,22 +102,25 @@ func semgrep_system() {
     # ensure semgrep is on PATH
     # https://github.com/semgrep/semgrep/issues/10652
     head, tail := path_split(result)
-    result := "PATH=" + head + ":$PATH " + result
+    # timeout goes between the PATH= prefix and the binary so the shell
+    # can interpret the assignment while timeout wraps just the executable
+    result := "PATH=" + head + ":$PATH " + with_timeout(result, tool.semgrep.semgrep_timeout)
   }
 }
 
 func find_semgrep(path) {
   if tool.semgrep.semgrep_prefer_docker {
-    result := semgrep_docker(path)
-    if result != "" {
+    found := semgrep_docker(path)
+    if found != "" {
+      result := with_timeout(found, tool.semgrep.semgrep_timeout)
       return
     }
   }
   result := semgrep_system()
   if result != "" {
-    return result
+    return
   }
-  result := semgrep_docker(path)
+  result := with_timeout(semgrep_docker(path), tool.semgrep.semgrep_timeout)
 }
 
 func install_semgrep(path) {

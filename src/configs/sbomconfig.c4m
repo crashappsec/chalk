@@ -21,6 +21,7 @@ tool syft {
   syft_entrypoint:    "/syft"
   syft_prefer_docker: false
   syft_argv:          " -o cyclonedx-json"  # CycloneDX by default.
+  syft_timeout:       "300"
   ~doc:               """
 This runs the syft SBOM tool.  If it can't be found in the current path,
 chalk will:
@@ -43,6 +44,10 @@ syft_installer:     URL of the official syft installer script.
                     Defaults to 'https://raw.githubusercontent.com/anchore/syft/main/install.sh'.
 syft_argv:          Command-line flags to pass to syft.
                     Defaults to '-o cyclone-json'
+syft_timeout:       Maximum time to allow syft to run, in seconds.
+                    When non-empty and the `timeout` executable is present,
+                    the invocation is wrapped with `timeout <value>`.
+                    Defaults to "300" (5 minutes). Set to "" to disable.
 """
 }
 
@@ -79,17 +84,19 @@ func syft_system() {
 }
 
 func find_syft(path) {
+  found := ""
   if tool.syft.syft_prefer_docker {
-    result := syft_docker(path)
-    if result != "" {
+    found := syft_docker(path)
+    if found != "" {
+      result := with_timeout(found, tool.syft.syft_timeout)
       return
     }
   }
-  result := syft_system()
-  if result != "" {
-    return result
+  found := syft_system()
+  if found == "" {
+    found := syft_docker(path)
   }
-  result := syft_docker(path)
+  result := with_timeout(found, tool.syft.syft_timeout)
 }
 
 func install_syft(path) {

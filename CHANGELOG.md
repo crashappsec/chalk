@@ -125,6 +125,13 @@
 
   ([#665](https://github.com/crashappsec/chalk/pull/665))
 
+- External tools (syft, semgrep, trufflehog) now support a configurable
+  execution timeout. When the system `timeout` command is present, the tool
+  invocation is automatically wrapped with `timeout <value>`. The timeout is
+  configured via `tool.<name>.<name>_timeout` (e.g.
+  `tool.semgrep.semgrep_timeout`) and defaults to `"300"` (5 minutes). Set
+  to `""` to disable.
+
 ### Fixes
 
 - Docker probe always failed due to a typo introduced in chalk `1.0.0`

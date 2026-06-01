@@ -7,6 +7,20 @@
 
 # base non-builtin callbacks to get used in keyspecs
 
+# Wrap a command with `timeout <secs>` if the `timeout` executable is available
+# and timeout_secs is non-empty. Returns cmd unchanged otherwise.
+func with_timeout(cmd, timeout_secs) {
+  if cmd == "" or timeout_secs == "" {
+    return cmd
+  }
+  timeout_exe := find_exe("timeout", [])
+  if timeout_exe == "" {
+    trace("with_timeout: timeout command not found; running without timeout")
+    return cmd
+  }
+  return timeout_exe + " " + timeout_secs + " " + cmd
+}
+
 func canonicalize_tools(data: dict[string, `x]) {
   t := typeof(data)
   if not typecmp(t, dict[string, `x]) {
