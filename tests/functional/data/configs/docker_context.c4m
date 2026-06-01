@@ -9,8 +9,10 @@ docker {
     docker_push context {
       repository: "context"
       tags: ["context:{chalk_rand}"]
-      upload_context: true
-      upload_context_strategy: env("CONTEXT_STRATEGY")
+      docker_context_upload {
+        enabled:  true
+        strategy: env("CONTEXT_STRATEGY")
+      }
     }
   }
 }

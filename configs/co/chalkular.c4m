@@ -39,8 +39,10 @@ docker {
       ~auth: "crashoverride_chalkular"
     }
     docker_push chalkular {
-      ~tags:            ["{CHALK_RAND}"]
-      ~upload_context:  true
+      ~tags: ["{CHALK_RAND}"]
+      docker_context_upload {
+        ~enabled: true
+      }
     }
   }
 }

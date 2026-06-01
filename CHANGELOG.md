@@ -76,21 +76,32 @@
 
   New configuration sections:
   - `docker.docker_registry` - declares a registry with its URI and login method
+    - `enabled` - enable or disable this registry (default: `true`)
+    - `uri` - registry hostname (and port if non-standard)
+    - `login_method` - credentials strategy; `""` for none, `"get"` for HTTP GET
   - `docker.docker_registry.<name>.docker_login_get` - fetches credentials via
-    HTTP GET and runs `docker login` before any build or push; supports an
-    `enabled` field (default `true`) to disable login without removing the
-    configuration
-  - `docker.docker_registry.<name>.docker_push` - declares repositories,
-    tags, and context upload options. Key fields:
-    - `repository`, `tags` - where and how to tag the pushed image
-    - `upload_context` - enable build context upload as an OCI attestation
-    - `upload_context_strategy` - `registry`, `local`, `disk`, or `auto`
-    - `upload_context_size_threshold` - skip upload when tarball exceeds
-      this size (default: 100mb); failure reported in `_OP_FAILED_KEYS`
-      with code `CONTEXT_TOO_LARGE`; set to `0` to disable
-    - `upload_context_max_file_size` - skip individual files in the tarball
-      that exceed this size (default: `0` = no limit); useful for omitting
-      large binaries or data files without explicit exclude patterns
+    HTTP GET and runs `docker login` before any build or push
+    - `enabled` - disable login without removing the configuration (default: `true`)
+    - `uri` - endpoint to call; the registry URI is appended as a query parameter
+    - `auth` - named auth config to use for the HTTP request
+  - `docker.docker_registry.<name>.docker_push` - declares a repository and
+    tag set to push the built image to
+    - `enabled` - disable this push target without removing it (default: `true`)
+    - `repository` - repository path within the registry (required)
+    - `tags` - list of tags to push; supports `{KEY}` substitution (required)
+  - `docker.docker_registry.<name>.docker_push.<name>.docker_context_upload` -
+    nested configuration that enables build context upload as an OCI attestation
+    - `enabled` - set to `true` to activate (default: `false`)
+    - `strategy` - `registry`, `local`, `disk`, or `auto`
+    - `size_threshold` - skip upload when tarball exceeds this size
+      (default: `100mb`); failure reported in `_OP_FAILED_KEYS` with code
+      `CONTEXT_TOO_LARGE`; set to `0` to disable
+    - `max_file_size` - skip individual files that exceed this size
+      (default: `0` = no limit); useful for omitting large binaries or
+      data files without explicit exclude patterns
+    - `exclude_patterns` - glob patterns to exclude from the tarball
+      (default: `[".git"]`)
+    - `honor_dockerignore` - apply `.dockerignore` patterns (default: `true`)
 
   ```
   docker {
@@ -104,14 +115,16 @@
       docker_push my_app {
         repository: "my-org/my-app"
         tags: ["latest", "{BRANCH}", "{TAG}"]
-        upload_context: true
-        upload_context_strategy: "auto"
+        docker_context_upload {
+          enabled:  true
+          strategy: "auto"
+        }
       }
     }
   }
   ```
 
-  Upload strategies for `upload_context_strategy`:
+  Upload strategies for `strategy`:
   - `registry` - uploads the blob at build time; only the manifest is
     created at push time (recommended for CI)
   - `local` - saves the tarball to `/tmp` at build time and uploads at
@@ -141,7 +154,8 @@
   See `docs/design-docker-registry.md` for full details.
 
   ([#664](https://github.com/crashappsec/chalk/pull/664),
-  [#665](https://github.com/crashappsec/chalk/pull/665))
+  [#665](https://github.com/crashappsec/chalk/pull/665),
+  [#669](https://github.com/crashappsec/chalk/pull/669))
 
 - Chalk operator integration for richer Kubernetes metadata during `chalk exec`.
   When the chalk operator injects the required environment variables, chalk can

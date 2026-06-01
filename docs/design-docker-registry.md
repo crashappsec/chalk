@@ -22,9 +22,9 @@ the Chalk configuration control registry-level and push-level settings.
 ```con4m
 docker {
   docker_registry my_registry {
-    uri:           "registry.example.com"
-    enabled:       true
-    login_method:  "get"
+    uri:          "registry.example.com"
+    enabled:      true
+    login_method: "get"
     docker_login_get {
       uri: "https://auth.example.com/v1/docker-creds"
     }
@@ -32,6 +32,10 @@ docker {
       enabled:    true
       repository: "my-org/my-app"
       tags:       ["latest", "{BRANCH}"]
+      docker_context_upload {
+        enabled:  true
+        strategy: "auto"
+      }
     }
   }
 }
@@ -40,20 +44,29 @@ docker {
 Each named `docker_push` section inside a `docker_registry` section
 defines a repository and tag set to mirror the built image to.
 
-**Fields:**
+**`docker_push` fields:**
 
-| Field                               | Type           | Default     | Description                                                           |
-| ----------------------------------- | -------------- | ----------- | --------------------------------------------------------------------- |
-| `enabled`                           | `bool`         | `true`      | Enable or disable this push configuration                             |
-| `repository`                        | `string`       | (required)  | Repository path within the parent registry                            |
-| `tags`                              | `list[string]` | (required)  | Tags to push; supports `{KEY}` substitution                           |
-| `upload_context`                    | `bool`         | `false`     | Upload the build context as an OCI attestation                        |
-| `upload_context_mode`               | `string`       | `"full"`    | Context upload mode; only `"full"` is supported                       |
-| `upload_context_strategy`           | `string`       | `"auto"`    | Strategy for context upload (see below)                               |
-| `upload_context_size_threshold`     | `Size`         | `<<100mb>>` | Skip upload when tarball exceeds this size (0 = no limit)             |
-| `upload_context_exclude_patterns`   | `list[string]` | `[".git"]`  | Glob patterns to exclude from the context tarball                     |
-| `upload_context_honor_dockerignore` | `bool`         | `true`      | Apply `.dockerignore` patterns when creating the tarball              |
-| `upload_context_max_file_size`      | `Size`         | `<<0mb>>`   | Skip individual files larger than this size in the tarball (0 = none) |
+| Field        | Type           | Default    | Description                                 |
+| ------------ | -------------- | ---------- | ------------------------------------------- |
+| `enabled`    | `bool`         | `true`     | Enable or disable this push configuration   |
+| `repository` | `string`       | (required) | Repository path within the parent registry  |
+| `tags`       | `list[string]` | (required) | Tags to push; supports `{KEY}` substitution |
+
+Build context upload is configured in a nested `docker_context_upload`
+singleton. Its presence enables upload; omitting it disables upload for
+that push target.
+
+**`docker_context_upload` fields:**
+
+| Field                | Type           | Default     | Description                                                           |
+| -------------------- | -------------- | ----------- | --------------------------------------------------------------------- |
+| `enabled`            | `bool`         | `false`     | Set to `true` to activate context upload                              |
+| `mode`               | `string`       | `"full"`    | Context upload mode; only `"full"` is supported                       |
+| `strategy`           | `string`       | `"auto"`    | Strategy for context upload (see below)                               |
+| `size_threshold`     | `Size`         | `<<100mb>>` | Skip upload when tarball exceeds this size (0 = no limit)             |
+| `max_file_size`      | `Size`         | `<<0mb>>`   | Skip individual files larger than this size in the tarball (0 = none) |
+| `exclude_patterns`   | `list[string]` | `[".git"]`  | Glob patterns to exclude from the context tarball                     |
+| `honor_dockerignore` | `bool`         | `true`      | Apply `.dockerignore` patterns when creating the tarball              |
 
 ### Tag Template Substitution
 

@@ -2182,6 +2182,8 @@ retags the image and runs `docker push` for each configured image reference.
 Any locally-created tags are pruned once all pushes are complete.
 """
 
+  allow docker_context_upload
+
   field enabled {
     type:    bool
     default: true
@@ -2219,22 +2221,36 @@ Any characters in the substituted value that are not alphanumeric, `.`,
 """
   }
 
-  field upload_context {
-    type:     bool
-    default:  false
-    shortdoc: "Upload the build context as an OCI attestation"
-    doc:      """
-When `true` and `tags` is non-empty, Chalk uploads the Docker build context
-as a `.tar.gz` OCI artifact attached to the pushed image.  The artifact uses
-`artifactType: application/vnd.crashoverride.chalk.build-context.v1` and is
+}
+
+singleton docker_context_upload {
+  user_def_ok: true
+  doc:         """
+Configuration for uploading the Docker build context as an OCI attestation
+attached to the pushed image.  Declare this section inside a `docker_push`
+block to enable context upload for that push target.
+
+When present (and `enabled` is `true`), Chalk archives the build context
+as a `.tar.gz` and uploads it as an OCI artifact with
+`artifactType: application/vnd.crashoverride.chalk.build-context.v1`,
 stored at the attestation tag `sha256-<image-manifest-digest>`.
 
-The upload strategy (when the tarball is created and when the manifest is
-pushed) is controlled by `upload_context_strategy`.
+Both the main build context and any extra contexts added via
+`--build-context name=path` are uploaded for local directory contexts.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable or disable context upload for this push target"
+    doc:      """
+Set to `true` to enable context upload.  Defaults to `false` so that
+declaring the section without setting this field does not silently
+activate uploads.
 """
   }
 
-  field upload_context_mode {
+  field mode {
     type:    string
     default: "full"
     choices: ["full"]
@@ -2245,7 +2261,7 @@ Controls which parts of the build context are uploaded.  Currently only
 """
   }
 
-  field upload_context_strategy {
+  field strategy {
     type:    string
     default: "auto"
     choices: ["auto", "registry", "local", "disk"]
@@ -2270,7 +2286,7 @@ Controls when the build context tarball is created and uploaded relative to
 """
   }
 
-  field upload_context_size_threshold {
+  field size_threshold {
     type:     Size
     default:  <<100mb>>
     shortdoc: "Skip context upload when tarball exceeds this size"
@@ -2282,24 +2298,24 @@ A value of `0` disables the check and always uploads regardless of size.
 """
   }
 
-  field upload_context_honor_dockerignore {
-    type:     bool
-    default:  true
-    shortdoc: "Apply .dockerignore patterns when creating the context tarball"
+  field max_file_size {
+    type:     Size
+    default:  <<0mb>>
+    shortdoc: "Skip individual files larger than this size in the context tarball"
     doc:      """
-When `true`, Chalk reads the `.dockerignore` file from the build context
-directory (if present) and adds its patterns to the exclusion list used when
-creating the context `.tar.gz` archive.  This ensures the uploaded context
-matches what Docker itself would have used for the build.
+Per-file size limit when creating the build context `.tar.gz` archive.
+Any individual file whose size exceeds this threshold is silently omitted
+from the tarball.  A value of `0` (the default) disables the check and
+includes all files regardless of size.
 
-Negation patterns (lines beginning with `!`) are supported: they re-include
-files that were previously matched by an earlier exclusion rule, with the last
-matching pattern winning.  All standard `.dockerignore` glob syntax is honored,
-including `**` path wildcards.
+This is useful for skipping unexpectedly large files (compiled binaries,
+model weights, data dumps) that would otherwise push the total archive
+over `size_threshold` without requiring explicit exclude patterns for
+every such file.
 """
   }
 
-  field upload_context_exclude_patterns {
+  field exclude_patterns {
     type:     list[string]
     default:  [".git"]
     shortdoc: "Glob patterns to exclude from the context tarball"
@@ -2318,20 +2334,20 @@ which is typically not needed in the uploaded context and can be large.
 """
   }
 
-  field upload_context_max_file_size {
-    type:     Size
-    default:  <<0mb>>
-    shortdoc: "Skip individual files larger than this size in the context tarball"
+  field honor_dockerignore {
+    type:     bool
+    default:  true
+    shortdoc: "Apply .dockerignore patterns when creating the context tarball"
     doc:      """
-Per-file size limit when creating the build context `.tar.gz` archive.
-Any individual file whose size exceeds this threshold is silently omitted
-from the tarball.  A value of `0` (the default) disables the check and
-includes all files regardless of size.
+When `true`, Chalk reads the `.dockerignore` file from the build context
+directory (if present) and adds its patterns to the exclusion list used when
+creating the context `.tar.gz` archive.  This ensures the uploaded context
+matches what Docker itself would have used for the build.
 
-This is useful for skipping unexpectedly large files (compiled binaries,
-model weights, data dumps) that would otherwise push the total archive
-over `upload_context_size_threshold` without requiring explicit exclude
-patterns for every such file.
+Negation patterns (lines beginning with `!`) are supported: they re-include
+files that were previously matched by an earlier exclusion rule, with the last
+matching pattern winning.  All standard `.dockerignore` glob syntax is honored,
+including `**` path wildcards.
 """
   }
 }

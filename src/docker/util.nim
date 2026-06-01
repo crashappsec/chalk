@@ -198,20 +198,26 @@ iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
       continue
     for pushName in getChalkSubsections(registrySection & ".docker_push"):
       let
-        pushSection   = registrySection & ".docker_push." & pushName
-        pushEnabled   = attrGet[bool](pushSection & ".enabled")
-        uploadContext = attrGet[bool](pushSection & ".upload_context")
-        pushTags      = attrGet[seq[string]](pushSection & ".tags")
-        pushRepo      = attrGet[string](pushSection & ".repository").removePrefix('/')
-        rawStrategy         = attrGet[string](pushSection & ".upload_context_strategy")
-        strategy            = if rawStrategy != "auto": rawStrategy
-                              elif isCI():              "registry"
-                              else:                     "local"
-        sizeThreshold       = int(attrGet[Con4mSize](pushSection & ".upload_context_size_threshold"))
-        maxFileSize         = int(attrGet[Con4mSize](pushSection & ".upload_context_max_file_size"))
-        excludePatterns     = attrGet[seq[string]](pushSection & ".upload_context_exclude_patterns")
-        honorDockerignore   = attrGet[bool](pushSection & ".upload_context_honor_dockerignore")
-      if not pushEnabled or not uploadContext or len(pushTags) == 0:
+        pushSection    = registrySection & ".docker_push." & pushName
+        pushEnabled    = attrGet[bool](pushSection & ".enabled")
+        pushTags       = attrGet[seq[string]](pushSection & ".tags")
+        pushRepo       = attrGet[string](pushSection & ".repository").removePrefix('/')
+        contextSection = pushSection & ".docker_context_upload"
+      if not pushEnabled or len(pushTags) == 0:
+        continue
+      if not sectionExists(contextSection):
+        continue
+      let
+        contextEnabled    = attrGet[bool](contextSection & ".enabled")
+        rawStrategy       = attrGet[string](contextSection & ".strategy")
+        strategy          = if rawStrategy != "auto": rawStrategy
+                            elif isCI():              "registry"
+                            else:                     "local"
+        sizeThreshold     = int(attrGet[Con4mSize](contextSection & ".size_threshold"))
+        maxFileSize       = int(attrGet[Con4mSize](contextSection & ".max_file_size"))
+        excludePatterns   = attrGet[seq[string]](contextSection & ".exclude_patterns")
+        honorDockerignore = attrGet[bool](contextSection & ".honor_dockerignore")
+      if not contextEnabled:
         continue
       yield DockerContextUploadConfig(
         registryUri:       registryUri,
@@ -219,9 +225,9 @@ iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
         tags:              pushTags,
         strategy:          strategy,
         sizeThreshold:     sizeThreshold,
+        maxFileSize:       maxFileSize,
         excludePatterns:   excludePatterns,
         honorDockerignore: honorDockerignore,
-        maxFileSize:       maxFileSize,
       )
 
 iterator iterPushTags*(chalk: ChalkObj): string =
