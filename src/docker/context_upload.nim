@@ -433,8 +433,21 @@ proc completeBuildContextUploads*(
                image.registry & "/" & repoPath &
                " image digest " & image.digest)
         except:
-          error("docker: build context upload failed: " & getCurrentExceptionMsg())
+          let msg = (
+            "build context '" & contextName & "' upload failed for " &
+            image.registry & "/" & repoPath & ": " & getCurrentExceptionMsg()
+          )
+          error("docker: " & msg)
           dumpExOnDebug()
+          addFailedKey(
+            "_REPO_BUILD_CONTEXTS",
+            code        = "CONTEXT_UPLOAD_FAILED",
+            error       = msg,
+            description = (
+              "The build context could not be uploaded. Check registry " &
+              "credentials and network access."
+            ),
+          )
 
   result.setIfNeeded("_REPO_BUILD_CONTEXTS", buildContexts)
   result.setIfNeeded("_REPO_BUILD_CONTEXT_TAR_SIZES", sizeResults)
