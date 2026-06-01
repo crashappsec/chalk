@@ -2263,20 +2263,23 @@ def test_version_bare(chalk_default: Chalk):
 
 
 @pytest.mark.parametrize(
-    "strategy, push",
+    "strategy, push, exceed_size",
     [
         # separate build + push: all strategies are meaningfully different
-        ("registry", False),
-        ("local", False),
-        ("disk", False),
+        ("registry", False, False),
+        ("local", False, False),
+        ("disk", False, False),
         # combined --push: strategies collapse to same behaviour; test one
-        ("local", True),
+        ("local", True, False),
+        # size_threshold too small: upload must be skipped entirely
+        ("local", False, True),
     ],
 )
 def test_build_context_upload(
     chalk_copy: Chalk,
     strategy: str,
     push: bool,
+    exceed_size: bool,
     random_hex: str,
     server_http: str,
     tmp_data_dir: Path,
@@ -2301,6 +2304,8 @@ def test_build_context_upload(
     (context_dir / "logs" / "temp.tmp").write_text("scratch\n")
     (context_dir / "secrets").mkdir()
     (context_dir / "secrets" / "api_key.txt").write_text("s3cr3t\n")
+    # file larger than max_file_size (<<1kb>> in docker_context.c4m) must be skipped
+    (context_dir / "large_file.bin").write_bytes(b"x" * 2048)
     (context_dir / ".dockerignore").write_text(
         "\n".join(
             [
@@ -2320,10 +2325,19 @@ def test_build_context_upload(
 
     name = f"context_upload_{random_hex}"
     tag = f"{REGISTRY}/{name}:latest"
+    if exceed_size:
+        # create many incompressible files in both contexts to push their tarballs
+        # over size_threshold (<<5kb>> in docker_context.c4m); each file is under
+        # max_file_size (<<1kb>>) so they are included, but together exceed the total
+        for i in range(50):
+            (context_dir / f"bulk_{i:02d}.bin").write_bytes(os.urandom(768))
+            (libs_dir / f"bulk_{i:02d}.bin").write_bytes(os.urandom(768))
+
     env = {
         "CHALK_SERVER": server_http,
         "CONTEXT_STRATEGY": strategy,
     }
+    config = CONFIGS / "docker_context.c4m"
 
     digests, build_result = chalk_copy.docker_build(
         dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
@@ -2332,7 +2346,7 @@ def test_build_context_upload(
         tag=tag,
         push=push,
         run_docker=False,
-        config=CONFIGS / "docker_context.c4m",
+        config=config,
         env=env,
         buildx=True,
     )
@@ -2342,17 +2356,31 @@ def test_build_context_upload(
             tag,
             env=env,
             digests=digests,
-            config=CONFIGS / "docker_context.c4m",
+            config=config,
         )
     else:
         push_result = build_result
 
+    # named extra contexts are always captured regardless of upload outcome
+    assert build_result.mark.has(
+        DOCKER_ADDITIONAL_CONTEXTS={"libs": re.compile(r".+")},
+    )
+
+    if exceed_size:
+        # size_threshold too small: upload is skipped, key must be absent
+        assert push_result.mark.has(_REPO_BUILD_CONTEXTS=MISSING)
+        assert build_result.report.has(
+            _OP_FAILED_KEYS={
+                "_REPO_BUILD_CONTEXTS": {
+                    "code": "CONTEXT_TOO_LARGE",
+                },
+            },
+        )
+        return
+
     # snapshots are embedded in the chalk mark at build time;
     # "context" is the repository name from docker_context.c4m
     assert build_result.mark.has(
-        DOCKER_ADDITIONAL_CONTEXTS={
-            "libs": re.compile(r".+"),
-        },
         DOCKER_BUILD_CONTEXT_SNAPSHOTS={
             REGISTRY_AUTH: {
                 "context": {
@@ -2394,8 +2422,11 @@ def test_build_context_upload(
     assert "src/main.py" in context_files
     assert "README.md" in context_files
 
-    # .git directory must be excluded (default upload_context_exclude_patterns)
+    # .git directory must be excluded (default exclude_patterns)
     assert not any(f == ".git" or f.startswith(".git/") for f in context_files)
+
+    # file larger than max_file_size (<<1kb>>) must be skipped
+    assert "large_file.bin" not in context_files
 
     # logs/ is excluded but logs/*.log is re-included via wildcard negation
     assert "logs/debug.log" in context_files

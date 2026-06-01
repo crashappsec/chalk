@@ -10,8 +10,10 @@ docker {
       repository: "context"
       tags: ["context:{chalk_rand}"]
       docker_context_upload {
-        enabled:  true
-        strategy: env("CONTEXT_STRATEGY")
+        enabled:        true
+        strategy:       env("CONTEXT_STRATEGY")
+        max_file_size:  <<1kb>>
+        size_threshold: <<5kb>>
       }
     }
   }
