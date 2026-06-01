@@ -88,6 +88,9 @@
     - `upload_context_size_threshold` - skip upload when tarball exceeds
       this size (default: 100mb); failure reported in `_OP_FAILED_KEYS`
       with code `CONTEXT_TOO_LARGE`; set to `0` to disable
+    - `upload_context_max_file_size` - skip individual files in the tarball
+      that exceed this size (default: `0` = no limit); useful for omitting
+      large binaries or data files without explicit exclude patterns
 
   ```
   docker {

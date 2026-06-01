@@ -420,6 +420,7 @@ type
     tags*:                 seq[string]
     strategy*:             string        ## resolved upload strategy (never "auto")
     sizeThreshold*:        int           ## max tarball bytes; 0 = unlimited
+    maxFileSize*:          int           ## max bytes per individual file; 0 = unlimited
     excludePatterns*:      seq[string]   ## patterns to exclude from context tarball
     honorDockerignore*:    bool          ## merge .dockerignore patterns at tar time
 

@@ -42,17 +42,18 @@ defines a repository and tag set to mirror the built image to.
 
 **Fields:**
 
-| Field                               | Type           | Default     | Description                                               |
-| ----------------------------------- | -------------- | ----------- | --------------------------------------------------------- |
-| `enabled`                           | `bool`         | `true`      | Enable or disable this push configuration                 |
-| `repository`                        | `string`       | (required)  | Repository path within the parent registry                |
-| `tags`                              | `list[string]` | (required)  | Tags to push; supports `{KEY}` substitution               |
-| `upload_context`                    | `bool`         | `false`     | Upload the build context as an OCI attestation            |
-| `upload_context_mode`               | `string`       | `"full"`    | Context upload mode; only `"full"` is supported           |
-| `upload_context_strategy`           | `string`       | `"auto"`    | Strategy for context upload (see below)                   |
-| `upload_context_size_threshold`     | `Size`         | `<<100mb>>` | Skip upload when tarball exceeds this size (0 = no limit) |
-| `upload_context_exclude_patterns`   | `list[string]` | `[".git"]`  | Glob patterns to exclude from the context tarball         |
-| `upload_context_honor_dockerignore` | `bool`         | `true`      | Apply `.dockerignore` patterns when creating the tarball  |
+| Field                               | Type           | Default     | Description                                                           |
+| ----------------------------------- | -------------- | ----------- | --------------------------------------------------------------------- |
+| `enabled`                           | `bool`         | `true`      | Enable or disable this push configuration                             |
+| `repository`                        | `string`       | (required)  | Repository path within the parent registry                            |
+| `tags`                              | `list[string]` | (required)  | Tags to push; supports `{KEY}` substitution                           |
+| `upload_context`                    | `bool`         | `false`     | Upload the build context as an OCI attestation                        |
+| `upload_context_mode`               | `string`       | `"full"`    | Context upload mode; only `"full"` is supported                       |
+| `upload_context_strategy`           | `string`       | `"auto"`    | Strategy for context upload (see below)                               |
+| `upload_context_size_threshold`     | `Size`         | `<<100mb>>` | Skip upload when tarball exceeds this size (0 = no limit)             |
+| `upload_context_exclude_patterns`   | `list[string]` | `[".git"]`  | Glob patterns to exclude from the context tarball                     |
+| `upload_context_honor_dockerignore` | `bool`         | `true`      | Apply `.dockerignore` patterns when creating the tarball              |
+| `upload_context_max_file_size`      | `Size`         | `<<0mb>>`   | Skip individual files larger than this size in the tarball (0 = none) |
 
 ### Tag Template Substitution
 
@@ -280,11 +281,11 @@ The context name is `"."` for the main build context and the declared
 name for each `--build-context` extra. The per-context config object
 carries strategy-specific fields:
 
-| Strategy   | Fields                                                                                 |
-| ---------- | -------------------------------------------------------------------------------------- |
-| `registry` | `strategy`, `blob_digest`, `blob_size`                                                 |
-| `local`    | `strategy`, `tar_path`                                                                 |
-| `disk`     | `strategy`, `context_path`, `size_threshold`, `exclude_patterns`, `honor_dockerignore` |
+| Strategy   | Fields                                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------------------- |
+| `registry` | `strategy`, `blob_digest`, `blob_size`                                                                  |
+| `local`    | `strategy`, `tar_path`                                                                                  |
+| `disk`     | `strategy`, `context_path`, `size_threshold`, `exclude_patterns`, `honor_dockerignore`, `max_file_size` |
 
 At push time, Chalk reads this key from the image's chalk mark and
 completes the attestation manifest creation.

@@ -2317,6 +2317,23 @@ The default `[".git"]` excludes the Git repository metadata directory,
 which is typically not needed in the uploaded context and can be large.
 """
   }
+
+  field upload_context_max_file_size {
+    type:     Size
+    default:  <<0mb>>
+    shortdoc: "Skip individual files larger than this size in the context tarball"
+    doc:      """
+Per-file size limit when creating the build context `.tar.gz` archive.
+Any individual file whose size exceeds this threshold is silently omitted
+from the tarball.  A value of `0` (the default) disables the check and
+includes all files regardless of size.
+
+This is useful for skipping unexpectedly large files (compiled binaries,
+model weights, data dumps) that would otherwise push the total archive
+over `upload_context_size_threshold` without requiring explicit exclude
+patterns for every such file.
+"""
+  }
 }
 
 singleton zip {

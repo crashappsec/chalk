@@ -222,10 +222,11 @@ proc isExcluded*(relPath: string, patterns: seq[string]): bool =
 ## Directory walk
 
 proc addDirToTar(
-    gz:       GzFile,
-    baseDir:  string,
-    relDir:   string,
-    patterns: seq[string],
+    gz:          GzFile,
+    baseDir:     string,
+    relDir:      string,
+    patterns:    seq[string],
+    maxFileSize: int64,
 ) =
   for kind, entry in walkDir(baseDir / relDir, relative = true):
     let
@@ -240,7 +241,7 @@ proc addDirToTar(
         gz.gzWriteAll(buildTarHeader(norm, 0, isDir = true, mtime))
       ## Always recurse so negation patterns can re-include files inside
       ## an excluded directory (e.g. "logs/" with "!logs/*.log").
-      addDirToTar(gz, baseDir, rel, patterns)
+      addDirToTar(gz, baseDir, rel, patterns, maxFileSize)
 
     of pcFile:
       if isExcluded(norm, patterns):
@@ -249,6 +250,10 @@ proc addDirToTar(
       let
         size  = full.getFileSize()
         mtime = full.getLastModificationTime().toUnix()
+      if maxFileSize > 0 and size > maxFileSize:
+        trace("docker: context upload: skipping large file " & norm &
+              " (" & $size & " bytes > " & $maxFileSize & " bytes)")
+        continue
       gz.gzWriteAll(buildTarHeader(norm, size, isDir = false, mtime))
       let fh = open(full, fmRead)
       try:
@@ -276,15 +281,17 @@ proc writeTarGz*(
     outPath:     string,
     contextPath: string,
     patterns:    seq[string],
+    maxFileSize: int64 = 0,
 ) =
   ## Write a .tar.gz of contextPath to outPath.
   ## Files and directories whose path relative to contextPath matches any
   ## entry in patterns are excluded from the archive.
+  ## Individual files larger than maxFileSize bytes are skipped (0 = no limit).
   let gz = gzopen(outPath.cstring, "wb")
   if gz == nil:
     raise newException(IOError, "could not open " & outPath & " for gzip writing")
   try:
-    addDirToTar(gz, contextPath, "", patterns)
+    addDirToTar(gz, contextPath, "", patterns, maxFileSize)
     gzWriteZeros(gz, tarBlock * 2)  ## POSIX end-of-archive: two zero blocks
   finally:
     discard gzclose(gz)

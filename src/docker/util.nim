@@ -208,6 +208,7 @@ iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
                               elif isCI():              "registry"
                               else:                     "local"
         sizeThreshold       = int(attrGet[Con4mSize](pushSection & ".upload_context_size_threshold"))
+        maxFileSize         = int(attrGet[Con4mSize](pushSection & ".upload_context_max_file_size"))
         excludePatterns     = attrGet[seq[string]](pushSection & ".upload_context_exclude_patterns")
         honorDockerignore   = attrGet[bool](pushSection & ".upload_context_honor_dockerignore")
       if not pushEnabled or not uploadContext or len(pushTags) == 0:
@@ -220,6 +221,7 @@ iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
         sizeThreshold:     sizeThreshold,
         excludePatterns:   excludePatterns,
         honorDockerignore: honorDockerignore,
+        maxFileSize:       maxFileSize,
       )
 
 iterator iterPushTags*(chalk: ChalkObj): string =

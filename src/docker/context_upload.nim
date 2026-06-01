@@ -97,11 +97,13 @@ proc readDockerignorePatterns(contextPath: string): seq[string] =
 proc contextToTarGz*(
     contextPath:       string,
     excludePatterns:   seq[string],
-    honorDockerignore: bool = false,
+    honorDockerignore: bool  = false,
+    maxFileSize:       int64 = 0,
 ): string =
   ## Archive a context directory to a temp .tar.gz and return its path.
   ## Files and directories matching any pattern in excludePatterns are omitted.
   ## When honorDockerignore is true, patterns from .dockerignore are also applied.
+  ## Individual files larger than maxFileSize bytes are skipped (0 = no limit).
   let
     base    = lastPathPart(contextPath)
     dateDir = contextCacheDir() / now().utc.format(CONTEXT_CACHE_DIR_FMT)
@@ -111,7 +113,12 @@ proc contextToTarGz*(
     patterns.add(readDockerignorePatterns(contextPath))
   patterns.add(excludePatterns)
   let outPath = dateDir / (base & "-" & $int(epochTime()) & ".tar.gz")
-  writeTarGz(outPath, contextPath, patterns)
+  writeTarGz(
+    outPath     = outPath,
+    contextPath = contextPath,
+    patterns    = patterns,
+    maxFileSize = maxFileSize,
+  )
   return outPath
 
 proc newContextManifest(
@@ -202,6 +209,7 @@ proc uploadBuildContextsAtBuildTime*(
         contextPath       = contextPath,
         excludePatterns   = config.excludePatterns,
         honorDockerignore = config.honorDockerignore,
+        maxFileSize       = int64(config.maxFileSize),
       )
       try:
         if not checkContextSize(
@@ -233,6 +241,7 @@ proc uploadBuildContextsAtBuildTime*(
         contextPath       = contextPath,
         excludePatterns   = config.excludePatterns,
         honorDockerignore = config.honorDockerignore,
+        maxFileSize       = int64(config.maxFileSize),
       )
       if not checkContextSize(tarPath, contextName, contextPath, config.sizeThreshold):
         removeFile(tarPath)
@@ -251,6 +260,7 @@ proc uploadBuildContextsAtBuildTime*(
         "size_threshold":     config.sizeThreshold,
         "exclude_patterns":   config.excludePatterns,
         "honor_dockerignore": config.honorDockerignore,
+        "max_file_size":      config.maxFileSize,
       }
       trace("docker: build context disk strategy: path=" & contextPath)
 
@@ -342,10 +352,12 @@ proc completeBuildContextUpload(
       sizeThreshold      = snapshot{"size_threshold"}.getInt(0)
       excludePatterns    = snapshot{"exclude_patterns"}.getStrElems()
       honorDockerignore  = snapshot{"honor_dockerignore"}.getBool(false)
+      maxFileSize        = int64(snapshot{"max_file_size"}.getInt(0))
       tarPath            = contextToTarGz(
         contextPath       = contextPath,
         excludePatterns   = excludePatterns,
         honorDockerignore = honorDockerignore,
+        maxFileSize       = maxFileSize,
       )
     try:
       if not checkContextSize(
