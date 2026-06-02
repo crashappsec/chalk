@@ -16,10 +16,10 @@ import ".."/[
 ]
 
 type Get = ref object of AttestationKeyProvider
-  location: string
-  url:      string
-  timeout:  int
-  auth:     AuthConfig
+  location:  string
+  url:       string
+  timeoutMs: int
+  auth:      AuthConfig
 
 proc request(self: Get, query = ""): JsonNode =
   let url       = self.url & query
@@ -32,7 +32,7 @@ proc request(self: Get, query = ""): JsonNode =
     response = safeRequest(url               = url,
                            httpMethod        = HttpGet,
                            headers           = authHeaders,
-                           timeout           = self.timeout,
+                           timeout           = self.timeoutMs,
                            retries           = 2,
                            firstRetryDelayMs = 100,
                            acceptStatusCodes = @[200..200])
@@ -60,7 +60,7 @@ proc initCallback(this: AttestationKeyProvider) =
     authName  = attrGet[string]("attestation.attestation_key_get.auth")
     authOpt   = getAuthConfigByName(authName)
     url       = attrGet[string]("attestation.attestation_key_get.uri").removeSuffix("/")
-    timeout   = cast[int](attrGet[Con4mDuration]("attestation.attestation_key_get.timeout"))
+    timeoutMs = cast[int](attrGet[Con4mDuration]("attestation.attestation_key_get.timeout")) div 1000
 
   if authOpt.isNone():
     raise newException(ValueError,
@@ -72,9 +72,9 @@ proc initCallback(this: AttestationKeyProvider) =
                        "attestation.attestation_key_get.uri " &
                        " is required to use signing key retrieval service")
 
-  self.auth     = authOpt.get()
-  self.url      = url
-  self.timeout  = timeout
+  self.auth      = authOpt.get()
+  self.url       = url
+  self.timeoutMs = timeoutMs
 
 proc retrieveKeyCallback(this: AttestationKeyProvider): AttestationKey =
   let

@@ -758,7 +758,7 @@ proc layerPutFileStream*(
     size           = len(fileStream)
     # fyi docker cli seems to upload as monolithic upload :shrug:
     chunkSize      = int(attrGet[Con4mSize]("docker.registry_layer_chunk_size"))
-    layerTimeout   = int(attrGet[Con4mDuration]("docker.registry_layer_upload_timeout"))
+    layerTimeoutMs = int(attrGet[Con4mDuration]("docker.registry_layer_upload_timeout")) div 1000
   try:
     let (_, response) = layer.request(
       useCase     = RegistryUseCase.ReadWrite,
@@ -799,7 +799,7 @@ proc layerPutFileStream*(
           size              = size,
           contentType       = "application/octet-stream",
           acceptStatusCodes = [200..299, 416..416],
-          timeout           = layerTimeout,
+          timeout           = layerTimeoutMs,
         )
       except:
         raise newException(

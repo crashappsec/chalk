@@ -38,11 +38,11 @@ proc loginToRegistries*() =
       if not loginEnabled:
         continue
       let
-        loginBase = parseUri(attrGet[string](loginSection & ".uri"))
-        loginUri  = loginBase.withQueryPair("registry", registryUri)
-        timeout   = cast[int](attrGet[Con4mDuration](loginSection & ".timeout"))
-        authName  = attrGet[string](loginSection & ".auth")
-        authOpt   = getAuthConfigByName(authName)
+        loginBase  = parseUri(attrGet[string](loginSection & ".uri"))
+        loginUri   = loginBase.withQueryPair("registry", registryUri)
+        timeoutMs  = cast[int](attrGet[Con4mDuration](loginSection & ".timeout")) div 1000
+        authName   = attrGet[string](loginSection & ".auth")
+        authOpt    = getAuthConfigByName(authName)
       var headers = newHttpHeaders()
       if authOpt.isSome():
         let auth  = authOpt.get()
@@ -51,7 +51,7 @@ proc loginToRegistries*() =
         let response = safeRequest(
           url               = loginUri,
           httpMethod        = HttpGet,
-          timeout           = timeout,
+          timeout           = timeoutMs,
           headers           = headers,
           retries           = 2,
           firstRetryDelayMs = 100,
