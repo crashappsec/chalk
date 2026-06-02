@@ -2306,6 +2306,13 @@ def test_build_context_upload(
     (context_dir / "secrets" / "api_key.txt").write_text("s3cr3t\n")
     # file larger than max_file_size (<<1kb>> in docker_context.c4m) must be skipped
     (context_dir / "large_file.bin").write_bytes(b"x" * 2048)
+    # single-component name > 100 bytes: requires GNU LongLink entry
+    long_name = "a" * 101 + ".py"
+    (context_dir / long_name).write_text("# long name\n")
+    # name component in a subdirectory still > 100 bytes
+    (context_dir / "sub").mkdir()
+    long_subname = "b" * 101 + ".py"
+    (context_dir / "sub" / long_subname).write_text("# long sub name\n")
     (context_dir / ".dockerignore").write_text(
         "\n".join(
             [
@@ -2436,6 +2443,10 @@ def test_build_context_upload(
     # secrets/ is excluded entirely
     assert not any(f == "secrets" or f.startswith("secrets/") for f in context_files)
 
+    # long filenames (>100 bytes) stored via GNU LongLink must round-trip correctly
+    assert long_name in context_files
+    assert f"sub/{long_subname}" in context_files
+
     # --- named context ("libs") ---
     libs_attest_digest = push_result.mark["_REPO_BUILD_CONTEXTS"][REGISTRY_AUTH][
         "context"
@@ -2450,13 +2461,26 @@ def test_build_context_upload(
     assert "vendor/dep.py" in libs_files
     assert not any(f == ".git" or f.startswith(".git/") for f in libs_files)
 
-    # tar sizes are positive integers for each uploaded context
+    # tar sizes are positive integers; large_file.bin exceeds max_file_size and
+    # must be reported in skipped files with its sha256 hash and byte size
     assert push_result.mark.has(
         _REPO_BUILD_CONTEXT_TAR_SIZES={
             REGISTRY_AUTH: {
                 "context": {
                     ".": IntCompare(0, operator.gt),
                     "libs": IntCompare(0, operator.gt),
+                },
+            },
+        },
+        _REPO_BUILD_CONTEXT_SKIPPED_FILES={
+            REGISTRY_AUTH: {
+                "context": {
+                    ".": {
+                        "large_file.bin": {
+                            "hash": re.compile(r"^[a-f0-9]{64}$"),
+                            "size": 2048,
+                        },
+                    },
                 },
             },
         },

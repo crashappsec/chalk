@@ -61,24 +61,29 @@ proc testIsExcluded() =
   check isExcluded(".git", @[".git"])
   check not isExcluded("src", @[".git"])
 
-  ## Pattern without '/' matches against every path component
-  check isExcluded("a/.git", @[".git"])
-  check isExcluded("a/b/.git", @[".git"])
-  check isExcluded("a/.git/config", @[".git"])
+  ## Docker semantics: no-slash pattern matches the full path, not per-component.
+  ## A nested .git is not matched; only the root-level .git (and its contents via
+  ## ancestor check) are excluded.
+  check not isExcluded("a/.git", @[".git"])
+  check not isExcluded("a/b/.git", @[".git"])
+  check not isExcluded("a/.git/config", @[".git"])
   check not isExcluded("a/b/src", @[".git"])
+  ## Ancestor check: files inside a matched root dir are also excluded.
+  check isExcluded(".git/config", @[".git"])
+  check isExcluded(".git/hooks/pre-commit", @[".git"])
 
-  ## Trailing-slash patterns have the slash stripped, so they match any
-  ## path component at any depth (same as the no-slash form)
+  ## Trailing-slash stripped; pattern matches the root-level dir and its contents
+  ## via ancestor check, but not a same-named dir nested deeper.
   check isExcluded("logs/app.log", @["logs/"])
-  check isExcluded("a/logs/app.log", @["logs/"])
+  check not isExcluded("a/logs/app.log", @["logs/"])
 
   ## Pattern with an internal '/' matches the full relative path only
   check isExcluded("build/output.o", @["build/*.o"])
   check not isExcluded("a/build/output.o", @["build/*.o"])
 
-  ## Glob pattern without '/'
+  ## Glob pattern without '/' matches only root-level entries
   check isExcluded("foo.tmp", @["*.tmp"])
-  check isExcluded("a/b/foo.tmp", @["*.tmp"])
+  check not isExcluded("a/b/foo.tmp", @["*.tmp"])
   check not isExcluded("foo.nim", @["*.tmp"])
 
   ## Last-match-wins: later patterns override earlier ones
@@ -142,7 +147,7 @@ proc testWriteTarGz() =
     removeFile(outPath)
 
   ## With negation: logs/ excluded but *.log files re-included.
-  writeTarGz(
+  discard writeTarGz(
     outPath     = outPath,
     contextPath = tmpDir,
     patterns    = @["logs/", "!logs/*.log", "secrets/"],
@@ -160,7 +165,7 @@ proc testWriteTarGz() =
   check "secrets" notin files
 
   ## Without negation: entire logs/ subtree must be absent.
-  writeTarGz(
+  discard writeTarGz(
     outPath     = outPath,
     contextPath = tmpDir,
     patterns    = @["logs/", "secrets/"],

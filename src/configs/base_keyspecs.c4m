@@ -4927,6 +4927,43 @@ For example:
 """
 }
 
+keyspec _REPO_BUILD_CONTEXT_SKIPPED_FILES {
+    kind:             RunTimeArtifact
+    type:             dict[string, dict[string, dict[string, dict[string, dict[string, `x]]]]]
+    standard:         true
+    doc: """
+Files skipped during build context upload because they exceeded the
+`max_file_size` limit. The structure mirrors `_REPO_BUILD_CONTEXTS`:
+
+* normalized registry name (domain and port if any)
+* repository name
+* context name (`"."` for the main context, named value for `--build-context` extras)
+* file path relative to the context root
+* per-file info object with two fields:
+  - `hash` - SHA-256 hex digest of the file
+  - `size` - file size in bytes
+
+For example:
+
+```json
+{
+  "_REPO_BUILD_CONTEXT_SKIPPED_FILES": {
+    "registry-1.docker.io": {
+      "my-org/my-app": {
+        ".": {
+          "vendor/large.bin": {
+            "hash": "a1b2c3d4...",
+            "size": 52428800
+          }
+        }
+      }
+    }
+  }
+}
+```
+"""
+}
+
 keyspec DOCKER_BUILD_CONTEXT_SNAPSHOTS {
     kind:             ChalkTimeArtifact
     type:             dict[string, dict[string, dict[string, dict[string, `x]]]]

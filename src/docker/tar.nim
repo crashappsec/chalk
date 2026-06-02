@@ -16,6 +16,7 @@ import std/[
 ]
 import ".."/[
   types,
+  utils/files,
 ]
 
 ## ---------------------------------------------------------------------------
@@ -30,14 +31,18 @@ proc gzclose(file: GzFile): cint {.importc: "gzclose".}
 proc gzerror(file: GzFile, errnum: ptr cint): cstring {.importc: "gzerror".}
 {.pop.}
 
+type
+  SkippedFile* = tuple[path: string, size: int64, hash: string]
+
 ## ---------------------------------------------------------------------------
 ## Tar format constants
 
 const
-  tarBlock      = 512
-  tarNameLen    = 100
-  tarPrefixLen  = 155
-  tarChunkSize  = 65536
+  tarBlock       = 512
+  tarNameLen     = 100
+  tarLinkNameLen = 100
+  tarPrefixLen   = 155
+  tarChunkSize   = 65536
 
 ## ---------------------------------------------------------------------------
 ## Internal helpers
@@ -48,6 +53,11 @@ proc toOctal(n: int64, width: int): string =
   for i in countdown(width - 1, 0):
     result[i] = char(ord('0') + int(v and 7))
     v = v shr 3
+  if v != 0:
+    raise newException(
+      ValueError,
+      "value " & $n & " does not fit in " & $width & " octal digits",
+    )
 
 proc gzWriteAll(gz: GzFile, data: string) =
   if data.len == 0:
@@ -65,10 +75,12 @@ proc gzWriteZeros(gz: GzFile, n: int) =
   discard gzwrite(gz, unsafeAddr zeros[0], cuint(n))
 
 proc buildTarHeader(
-    relPath: string,
-    size:    int64,
-    isDir:   bool,
-    mtime:   int64,
+    relPath:    string,
+    size:       int64,
+    isDir:      bool,
+    mtime:      int64,
+    linkTarget: string = "",
+    typeFlag:   char   = '\0',
 ): string =
   result = newString(tarBlock)  ## zero-filled
 
@@ -94,8 +106,11 @@ proc buildTarHeader(
   for i in 0 ..< min(name.len, tarNameLen):
     result[i] = name[i]
 
-  ## Mode (100..107): "0000755\0" for dirs, "0000644\0" for files
-  let modeStr = if isDir: "0000755\0" else: "0000644\0"
+  ## Mode (100..107): "0000755\0" for dirs, "0000777\0" for symlinks, "0000644\0" for files
+  let modeStr =
+    if isDir:              "0000755\0"
+    elif linkTarget != "": "0000777\0"
+    else:                  "0000644\0"
   for i in 0 ..< 8:
     result[100 + i] = modeStr[i]
 
@@ -105,7 +120,7 @@ proc buildTarHeader(
       result[base + i] = '0'
     result[base + 7] = '\0'
 
-  ## File size (124..135): 11-digit octal + space
+  ## File size (124..135): 11-digit octal + space (0 for symlinks and dirs)
   let sizeStr = toOctal(size, 11)
   for i in 0 ..< 11:
     result[124 + i] = sizeStr[i]
@@ -121,8 +136,18 @@ proc buildTarHeader(
   for i in 0 ..< 8:
     result[148 + i] = ' '
 
-  ## Type flag (156): '5' = directory, '0' = regular file
-  result[156] = if isDir: '5' else: '0'
+  ## Type flag (156): 'L' = GNU longname preamble, '5' = directory,
+  ##                  '2' = symlink, '0' = regular file
+  result[156] =
+    if typeFlag != '\0':   typeFlag
+    elif isDir:            '5'
+    elif linkTarget != "": '2'
+    else:                  '0'
+
+  ## Linkname field (157..256): symlink target, null-terminated
+  if linkTarget != "":
+    for i in 0 ..< min(linkTarget.len, tarLinkNameLen):
+      result[157 + i] = linkTarget[i]
 
   ## UStar magic (257..262) and version (263..264)
   result[257] = 'u'
@@ -192,10 +217,13 @@ proc globMatch*(path, pattern: string): bool =
 
 proc isExcluded*(relPath: string, patterns: seq[string]): bool =
   ## Returns true if relPath should be excluded given the ordered pattern list.
-  ## Patterns are processed in order; the last match wins.
-  ## A leading '!' negates the pattern (re-includes a previously excluded path).
-  ## Patterns without '/' are matched against each path component individually.
-  ## Patterns with '/' are matched against the full relative path.
+  ## Matches Docker .dockerignore semantics:
+  ## - Patterns are processed in order; the last match wins.
+  ## - A leading '!' negates the pattern (re-includes a previously excluded path).
+  ## - Trailing '/' is stripped before matching (it only signals directory intent).
+  ## - The full relative path is matched against the cleaned pattern with globMatch.
+  ## - A path also matches if any of its ancestor directories matches the pattern,
+  ##   which is how "logs/" covers "logs/debug.log".
   let norm = relPath.replace('\\', '/')
   result = false
   for pat in patterns:
@@ -204,29 +232,80 @@ proc isExcluded*(relPath: string, patterns: seq[string]): bool =
       p      = (if negate: pat[1 .. ^1] else: pat).strip(chars = {'/'})
     if p.len == 0:
       continue
-    let matches =
-      if '/' notin p:
-        block:
-          var found = false
-          for component in norm.split('/'):
-            if component.len > 0 and globMatch(component, p):
-              found = true
-              break
-          found
-      else:
-        globMatch(norm, p)
-    if matches:
+    var matched = globMatch(norm, p)
+    if not matched:
+      var slash = norm.find('/')
+      while slash > 0:
+        if globMatch(norm[0 ..< slash], p):
+          matched = true
+          break
+        slash = norm.find('/', slash + 1)
+    if matched:
       result = not negate
+
+proc hasNegationForDir*(norm: string, patterns: seq[string]): bool =
+  ## Returns true if any negation pattern in `patterns` could re-include
+  ## files inside the directory at `norm`, meaning recursion must not be pruned.
+  ##
+  ## Under Docker .dockerignore semantics a negation pattern can reach inside
+  ## `norm` only when:
+  ##   - it explicitly starts with `norm/` (targets files inside this dir), or
+  ##   - it contains '**' (can cross directory boundaries).
+  ## Patterns without a '/' cannot match across a directory boundary, so they
+  ## cannot re-include files inside an excluded subdirectory.
+  for pat in patterns:
+    if not pat.startsWith('!'):
+      continue
+    let p = pat[1 .. ^1].strip(chars = {'/'})
+    if p.len == 0:
+      continue
+    if p.startsWith(norm & "/"):
+      return true
+    if "**" in p:
+      return true
+  return false
+
+proc needsLongLink(relPath: string, isDir: bool): bool =
+  ## Returns true when relPath cannot be stored in ustar prefix+name fields.
+  var name = relPath.replace('\\', '/')
+  if isDir and not name.endsWith('/'):
+    name.add('/')
+  if name.len <= tarNameLen:
+    return false
+  let maxSearch = min(name.high - 1, tarNameLen + tarPrefixLen - 1)
+  for i in countdown(maxSearch, 0):
+    if name[i] == '/' and (name.len - i - 1) < tarNameLen:
+      return false
+  return true
+
+proc writeLongLinkEntry(gz: GzFile, fullPath: string) =
+  ## Emit a GNU tar ././@LongLink preamble for paths that exceed ustar limits.
+  ## Readers use this entry's data block as the name for the entry that follows.
+  let
+    data = fullPath & "\0"
+    hdr  = buildTarHeader(
+      relPath  = "././@LongLink",
+      size     = int64(data.len),
+      isDir    = false,
+      mtime    = 0,
+      typeFlag = 'L',
+    )
+  gz.gzWriteAll(hdr)
+  gz.gzWriteAll(data)
+  let pad = (tarBlock - (data.len mod tarBlock)) mod tarBlock
+  if pad > 0:
+    gzWriteZeros(gz, pad)
 
 ## ---------------------------------------------------------------------------
 ## Directory walk
 
 proc addDirToTar(
-    gz:          GzFile,
-    baseDir:     string,
-    relDir:      string,
-    patterns:    seq[string],
-    maxFileSize: int64,
+    gz:           GzFile,
+    baseDir:      string,
+    relDir:       string,
+    patterns:     seq[string],
+    maxFileSize:  int64,
+    skippedFiles: var seq[SkippedFile],
 ) =
   for kind, entry in walkDir(baseDir / relDir, relative = true):
     let
@@ -236,25 +315,46 @@ proc addDirToTar(
 
     case kind:
     of pcDir:
-      if not isExcluded(norm, patterns):
+      let excluded = isExcluded(norm, patterns)
+      if not excluded:
         let mtime = full.getLastModificationTime().toUnix()
-        gz.gzWriteAll(buildTarHeader(norm, 0, isDir = true, mtime))
-      ## Always recurse so negation patterns can re-include files inside
-      ## an excluded directory (e.g. "logs/" with "!logs/*.log").
-      addDirToTar(gz, baseDir, rel, patterns, maxFileSize)
+        if needsLongLink(relPath = norm, isDir = true):
+          gz.writeLongLinkEntry(norm & "/")
+        gz.gzWriteAll(buildTarHeader(
+          relPath = norm,
+          size    = 0,
+          isDir   = true,
+          mtime   = mtime,
+        ))
+      ## Only recurse into an excluded directory when a negation pattern
+      ## could re-include files inside it (e.g. "logs/" with "!logs/*.log").
+      ## Pruning here avoids walking .git, node_modules, etc. unnecessarily.
+      if not excluded or hasNegationForDir(norm, patterns):
+        addDirToTar(gz, baseDir, rel, patterns, maxFileSize, skippedFiles)
 
     of pcFile:
       if isExcluded(norm, patterns):
         trace("docker: context upload: excluding " & norm)
         continue
       let
-        size  = full.getFileSize()
+        fss   = newFileStringStream(full)
+        size  = int64(len(fss))
         mtime = full.getLastModificationTime().toUnix()
       if maxFileSize > 0 and size > maxFileSize:
+        let hash = fss.sha256Hex()
         trace("docker: context upload: skipping large file " & norm &
-              " (" & $size & " bytes > " & $maxFileSize & " bytes)")
+              " (sha256:" & hash & " size:" & $size &
+              " bytes > max_file_size:" & $maxFileSize & " bytes)")
+        skippedFiles.add((path: norm, size: size, hash: hash))
         continue
-      gz.gzWriteAll(buildTarHeader(norm, size, isDir = false, mtime))
+      if needsLongLink(relPath = norm, isDir = false):
+        gz.writeLongLinkEntry(norm)
+      gz.gzWriteAll(buildTarHeader(
+        relPath = norm,
+        size    = size,
+        isDir   = false,
+        mtime   = mtime,
+      ))
       let fh = open(full, fmRead)
       try:
         var written: int64
@@ -271,8 +371,23 @@ proc addDirToTar(
       finally:
         fh.close()
 
-    else:
-      discard  ## skip symlinks and other special files
+    of pcLinkToFile, pcLinkToDir:
+      if isExcluded(norm, patterns):
+        trace("docker: context upload: excluding symlink " & norm)
+        continue
+      let
+        target = expandSymlink(full)
+        mtime  = full.getLastModificationTime().toUnix()
+      trace("docker: context upload: adding symlink " & norm & " -> " & target)
+      if needsLongLink(relPath = norm, isDir = false):
+        gz.writeLongLinkEntry(norm)
+      gz.gzWriteAll(buildTarHeader(
+        relPath    = norm,
+        size       = 0,
+        isDir      = false,
+        mtime      = mtime,
+        linkTarget = target,
+      ))
 
 ## ---------------------------------------------------------------------------
 ## Public API
@@ -282,16 +397,17 @@ proc writeTarGz*(
     contextPath: string,
     patterns:    seq[string],
     maxFileSize: int64 = 0,
-) =
+): seq[SkippedFile] =
   ## Write a .tar.gz of contextPath to outPath.
   ## Files and directories whose path relative to contextPath matches any
   ## entry in patterns are excluded from the archive.
   ## Individual files larger than maxFileSize bytes are skipped (0 = no limit).
+  ## Returns the list of files that were skipped due to maxFileSize.
   let gz = gzopen(outPath.cstring, "wb")
   if gz == nil:
     raise newException(IOError, "could not open " & outPath & " for gzip writing")
   try:
-    addDirToTar(gz, contextPath, "", patterns, maxFileSize)
+    addDirToTar(gz, contextPath, "", patterns, maxFileSize, result)
     gzWriteZeros(gz, tarBlock * 2)  ## POSIX end-of-archive: two zero blocks
   finally:
     discard gzclose(gz)

@@ -90,7 +90,8 @@
     - `repository` - repository path within the registry (required)
     - `tags` - list of tags to push; supports `{KEY}` substitution (required)
   - `docker.docker_registry.<name>.docker_push.<name>.docker_context_upload` -
-    nested configuration that enables build context upload as an OCI attestation
+    nested configuration that uploads the build context as a `.tar.gz` OCI
+    attestation
     - `enabled` - set to `true` to activate (default: `false`)
     - `strategy` - `registry`, `local`, `disk`, or `auto`
     - `size_threshold` - skip upload when tarball exceeds this size
@@ -146,10 +147,18 @@
     keyed by registry -> repo -> context name
   - `_REPO_BUILD_CONTEXT_TAR_SIZES` (runtime) - tarball sizes in bytes
     keyed by registry -> repo -> context name
+  - `_REPO_BUILD_CONTEXT_SKIPPED_FILES` (runtime) - files skipped due
+    to `max_file_size`, keyed by registry -> repo -> context name ->
+    file path -> `{hash, size}`; allows consumers to detect that the
+    uploaded archive is intentionally partial
 
-  New configuration field on `docker`:
+  New configuration fields on `docker`:
   - `build_context_cache_max_age` - maximum age of cached tarballs
     under `/tmp/chalk-build-contexts/` (default: 1 hour)
+  - `registry_layer_chunk_size` - chunk size for registry layer uploads
+    (default: `5mb`)
+  - `registry_layer_upload_timeout` - timeout for a single chunk upload
+    (default: `30 sec`)
 
   See `docs/design-docker-registry.md` for full details.
 

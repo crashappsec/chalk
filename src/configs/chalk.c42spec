@@ -2008,6 +2008,28 @@ is invoked on an image instead of a file-system path.
 """
   }
 
+  field registry_layer_chunk_size {
+    type:     Size
+    default:  <<5mb>>
+    shortdoc: "Chunk size for registry layer uploads"
+    doc:      """
+Size of each chunk sent in a PATCH request when uploading a layer blob to
+a Docker registry. Larger values reduce round-trips but require more memory
+and may time out on slow connections.
+"""
+  }
+
+  field registry_layer_upload_timeout {
+    type:     Duration
+    default:  << 30 sec >>
+    shortdoc: "Timeout for a single registry layer chunk upload"
+    doc:      """
+Timeout applied to each individual chunk PATCH/PUT request when uploading
+a layer blob to a Docker registry. Increase this when uploading large build
+contexts over slow connections.
+"""
+  }
+
   field build_context_cache_max_age {
     type:     Duration
     default:  << 1 hrs >>

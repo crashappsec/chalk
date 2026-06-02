@@ -326,6 +326,10 @@ completes the attestation manifest creation.
 - The `disk` strategy does not verify context integrity; the uploaded
   content may differ from the build-time context if the directory was
   mutated between build and push.
+- The `registry` strategy uploads the blob during `chalk docker build`.
+  If the subsequent push never runs (build aborted, push disabled, or a
+  different repository targeted), the blob remains in the registry
+  unreferenced until the registry's garbage-collection cycle removes it.
 
 ## Registry Authentication
 

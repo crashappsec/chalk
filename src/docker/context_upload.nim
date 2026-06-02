@@ -54,6 +54,11 @@ type
     ],
   ]
 
+proc skippedFilesToJson(files: seq[SkippedFile]): JsonNode =
+  result = newJObject()
+  for f in files:
+    result[f.path] = %*{"hash": f.hash, "size": f.size}
+
 proc contextCacheDir*(): string =
   return getTempDir() / CONTEXT_CACHE_SUBDIR
 
@@ -100,11 +105,9 @@ proc contextToTarGz*(
     excludePatterns:   seq[string],
     honorDockerignore: bool  = false,
     maxFileSize:       int64 = 0,
-): string =
-  ## Archive a context directory to a temp .tar.gz and return its path.
-  ## Files and directories matching any pattern in excludePatterns are omitted.
-  ## When honorDockerignore is true, patterns from .dockerignore are also applied.
-  ## Individual files larger than maxFileSize bytes are skipped (0 = no limit).
+): (string, seq[SkippedFile]) =
+  ## Archive a context directory to a temp .tar.gz and return its path along
+  ## with the list of files skipped due to maxFileSize.
   let
     base    = lastPathPart(contextPath)
     dateDir = contextCacheDir() / now().utc.format(CONTEXT_CACHE_DIR_FMT)
@@ -113,14 +116,15 @@ proc contextToTarGz*(
   if honorDockerignore:
     patterns.add(readDockerignorePatterns(contextPath))
   patterns.add(excludePatterns)
-  let outPath = dateDir / (base & "-" & $int(epochTime()) & ".tar.gz")
-  writeTarGz(
-    outPath     = outPath,
-    contextPath = contextPath,
-    patterns    = patterns,
-    maxFileSize = maxFileSize,
-  )
-  return outPath
+  let
+    outPath      = dateDir / (base & "-" & $int(epochTime()) & ".tar.gz")
+    skippedFiles = writeTarGz(
+      outPath     = outPath,
+      contextPath = contextPath,
+      patterns    = patterns,
+      maxFileSize = maxFileSize,
+    )
+  return (outPath, skippedFiles)
 
 proc newContextManifest(
     image:       DockerImage,
@@ -163,7 +167,7 @@ proc checkContextSize(
   if size > sizeThreshold:
     let msg = (
       "build context '" & contextName & "' (" & contextPath & ") tarball is " &
-      $size & " bytes which exceeds upload_context_size_threshold of " &
+      $size & " bytes which exceeds size_threshold of " &
       $sizeThreshold & " bytes"
     )
     warn("docker: " & msg & "; skipping upload")
@@ -200,7 +204,7 @@ proc uploadBuildContextsAtBuildTime*(
         # Upload blob now so it is present in the registry at push time.
         trace("docker: uploading build context blob for '" & contextName &
               "' to " & $repoImage & " (registry strategy)")
-        let tarPath = contextToTarGz(
+        let (tarPath, skippedFiles) = contextToTarGz(
           contextPath       = contextPath,
           excludePatterns   = config.excludePatterns,
           honorDockerignore = config.honorDockerignore,
@@ -224,9 +228,10 @@ proc uploadBuildContextsAtBuildTime*(
           )
           layer.put()
           entry = %*{
-            "strategy":    "registry",
-            "blob_digest": layer.digest.extractDockerHash(),
-            "blob_size":   layer.size,
+            "strategy":      "registry",
+            "blob_digest":   layer.digest.extractDockerHash(),
+            "blob_size":     layer.size,
+            "skipped_files": skippedFilesToJson(skippedFiles),
           }
           trace("docker: build context blob uploaded: sha256:" & entry["blob_digest"].getStr())
         finally:
@@ -235,7 +240,7 @@ proc uploadBuildContextsAtBuildTime*(
       of "local":
         # Save tarball for upload at push time.
         let
-          tarPath = contextToTarGz(
+          (tarPath, skippedFiles) = contextToTarGz(
             contextPath       = contextPath,
             excludePatterns   = config.excludePatterns,
             honorDockerignore = config.honorDockerignore,
@@ -252,8 +257,9 @@ proc uploadBuildContextsAtBuildTime*(
           tooLargeContexts.add(contextName)
           continue
         entry = %*{
-          "strategy": "local",
-          "tar_path": tarPath,
+          "strategy":      "local",
+          "tar_path":      tarPath,
+          "skipped_files": skippedFilesToJson(skippedFiles),
         }
         trace("docker: build context tarball cached at: " & tarPath)
 
@@ -292,7 +298,7 @@ proc uploadBuildContextsAtBuildTime*(
       error       = "build contexts exceeded size_threshold: " & tooLargeContexts.join(", "),
       description = (
         "One or more build context tarballs exceeded the configured " &
-        "upload_context_size_threshold. Increase the threshold or reduce " &
+        "size_threshold. Increase the threshold or reduce " &
         "the context size to enable upload."
       ),
     )
@@ -313,11 +319,12 @@ proc completeBuildContextUpload(
     image:       DockerImage,
     snapshot:    ContextSnapshotEntry,
     contextName: string,
-): (string, int) =
+): (string, int, seq[SkippedFile]) =
   ## Complete a single context upload by creating the attestation manifest.
-  ## Returns (digest, tarSize) where digest is the context manifest digest
-  ## (without sha256: prefix) and tarSize is the tarball size in bytes.
-  ## Returns ("", 0) on failure.
+  ## Returns (digest, tarSize, skippedFiles) where digest is the context manifest
+  ## digest (without sha256: prefix), tarSize is the tarball size in bytes, and
+  ## skippedFiles is the list of files skipped due to maxFileSize (disk strategy only).
+  ## Returns ("", 0, @[]) on failure.
   let
     strategy = snapshot{"strategy"}.getStr("")
     platform = if chalk.platform != nil: chalk.platform else: DockerPlatform()
@@ -330,7 +337,7 @@ proc completeBuildContextUpload(
       blobSize   = snapshot{"blob_size"}.getInt(0)
     if blobDigest == "":
       warn("docker: context snapshot missing blobDigest for registry strategy")
-      return ("", 0)
+      return ("", 0, @[])
     # Layer is already in the registry; mark as fetched so put() is skipped.
     let
       layer       = DockerManifest(
@@ -348,13 +355,13 @@ proc completeBuildContextUpload(
         contextName = contextName,
       )
     discard image.appendToAttestationManifestList(ctxManifest)
-    return (ctxManifest.digest.extractDockerHash(), blobSize)
+    return (ctxManifest.digest.extractDockerHash(), blobSize, @[])
 
   of "local":
     let tarPath = snapshot{"tar_path"}.getStr("")
     if tarPath == "" or not fileExists(tarPath):
       warn("docker: context tarball not found at push time: " & tarPath)
-      return ("", 0)
+      return ("", 0, @[])
     let
       tarSize = int(getFileSize(tarPath))
       layer   = DockerManifest(
@@ -371,21 +378,21 @@ proc completeBuildContextUpload(
       contextName = contextName,
     )
     discard image.appendToAttestationManifestList(ctxManifest)
-    return (ctxManifest.digest.extractDockerHash(), tarSize)
+    return (ctxManifest.digest.extractDockerHash(), tarSize, @[])
 
   of "disk":
     let contextPath = snapshot{"context_path"}.getStr("")
     if contextPath == "" or not dirExists(contextPath):
       warn("docker: disk strategy: context dir not found at push time: " & contextPath)
-      return ("", 0)
+      return ("", 0, @[])
     warn("docker: disk strategy: context dir may have changed since build: " &
          contextPath)
     let
-      sizeThreshold      = snapshot{"size_threshold"}.getInt(0)
-      excludePatterns    = snapshot{"exclude_patterns"}.getStrElems()
-      honorDockerignore  = snapshot{"honor_dockerignore"}.getBool(false)
-      maxFileSize        = int64(snapshot{"max_file_size"}.getInt(0))
-      tarPath            = contextToTarGz(
+      sizeThreshold     = snapshot{"size_threshold"}.getInt(0)
+      excludePatterns   = snapshot{"exclude_patterns"}.getStrElems()
+      honorDockerignore = snapshot{"honor_dockerignore"}.getBool(false)
+      maxFileSize       = int64(snapshot{"max_file_size"}.getInt(0))
+      (tarPath, skippedFiles) = contextToTarGz(
         contextPath       = contextPath,
         excludePatterns   = excludePatterns,
         honorDockerignore = honorDockerignore,
@@ -416,13 +423,13 @@ proc completeBuildContextUpload(
         contextName = contextName,
       )
       discard image.appendToAttestationManifestList(ctxManifest)
-      return (ctxManifest.digest.extractDockerHash(), tarSize)
+      return (ctxManifest.digest.extractDockerHash(), tarSize, skippedFiles)
     finally:
       removeFile(tarPath)
 
   else:
     warn("docker: unknown strategy in build context snapshot: " & strategy)
-    return ("", 0)
+    return ("", 0, @[])
 
 proc completeBuildContextUploads*(
     chalk:  ChalkObj,
@@ -440,6 +447,7 @@ proc completeBuildContextUploads*(
   var
     buildContexts         = ContextResults()
     sizeResults           = SizeResults()
+    skippedResults        = newJObject()
     tooLargeContexts:     seq[string]
     uploadFailedContexts: seq[string]
 
@@ -451,7 +459,7 @@ proc completeBuildContextUploads*(
         continue
       for contextName, snapshot in contexts.pairs:
         try:
-          let (attestDigest, tarSize) = chalk.completeBuildContextUpload(
+          let (attestDigest, tarSize, diskSkipped) = chalk.completeBuildContextUpload(
             image       = image,
             snapshot    = snapshot,
             contextName = contextName,
@@ -476,6 +484,19 @@ proc completeBuildContextUploads*(
             newOrderedTable[string, int](),
           )
           sizeResults[image.registry][repoPath][contextName] = tarSize
+          # Collect skipped files: disk strategy returns them directly;
+          # registry/local strategies carry them in the snapshot.
+          let skippedJson =
+            if diskSkipped.len > 0:
+              skippedFilesToJson(diskSkipped)
+            else:
+              snapshot{"skipped_files"}
+          if skippedJson != nil and skippedJson.kind == JObject and skippedJson.len > 0:
+            if skippedResults{image.registry} == nil:
+              skippedResults[image.registry] = newJObject()
+            if skippedResults{image.registry, repoPath} == nil:
+              skippedResults[image.registry][repoPath] = newJObject()
+            skippedResults[image.registry][repoPath][contextName] = skippedJson
           info("docker: build context '" & contextName & "' uploaded for " &
                image.registry & "/" & repoPath &
                " image digest " & image.digest)
@@ -501,7 +522,7 @@ proc completeBuildContextUploads*(
       error       = "build contexts exceeded size_threshold: " & tooLargeContexts.join(", "),
       description = (
         "One or more build context tarballs exceeded the configured " &
-        "upload_context_size_threshold. Increase the threshold or reduce " &
+        "size_threshold. Increase the threshold or reduce " &
         "the context size to enable upload."
       ),
     )
@@ -517,3 +538,4 @@ proc completeBuildContextUploads*(
     )
   result.setIfNeeded("_REPO_BUILD_CONTEXTS", buildContexts)
   result.setIfNeeded("_REPO_BUILD_CONTEXT_TAR_SIZES", sizeResults)
+  result.setIfNeeded("_REPO_BUILD_CONTEXT_SKIPPED_FILES", skippedResults.nimJsonToBox())

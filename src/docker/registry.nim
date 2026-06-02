@@ -66,7 +66,7 @@ type
     fallthrough*: bool # whether to fallthrough to next config on http errors
 
 const
-  TIMEOUT = 3000 # sec
+  TIMEOUT = 3000 # ms
   CONTENT_TYPE_MAPPING* = {
     "application/vnd.docker.distribution.manifest.list.v2+json": DockerManifestType.list,
     "application/vnd.docker.distribution.manifest.v2+json": DockerManifestType.image,
@@ -506,6 +506,7 @@ proc request(self:              DockerImage,
              body               = "",
              range              = 0 .. 0,
              size               = 0,
+             timeout            = TIMEOUT,
              acceptStatusCodes: openArray[Slice[int]] = @[200..299],
              ): (string, Response) =
   let cacheKey = (self, httpMethod, path, useCase)
@@ -544,7 +545,10 @@ proc request(self:              DockerImage,
           # https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-blobs
           # Only include for chunked uploads; omit for monolithic uploads because
           # some registries (e.g. ghcr) reject Content-Range on monolithic PUT.
-          if range.a > 0 or range.b > 0 and range.b - range.a + 1 != size:
+          let
+            hasRange    = range.a > 0 or range.b > 0
+            isPartial   = range.b - range.a + 1 != size
+          if hasRange and isPartial:
             headers["Content-Range"] = $range.a & "-" & $range.b
           headers["Content-Length"] = $len(body)
         for k, v in headers.pairs():
@@ -564,7 +568,7 @@ proc request(self:              DockerImage,
             headers           = headers.update(config.authHeadersFor(normalized)).update(wwwAuth),
             pinnedCert        = config.pinnedCert,
             verifyMode        = config.verifyMode,
-            timeout           = TIMEOUT,
+            timeout           = timeout,
             retries           = 2,
             acceptStatusCodes = acceptStatusCodes,
           )
@@ -744,15 +748,17 @@ proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): 
     attempts = 1
   return (nextStartAt, attempts)
 
-proc layerPutFileStream*(layer:       DockerImage,
-                         contentType: string,
-                         fileStream:  FileStringStream,
-                         # fyi docker cli seems to upload as monolithic upload :shrug:
-                         chunkSize    = 5 * MEGABYTE,
-                        ): DockerDigestedJson =
+proc layerPutFileStream*(
+    layer:       DockerImage,
+    contentType: string,
+    fileStream:  FileStringStream,
+): DockerDigestedJson =
   let
-    layer = layer.withDigest(fileStream.sha256Hex())
-    size  = len(fileStream)
+    layer          = layer.withDigest(fileStream.sha256Hex())
+    size           = len(fileStream)
+    # fyi docker cli seems to upload as monolithic upload :shrug:
+    chunkSize      = int(attrGet[Con4mSize]("docker.registry_layer_chunk_size"))
+    layerTimeout   = int(attrGet[Con4mDuration]("docker.registry_layer_upload_timeout"))
   try:
     let (_, response) = layer.request(
       useCase     = RegistryUseCase.ReadWrite,
@@ -793,6 +799,7 @@ proc layerPutFileStream*(layer:       DockerImage,
           size              = size,
           contentType       = "application/octet-stream",
           acceptStatusCodes = [200..299, 416..416],
+          timeout           = layerTimeout,
         )
       except:
         raise newException(
