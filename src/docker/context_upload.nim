@@ -101,10 +101,10 @@ proc readDockerignorePatterns(contextPath: string): seq[string] =
       result.add(p.removePrefix('/'))
 
 proc contextToTarGz*(
-    contextPath:       string,
-    excludePatterns:   seq[string],
-    honorDockerignore: bool  = false,
-    maxFileSize:       int64 = 0,
+    contextPath:            string,
+    additionalDockerignore: seq[string],
+    honorDockerignore:      bool  = false,
+    maxFileSize:            int64 = 0,
 ): (string, seq[SkippedFile]) =
   ## Archive a context directory to a temp .tar.gz and return its path along
   ## with the list of files skipped due to maxFileSize.
@@ -115,7 +115,7 @@ proc contextToTarGz*(
   var patterns: seq[string]
   if honorDockerignore:
     patterns.add(readDockerignorePatterns(contextPath))
-  patterns.add(excludePatterns)
+  patterns.add(additionalDockerignore)
   let
     outPath      = dateDir / (base & "-" & $int(epochTime()) & ".tar.gz")
     skippedFiles = writeTarGz(
@@ -205,10 +205,10 @@ proc uploadBuildContextsAtBuildTime*(
         trace("docker: uploading build context blob for '" & contextName &
               "' to " & $repoImage & " (registry strategy)")
         let (tarPath, skippedFiles) = contextToTarGz(
-          contextPath       = contextPath,
-          excludePatterns   = config.excludePatterns,
-          honorDockerignore = config.honorDockerignore,
-          maxFileSize       = int64(config.maxFileSize),
+          contextPath            = contextPath,
+          additionalDockerignore = config.additionalDockerignore,
+          honorDockerignore      = config.honorDockerignore,
+          maxFileSize            = int64(config.maxFileSize),
         )
         try:
           let sizeErr = checkContextSize(
@@ -241,10 +241,10 @@ proc uploadBuildContextsAtBuildTime*(
         # Save tarball for upload at push time.
         let
           (tarPath, skippedFiles) = contextToTarGz(
-            contextPath       = contextPath,
-            excludePatterns   = config.excludePatterns,
-            honorDockerignore = config.honorDockerignore,
-            maxFileSize       = int64(config.maxFileSize),
+            contextPath            = contextPath,
+            additionalDockerignore = config.additionalDockerignore,
+            honorDockerignore      = config.honorDockerignore,
+            maxFileSize            = int64(config.maxFileSize),
           )
           sizeErr = checkContextSize(
             tarPath       = tarPath,
@@ -266,12 +266,12 @@ proc uploadBuildContextsAtBuildTime*(
       of "disk":
         # Record the context path; push time will read from disk.
         entry = %*{
-          "strategy":           "disk",
-          "context_path":       contextPath,
-          "size_threshold":     config.sizeThreshold,
-          "exclude_patterns":   config.excludePatterns,
-          "honor_dockerignore": config.honorDockerignore,
-          "max_file_size":      config.maxFileSize,
+          "strategy":                "disk",
+          "context_path":            contextPath,
+          "size_threshold":          config.sizeThreshold,
+          "additional_dockerignore": config.additionalDockerignore,
+          "honor_dockerignore":      config.honorDockerignore,
+          "max_file_size":           config.maxFileSize,
         }
         trace("docker: build context disk strategy: path=" & contextPath)
 
@@ -388,15 +388,15 @@ proc completeBuildContextUpload(
     warn("docker: disk strategy: context dir may have changed since build: " &
          contextPath)
     let
-      sizeThreshold     = snapshot{"size_threshold"}.getInt(0)
-      excludePatterns   = snapshot{"exclude_patterns"}.getStrElems()
-      honorDockerignore = snapshot{"honor_dockerignore"}.getBool(false)
-      maxFileSize       = int64(snapshot{"max_file_size"}.getInt(0))
+      sizeThreshold          = snapshot{"size_threshold"}.getInt(0)
+      additionalDockerignore = snapshot{"additional_dockerignore"}.getStrElems()
+      honorDockerignore      = snapshot{"honor_dockerignore"}.getBool(false)
+      maxFileSize            = int64(snapshot{"max_file_size"}.getInt(0))
       (tarPath, skippedFiles) = contextToTarGz(
-        contextPath       = contextPath,
-        excludePatterns   = excludePatterns,
-        honorDockerignore = honorDockerignore,
-        maxFileSize       = maxFileSize,
+        contextPath            = contextPath,
+        additionalDockerignore = additionalDockerignore,
+        honorDockerignore      = honorDockerignore,
+        maxFileSize            = maxFileSize,
       )
     try:
       let sizeErr = checkContextSize(

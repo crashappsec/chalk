@@ -99,9 +99,9 @@
       `CONTEXT_TOO_LARGE`; set to `0` to disable
     - `max_file_size` - skip individual files that exceed this size
       (default: `0` = no limit); useful for omitting large binaries or
-      data files without explicit exclude patterns
-    - `exclude_patterns` - glob patterns to exclude from the tarball
-      (default: `[".git"]`)
+      data files without explicit `additional_dockerignore` patterns
+    - `additional_dockerignore` - extra glob patterns appended after
+      `.dockerignore` (last-match-wins; default: `[".git"]`)
     - `honor_dockerignore` - apply `.dockerignore` patterns (default: `true`)
 
   ```

@@ -208,26 +208,26 @@ iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
       if not sectionExists(contextSection):
         continue
       let
-        contextEnabled    = attrGet[bool](contextSection & ".enabled")
-        rawStrategy       = attrGet[string](contextSection & ".strategy")
-        strategy          = if rawStrategy != "auto": rawStrategy
-                            elif isCI():              "registry"
-                            else:                     "local"
-        sizeThreshold     = int(attrGet[Con4mSize](contextSection & ".size_threshold"))
-        maxFileSize       = int(attrGet[Con4mSize](contextSection & ".max_file_size"))
-        excludePatterns   = attrGet[seq[string]](contextSection & ".exclude_patterns")
-        honorDockerignore = attrGet[bool](contextSection & ".honor_dockerignore")
+        contextEnabled         = attrGet[bool](contextSection & ".enabled")
+        rawStrategy            = attrGet[string](contextSection & ".strategy")
+        strategy               = if rawStrategy != "auto": rawStrategy
+                                 elif isCI():              "registry"
+                                 else:                     "local"
+        sizeThreshold          = int(attrGet[Con4mSize](contextSection & ".size_threshold"))
+        maxFileSize            = int(attrGet[Con4mSize](contextSection & ".max_file_size"))
+        additionalDockerignore = attrGet[seq[string]](contextSection & ".additional_dockerignore")
+        honorDockerignore      = attrGet[bool](contextSection & ".honor_dockerignore")
       if not contextEnabled:
         continue
       yield DockerContextUploadConfig(
-        registryUri:       registryUri,
-        repoPath:          pushRepo,
-        tags:              pushTags,
-        strategy:          strategy,
-        sizeThreshold:     sizeThreshold,
-        maxFileSize:       maxFileSize,
-        excludePatterns:   excludePatterns,
-        honorDockerignore: honorDockerignore,
+        registryUri:            registryUri,
+        repoPath:               pushRepo,
+        tags:                   pushTags,
+        strategy:               strategy,
+        sizeThreshold:          sizeThreshold,
+        maxFileSize:            maxFileSize,
+        additionalDockerignore: additionalDockerignore,
+        honorDockerignore:      honorDockerignore,
       )
 
 iterator iterPushTags*(chalk: ChalkObj): string =

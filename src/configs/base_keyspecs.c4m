@@ -4979,7 +4979,7 @@ At build time Chalk stores per-push-config, per-context information keyed by:
 * context name (`"."` for the main context, named value for `--build-context` extras)
 
 The leaf object holds strategy-specific fields whose values may be strings,
-integers, booleans, or arrays (e.g. `exclude_patterns` is a list of strings,
+integers, booleans, or arrays (e.g. `additional_dockerignore` is a list of strings,
 `honor_dockerignore` is a boolean).
 
 At push time Chalk reads this key from the chalk mark to complete the context
@@ -5033,11 +5033,11 @@ With the `disk` strategy:
     "registry.example.com": {
       "my-org/my-app": {
         ".": {
-          "strategy":           "disk",
-          "context_path":       "/path/to/build/context",
-          "size_threshold":     104857600,
-          "exclude_patterns":   [".git"],
-          "honor_dockerignore": true
+          "strategy":                "disk",
+          "context_path":            "/path/to/build/context",
+          "size_threshold":          104857600,
+          "additional_dockerignore": [".git"],
+          "honor_dockerignore":      true
         }
       }
     }

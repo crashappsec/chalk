@@ -2429,7 +2429,7 @@ def test_build_context_upload(
     assert "src/main.py" in context_files
     assert "README.md" in context_files
 
-    # .git directory must be excluded (default exclude_patterns)
+    # .git directory must be excluded (default additional_dockerignore)
     assert not any(f == ".git" or f.startswith(".git/") for f in context_files)
 
     # file larger than max_file_size (<<1kb>>) must be skipped

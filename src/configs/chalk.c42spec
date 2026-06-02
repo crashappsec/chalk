@@ -2337,19 +2337,21 @@ every such file.
 """
   }
 
-  field exclude_patterns {
+  field additional_dockerignore {
     type:     list[string]
     default:  [".git"]
-    shortdoc: "Glob patterns to exclude from the context tarball"
+    shortdoc: "Extra glob patterns appended after .dockerignore when creating the tarball"
     doc:      """
-List of glob patterns for files and directories to exclude when creating
-the build context `.tar.gz` archive.  The syntax follows `tar --exclude`
-conventions: patterns without a `/` are matched against each path
-component individually (so `.git` excludes any `.git` directory at any
-depth); patterns containing `/` are matched against the full relative
-path from the context root.  `*` matches any run of non-separator
-characters, `?` matches a single non-separator character, and `**`
-matches across path separators.
+Additional glob patterns applied after the `.dockerignore` patterns when
+creating the build context `.tar.gz` archive.  Because patterns are evaluated
+in order with last-match-wins semantics, these patterns take final precedence
+over anything in `.dockerignore`.
+
+Pattern syntax follows Docker `.dockerignore` conventions: `*` matches any
+sequence of characters except `/`; `?` matches a single non-`/` character;
+`**` matches across path separators; a leading `!` negates the rule.  Patterns
+without a `/` match only root-level entries; patterns with a `/` are matched
+against the full relative path from the context root.
 
 The default `[".git"]` excludes the Git repository metadata directory,
 which is typically not needed in the uploaded context and can be large.
@@ -2362,14 +2364,14 @@ which is typically not needed in the uploaded context and can be large.
     shortdoc: "Apply .dockerignore patterns when creating the context tarball"
     doc:      """
 When `true`, Chalk reads the `.dockerignore` file from the build context
-directory (if present) and adds its patterns to the exclusion list used when
-creating the context `.tar.gz` archive.  This ensures the uploaded context
-matches what Docker itself would have used for the build.
+directory (if present) and applies its patterns using Docker's own semantics
+before the `additional_dockerignore` patterns.  This ensures the uploaded
+context matches what Docker itself would have used for the build.
 
-Negation patterns (lines beginning with `!`) are supported: they re-include
-files that were previously matched by an earlier exclusion rule, with the last
-matching pattern winning.  All standard `.dockerignore` glob syntax is honored,
-including `**` path wildcards.
+Pattern matching uses full-path `filepath.Match` semantics: `*` never crosses
+`/`, a file also matches if any ancestor directory matches the pattern, and
+patterns without a `/` match only root-level entries.  Negation patterns
+(`!`-prefixed) and `**` wildcards are supported.
 """
   }
 }

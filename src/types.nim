@@ -415,14 +415,14 @@ type
     src*:  string
 
   DockerContextUploadConfig* = ref object
-    registryUri*:          string
-    repoPath*:             string
-    tags*:                 seq[string]
-    strategy*:             string        ## resolved upload strategy (never "auto")
-    sizeThreshold*:        int           ## max tarball bytes; 0 = unlimited
-    maxFileSize*:          int           ## max bytes per individual file; 0 = unlimited
-    excludePatterns*:      seq[string]   ## patterns to exclude from context tarball
-    honorDockerignore*:    bool          ## merge .dockerignore patterns at tar time
+    registryUri*:            string
+    repoPath*:               string
+    tags*:                   seq[string]
+    strategy*:               string      ## resolved upload strategy (never "auto")
+    sizeThreshold*:          int         ## max tarball bytes; 0 = unlimited
+    maxFileSize*:            int         ## max bytes per individual file; 0 = unlimited
+    additionalDockerignore*: seq[string] ## extra patterns appended after .dockerignore
+    honorDockerignore*:      bool        ## merge .dockerignore patterns at tar time
 
   DockerCmd* = enum
     build, push, pull, other

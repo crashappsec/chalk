@@ -58,15 +58,15 @@ that push target.
 
 **`docker_context_upload` fields:**
 
-| Field                | Type           | Default     | Description                                                           |
-| -------------------- | -------------- | ----------- | --------------------------------------------------------------------- |
-| `enabled`            | `bool`         | `false`     | Set to `true` to activate context upload                              |
-| `mode`               | `string`       | `"full"`    | Context upload mode; only `"full"` is supported                       |
-| `strategy`           | `string`       | `"auto"`    | Strategy for context upload (see below)                               |
-| `size_threshold`     | `Size`         | `<<100mb>>` | Skip upload when tarball exceeds this size (0 = no limit)             |
-| `max_file_size`      | `Size`         | `<<0mb>>`   | Skip individual files larger than this size in the tarball (0 = none) |
-| `exclude_patterns`   | `list[string]` | `[".git"]`  | Glob patterns to exclude from the context tarball                     |
-| `honor_dockerignore` | `bool`         | `true`      | Apply `.dockerignore` patterns when creating the tarball              |
+| Field                     | Type           | Default     | Description                                                           |
+| ------------------------- | -------------- | ----------- | --------------------------------------------------------------------- |
+| `enabled`                 | `bool`         | `false`     | Set to `true` to activate context upload                              |
+| `mode`                    | `string`       | `"full"`    | Context upload mode; only `"full"` is supported                       |
+| `strategy`                | `string`       | `"auto"`    | Strategy for context upload (see below)                               |
+| `size_threshold`          | `Size`         | `<<100mb>>` | Skip upload when tarball exceeds this size (0 = no limit)             |
+| `max_file_size`           | `Size`         | `<<0mb>>`   | Skip individual files larger than this size in the tarball (0 = none) |
+| `additional_dockerignore` | `list[string]` | `[".git"]`  | Extra glob patterns appended after `.dockerignore` (last-match-wins)  |
+| `honor_dockerignore`      | `bool`         | `true`      | Apply `.dockerignore` patterns when creating the tarball              |
 
 ### Tag Template Substitution
 
@@ -186,24 +186,20 @@ patterns to decide which files and directories to include. Two sources of
 patterns are combined:
 
 1. **`.dockerignore`** - read from the root of the build context when
-   `upload_context_honor_dockerignore` is `true` (the default). This ensures
-   the uploaded context matches what Docker itself would have used.
-2. **`upload_context_exclude_patterns`** - explicitly configured patterns,
-   applied after `.dockerignore` so they take final precedence (default
-   `[".git"]`).
+   `honor_dockerignore` is `true` (the default).
+2. **`additional_dockerignore`** - explicitly configured patterns appended
+   after `.dockerignore` so they take final precedence (default `[".git"]`).
 
 Because patterns are evaluated in order with **last-match-wins** semantics, the
 chalk configuration always has the final say over what is included or excluded.
 
-When a directory matches an exclusion pattern, Chalk still recurses into it so
-that negation patterns can re-include individual files inside it. For example,
-`logs/` excludes the directory entry itself but a later `!logs/*.log` can still
-re-include matching files within it. Only the directory header is suppressed;
-recursion is unconditional.
+Chalk prunes recursion into an excluded directory unless a negation pattern
+could re-include files inside it (i.e. a pattern starting with `<dir>/` or
+containing `**`), matching Docker's own pruning behaviour.
 
 #### Pattern syntax
 
-Patterns follow the same rules as `.dockerignore` and `tar --exclude`:
+Patterns follow Docker `.dockerignore` semantics:
 
 | Syntax | Meaning                                               |
 | ------ | ----------------------------------------------------- |
@@ -212,9 +208,10 @@ Patterns follow the same rules as `.dockerignore` and `tar --exclude`:
 | `**`   | Any sequence of characters including `/` (path cross) |
 | `!pat` | Negate: re-include files matched by a previous rule   |
 
-Patterns **without** a `/` are matched against every path component
-individually (so `.git` excludes any directory named `.git` at any depth).
-Patterns **with** a `/` are matched against the full path relative to the
+Patterns are matched against the **full relative path**. A file also matches
+if any of its ancestor directories matches the pattern (so `logs/` covers
+`logs/debug.log`). Patterns **without** a `/` match only root-level entries;
+patterns **with** a `/` are matched against the full path relative to the
 context root.
 
 Leading `/` characters are stripped from patterns read from `.dockerignore`
@@ -230,19 +227,19 @@ logs/
 !logs/important.log
 ```
 
-And `upload_context_exclude_patterns: ["*.tmp", "!keep.tmp"]`, the effective
+And `additional_dockerignore: ["*.tmp", "!keep.tmp"]`, the effective
 pattern list is:
 
 ```
 logs/              # from .dockerignore - excludes logs/ directory
 !logs/important.log  # from .dockerignore - re-includes one file
-*.tmp              # from chalk config - excludes .tmp files
+*.tmp              # from chalk config - excludes root-level .tmp files
 !keep.tmp          # from chalk config - re-includes keep.tmp
 ```
 
 Because chalk config patterns come last, `!keep.tmp` overrides any earlier
 exclusion of `keep.tmp`, and `*.tmp` overrides `.dockerignore` rules for
-`.tmp` files.
+root-level `.tmp` files.
 
 ### Size Threshold
 
@@ -294,11 +291,11 @@ The context name is `"."` for the main build context and the declared
 name for each `--build-context` extra. The per-context config object
 carries strategy-specific fields:
 
-| Strategy   | Fields                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------- |
-| `registry` | `strategy`, `blob_digest`, `blob_size`                                                                  |
-| `local`    | `strategy`, `tar_path`                                                                                  |
-| `disk`     | `strategy`, `context_path`, `size_threshold`, `exclude_patterns`, `honor_dockerignore`, `max_file_size` |
+| Strategy   | Fields                                                                                                         |
+| ---------- | -------------------------------------------------------------------------------------------------------------- |
+| `registry` | `strategy`, `blob_digest`, `blob_size`                                                                         |
+| `local`    | `strategy`, `tar_path`                                                                                         |
+| `disk`     | `strategy`, `context_path`, `size_threshold`, `additional_dockerignore`, `honor_dockerignore`, `max_file_size` |
 
 At push time, Chalk reads this key from the image's chalk mark and
 completes the attestation manifest creation.
