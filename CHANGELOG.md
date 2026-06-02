@@ -132,6 +132,13 @@
   `tool.semgrep.semgrep_timeout`) and defaults to `"300"` (5 minutes). Set
   to `""` to disable.
 
+- Trufflehog now checks the size of the `.git` directory before running in
+  git mode. If the directory exceeds the threshold (default `<<250mb>>`),
+  trufflehog falls back to filesystem mode to avoid excessively long scan
+  times on large repositories. Controlled via
+  `tool.trufflehog.trufflehog_git_size_check` (bool, default `true`) and
+  `tool.trufflehog.trufflehog_git_size_limit` (size, default `<<250mb>>`).
+
 ### Fixes
 
 - Docker probe always failed due to a typo introduced in chalk `1.0.0`
