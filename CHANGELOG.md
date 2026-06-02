@@ -131,6 +131,7 @@
   configured via `tool.<name>.<name>_timeout` (e.g.
   `tool.semgrep.semgrep_timeout`) and defaults to `"300"` (5 minutes). Set
   to `""` to disable.
+  ([#670](https://github.com/crashappsec/chalk/pull/670))
 
 - Trufflehog now checks the size of the `.git` directory before running in
   git mode. If the directory exceeds the threshold (default `<<250mb>>`),
@@ -138,6 +139,7 @@
   times on large repositories. Controlled via
   `tool.trufflehog.trufflehog_git_size_check` (bool, default `true`) and
   `tool.trufflehog.trufflehog_git_size_limit` (size, default `<<250mb>>`).
+  ([#670](https://github.com/crashappsec/chalk/pull/670))
 
 ### Fixes
 
