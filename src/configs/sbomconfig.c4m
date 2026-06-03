@@ -84,19 +84,19 @@ func syft_system() {
 }
 
 func find_syft(path) {
-  found := ""
   if tool.syft.syft_prefer_docker {
     found := syft_docker(path)
     if found != "" {
-      result := with_timeout(found, tool.syft.syft_timeout)
+      result := with_timeout(found, tool.syft.syft_timeout, "TERM")
       return
     }
   }
   found := syft_system()
-  if found == "" {
-    found := syft_docker(path)
+  if found != "" {
+    result := with_timeout(found, tool.syft.syft_timeout, "KILL")
+    return
   }
-  result := with_timeout(found, tool.syft.syft_timeout)
+  result := with_timeout(syft_docker(path), tool.syft.syft_timeout, "TERM")
 }
 
 func install_syft(path) {

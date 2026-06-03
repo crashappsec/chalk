@@ -104,7 +104,7 @@ func semgrep_system() {
     head, tail := path_split(result)
     # timeout goes between the PATH= prefix and the binary so the shell
     # can interpret the assignment while timeout wraps just the executable
-    result := "PATH=" + head + ":$PATH " + with_timeout(result, tool.semgrep.semgrep_timeout)
+    result := "PATH=" + head + ":$PATH " + with_timeout(result, tool.semgrep.semgrep_timeout, "KILL")
   }
 }
 
@@ -112,7 +112,7 @@ func find_semgrep(path) {
   if tool.semgrep.semgrep_prefer_docker {
     found := semgrep_docker(path)
     if found != "" {
-      result := with_timeout(found, tool.semgrep.semgrep_timeout)
+      result := with_timeout(found, tool.semgrep.semgrep_timeout, "TERM")
       return
     }
   }
@@ -120,7 +120,7 @@ func find_semgrep(path) {
   if result != "" {
     return
   }
-  result := with_timeout(semgrep_docker(path), tool.semgrep.semgrep_timeout)
+  result := with_timeout(semgrep_docker(path), tool.semgrep.semgrep_timeout, "TERM")
 }
 
 func install_semgrep(path) {

@@ -9,11 +9,13 @@
 
 # Wrap a command with `timeout -s <signal> <secs>` if the `timeout` executable
 # is available and timeout_secs is non-empty. Returns cmd unchanged otherwise.
-# Uses SIGKILL for non-docker commands so the tool cannot catch or ignore the
-# signal. Uses SIGTERM for docker commands so the daemon stops the container
-# cleanly; SIGKILL would kill only the docker CLI and orphan the container.
 # Exit code 124 is returned by timeout when the limit is exceeded.
-func with_timeout(cmd, timeout_secs) {
+#
+# signal: "KILL" for system binaries (cannot be caught or ignored).
+#         "TERM" for docker commands: SIGKILL would kill only the docker CLI
+#         and orphan the running container; SIGTERM lets the daemon stop the
+#         container cleanly before the CLI exits.
+func with_timeout(cmd, timeout_secs, signal) {
   if cmd == "" or timeout_secs == "" {
     return cmd
   }
@@ -21,11 +23,6 @@ func with_timeout(cmd, timeout_secs) {
   if timeout_exe == "" {
     trace("with_timeout: timeout command not found; running without timeout")
     return cmd
-  }
-  signal := "KILL"
-  docker := docker_exe()
-  if docker != "" and starts_with(cmd, docker) {
-    signal := "TERM"
   }
   return timeout_exe + " -s " + signal + " " + timeout_secs + " " + cmd
 }

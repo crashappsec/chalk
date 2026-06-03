@@ -178,6 +178,24 @@ proc c4mDirSize(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   except:
     return some(pack(Con4mSize(0)))
 
+proc c4mDirSizeUnder(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+  try:
+    let
+      path  = resolvePath(unpack[string](args[0]))
+      limit = unpack[Con4mSize](args[1])
+    var total: Con4mSize = 0
+    for f in walkDirRec(path, yieldFilter = {pcFile}):
+      try:
+        total += Con4mSize(getFileSize(f))
+      except:
+        dumpExOnDebug()
+      if total >= limit:
+        return some(pack(false))
+    return some(pack(true))
+  except:
+    dumpExOnDebug()
+    return some(pack(true))
+
 proc dockerExe(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
   return some(pack(getDockerExeLocation()))
 
@@ -332,6 +350,16 @@ Returns normalized binary hash of the data.
       """
 Returns the total size in bytes of all files under the given directory,
 recursing into subdirectories. Returns 0 if the path cannot be read.
+""",
+      @["filesystem"]),
+     ("dir_size_under(string, Size) -> bool",
+      BuiltInFn(c4mDirSizeUnder),
+      """
+Returns true if the total size of all files under the given directory is
+strictly less than the given limit, false otherwise. Stops walking as soon
+as the limit is reached, making it more efficient than dir_size for threshold
+checks. Returns true (conservatively allowing the operation) if the path
+cannot be read.
 """,
       @["filesystem"]),
      ("docker_exe() -> string",

@@ -50,10 +50,10 @@ endif
 # to get back to original compiled binary
 $(BINARY).bck: $(SOURCES)
 ifneq "$(TMUX)" ""
-	reset
-	tmux clear-history
+	@test -t 0 && reset || true
+	@test -t 0 && tmux clear-history || true
 endif
-	$(DOCKER) nimble -y $(CHALK_BUILD)
+	$(DOCKER) nimble -y $(CHALK_BUILD); touch $(WATCH_DONE)
 	mv $(BINARY) $@
 	cp $@ $(BINARY)
 	ls -la $(BINARY) $@
@@ -76,8 +76,11 @@ version:
 clean:
 	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop nimble.paths
 
+WATCH_LOG  ?= /tmp/chalk-watch.log
+WATCH_DONE ?= /tmp/chalk-watch-done
+
 watch: $(SOURCES)
-	echo $^ | tr ' ' '\n' | entr $(MAKE)
+	echo $^ | tr ' ' '\n' | entr $(MAKE) 2>&1 | tee $(WATCH_LOG)
 
 # devmode for local deps
 # this allows to dev againt local versions of nimutils/con4m
