@@ -30,6 +30,7 @@ proc gzwrite(file: GzFile, buf: pointer, len: cuint): cint {.importc: "gzwrite".
 proc gzclose(file: GzFile): cint {.importc: "gzclose".}
 proc gzerror(file: GzFile, errnum: ptr cint): cstring {.importc: "gzerror".}
 proc gzoffset(file: GzFile): int64 {.importc: "gzoffset".}
+proc gzflush(file: GzFile, flush: cint): cint {.importc: "gzflush".}
 {.pop.}
 
 type
@@ -420,6 +421,8 @@ proc addDirToTar(
           gzWriteZeros(gz, pad)
       finally:
         fh.close()
+      if sizeThreshold > 0:
+        discard gzflush(gz, 2)  ## Z_SYNC_FLUSH: flush to fd so gzoffset is accurate
       if sizeThreshold > 0 and gzoffset(gz) > sizeThreshold:
         raise newException(
           TarSizeLimitError,
@@ -473,3 +476,12 @@ proc writeTarGz*(
     let rc = gzclose(gz)
     if ok and rc != 0:
       raise newException(IOError, "gzclose failed: rc=" & $rc)
+  ## Final size check after gzclose flushes all buffered data.
+  ## The incremental check in addDirToTar catches large archives early,
+  ## but gzip buffering can delay flushing for small archives.
+  if sizeThreshold > 0 and getFileSize(outPath) > sizeThreshold:
+    removeFile(outPath)
+    raise newException(
+      TarSizeLimitError,
+      "archive exceeded size_threshold of " & $sizeThreshold & " bytes",
+    )

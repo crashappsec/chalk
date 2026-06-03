@@ -2356,6 +2356,7 @@ def test_build_context_upload(
         config=config,
         env=env,
         buildx=True,
+        ignore_errors=exceed_size,
     )
 
     if not push:
@@ -2364,6 +2365,7 @@ def test_build_context_upload(
             env=env,
             digests=digests,
             config=config,
+            ignore_errors=exceed_size,
         )
     else:
         push_result = build_result

@@ -695,6 +695,7 @@ class Chalk:
         labels: Optional[dict[str, str]] = None,
         annotations: Optional[dict[str, str]] = None,
         named_contexts: Optional[dict[str, Path | str]] = None,
+        ignore_errors: bool = False,
     ) -> tuple[DockerDigests, ChalkProgram]:
         cwd = cwd or Path(os.getcwd())
         context = context or getattr(dockerfile, "parent", cwd)
@@ -753,7 +754,8 @@ class Chalk:
                     params=params,
                     stdin=stdin,
                     expected_success=expected_success,
-                    ignore_errors=not expecting_report,
+                    expecting_report=expecting_report,
+                    ignore_errors=ignore_errors,
                     cwd=cwd,
                     env={
                         **Docker.build_env(buildkit=buildkit),
@@ -812,10 +814,12 @@ class Chalk:
         env: Optional[dict[str, str]] = None,
         digests: Optional[DockerDigests] = None,
         config: Optional[Path] = None,
+        ignore_errors: bool = False,
     ) -> tuple[DockerDigests, ChalkProgram]:
         push = self.run(
             params=["docker", "push", image],
             config=config,
+            ignore_errors=ignore_errors,
             env={
                 **Docker.build_env(buildkit=buildkit),
                 **(env or {}),
