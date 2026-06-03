@@ -29,10 +29,12 @@ proc gzopen(path: cstring, mode: cstring): GzFile {.importc: "gzopen".}
 proc gzwrite(file: GzFile, buf: pointer, len: cuint): cint {.importc: "gzwrite".}
 proc gzclose(file: GzFile): cint {.importc: "gzclose".}
 proc gzerror(file: GzFile, errnum: ptr cint): cstring {.importc: "gzerror".}
+proc gzoffset(file: GzFile): int64 {.importc: "gzoffset".}
 {.pop.}
 
 type
-  SkippedFile* = tuple[path: string, size: int64, hash: string]
+  SkippedFile*       = tuple[path: string, size: int64, hash: string]
+  TarSizeLimitError* = object of CatchableError
 
 ## ---------------------------------------------------------------------------
 ## Tar format constants
@@ -71,8 +73,13 @@ proc gzWriteAll(gz: GzFile, data: string) =
 proc gzWriteZeros(gz: GzFile, n: int) =
   if n <= 0:
     return
-  let zeros = newString(n)
-  discard gzwrite(gz, unsafeAddr zeros[0], cuint(n))
+  let
+    zeros   = newString(n)
+    written = gzwrite(gz, unsafeAddr zeros[0], cuint(n))
+  if written != cint(n):
+    var errnum: cint
+    let msg = $gzerror(gz, addr errnum)
+    raise newException(IOError, "gzwrite (zeros) failed: " & msg)
 
 proc buildTarHeader(
     relPath:    string,
@@ -181,6 +188,8 @@ proc globMatch*(path, pattern: string): bool =
   ## * matches any run of non-separator characters.
   ## ? matches any single non-separator character.
   ## ** matches any run of characters including path separators.
+  ## [abc], [a-z], [!a-z] match character classes (/ never matches inside []).
+  ## \x matches the literal character x.
   var pi, si = 0
   while pi < pattern.len and si < path.len:
     if pattern[pi] == '*':
@@ -206,6 +215,35 @@ proc globMatch*(path, pattern: string): bool =
     elif pattern[pi] == '?' and path[si] != '/':
       inc pi
       inc si
+    elif pattern[pi] == '[':
+      inc pi  ## skip '['
+      let negate = pi < pattern.len and (pattern[pi] == '!' or pattern[pi] == '^')
+      if negate: inc pi
+      var classMatched = false
+      var first = true
+      while pi < pattern.len and (first or pattern[pi] != ']'):
+        first = false
+        if pattern[pi] == '\\' and pi + 1 < pattern.len:
+          inc pi
+          if path[si] == pattern[pi]: classMatched = true
+          inc pi
+        elif pi + 2 < pattern.len and pattern[pi + 1] == '-' and pattern[pi + 2] != ']':
+          if path[si] >= pattern[pi] and path[si] <= pattern[pi + 2]: classMatched = true
+          pi += 3
+        else:
+          if path[si] == pattern[pi]: classMatched = true
+          inc pi
+      if pi >= pattern.len:
+        return false  ## unterminated '[': no match
+      inc pi  ## skip ']'
+      let classHit = if negate: not classMatched else: classMatched
+      if path[si] == '/' or not classHit: return false
+      inc si
+    elif pattern[pi] == '\\' and pi + 1 < pattern.len:
+      inc pi  ## skip '\'
+      if path[si] != pattern[pi]: return false
+      inc pi
+      inc si
     elif pattern[pi] == path[si]:
       inc pi
       inc si
@@ -221,22 +259,29 @@ proc isExcluded*(relPath: string, patterns: seq[string]): bool =
   ## - Patterns are processed in order; the last match wins.
   ## - A leading '!' negates the pattern (re-includes a previously excluded path).
   ## - Trailing '/' is stripped before matching (it only signals directory intent).
-  ## - The full relative path is matched against the cleaned pattern with globMatch.
-  ## - A path also matches if any of its ancestor directories matches the pattern,
-  ##   which is how "logs/" covers "logs/debug.log".
+  ## - Patterns WITHOUT a '/' are matched against the basename (last path
+  ##   component) at any depth, matching Docker's filepath.Match behavior.
+  ## - Patterns WITH a '/' are matched against the full relative path.
+  ## - A path also matches if any of its ancestor directories matches the
+  ##   pattern (by full path for slash patterns, by basename for no-slash ones).
   let norm = relPath.replace('\\', '/')
   result = false
   for pat in patterns:
     let
-      negate = pat.startsWith('!')
-      p      = (if negate: pat[1 .. ^1] else: pat).strip(chars = {'/'})
+      negate   = pat.startsWith('!')
+      p        = (if negate: pat[1 .. ^1] else: pat).strip(chars = {'/'})
+      hasSlash = '/' in p
     if p.len == 0:
       continue
     var matched = globMatch(norm, p)
+    if not matched and not hasSlash:
+      matched = globMatch(lastPathPart(norm), p)
     if not matched:
       var slash = norm.find('/')
       while slash > 0:
-        if globMatch(norm[0 ..< slash], p):
+        let ancestor = norm[0 ..< slash]
+        if globMatch(ancestor, p) or
+            (not hasSlash and globMatch(lastPathPart(ancestor), p)):
           matched = true
           break
         slash = norm.find('/', slash + 1)
@@ -248,17 +293,21 @@ proc hasNegationForDir*(norm: string, patterns: seq[string]): bool =
   ## files inside the directory at `norm`, meaning recursion must not be pruned.
   ##
   ## Under Docker .dockerignore semantics a negation pattern can reach inside
-  ## `norm` only when:
+  ## `norm` when:
+  ##   - it has no '/' (matches by basename at any depth, so can reach inside
+  ##     any excluded directory), or
   ##   - it explicitly starts with `norm/` (targets files inside this dir), or
   ##   - it contains '**' (can cross directory boundaries).
-  ## Patterns without a '/' cannot match across a directory boundary, so they
-  ## cannot re-include files inside an excluded subdirectory.
   for pat in patterns:
     if not pat.startsWith('!'):
       continue
     let p = pat[1 .. ^1].strip(chars = {'/'})
     if p.len == 0:
       continue
+    if '/' notin p:
+      ## No-slash negations match by basename at any depth and can re-include
+      ## files inside any excluded directory.
+      return true
     if p.startsWith(norm & "/"):
       return true
     if "**" in p:
@@ -300,12 +349,13 @@ proc writeLongLinkEntry(gz: GzFile, fullPath: string) =
 ## Directory walk
 
 proc addDirToTar(
-    gz:           GzFile,
-    baseDir:      string,
-    relDir:       string,
-    patterns:     seq[string],
-    maxFileSize:  int64,
-    skippedFiles: var seq[SkippedFile],
+    gz:            GzFile,
+    baseDir:       string,
+    relDir:        string,
+    patterns:      seq[string],
+    maxFileSize:   int64,
+    sizeThreshold: int64,
+    skippedFiles:  var seq[SkippedFile],
 ) =
   for kind, entry in walkDir(baseDir / relDir, relative = true):
     let
@@ -330,7 +380,7 @@ proc addDirToTar(
       ## could re-include files inside it (e.g. "logs/" with "!logs/*.log").
       ## Pruning here avoids walking .git, node_modules, etc. unnecessarily.
       if not excluded or hasNegationForDir(norm, patterns):
-        addDirToTar(gz, baseDir, rel, patterns, maxFileSize, skippedFiles)
+        addDirToTar(gz, baseDir, rel, patterns, maxFileSize, sizeThreshold, skippedFiles)
 
     of pcFile:
       if isExcluded(norm, patterns):
@@ -370,6 +420,11 @@ proc addDirToTar(
           gzWriteZeros(gz, pad)
       finally:
         fh.close()
+      if sizeThreshold > 0 and gzoffset(gz) > sizeThreshold:
+        raise newException(
+          TarSizeLimitError,
+          "archive exceeded size_threshold of " & $sizeThreshold & " bytes",
+        )
 
     of pcLinkToFile, pcLinkToDir:
       if isExcluded(norm, patterns):
@@ -393,21 +448,28 @@ proc addDirToTar(
 ## Public API
 
 proc writeTarGz*(
-    outPath:     string,
-    contextPath: string,
-    patterns:    seq[string],
-    maxFileSize: int64 = 0,
+    outPath:       string,
+    contextPath:   string,
+    patterns:      seq[string],
+    maxFileSize:   int64 = 0,
+    sizeThreshold: int64 = 0,
 ): seq[SkippedFile] =
   ## Write a .tar.gz of contextPath to outPath.
   ## Files and directories whose path relative to contextPath matches any
   ## entry in patterns are excluded from the archive.
   ## Individual files larger than maxFileSize bytes are skipped (0 = no limit).
+  ## If sizeThreshold > 0, raises TarSizeLimitError as soon as the compressed
+  ## output exceeds the threshold, avoiding writing the full archive.
   ## Returns the list of files that were skipped due to maxFileSize.
   let gz = gzopen(outPath.cstring, "wb")
   if gz == nil:
     raise newException(IOError, "could not open " & outPath & " for gzip writing")
+  var ok = false
   try:
-    addDirToTar(gz, contextPath, "", patterns, maxFileSize, result)
+    addDirToTar(gz, contextPath, "", patterns, maxFileSize, sizeThreshold, result)
     gzWriteZeros(gz, tarBlock * 2)  ## POSIX end-of-archive: two zero blocks
+    ok = true
   finally:
-    discard gzclose(gz)
+    let rc = gzclose(gz)
+    if ok and rc != 0:
+      raise newException(IOError, "gzclose failed: rc=" & $rc)

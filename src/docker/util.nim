@@ -188,7 +188,7 @@ proc getValue*(secret: DockerSecret): string =
 
 iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
   ## Yields a fully-resolved DockerContextUploadConfig for each docker_push
-  ## config that has upload_context = true and at least one tag.
+  ## config that has docker_context_upload.enabled = true and at least one tag.
   for registryName in getChalkSubsections("docker.docker_registry"):
     let
       registrySection = "docker.docker_registry." & registryName

@@ -2035,7 +2035,7 @@ contexts over slow connections.
     default:  << 1 hrs >>
     shortdoc: "Max age of cached build context tarballs"
     doc:      """
-When `upload_context_strategy` is `local` or `auto` (and the build is not in
+When `docker_context_upload.strategy` is `local` or `auto` (and the build is not in
 CI), Chalk saves the build context as a `.tar.gz` under
 `<tmpdir>/chalk-build-contexts/`. This setting controls how long those cached
 tarballs are kept before being deleted.
@@ -2347,11 +2347,18 @@ creating the build context `.tar.gz` archive.  Because patterns are evaluated
 in order with last-match-wins semantics, these patterns take final precedence
 over anything in `.dockerignore`.
 
-Pattern syntax follows Docker `.dockerignore` conventions: `*` matches any
-sequence of characters except `/`; `?` matches a single non-`/` character;
-`**` matches across path separators; a leading `!` negates the rule.  Patterns
-without a `/` match only root-level entries; patterns with a `/` are matched
-against the full relative path from the context root.
+Pattern syntax follows Docker `.dockerignore` conventions (see
+`honor_dockerignore` for the full rule reference).  Key points:
+
+- Patterns without a `/` (after stripping leading/trailing slashes) are
+  matched against the basename of each path at any depth -- e.g. `*.pyc`
+  excludes `src/main.pyc`, not just root-level `.pyc` files.
+- Patterns with a `/` are matched against the full relative path from the
+  context root -- e.g. `build/*.o` only matches inside a root-level `build/`.
+- `*` matches any sequence of non-`/` characters; `?` matches a single
+  non-`/` character; `**` matches across path separators (including `/`);
+  `[abc]`/`[a-z]`/`[!abc]` are character classes; a backslash escapes the next character literally.
+- A leading `!` negates the rule, re-including a previously excluded path.
 
 The default `[".git"]` excludes the Git repository metadata directory,
 which is typically not needed in the uploaded context and can be large.
@@ -2363,15 +2370,43 @@ which is typically not needed in the uploaded context and can be large.
     default:  true
     shortdoc: "Apply .dockerignore patterns when creating the context tarball"
     doc:      """
-When `true`, Chalk reads the `.dockerignore` file from the build context
-directory (if present) and applies its patterns using Docker's own semantics
+When `true`, Chalk reads the context-root ignore file and applies its patterns
 before the `additional_dockerignore` patterns.  This ensures the uploaded
 context matches what Docker itself would have used for the build.
 
-Pattern matching uses full-path `filepath.Match` semantics: `*` never crosses
-`/`, a file also matches if any ancestor directory matches the pattern, and
-patterns without a `/` match only root-level entries.  Negation patterns
-(`!`-prefixed) and `**` wildcards are supported.
+Ignore-file selection (BuildKit priority):
+
+1. `<Dockerfile-basename>.dockerignore` in the context root, if it exists
+   (only when a named `-f` flag was given and the Dockerfile is not stdin).
+2. `.dockerignore` in the context root, if it exists.
+3. No ignore file -- nothing is excluded by this step.
+
+Pattern file format:
+
+- Blank lines and lines beginning with `#` are ignored.
+- Leading `/` is stripped from each pattern (all paths are context-relative).
+- Trailing `/` signals directory intent; it is stripped before matching, and
+  the resulting pattern then follows the no-slash matching rule below.
+
+Pattern matching rules (mirrors Moby `fileutils.PatternMatcher` /
+Go `filepath.Match` extended with `**`):
+
+- **No-slash patterns** (no `/` after stripping): matched against the
+  basename (last path component) at any depth.  Example: `.git` excludes
+  `vendor/.git` as well as the root `.git`.
+- **Slash patterns** (contain `/` after stripping): matched against the
+  full relative path from the context root.  Example: `build/*.o` only
+  matches files directly inside a root-level `build/` directory.
+- A path also matches if any ancestor directory matches the pattern (using
+  the same no-slash vs. slash rule).
+- Glob characters: `*` (non-`/` run), `?` (single non-`/`), `**` (path-
+  crossing run), `[abc]`/`[a-z]`/`[!abc]` (character classes, `/` never
+  matches inside `[]`), backslash (literal character escape).
+- Patterns beginning with `!` re-include previously excluded paths.
+- Evaluation is ordered; the **last matching pattern wins**.
+- When a directory is excluded, Chalk skips recursing into it unless a
+  negation pattern could re-include entries inside (no-slash negation,
+  negation starting with `<dir>/`, or negation containing `**`).
 """
   }
 }

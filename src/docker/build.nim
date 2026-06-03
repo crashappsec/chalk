@@ -622,6 +622,7 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     try:
       baseChalk.collectedData.merge(
         uploadBuildContextsAtBuildTime(
+          chalk  = baseChalk,
           ctx    = ctx,
           config = config,
         ),

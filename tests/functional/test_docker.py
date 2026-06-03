@@ -2271,7 +2271,7 @@ def test_version_bare(chalk_default: Chalk):
         ("disk", False, False),
         # combined --push: strategies collapse to same behaviour; test one
         ("local", True, False),
-        # size_threshold too small: upload must be skipped entirely
+        # only libs exceeds size_threshold: primary context succeeds, libs fails
         ("local", False, True),
     ],
 )
@@ -2333,11 +2333,11 @@ def test_build_context_upload(
     name = f"context_upload_{random_hex}"
     tag = f"{REGISTRY}/{name}:latest"
     if exceed_size:
-        # create many incompressible files in both contexts to push their tarballs
-        # over size_threshold (<<5kb>> in docker_context.c4m); each file is under
-        # max_file_size (<<1kb>>) so they are included, but together exceed the total
-        for i in range(50):
-            (context_dir / f"bulk_{i:02d}.bin").write_bytes(os.urandom(768))
+        # only libs gets bulk incompressible files to push it over size_threshold
+        # (<<5kb>> in docker_context.c4m); each file is under max_file_size (<<1kb>>)
+        # so they are included individually but together exceed the total threshold.
+        # primary context stays well under size_threshold to test partial failure.
+        for i in range(10):
             (libs_dir / f"bulk_{i:02d}.bin").write_bytes(os.urandom(768))
 
     env = {
@@ -2374,12 +2374,23 @@ def test_build_context_upload(
     )
 
     if exceed_size:
-        # size_threshold too small: upload is skipped, key must be absent
-        assert push_result.mark.has(_REPO_BUILD_CONTEXTS=MISSING)
+        # partial failure: only libs exceeds size_threshold; primary context succeeds
+        assert push_result.mark.has(
+            _REPO_BUILD_CONTEXTS={
+                REGISTRY_AUTH: {
+                    "context": {
+                        ".": re.compile(r"^[a-f0-9]{64}$"),
+                        "libs": MISSING,
+                    },
+                },
+            },
+        )
+        # libs failure must be recorded at build time, not silently dropped
         assert build_result.report.has(
             _OP_FAILED_KEYS={
                 "_REPO_BUILD_CONTEXTS": {
                     "code": "CONTEXT_TOO_LARGE",
+                    "error": re.compile(r"libs"),
                 },
             },
         )

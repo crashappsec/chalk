@@ -52,6 +52,35 @@ proc testGlobMatch() =
   check globMatch("src/docker/tar.nim", "src/**/*.nim")
   check not globMatch("src/docker/tar.c", "src/**/*.nim")
 
+  ## Character classes [abc]
+  check globMatch("a", "[abc]")
+  check globMatch("b", "[abc]")
+  check globMatch("c", "[abc]")
+  check not globMatch("d", "[abc]")
+  check not globMatch("/", "[abc]")
+
+  ## Character class range [a-z]
+  check globMatch("m", "[a-z]")
+  check not globMatch("M", "[a-z]")
+  check globMatch("9", "[0-9]")
+  check not globMatch("a", "[0-9]")
+
+  ## Negated class [!abc]
+  check not globMatch("a", "[!abc]")
+  check globMatch("d", "[!abc]")
+  check not globMatch("/", "[!abc]")
+
+  ## Classes inside longer patterns
+  check globMatch("foo.c", "foo.[ch]")
+  check globMatch("foo.h", "foo.[ch]")
+  check not globMatch("foo.x", "foo.[ch]")
+
+  ## Escape \x matches literal x
+  check globMatch("*", "\\*")
+  check not globMatch("a", "\\*")
+  check globMatch("?", "\\?")
+  check not globMatch("a", "\\?")
+
 proc testIsExcluded() =
   ## No patterns: never excluded
   check not isExcluded("foo", @[])
@@ -61,29 +90,26 @@ proc testIsExcluded() =
   check isExcluded(".git", @[".git"])
   check not isExcluded("src", @[".git"])
 
-  ## Docker semantics: no-slash pattern matches the full path, not per-component.
-  ## A nested .git is not matched; only the root-level .git (and its contents via
-  ## ancestor check) are excluded.
-  check not isExcluded("a/.git", @[".git"])
-  check not isExcluded("a/b/.git", @[".git"])
-  check not isExcluded("a/.git/config", @[".git"])
-  check not isExcluded("a/b/src", @[".git"])
-  ## Ancestor check: files inside a matched root dir are also excluded.
+  ## Docker semantics: no-slash patterns match by basename at any depth.
+  check isExcluded("a/.git", @[".git"])          ## basename .git matches
+  check isExcluded("a/b/.git", @[".git"])        ## basename .git matches
+  check isExcluded("a/.git/config", @[".git"])   ## ancestor .git basename match
+  check not isExcluded("a/b/src", @[".git"])     ## no match
+  ## Ancestor check: files inside a matched dir are also excluded.
   check isExcluded(".git/config", @[".git"])
   check isExcluded(".git/hooks/pre-commit", @[".git"])
 
-  ## Trailing-slash stripped; pattern matches the root-level dir and its contents
-  ## via ancestor check, but not a same-named dir nested deeper.
+  ## Trailing-slash stripped; no-slash pattern matches by basename at any depth.
   check isExcluded("logs/app.log", @["logs/"])
-  check not isExcluded("a/logs/app.log", @["logs/"])
+  check isExcluded("a/logs/app.log", @["logs/"])  ## ancestor basename match
 
   ## Pattern with an internal '/' matches the full relative path only
   check isExcluded("build/output.o", @["build/*.o"])
   check not isExcluded("a/build/output.o", @["build/*.o"])
 
-  ## Glob pattern without '/' matches only root-level entries
+  ## Glob pattern without '/' matches by basename at any depth
   check isExcluded("foo.tmp", @["*.tmp"])
-  check not isExcluded("a/b/foo.tmp", @["*.tmp"])
+  check isExcluded("a/b/foo.tmp", @["*.tmp"])  ## basename match
   check not isExcluded("foo.nim", @["*.tmp"])
 
   ## Last-match-wins: later patterns override earlier ones

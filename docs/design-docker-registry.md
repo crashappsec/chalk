@@ -149,7 +149,7 @@ context manifest directly without resolving through the list.
 
 Because `chalk docker build` and `chalk docker push` can run as
 separate commands, the timing of the context upload is configurable
-via `upload_context_strategy`:
+via `docker_context_upload.strategy`:
 
 | Strategy   | Build time                                 | Push time                                          |
 | ---------- | ------------------------------------------ | -------------------------------------------------- |
@@ -186,7 +186,10 @@ patterns to decide which files and directories to include. Two sources of
 patterns are combined:
 
 1. **`.dockerignore`** - read from the root of the build context when
-   `honor_dockerignore` is `true` (the default).
+   `honor_dockerignore` is `true` (the default). When a Dockerfile name is
+   known (i.e. `-f` was passed and was not stdin), Chalk first checks for
+   `<dockerfile-basename>.dockerignore` in the context root (BuildKit
+   priority); if that file does not exist it falls back to `.dockerignore`.
 2. **`additional_dockerignore`** - explicitly configured patterns appended
    after `.dockerignore` so they take final precedence (default `[".git"]`).
 
@@ -194,29 +197,91 @@ Because patterns are evaluated in order with **last-match-wins** semantics, the
 chalk configuration always has the final say over what is included or excluded.
 
 Chalk prunes recursion into an excluded directory unless a negation pattern
-could re-include files inside it (i.e. a pattern starting with `<dir>/` or
-containing `**`), matching Docker's own pruning behaviour.
+could re-include files inside it. A negation pattern can reach inside an
+excluded directory when it has no `/` (basename patterns match at any depth),
+starts with `<dir>/`, or contains `**`. This matches Docker's own pruning
+behaviour.
 
-#### Pattern syntax
+#### Ignore-file selection
 
-Patterns follow Docker `.dockerignore` semantics:
+This behavior matches BuildKit's documented priority
+([reference](https://docs.docker.com/reference/dockerfile/#dockerignore-file)):
 
-| Syntax | Meaning                                               |
-| ------ | ----------------------------------------------------- |
-| `*`    | Any sequence of characters except `/`                 |
-| `?`    | Any single character except `/`                       |
-| `**`   | Any sequence of characters including `/` (path cross) |
-| `!pat` | Negate: re-include files matched by a previous rule   |
+| Condition                                                                      | File used                               |
+| ------------------------------------------------------------------------------ | --------------------------------------- |
+| `-f Dockerfile.prod` and `Dockerfile.prod.dockerignore` exists in context root | `Dockerfile.prod.dockerignore`          |
+| Otherwise, `.dockerignore` exists in context root                              | `.dockerignore`                         |
+| Neither file exists                                                            | No patterns (nothing excluded)          |
+| `-f -` (Dockerfile from stdin)                                                 | `.dockerignore` only (no named variant) |
 
-Patterns are matched against the **full relative path**. A file also matches
-if any of its ancestor directories matches the pattern (so `logs/` covers
-`logs/debug.log`). Patterns **without** a `/` match only root-level entries;
-patterns **with** a `/` are matched against the full path relative to the
-context root.
+#### Pattern file format
 
-Leading `/` characters are stripped from patterns read from `.dockerignore`
-since all paths are relative to the context root. Blank lines and lines
-beginning with `#` are ignored.
+Rules for parsing the ignore file
+([reference](https://docs.docker.com/reference/dockerfile/#dockerignore-file)):
+
+- Blank lines are ignored.
+- Lines beginning with `#` are treated as comments and ignored.
+- Leading `/` is stripped from each pattern: all paths are relative to the
+  context root, so a leading slash is meaningless.
+- Trailing `/` signals directory intent but is stripped before matching; the
+  resulting pattern is then subject to the no-slash matching rule below.
+
+#### Pattern matching rules
+
+Chalk implements the same matching logic as Moby's `fileutils.PatternMatcher`
+([source](https://github.com/moby/moby/blob/master/pkg/fileutils/fileutils.go)).
+Glob expansion uses Go's `filepath.Match` extended with `**`
+([reference](https://pkg.go.dev/path/filepath#Match)):
+
+**No-slash vs. slash patterns**
+
+The most important rule:
+
+- **Pattern contains no `/`** (after stripping leading and trailing `/`):
+  matched against the **basename** (last path component) of the candidate at
+  any depth. For example, `*.pyc` excludes `src/main.pyc`, and `.git` excludes
+  `vendor/.git` as well as the root `.git`.
+- **Pattern contains a `/`**: matched against the **full relative path** from
+  the context root. For example, `build/*.o` only matches files directly inside
+  a root-level `build/` directory.
+
+**Ancestor matching**
+
+A file also matches a pattern if any of its **ancestor directories** matches
+the same pattern (using the same no-slash vs. slash rule). This is how `logs/`
+(stripped to `logs`, no slash - basename rule applies) covers
+`a/logs/debug.log`: the ancestor `a/logs` has basename `logs`, which matches.
+
+**Glob characters**
+
+| Syntax   | Meaning                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------- |
+| `*`      | Any sequence of non-`/` characters                                                                   |
+| `?`      | Any single non-`/` character                                                                         |
+| `[abc]`  | Any single character in the set; `/` never matches inside `[]`                                       |
+| `[a-z]`  | Any single character in the range                                                                    |
+| `[!abc]` | Any single character **not** in the set (`^` is also accepted)                                       |
+| `**`     | Any sequence of characters **including** `/` (path cross); Moby extension on top of `filepath.Match` |
+| `\x`     | Literal character `x` (escape)                                                                       |
+
+**Negation**
+
+A pattern beginning with `!` re-includes files that were previously excluded.
+The `!` is stripped and the remainder is matched with the same rules above.
+Last-match-wins means a later `!pat` overrides an earlier exclusion, and a
+later positive pattern overrides an earlier negation.
+
+**Directory pruning**
+
+When a directory entry matches an exclusion pattern, Chalk skips recursing into
+it entirely unless any negation pattern could re-include files inside:
+
+- A negation pattern **without** `/` can match files inside any directory (via
+  basename rule), so recursion is always kept when such a pattern exists.
+- A negation pattern **with** `/` that starts with `<dir>/` targets files
+  inside that specific directory, so recursion is kept for that directory.
+- A negation pattern containing `**` can cross directory boundaries, so
+  recursion is always kept when such a pattern exists.
 
 #### Precedence example
 
@@ -231,19 +296,19 @@ And `additional_dockerignore: ["*.tmp", "!keep.tmp"]`, the effective
 pattern list is:
 
 ```
-logs/              # from .dockerignore - excludes logs/ directory
-!logs/important.log  # from .dockerignore - re-includes one file
-*.tmp              # from chalk config - excludes root-level .tmp files
-!keep.tmp          # from chalk config - re-includes keep.tmp
+logs/               # from .dockerignore - excludes any dir named logs at any depth
+!logs/important.log # from .dockerignore - re-includes logs/important.log (full path)
+*.tmp               # from chalk config - excludes *.tmp files at any depth
+!keep.tmp           # from chalk config - re-includes keep.tmp at any depth
 ```
 
 Because chalk config patterns come last, `!keep.tmp` overrides any earlier
 exclusion of `keep.tmp`, and `*.tmp` overrides `.dockerignore` rules for
-root-level `.tmp` files.
+`.tmp` files at any depth.
 
 ### Size Threshold
 
-When `upload_context_size_threshold` is set (default `100mb`), Chalk measures
+When `docker_context_upload.size_threshold` is set (default `100mb`), Chalk measures
 the `.tar.gz` tarball after it is created and skips the upload if the size
 exceeds the threshold. The failure is recorded in `_OP_FAILED_KEYS` under the
 key `_REPO_BUILD_CONTEXTS` with code `CONTEXT_TOO_LARGE`, including the context
@@ -262,7 +327,8 @@ directory structure:
 ```
 /tmp/chalk-build-contexts/
   2025-01-15T14-32-07/
-    myapp-1736956800.tar.gz
+    <chalk-id>-main.tar.gz
+    <chalk-id>-libs.tar.gz
   2025-01-15T09-10-45/
     ...
 ```
@@ -291,11 +357,11 @@ The context name is `"."` for the main build context and the declared
 name for each `--build-context` extra. The per-context config object
 carries strategy-specific fields:
 
-| Strategy   | Fields                                                                                                         |
-| ---------- | -------------------------------------------------------------------------------------------------------------- |
-| `registry` | `strategy`, `blob_digest`, `blob_size`                                                                         |
-| `local`    | `strategy`, `tar_path`                                                                                         |
-| `disk`     | `strategy`, `context_path`, `size_threshold`, `additional_dockerignore`, `honor_dockerignore`, `max_file_size` |
+| Strategy   | Fields                                                                                                                            |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `registry` | `strategy`, `blob_digest`, `blob_size`, `skipped_files`                                                                           |
+| `local`    | `strategy`, `tar_path`, `tar_hash`, `skipped_files`                                                                               |
+| `disk`     | `strategy`, `context_path`, `dockerfile_path`, `size_threshold`, `additional_dockerignore`, `honor_dockerignore`, `max_file_size` |
 
 At push time, Chalk reads this key from the image's chalk mark and
 completes the attestation manifest creation.
@@ -315,7 +381,7 @@ completes the attestation manifest creation.
   primary use-case is uploading contexts that may have been mutated
   relative to git (local directories). `oci-layout://` and
   `docker-image://` references are also skipped.
-- The `full` mode is the only supported `upload_context_mode`; future
+- The `full` mode is the only supported `docker_context_upload.mode`; future
   modes may support filtered or diff-only uploads.
 - Multi-platform builds upload all contexts once (on the base chalk
   object before per-platform copies are made); each platform image then
@@ -327,6 +393,13 @@ completes the attestation manifest creation.
   If the subsequent push never runs (build aborted, push disabled, or a
   different repository targeted), the blob remains in the registry
   unreferenced until the registry's garbage-collection cycle removes it.
+- **Trust assumption:** Push-time context completion reads
+  `DOCKER_BUILD_CONTEXT_SNAPSHOTS` from the chalk mark embedded in the
+  image and trusts its contents. For the `local` strategy Chalk verifies
+  the tarball SHA-256 against the hash recorded at build time, but a
+  compromised or forged chalk mark can still direct Chalk to upload an
+  arbitrary file at the recorded path. This feature assumes the chalk mark
+  itself has not been tampered with.
 
 ## Registry Authentication
 

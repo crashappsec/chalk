@@ -4970,7 +4970,7 @@ keyspec DOCKER_BUILD_CONTEXT_SNAPSHOTS {
     standard:         true
     doc: """
 Intermediate state used when `chalk docker build` and `chalk docker push` are
-invoked as separate commands with `upload_context: true` configured.
+invoked as separate commands with `docker_context_upload.enabled: true` configured.
 
 At build time Chalk stores per-push-config, per-context information keyed by:
 
@@ -4993,14 +4993,16 @@ For example, with the `registry` strategy and a named extra context:
     "registry.example.com": {
       "my-org/my-app": {
         ".": {
-          "strategy":    "registry",
-          "blob_digest": "a1b2c3d4...",
-          "blob_size":   123456
+          "strategy":      "registry",
+          "blob_digest":   "a1b2c3d4...",
+          "blob_size":     123456,
+          "skipped_files": {}
         },
         "libs": {
-          "strategy":    "registry",
-          "blob_digest": "e5f6a7b8...",
-          "blob_size":   654321
+          "strategy":      "registry",
+          "blob_digest":   "e5f6a7b8...",
+          "blob_size":     654321,
+          "skipped_files": {}
         }
       }
     }
@@ -5016,8 +5018,10 @@ With the `local` strategy:
     "registry.example.com": {
       "my-org/my-app": {
         ".": {
-          "strategy": "local",
-          "tar_path": "/tmp/chalk-build-contexts/2025-01-15T14-32-07/my-app-1234567890.tar.gz"
+          "strategy":      "local",
+          "tar_path":      "/tmp/chalk-build-contexts/2025-01-15T14-32-07/<chalk-id>-main.tar.gz",
+          "tar_hash":      "a1b2c3d4...",
+          "skipped_files": {}
         }
       }
     }
@@ -5035,9 +5039,11 @@ With the `disk` strategy:
         ".": {
           "strategy":                "disk",
           "context_path":            "/path/to/build/context",
+          "dockerfile_path":         "/path/to/build/context/Dockerfile",
           "size_threshold":          104857600,
           "additional_dockerignore": [".git"],
-          "honor_dockerignore":      true
+          "honor_dockerignore":      true,
+          "max_file_size":           0
         }
       }
     }

@@ -36,6 +36,19 @@ const
   ANNOTATION_CREATED       = "org.opencontainers.image.created"
   ANNOTATION_CONTEXT_NAME* = "dev.crashoverride.chalk.build-context.name"
 
+## SNAPSHOT CONTRACT
+## The DOCKER_BUILD_CONTEXT_SNAPSHOTS key holds per-strategy JSON objects whose
+## field sets are part of the persistent chalk mark schema.  Any change to the
+## fields written below (the `entry = %*{...}` blocks) or read in
+## `completeBuildContextUpload` MUST be reflected in both:
+##   - src/configs/base_keyspecs.c4m  (DOCKER_BUILD_CONTEXT_SNAPSHOTS doc/examples)
+##   - docs/design-docker-registry.md (Intermediate State fields table)
+##
+## registry: strategy, blob_digest, blob_size, skipped_files
+## local:    strategy, tar_path, tar_hash, skipped_files
+## disk:     strategy, context_path, dockerfile_path, size_threshold,
+##           additional_dockerignore, honor_dockerignore, max_file_size
+
 type
   ContextTooLargeError = object of CatchableError
   ContextSnapshotEntry = JsonNode  ## JObject with strategy-specific fields
@@ -85,46 +98,83 @@ proc cleanBuildContextCache*() =
             getCurrentExceptionMsg())
       dumpExOnDebug()
 
-proc readDockerignorePatterns(contextPath: string): seq[string] =
-  let path = contextPath / ".dockerignore"
-  if not fileExists(path):
+proc readDockerignorePatterns(
+    contextPath:    string,
+    dockerfilePath: string = "",
+): seq[string] =
+  ## Read ignore patterns from the context-root ignore file.
+  ## BuildKit priority: <dockerfileName>.dockerignore > .dockerignore.
+  var ignorePath = ""
+  if dockerfilePath != "" and dockerfilePath != stdinIndicator:
+    let candidate = contextPath / (lastPathPart(dockerfilePath) & ".dockerignore")
+    if fileExists(candidate):
+      ignorePath = candidate
+  if ignorePath == "":
+    let candidate = contextPath / ".dockerignore"
+    if fileExists(candidate):
+      ignorePath = candidate
+  if ignorePath == "":
     return @[]
   result = @[]
-  for line in tryToLoadFile(path).splitLines():
+  for line in tryToLoadFile(ignorePath).splitLines():
     let p = line.strip()
     if p.len == 0 or p.startsWith('#'):
       continue
     if p.startsWith('!'):
-      # Preserve '!' for negation; strip any leading '/' from the pattern part.
       result.add('!' & p[1 .. ^1].removePrefix('/'))
     else:
       result.add(p.removePrefix('/'))
 
+proc contextNameSlug(name: string): string =
+  ## Produce a filename-safe slug from a context name.
+  ## "." (the main context) becomes "main"; other characters outside
+  ## [a-zA-Z0-9_-] are replaced with "_".
+  if name == ".":
+    return "main"
+  result = ""
+  for c in name:
+    if c in {'a' .. 'z', 'A' .. 'Z', '0' .. '9', '-', '_'}:
+      result.add(c)
+    else:
+      result.add('_')
+
 proc contextToTarGz*(
+    chalk:                  ChalkObj,
+    contextName:            string,
     contextPath:            string,
     additionalDockerignore: seq[string],
-    honorDockerignore:      bool  = false,
-    maxFileSize:            int64 = 0,
+    honorDockerignore:      bool   = false,
+    maxFileSize:            int64  = 0,
+    sizeThreshold:          int64  = 0,
+    dockerfilePath:         string = "",
 ): (string, seq[SkippedFile]) =
   ## Archive a context directory to a temp .tar.gz and return its path along
   ## with the list of files skipped due to maxFileSize.
+  ## Raises ContextTooLargeError immediately when the compressed output
+  ## exceeds sizeThreshold, cleaning up the partial file before raising.
   let
-    base    = lastPathPart(contextPath)
+    chalkId = unpack[string](chalk.lookupCollectedKey("CHALK_ID").get(pack("")))
+    slug    = contextNameSlug(contextName)
     dateDir = contextCacheDir() / now().utc.format(CONTEXT_CACHE_DIR_FMT)
   createDir(dateDir)
   var patterns: seq[string]
   if honorDockerignore:
-    patterns.add(readDockerignorePatterns(contextPath))
+    patterns.add(readDockerignorePatterns(contextPath, dockerfilePath))
   patterns.add(additionalDockerignore)
-  let
-    outPath      = dateDir / (base & "-" & $int(epochTime()) & ".tar.gz")
-    skippedFiles = writeTarGz(
-      outPath     = outPath,
-      contextPath = contextPath,
-      patterns    = patterns,
-      maxFileSize = maxFileSize,
+  let outPath = dateDir / (chalkId & "-" & slug & ".tar.gz")
+  try:
+    let skippedFiles = writeTarGz(
+      outPath       = outPath,
+      contextPath   = contextPath,
+      patterns      = patterns,
+      maxFileSize   = maxFileSize,
+      sizeThreshold = sizeThreshold,
     )
-  return (outPath, skippedFiles)
+    return (outPath, skippedFiles)
+  except TarSizeLimitError:
+    if fileExists(outPath):
+      removeFile(outPath)
+    raise newException(ContextTooLargeError, getCurrentExceptionMsg())
 
 proc newContextManifest(
     image:       DockerImage,
@@ -152,29 +202,8 @@ proc newContextManifest(
     layers: @[layer],
   )
 
-proc checkContextSize(
-    tarPath:       string,
-    contextName:   string,
-    contextPath:   string,
-    sizeThreshold: int,
-): string =
-  ## Returns "" if the tarball is within the allowed size.
-  ## Returns a human-readable error message if the size exceeds the threshold.
-  ## The caller is responsible for recording the failure in _OP_FAILED_KEYS.
-  if sizeThreshold == 0:
-    return ""
-  let size = getFileSize(tarPath)
-  if size > sizeThreshold:
-    let msg = (
-      "build context '" & contextName & "' (" & contextPath & ") tarball is " &
-      $size & " bytes which exceeds size_threshold of " &
-      $sizeThreshold & " bytes"
-    )
-    warn("docker: " & msg & "; skipping upload")
-    return msg
-  return ""
-
 proc uploadBuildContextsAtBuildTime*(
+    chalk:  ChalkObj,
     ctx:    DockerInvocation,
     config: DockerContextUploadConfig,
 ): ChalkDict =
@@ -205,21 +234,16 @@ proc uploadBuildContextsAtBuildTime*(
         trace("docker: uploading build context blob for '" & contextName &
               "' to " & $repoImage & " (registry strategy)")
         let (tarPath, skippedFiles) = contextToTarGz(
+          chalk                  = chalk,
+          contextName            = contextName,
           contextPath            = contextPath,
           additionalDockerignore = config.additionalDockerignore,
           honorDockerignore      = config.honorDockerignore,
           maxFileSize            = int64(config.maxFileSize),
+          sizeThreshold          = int64(config.sizeThreshold),
+          dockerfilePath         = ctx.dockerFileLoc,
         )
         try:
-          let sizeErr = checkContextSize(
-            tarPath       = tarPath,
-            contextName   = contextName,
-            contextPath   = contextPath,
-            sizeThreshold = config.sizeThreshold,
-          )
-          if sizeErr != "":
-            tooLargeContexts.add(contextName)
-            continue
           let layer = DockerManifest(
             kind:       DockerManifestType.layer,
             name:       repoImage,
@@ -239,26 +263,20 @@ proc uploadBuildContextsAtBuildTime*(
 
       of "local":
         # Save tarball for upload at push time.
-        let
-          (tarPath, skippedFiles) = contextToTarGz(
-            contextPath            = contextPath,
-            additionalDockerignore = config.additionalDockerignore,
-            honorDockerignore      = config.honorDockerignore,
-            maxFileSize            = int64(config.maxFileSize),
-          )
-          sizeErr = checkContextSize(
-            tarPath       = tarPath,
-            contextName   = contextName,
-            contextPath   = contextPath,
-            sizeThreshold = config.sizeThreshold,
-          )
-        if sizeErr != "":
-          removeFile(tarPath)
-          tooLargeContexts.add(contextName)
-          continue
+        let (tarPath, skippedFiles) = contextToTarGz(
+          chalk                  = chalk,
+          contextName            = contextName,
+          contextPath            = contextPath,
+          additionalDockerignore = config.additionalDockerignore,
+          honorDockerignore      = config.honorDockerignore,
+          maxFileSize            = int64(config.maxFileSize),
+          sizeThreshold          = int64(config.sizeThreshold),
+          dockerfilePath         = ctx.dockerFileLoc,
+        )
         entry = %*{
           "strategy":      "local",
           "tar_path":      tarPath,
+          "tar_hash":      newFileStringStream(tarPath).sha256Hex(),
           "skipped_files": skippedFilesToJson(skippedFiles),
         }
         trace("docker: build context tarball cached at: " & tarPath)
@@ -268,6 +286,7 @@ proc uploadBuildContextsAtBuildTime*(
         entry = %*{
           "strategy":                "disk",
           "context_path":            contextPath,
+          "dockerfile_path":         (if ctx.dockerFileLoc == stdinIndicator: "" else: ctx.dockerFileLoc),
           "size_threshold":          config.sizeThreshold,
           "additional_dockerignore": config.additionalDockerignore,
           "honor_dockerignore":      config.honorDockerignore,
@@ -276,8 +295,12 @@ proc uploadBuildContextsAtBuildTime*(
         trace("docker: build context disk strategy: path=" & contextPath)
 
       else:
-        warn("docker: unknown upload_context_strategy: " & config.strategy)
+        warn("docker: unknown docker_context_upload.strategy: " & config.strategy)
 
+    except ContextTooLargeError:
+      error("docker: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
+      tooLargeContexts.add(contextName)
     except:
       let errMsg = getCurrentExceptionMsg()
       error("docker: build context '" & contextName & "' upload failed: " & errMsg)
@@ -360,8 +383,22 @@ proc completeBuildContextUpload(
   of "local":
     let tarPath = snapshot{"tar_path"}.getStr("")
     if tarPath == "" or not fileExists(tarPath):
-      warn("docker: context tarball not found at push time: " & tarPath)
-      return ("", 0, @[])
+      raise newException(
+        ValueError,
+        "context tarball not found at push time: '" & tarPath & "'; " &
+        "it may have been removed by the build_context_cache_max_age TTL " &
+        "if too much time elapsed between build and push",
+      )
+    let
+      storedHash = snapshot{"tar_hash"}.getStr("")
+      actualHash = newFileStringStream(tarPath).sha256Hex()
+    if storedHash != "" and actualHash != storedHash:
+      raise newException(
+        ValueError,
+        "context tarball hash mismatch for '" & tarPath & "': " &
+        "expected " & storedHash & " got " & actualHash &
+        "; the tarball may have been tampered with or replaced",
+      )
     let
       tarSize = int(getFileSize(tarPath))
       layer   = DockerManifest(
@@ -383,8 +420,12 @@ proc completeBuildContextUpload(
   of "disk":
     let contextPath = snapshot{"context_path"}.getStr("")
     if contextPath == "" or not dirExists(contextPath):
-      warn("docker: disk strategy: context dir not found at push time: " & contextPath)
-      return ("", 0, @[])
+      raise newException(
+        ValueError,
+        "context directory not found at push time: '" & contextPath & "'; " &
+        "the build context directory must still exist and be accessible " &
+        "when using the disk strategy",
+      )
     warn("docker: disk strategy: context dir may have changed since build: " &
          contextPath)
     let
@@ -392,21 +433,18 @@ proc completeBuildContextUpload(
       additionalDockerignore = snapshot{"additional_dockerignore"}.getStrElems()
       honorDockerignore      = snapshot{"honor_dockerignore"}.getBool(false)
       maxFileSize            = int64(snapshot{"max_file_size"}.getInt(0))
+      dockerfilePath         = snapshot{"dockerfile_path"}.getStr("")
       (tarPath, skippedFiles) = contextToTarGz(
+        chalk                  = chalk,
+        contextName            = contextName,
         contextPath            = contextPath,
         additionalDockerignore = additionalDockerignore,
         honorDockerignore      = honorDockerignore,
         maxFileSize            = maxFileSize,
+        sizeThreshold          = int64(sizeThreshold),
+        dockerfilePath         = dockerfilePath,
       )
     try:
-      let sizeErr = checkContextSize(
-        tarPath       = tarPath,
-        contextName   = contextName,
-        contextPath   = contextPath,
-        sizeThreshold = sizeThreshold,
-      )
-      if sizeErr != "":
-        raise newException(ContextTooLargeError, sizeErr)
       let
         tarSize = int(getFileSize(tarPath))
         layer   = DockerManifest(
