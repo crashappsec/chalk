@@ -161,6 +161,10 @@ func get_semgrep_args(path) {
 func load_semgrep_results(out: string, code) {
   result := {}
 
+  if code == 124 {
+    error("semgrep timed out after " + tool.semgrep.semgrep_timeout + "s; results will be empty. Consider increasing semgrep_timeout.")
+    return {}
+  }
   if code != 0 {
     error("semgrep failed to run properly; ignoring")
     echo(out)

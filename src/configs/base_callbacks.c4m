@@ -7,8 +7,10 @@
 
 # base non-builtin callbacks to get used in keyspecs
 
-# Wrap a command with `timeout <secs>` if the `timeout` executable is available
-# and timeout_secs is non-empty. Returns cmd unchanged otherwise.
+# Wrap a command with `timeout -s KILL <secs>` if the `timeout` executable is
+# available and timeout_secs is non-empty. Returns cmd unchanged otherwise.
+# Uses SIGKILL so the process cannot catch or ignore the signal.
+# Exit code 124 is returned by timeout when the limit is exceeded.
 func with_timeout(cmd, timeout_secs) {
   if cmd == "" or timeout_secs == "" {
     return cmd
@@ -18,7 +20,7 @@ func with_timeout(cmd, timeout_secs) {
     trace("with_timeout: timeout command not found; running without timeout")
     return cmd
   }
-  return timeout_exe + " " + timeout_secs + " " + cmd
+  return timeout_exe + " -s KILL " + timeout_secs + " " + cmd
 }
 
 func canonicalize_tools(data: dict[string, `x]) {
