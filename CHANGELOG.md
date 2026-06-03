@@ -127,8 +127,10 @@
 
 - External tools (syft, semgrep, trufflehog) now support a configurable
   execution timeout. When the system `timeout` command is present, the tool
-  invocation is automatically wrapped with `timeout -s KILL <value>`. The
-  timeout is configured via `tool.<name>.<name>_timeout` (e.g.
+  invocation is automatically wrapped with `timeout -s KILL <value>` for
+  system-installed binaries, or `timeout -s TERM <value>` when running via
+  Docker (so the daemon can stop the container cleanly). The timeout is
+  configured via `tool.<name>.<name>_timeout` (e.g.
   `tool.semgrep.semgrep_timeout`) and defaults to `"300"` (5 minutes). Set
   to `""` to disable. This guard primarily targets Linux CI environments
   (where the `timeout` command from GNU coreutils is typically available)
