@@ -13,9 +13,21 @@ func build_observables(contexts) {
   if run_id == "" or attempt == "" {
     return ""
   }
-  path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.br"
-  if not is_file(path) {
+
+  # Old format: observables/ subdir, no job
+  old_path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.br"
+  if is_file(old_path) {
+    return base64(read_file(old_path))
+  }
+
+  # New format: root, per-job
+  job := env("GITHUB_JOB")
+  if job == "" {
     return ""
   }
-  return base64(read_file(path))
+  new_path := "/mnt/curiosity/" + run_id + "-" + job + "-" + attempt + "-observables.br"
+  if is_file(new_path) {
+    return base64(read_file(new_path))
+  }
+  return ""
 }
