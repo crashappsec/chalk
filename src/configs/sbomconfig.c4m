@@ -136,7 +136,7 @@ func get_syft_args(path) {
 func extract_syft_sbom(out: string, code) {
   result := {}
 
-  if code == 124 {
+  if code == 124 or code == 137 {
     error("syft timed out after " + tool.syft.syft_timeout + "s; results will be empty. Consider increasing syft_timeout.")
     return {}
   }
