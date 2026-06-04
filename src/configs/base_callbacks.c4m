@@ -9,7 +9,9 @@
 
 # Wrap a command with `timeout -s <signal> <secs>` if the `timeout` executable
 # is available and timeout_secs is non-empty. Returns cmd unchanged otherwise.
-# Exit code 124 is returned by timeout when the limit is exceeded.
+# Exit codes when the limit is exceeded:
+#   124 - SIGTERM (default): timeout sends TERM and exits 124.
+#   137 - SIGKILL: the killed process exits 128+9; callers must handle both.
 #
 # signal: "KILL" for system binaries (cannot be caught or ignored).
 #         "TERM" for docker commands: SIGKILL would kill only the docker CLI
@@ -21,7 +23,7 @@ func with_timeout(cmd, timeout_secs, signal) {
   }
   timeout_exe := find_exe("timeout", [])
   if timeout_exe == "" {
-    trace("with_timeout: timeout command not found; running without timeout")
+    warn("with_timeout: timeout command not found; " + cmd + " will run without a timeout")
     return cmd
   }
   return timeout_exe + " -s " + signal + " " + timeout_secs + " " + cmd
