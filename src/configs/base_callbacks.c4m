@@ -7,6 +7,28 @@
 
 # base non-builtin callbacks to get used in keyspecs
 
+# Wrap a command with `timeout -s <signal> <secs>` if the `timeout` executable
+# is available and timeout_secs is non-empty. Returns cmd unchanged otherwise.
+# Exit codes when the limit is exceeded:
+#   124 - SIGTERM (default): timeout sends TERM and exits 124.
+#   137 - SIGKILL: the killed process exits 128+9; callers must handle both.
+#
+# signal: "KILL" for system binaries (cannot be caught or ignored).
+#         "TERM" for docker commands: SIGKILL would kill only the docker CLI
+#         and orphan the running container; SIGTERM lets the daemon stop the
+#         container cleanly before the CLI exits.
+func with_timeout(cmd, timeout_secs, signal) {
+  if cmd == "" or timeout_secs == "" {
+    return cmd
+  }
+  timeout_exe := find_exe("timeout", [])
+  if timeout_exe == "" {
+    warn("with_timeout: timeout command not found; " + cmd + " will run without a timeout")
+    return cmd
+  }
+  return timeout_exe + " -s " + signal + " " + timeout_secs + " " + cmd
+}
+
 func canonicalize_tools(data: dict[string, `x]) {
   t := typeof(data)
   if not typecmp(t, dict[string, `x]) {

@@ -1323,6 +1323,50 @@ export AWS_SESSION_TOKEN={AWS_SESSION_TOKEN}
     )
 
 
+@pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
+def test_trufflehog_large_git_fallback(chalk: Chalk, tmp_data_dir: Path):
+    """
+    When .git exceeds trufflehog_git_size_limit, trufflehog falls back to
+    filesystem mode and should not report secrets that exist only in git history.
+    """
+    repo_dir = tmp_data_dir / "repo"
+    repo_dir.mkdir()
+    git = Git(repo_dir).init()
+
+    # Commit real AWS credentials into history, then remove them from the
+    # working tree. They should be invisible to a filesystem-mode scan.
+    secret_file = repo_dir / "aws.sh"
+    secret_file.write_text(
+        f"""#!/bin/sh
+export AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID}
+export AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY}
+export AWS_SESSION_TOKEN={AWS_SESSION_TOKEN}
+""".strip()
+    )
+    git.add().commit("add secrets")
+    secret_file.write_text("#!/bin/sh\n")
+    git.add().commit("remove secrets")
+
+    target = repo_dir / "hello.sh"
+    target.write_text("#!/bin/sh\necho hello\n")
+
+    insert = chalk.insert(
+        artifact=target,
+        config=(
+            CONFIGS
+            / "composable"
+            / "valid"
+            / "secret_scanner"
+            / "tiny_git_size_limit.c4m"
+        ),
+    )
+    # Confirm the size limit was actually triggered (not just no secrets found
+    # by coincidence).
+    assert "falling back to filesystem mode" in insert.logs
+    # Filesystem mode skips git history so no secrets should be reported.
+    assert insert.mark.has(SECRET_SCANNER=MISSING)
+
+
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_jenkins(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]

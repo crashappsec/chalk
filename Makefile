@@ -50,10 +50,13 @@ endif
 # to get back to original compiled binary
 $(BINARY).bck: $(SOURCES)
 ifneq "$(TMUX)" ""
-	reset
-	tmux clear-history
+	@test -t 0 && reset || true
+	@test -t 0 && tmux clear-history || true
 endif
-	$(DOCKER) nimble -y $(CHALK_BUILD)
+	$(DOCKER) nimble -y $(CHALK_BUILD); \
+		_rc=$$?; \
+		touch $(WATCH_DONE); \
+		exit $$_rc
 	mv $(BINARY) $@
 	cp $@ $(BINARY)
 	ls -la $(BINARY) $@
@@ -76,8 +79,23 @@ version:
 clean:
 	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop nimble.paths
 
+# WATCH_LOG  - build output is tee'd here on every rebuild cycle.
+#              Truncated once when "make watch" starts (tee opens for write);
+#              subsequent rebuilds append to the same file until watch restarts.
+#              A successful build ends with the "mv chalk chalk.bck" line.
+#              Any compile error appears before that line.
+#
+# WATCH_DONE - touched after every nimble invocation (success or failure) so
+#              that watch automation can wait on a single file event rather than
+#              polling. Use "echo $(WATCH_DONE) | entr -npz tail -5 $(WATCH_LOG)"
+#              to block until a cycle completes, then inspect the log.
+#              NOTE: the touch runs unconditionally (exit code saved and
+#              restored) so Make correctly fails the target on build errors.
+WATCH_LOG  ?= /tmp/chalk-watch.log
+WATCH_DONE ?= /tmp/chalk-watch-done
+
 watch: $(SOURCES)
-	echo $^ | tr ' ' '\n' | entr $(MAKE)
+	echo $^ | tr ' ' '\n' | entr $(MAKE) 2>&1 | tee $(WATCH_LOG)
 
 # devmode for local deps
 # this allows to dev againt local versions of nimutils/con4m

@@ -125,6 +125,28 @@
 
   ([#665](https://github.com/crashappsec/chalk/pull/665))
 
+- External tools (syft, semgrep, trufflehog) now support a configurable
+  execution timeout. When the system `timeout` command is present, the tool
+  invocation is automatically wrapped with `timeout -s KILL <value>` for
+  system-installed binaries, or `timeout -s TERM <value>` when running via
+  Docker (so the daemon can stop the container cleanly). The timeout is
+  configured via `tool.<name>.<name>_timeout` (e.g.
+  `tool.semgrep.semgrep_timeout`) and defaults to `"300"` (5 minutes). Set
+  to `""` to disable. This guard primarily targets Linux CI environments
+  (where the `timeout` command from GNU coreutils is typically available)
+  and is intended to prevent runaway scans from inflating CI build times.
+  On macOS the `timeout` command is not available by default, so the guard
+  is silently skipped.
+  ([#670](https://github.com/crashappsec/chalk/pull/670))
+
+- Trufflehog now checks the size of the `.git` directory before running in
+  git mode. If the directory exceeds the threshold (default `<<250mb>>`),
+  trufflehog falls back to filesystem mode to avoid excessively long scan
+  times on large repositories. Controlled via
+  `tool.trufflehog.trufflehog_git_size_check` (bool, default `true`) and
+  `tool.trufflehog.trufflehog_git_size_limit` (size, default `<<250mb>>`).
+  ([#670](https://github.com/crashappsec/chalk/pull/670))
+
 ### Fixes
 
 - Docker probe always failed due to a typo introduced in chalk `1.0.0`
