@@ -147,7 +147,7 @@ proc contextNameHash(name: string): string =
   ## Return the first 8 hex characters of the SHA-256 of `name`.
   ## Used as a suffix to disambiguate slugs that collide after sanitisation
   ## (e.g. "." and "main" both slug to "main").
-  sha256(name)[0 ..< 8]
+  name.sha256Hex()[0 ..< 8]
 
 proc contextToTarGz*(
     chalk:                  ChalkObj,
