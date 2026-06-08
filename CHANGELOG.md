@@ -1,5 +1,77 @@
 # Chalk Release Notes
 
+## 1.1.1
+
+### New Features
+
+- Build context upload as OCI attestation. When `docker_context_upload` is
+  configured inside a `docker_push` section, Chalk uploads the build context
+  as a `.tar.gz` layer attached to an OCI attestation manifest, enabling
+  downstream tools such as Ocular to inspect the exact sources used to produce
+  an image.
+
+  New configuration section nested under `docker_push`:
+  - `docker.docker_registry.<name>.docker_push.<name>.docker_context_upload`
+    - `enabled` - set to `true` to activate (default: `false`)
+    - `strategy` - `registry`, `local`, `disk`, or `auto`
+    - `size_threshold` - skip upload when tarball exceeds this size
+      (default: `100mb`); failure reported in `_OP_FAILED_KEYS` with code
+      `CONTEXT_TOO_LARGE`; set to `0` to disable
+    - `max_file_size` - skip individual files that exceed this size
+      (default: `0` = no limit); skipped files are recorded in
+      `_REPO_BUILD_CONTEXT_SKIPPED_FILES` with their path, size, and SHA-256
+      digest for audit purposes
+    - `additional_dockerignore` - extra glob patterns appended after
+      `.dockerignore` (last-match-wins; default: `[".git"]`)
+    - `honor_dockerignore` - apply `.dockerignore` patterns (default: `true`)
+
+  ```
+  docker_context_upload {
+    enabled:  true
+    strategy: "auto"
+  }
+  ```
+
+  Upload strategies:
+  - `registry` - uploads the blob at build time; only the manifest is
+    created at push time (recommended for CI)
+  - `local` - saves the tarball at build time and uploads at push time;
+    tarball is retained for multi-registry pushes and cleaned up by TTL
+    (default for non-CI environments)
+  - `disk` - records the context path at build time and reads from disk
+    at push time (single-machine workflows only)
+  - `auto` - selects `registry` when a CI environment is detected,
+    otherwise `local`
+
+  Git URL contexts are intentionally skipped - their content is already
+  captured in git state. Both the main context and any extra contexts
+  added via `--build-context name=path` are supported for local
+  directory contexts.
+
+  New chalk keys:
+  - `DOCKER_BUILD_CONTEXT_SNAPSHOTS` (chalk-time) - intermediate upload
+    state embedded in the chalk mark, consumed at push time
+  - `_REPO_BUILD_CONTEXTS` (runtime) - map of context manifest digests
+    keyed by registry -> repo -> context name
+  - `_REPO_BUILD_CONTEXT_TAR_SIZES` (runtime) - tarball sizes in bytes
+    keyed by registry -> repo -> context name
+  - `_REPO_BUILD_CONTEXT_SKIPPED_FILES` (runtime) - files skipped due
+    to `max_file_size`, keyed by registry -> repo -> context name ->
+    file path -> `{hash, size}`
+
+  New configuration fields on `docker`:
+  - `build_context_cache_max_age` - maximum age of cached tarballs
+    under `/tmp/chalk-build-contexts/` (default: 1 hour); cleanup runs
+    at both `chalk docker build` and `chalk docker push`
+  - `registry_layer_chunk_size` - chunk size for registry layer uploads
+    (default: `5mb`)
+  - `registry_layer_upload_timeout` - timeout for a single chunk upload
+    (default: `30 sec`)
+
+  See `docs/design-docker-registry.md` for full details.
+
+  ([#669](https://github.com/crashappsec/chalk/pull/669))
+
 ## 1.1.0
 
 **June 8, 2026**
@@ -67,42 +139,19 @@
   when entrypoint wrapping is enabled.
   ([#656](https://github.com/crashappsec/chalk/pull/656))
 
-- Docker registry push and build context upload support. Chalk can now
-  be configured to automatically log in to and push images to additional
-  registries during `chalk docker build` and `chalk docker push`.
-  Additionally, the build context can be uploaded as an OCI attestation
-  attached to the image, enabling downstream tools such as Ocular to
-  inspect the exact sources used to produce it.
+- Docker registry push support. Chalk can now be configured to automatically
+  log in to and push images to additional registries during
+  `chalk docker build` and `chalk docker push`.
 
   New configuration sections:
-  - `docker.docker_registry` - declares a registry with its URI and login method
-    - `enabled` - enable or disable this registry (default: `true`)
-    - `uri` - registry hostname (and port if non-standard)
-    - `login_method` - credentials strategy; `""` for none, `"get"` for HTTP GET
-  - `docker.docker_registry.<name>.docker_login_get` - fetches credentials via
-    HTTP GET and runs `docker login` before any build or push
-    - `enabled` - disable login without removing the configuration (default: `true`)
-    - `uri` - endpoint to call; the registry URI is appended as a query parameter
-    - `auth` - named auth config to use for the HTTP request
-  - `docker.docker_registry.<name>.docker_push` - declares a repository and
-    tag set to push the built image to
-    - `enabled` - disable this push target without removing it (default: `true`)
-    - `repository` - repository path within the registry (required)
-    - `tags` - list of tags to push; supports `{KEY}` substitution (required)
-  - `docker.docker_registry.<name>.docker_push.<name>.docker_context_upload` -
-    nested configuration that uploads the build context as a `.tar.gz` OCI
-    attestation
-    - `enabled` - set to `true` to activate (default: `false`)
-    - `strategy` - `registry`, `local`, `disk`, or `auto`
-    - `size_threshold` - skip upload when tarball exceeds this size
-      (default: `100mb`); failure reported in `_OP_FAILED_KEYS` with code
-      `CONTEXT_TOO_LARGE`; set to `0` to disable
-    - `max_file_size` - skip individual files that exceed this size
-      (default: `0` = no limit); useful for omitting large binaries or
-      data files without explicit `additional_dockerignore` patterns
-    - `additional_dockerignore` - extra glob patterns appended after
-      `.dockerignore` (last-match-wins; default: `[".git"]`)
-    - `honor_dockerignore` - apply `.dockerignore` patterns (default: `true`)
+  - `docker.docker_registry` — declares a registry with its URI and login method
+  - `docker.docker_registry.<name>.docker_login_get` — fetches credentials via
+    HTTP GET and runs `docker login` before any build or push; supports an
+    `enabled` field (default `true`) to disable login without removing the
+    configuration
+  - `docker.docker_registry.<name>.docker_push` — declares repositories and
+    tags to push the built or pushed image to, with tag values supporting
+    `{CHALK_KEY}` substitution
 
   ```
   docker {
@@ -116,55 +165,13 @@
       docker_push my_app {
         repository: "my-org/my-app"
         tags: ["latest", "{BRANCH}", "{TAG}"]
-        docker_context_upload {
-          enabled:  true
-          strategy: "auto"
-        }
       }
     }
   }
   ```
 
-  Upload strategies for `strategy`:
-  - `registry` - uploads the blob at build time; only the manifest is
-    created at push time (recommended for CI)
-  - `local` - saves the tarball to `/tmp` at build time and uploads at
-    push time (default for non-CI environments)
-  - `disk` - records the context path at build time and reads from disk
-    at push time (single-machine workflows only)
-  - `auto` - selects `registry` when a CI environment is detected,
-    otherwise `local`
-
-  Git URL contexts are intentionally skipped - their content is already
-  captured in git state. Both the main context and any extra contexts
-  added via `--build-context name=path` are supported for local
-  directory contexts.
-
-  New chalk keys:
-  - `DOCKER_BUILD_CONTEXT_SNAPSHOTS` (chalk-time) - intermediate upload
-    state embedded in the chalk mark, consumed at push time
-  - `_REPO_BUILD_CONTEXTS` (runtime) - map of context manifest digests
-    keyed by registry -> repo -> context name
-  - `_REPO_BUILD_CONTEXT_TAR_SIZES` (runtime) - tarball sizes in bytes
-    keyed by registry -> repo -> context name
-  - `_REPO_BUILD_CONTEXT_SKIPPED_FILES` (runtime) - files skipped due
-    to `max_file_size`, keyed by registry -> repo -> context name ->
-    file path -> `{hash, size}`; allows consumers to detect that the
-    uploaded archive is intentionally partial
-
-  New configuration fields on `docker`:
-  - `build_context_cache_max_age` - maximum age of cached tarballs
-    under `/tmp/chalk-build-contexts/` (default: 1 hour)
-  - `registry_layer_chunk_size` - chunk size for registry layer uploads
-    (default: `5mb`)
-  - `registry_layer_upload_timeout` - timeout for a single chunk upload
-    (default: `30 sec`)
-
-  See `docs/design-docker-registry.md` for full details.
-
   ([#664](https://github.com/crashappsec/chalk/pull/664),
-  [#665](https://github.com/crashappsec/chalk/pull/665),
-  [#669](https://github.com/crashappsec/chalk/pull/669))
+  [#665](https://github.com/crashappsec/chalk/pull/665))
 
 - Chalk operator integration for richer Kubernetes metadata during `chalk exec`.
   When the chalk operator injects the required environment variables, chalk can

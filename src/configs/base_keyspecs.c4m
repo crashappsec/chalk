@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "1.1.0"
+chalk_version :=   "1.1.1"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -4860,10 +4860,11 @@ For example:
 }
 
 keyspec _REPO_BUILD_CONTEXTS {
-    kind:             RunTimeArtifact
-    type:             dict[string, dict[string, dict[string, string]]]
-    standard:         true
-    doc: """
+    kind:     RunTimeArtifact
+    type:     dict[string, dict[string, dict[string, string]]]
+    standard: true
+    since:    "1.1.1"
+    doc:      """
 When chalk uploads Docker build contexts as OCI attestations, records the
 digest of each uploaded context manifest. The structure is as follows:
 
@@ -4898,10 +4899,11 @@ For example:
 }
 
 keyspec _REPO_BUILD_CONTEXT_TAR_SIZES {
-    kind:             RunTimeArtifact
-    type:             dict[string, dict[string, dict[string, int]]]
-    standard:         true
-    doc: """
+    kind:     RunTimeArtifact
+    type:     dict[string, dict[string, dict[string, int]]]
+    standard: true
+    since:    "1.1.1"
+    doc:      """
 Size in bytes of each uploaded build context tarball. The structure mirrors
 `_REPO_BUILD_CONTEXTS`:
 
@@ -4928,10 +4930,11 @@ For example:
 }
 
 keyspec _REPO_BUILD_CONTEXT_SKIPPED_FILES {
-    kind:             RunTimeArtifact
-    type:             dict[string, dict[string, dict[string, dict[string, dict[string, `x]]]]]
-    standard:         true
-    doc: """
+    kind:     RunTimeArtifact
+    type:     dict[string, dict[string, dict[string, dict[string, dict[string, `x]]]]]
+    standard: true
+    since:    "1.1.1"
+    doc:      """
 Files skipped during build context upload because they exceeded the
 `max_file_size` limit. The structure mirrors `_REPO_BUILD_CONTEXTS`:
 
@@ -4970,10 +4973,11 @@ For example:
 }
 
 keyspec DOCKER_BUILD_CONTEXT_SNAPSHOTS {
-    kind:             ChalkTimeArtifact
-    type:             dict[string, dict[string, dict[string, dict[string, `x]]]]
-    standard:         true
-    doc: """
+    kind:     ChalkTimeArtifact
+    type:     dict[string, dict[string, dict[string, dict[string, `x]]]]
+    standard: true
+    since:    "1.1.1"
+    doc:      """
 Intermediate state used when `chalk docker build` and `chalk docker push` are
 invoked as separate commands with `docker_context_upload.enabled: true` configured.
 
