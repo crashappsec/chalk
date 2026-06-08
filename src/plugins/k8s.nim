@@ -321,7 +321,7 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
     return
 
   try:
-    result.update(getContainerInfo(
+    discard result.update(getContainerInfo(
       podManifest   = podManifest,
       clusterId     = clusterId,
       namespace     = namespace,

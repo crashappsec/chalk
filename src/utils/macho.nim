@@ -37,12 +37,15 @@ import pkg/[
 const
   machoIncDir = currentSourcePath.parentDir.parentDir &
                 "/codecs/macho/include"
-  machoCFlags = "-std=c23 -I" & machoIncDir
+  # c23 is the ratified name; c2x is the pre-ratification alias accepted
+  # by older clang (< 18, e.g. Apple clang on macOS 13 runners).
+  cStd       = when defined(macosx): "-std=c2x" else: "-std=c23"
+  machoCFlags = cStd & " -I" & machoIncDir
 
 # nim-generated C for this module also #includes our headers (via
 # the {.header.} pragmas on imported types), so put the include path
-# in the module-level passc too.  -std=c23 doesn't go in passc — the
-# nim-emitted glue is C99 and would not survive C23's stricter rules.
+# in the module-level passc too.  The C std flag doesn't go in passc —
+# the nim-emitted glue is C99 and would not survive C23's stricter rules.
 {.passc: "-I" & machoIncDir.}
 
 {.compile("../codecs/macho/src/n00b_shim.c",   machoCFlags).}
