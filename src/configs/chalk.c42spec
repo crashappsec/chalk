@@ -2040,7 +2040,7 @@ CI), Chalk saves the build context as a `.tar.gz` under
 `<tmpdir>/chalk-build-contexts/`. This setting controls how long those cached
 tarballs are kept before being deleted.
 
-The cleanup runs at `chalk docker build` time, before new tarballs are created.
+The cleanup runs at the start of each `chalk docker build` and `chalk docker push`.
 """
   }
 
@@ -2300,7 +2300,9 @@ Controls when the build context tarball is created and uploaded relative to
   already-uploaded blob.
 * `local` — at build time, save the context as a `.tar.gz` under
   `<tmpdir>/chalk-build-contexts/`; at push time, upload the blob and create
-  the attestation manifest.
+  the attestation manifest.  The tarball is kept after push so the same
+  image can be pushed to multiple registries without re-archiving.  Cleanup
+  is governed by `docker.build_context_cache_max_age`.
 * `disk` — at push time, read the context directory from disk (using the path
   recorded at build time), create a tarball, upload, and push the manifest.
   Users who choose this strategy accept the risk that the context directory
@@ -2334,6 +2336,12 @@ This is useful for skipping unexpectedly large files (compiled binaries,
 model weights, data dumps) that would otherwise push the total archive
 over `size_threshold` without requiring explicit exclude patterns for
 every such file.
+
+Skipped files are not silently dropped: their path, byte size, and
+SHA-256 digest are recorded in `_REPO_BUILD_CONTEXT_SKIPPED_FILES`.
+The digest serves two purposes: it identifies the exact file version
+that was omitted, and it allows the skipped file to be matched against
+files in the source repository or artifact store in the future.
 """
   }
 
@@ -2374,10 +2382,12 @@ When `true`, Chalk reads the context-root ignore file and applies its patterns
 before the `additional_dockerignore` patterns.  This ensures the uploaded
 context matches what Docker itself would have used for the build.
 
-Ignore-file selection (BuildKit priority):
+Ignore-file selection (Docker priority):
 
-1. `<Dockerfile-basename>.dockerignore` in the context root, if it exists
-   (only when a named `-f` flag was given and the Dockerfile is not stdin).
+1. `<dockerfileDir>/<basename(dockerfile)>.dockerignore` next to the
+   Dockerfile, if it exists (only when a named `-f` flag was given and the
+   Dockerfile is not stdin).  For example, `-f docker/prod.Dockerfile`
+   checks for `docker/prod.Dockerfile.dockerignore`.
 2. `.dockerignore` in the context root, if it exists.
 3. No ignore file -- nothing is excluded by this step.
 
@@ -2405,8 +2415,10 @@ Go `filepath.Match` extended with `**`):
 - Patterns beginning with `!` re-include previously excluded paths.
 - Evaluation is ordered; the **last matching pattern wins**.
 - When a directory is excluded, Chalk skips recursing into it unless a
-  negation pattern could re-include entries inside (no-slash negation,
-  negation starting with `<dir>/`, or negation containing `**`).
+  negation pattern could re-include entries inside: no-slash negation
+  (basename match at any depth), negation containing `**`, or a slash
+  negation whose directory prefix at the same depth glob-matches the
+  excluded directory (e.g. `!logs_*/f` recurses into `logs_app/`).
 """
   }
 }

@@ -53,8 +53,9 @@ defines a repository and tag set to mirror the built image to.
 | `tags`       | `list[string]` | (required) | Tags to push; supports `{KEY}` substitution |
 
 Build context upload is configured in a nested `docker_context_upload`
-singleton. Its presence enables upload; omitting it disables upload for
-that push target.
+singleton. The section must be present **and** `enabled` must be set to
+`true`; omitting the section or leaving `enabled` at its default of
+`false` disables upload for that push target.
 
 **`docker_context_upload` fields:**
 
@@ -151,12 +152,12 @@ Because `chalk docker build` and `chalk docker push` can run as
 separate commands, the timing of the context upload is configurable
 via `docker_context_upload.strategy`:
 
-| Strategy   | Build time                                 | Push time                                          |
-| ---------- | ------------------------------------------ | -------------------------------------------------- |
-| `registry` | Upload blob to target registry             | Create and push attestation manifest               |
-| `local`    | Save `.tar.gz` to `/tmp`                   | Upload blob + push attestation manifest            |
-| `disk`     | Record context path in chalk mark          | Read path, create `.tar.gz`, upload, push manifest |
-| `auto`     | CI detected -> `registry`; else -> `local` | (see above)                                        |
+| Strategy   | Build time                                  | Push time                                             | Tarball lifetime                    |
+| ---------- | ------------------------------------------- | ----------------------------------------------------- | ----------------------------------- |
+| `registry` | Create tarball, upload blob, delete tarball | Create and push attestation manifest                  | Deleted after blob upload           |
+| `local`    | Create tarball, save to cache dir           | Upload blob + push attestation manifest; tarball kept | TTL (`build_context_cache_max_age`) |
+| `disk`     | Record context path in chalk mark           | Create tarball, upload, push manifest, delete tarball | Deleted after blob upload           |
+| `auto`     | CI detected -> `registry`; else -> `local`  | (see above)                                           | (see above)                         |
 
 **`registry` strategy** is best for CI environments where the build
 host has network access to the target registry. The tarball is created
@@ -171,7 +172,10 @@ by the presence of any of the following environment variables: `CI`,
 `BITBUCKET_BUILD_NUMBER`, `CODEBUILD_BUILD_ID`. The
 tarball is written to a date-stamped subdirectory under
 `<tmpdir>/chalk-build-contexts/` and uploaded at push time. This
-avoids requiring registry credentials at build time.
+avoids requiring registry credentials at build time. The tarball is
+**not** deleted after push — it is reused when the same image is pushed
+to multiple registries, and cleaned up by the TTL-based cache cleanup
+(`docker.build_context_cache_max_age`).
 
 **`disk` strategy** reads the context directory from disk at push
 time. This is suitable for single-machine workflows where the context
@@ -185,11 +189,11 @@ When creating the `.tar.gz` archive, Chalk applies an ordered list of glob
 patterns to decide which files and directories to include. Two sources of
 patterns are combined:
 
-1. **`.dockerignore`** - read from the root of the build context when
-   `honor_dockerignore` is `true` (the default). When a Dockerfile name is
-   known (i.e. `-f` was passed and was not stdin), Chalk first checks for
-   `<dockerfile-basename>.dockerignore` in the context root (BuildKit
-   priority); if that file does not exist it falls back to `.dockerignore`.
+1. **`.dockerignore`** - read when `honor_dockerignore` is `true` (the
+   default). When a Dockerfile path is known (i.e. `-f` was passed and was
+   not stdin), Chalk first checks for `<dockerfileDir>/<basename(dockerfile)>.dockerignore`
+   next to the Dockerfile (Docker priority); if that file does not exist it
+   falls back to `.dockerignore` in the context root.
 2. **`additional_dockerignore`** - explicitly configured patterns appended
    after `.dockerignore` so they take final precedence (default `[".git"]`).
 
@@ -199,17 +203,19 @@ chalk configuration always has the final say over what is included or excluded.
 Chalk prunes recursion into an excluded directory unless a negation pattern
 could re-include files inside it. A negation pattern can reach inside an
 excluded directory when it has no `/` (basename patterns match at any depth),
-starts with `<dir>/`, or contains `**`. This matches Docker's own pruning
-behaviour.
+contains `**`, or is a slash pattern whose directory prefix at the same depth
+as the excluded directory glob-matches the directory name (e.g.
+`!logs_*/important.log` reaches inside `logs_app/`). This matches Docker's
+own pruning behaviour.
 
 #### Ignore-file selection
 
-This behavior matches BuildKit's documented priority
-([reference](https://docs.docker.com/reference/dockerfile/#dockerignore-file)):
+This behavior matches Docker's documented priority
+([reference](https://docs.docker.com/build/concepts/context/#dockerignore-files)):
 
 | Condition                                                                      | File used                               |
 | ------------------------------------------------------------------------------ | --------------------------------------- |
-| `-f Dockerfile.prod` and `Dockerfile.prod.dockerignore` exists in context root | `Dockerfile.prod.dockerignore`          |
+| `-f path/to/Dockerfile.prod` and `path/to/Dockerfile.prod.dockerignore` exists | `path/to/Dockerfile.prod.dockerignore`  |
 | Otherwise, `.dockerignore` exists in context root                              | `.dockerignore`                         |
 | Neither file exists                                                            | No patterns (nothing excluded)          |
 | `-f -` (Dockerfile from stdin)                                                 | `.dockerignore` only (no named variant) |
@@ -278,10 +284,11 @@ it entirely unless any negation pattern could re-include files inside:
 
 - A negation pattern **without** `/` can match files inside any directory (via
   basename rule), so recursion is always kept when such a pattern exists.
-- A negation pattern **with** `/` that starts with `<dir>/` targets files
-  inside that specific directory, so recursion is kept for that directory.
 - A negation pattern containing `**` can cross directory boundaries, so
   recursion is always kept when such a pattern exists.
+- A negation pattern **with** `/` whose directory prefix at the same depth as
+  the excluded directory glob-matches the directory name causes recursion into
+  that directory (e.g. `!logs_*/important.log` recurses into `logs_app/`).
 
 #### Precedence example
 
@@ -306,6 +313,16 @@ Because chalk config patterns come last, `!keep.tmp` overrides any earlier
 exclusion of `keep.tmp`, and `*.tmp` overrides `.dockerignore` rules for
 `.tmp` files at any depth.
 
+### Per-file Size Limit
+
+When `docker_context_upload.max_file_size` is set (default `0`, disabled),
+any individual file whose size exceeds the limit is omitted from the tarball.
+Skipped files are not silently dropped: their path, byte size, and SHA-256
+digest are recorded in `_REPO_BUILD_CONTEXT_SKIPPED_FILES`. The digest serves
+two purposes — it identifies the exact version of each omitted file, and it
+allows the file to be matched against entries in the source repository or
+artifact store in the future.
+
 ### Size Threshold
 
 When `docker_context_upload.size_threshold` is set (default `100mb`), Chalk measures
@@ -319,6 +336,14 @@ immediately after the tarball is created. For the `disk` strategy the threshold
 is stored in the chalk mark snapshot and checked at push time when the tarball
 is created. Setting the threshold to `0` disables the check entirely.
 
+The threshold is checked after each complete file entry (header + data +
+padding) is written rather than after every compressed chunk. Checking
+mid-file would require flushing zlib's internal buffers on every chunk,
+which prevents the compressor from accumulating enough data for efficient
+compression. The per-file check granularity is a deliberate trade-off:
+use `max_file_size` to guard against individual oversized files when
+tighter control is needed.
+
 ### Context Cache and Cleanup
 
 For the `local` strategy, Chalk stores tarballs in a datetime-stamped
@@ -327,16 +352,26 @@ directory structure:
 ```
 /tmp/chalk-build-contexts/
   2025-01-15T14-32-07/
-    <chalk-id>-main.tar.gz
-    <chalk-id>-libs.tar.gz
+    <chalk-id>-<registry>-<push>-main-<8hexchars>.tar.gz
+    <chalk-id>-<registry>-<push>-libs-<8hexchars>.tar.gz
   2025-01-15T09-10-45/
     ...
 ```
 
-Old entries are removed when the age exceeds
-`docker.build_context_cache_max_age` (a `Duration` value, default 1
-hour). Cleanup runs automatically at build time before creating new
-tarballs.
+The filename embeds a human-readable slug of the context name followed by
+the first 8 hex characters of its SHA-1, ensuring uniqueness even when two
+context names produce the same slug after sanitisation (e.g. `"."` and a
+context named `"main"` both slug to `"main"` but have different hashes).
+
+Tarballs are kept after each `chalk docker push` so the same cached
+archive can be reused when pushing the image to additional registries.
+Old entries are removed when the age of the date-stamped directory
+exceeds `docker.build_context_cache_max_age` (a `Duration` value,
+default 1 hour). Cleanup runs automatically at the start of each
+`chalk docker build` and `chalk docker push`.
+
+The `registry` and `disk` strategies delete the tarball immediately
+after the blob is uploaded — they have no need to retain it.
 
 **Configuration:**
 
@@ -357,11 +392,11 @@ The context name is `"."` for the main build context and the declared
 name for each `--build-context` extra. The per-context config object
 carries strategy-specific fields:
 
-| Strategy   | Fields                                                                                                                            |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `registry` | `strategy`, `blob_digest`, `blob_size`, `skipped_files`                                                                           |
-| `local`    | `strategy`, `tar_path`, `tar_hash`, `skipped_files`                                                                               |
-| `disk`     | `strategy`, `context_path`, `dockerfile_path`, `size_threshold`, `additional_dockerignore`, `honor_dockerignore`, `max_file_size` |
+| Strategy   | Fields                                                                                                                                                          |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registry` | `strategy`, `blob_digest`, `blob_size`, `skipped_files`                                                                                                         |
+| `local`    | `strategy`, `tar_path`, `tar_hash`, `skipped_files`                                                                                                             |
+| `disk`     | `strategy`, `context_path`, `dockerfile_path`, `registry_name`, `push_name`, `size_threshold`, `additional_dockerignore`, `honor_dockerignore`, `max_file_size` |
 
 At push time, Chalk reads this key from the image's chalk mark and
 completes the attestation manifest creation.

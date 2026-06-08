@@ -147,6 +147,29 @@ proc testIsExcluded() =
   check isExcluded("a/b/secret.key", @["**/*.key"])
   check not isExcluded("a/b/secret.pub", @["**/*.key"])
 
+proc testHasNegationForDir() =
+  ## No-slash negation: always recurse (basename can match at any depth).
+  check hasNegationForDir("logs", @["!*.log"])
+  check hasNegationForDir("a/b", @["!important"])
+
+  ## Literal-prefix slash negation: recurse into the targeted dir.
+  check hasNegationForDir("logs", @["!logs/important.log"])
+  check not hasNegationForDir("other", @["!logs/important.log"])
+
+  ## ** negation: always recurse.
+  check hasNegationForDir("logs", @["!**/important.log"])
+
+  ## Wildcarded slash negation: recurse when the prefix glob-matches norm.
+  check hasNegationForDir("logs_app",  @["!logs_*/important.log"])
+  check not hasNegationForDir("other", @["!logs_*/important.log"])
+
+  ## Multi-level norm with wildcarded prefix.
+  check hasNegationForDir("a/b2",    @["!a/b[0-9]/file.txt"])
+  check not hasNegationForDir("a/c", @["!a/b[0-9]/file.txt"])
+
+  ## Positive patterns are ignored.
+  check not hasNegationForDir("logs", @["logs/"])
+
 proc listTarGzFiles(path: string): seq[string] =
   ## Return all entry names from a .tar.gz archive using the system tar command.
   let (output, exitCode) = execCmdEx("tar tf " & path)
@@ -204,9 +227,82 @@ proc testWriteTarGz() =
   check "logs/temp.tmp" notin files2
   check "secrets/api_key.txt" notin files2
 
+  ## Wildcarded slash negation: logs_app/ excluded, but !logs_*/important.log
+  ## re-includes the one file whose parent dir glob-matches logs_*.
+  createDir(tmpDir / "logs_app")
+  writeFile(tmpDir / "logs_app" / "important.log", "keep\n")
+  writeFile(tmpDir / "logs_app" / "debug.log",     "drop\n")
+  discard writeTarGz(
+    outPath     = outPath,
+    contextPath = tmpDir,
+    patterns    = @["logs_app/", "!logs_*/important.log"],
+  )
+  let files3 = listTarGzFiles(outPath)
+  check "logs_app/important.log" in files3
+  check "logs_app/debug.log" notin files3
+
+proc testSizeThreshold() =
+  let tmpDir = getTempDir() / "test_tar_threshold"
+  removeDir(tmpDir)
+  createDir(tmpDir)
+  let outPath = getTempDir() / "test_threshold_out.tar.gz"
+
+  ## Directory-only context: no regular files, so threshold must still fire.
+  createDir(tmpDir / "a")
+  createDir(tmpDir / "a" / "b")
+  createDir(tmpDir / "c")
+  var raised = false
+  try:
+    discard writeTarGz(
+      outPath        = outPath,
+      contextPath    = tmpDir,
+      patterns       = @[],
+      sizeThreshold  = 1,
+    )
+  except TarSizeLimitError:
+    raised = true
+  check raised
+  if fileExists(outPath):
+    removeFile(outPath)
+
+  ## Symlink-only context: no regular files, threshold must still fire.
+  let symlinkDir = getTempDir() / "test_tar_symlinks"
+  removeDir(symlinkDir)
+  createDir(symlinkDir)
+  createSymlink("/tmp", symlinkDir / "link")
+  raised = false
+  try:
+    discard writeTarGz(
+      outPath        = outPath,
+      contextPath    = symlinkDir,
+      patterns       = @[],
+      sizeThreshold  = 1,
+    )
+  except TarSizeLimitError:
+    raised = true
+  check raised
+  if fileExists(outPath):
+    removeFile(outPath)
+
+  ## Threshold not exceeded: no error raised.
+  let smallDir = getTempDir() / "test_tar_small"
+  removeDir(smallDir)
+  createDir(smallDir)
+  writeFile(smallDir / "tiny.txt", "hi\n")
+  discard writeTarGz(
+    outPath        = outPath,
+    contextPath    = smallDir,
+    patterns       = @[],
+    sizeThreshold  = 1024 * 1024,
+  )
+  check fileExists(outPath)
+  removeFile(outPath)
+
 proc main() =
   testGlobMatch()
   testIsExcluded()
+  testHasNegationForDir()
   testWriteTarGz()
+  testSizeThreshold()
 
 main()

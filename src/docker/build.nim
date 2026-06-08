@@ -614,7 +614,6 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   ctx.processPlatforms()
   ctx.pinBuildSectionBaseImages()
 
-  trace("docker: preparing chalk marks for build")
   cleanBuildContextCache()
   # Upload context blobs / create local tarballs on baseChalk before
   # copyPerPlatform so all platform copies inherit the snapshot state.
@@ -631,6 +630,8 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     except:
       error("docker: build context upload failed: " & getCurrentExceptionMsg())
       dumpExOnDebug()
+
+  trace("docker: preparing chalk marks for build")
   var oneChalk         = baseChalk
   let chalksByPlatform = baseChalk.copyPerPlatform(ctx.platforms)
   # chalk time artifact info determines metadata id/etc

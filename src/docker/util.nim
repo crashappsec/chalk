@@ -221,6 +221,8 @@ iterator iterContextUploadRepos*(chalk: ChalkObj): DockerContextUploadConfig =
         continue
       yield DockerContextUploadConfig(
         registryUri:            registryUri,
+        registryName:           registryName,
+        pushName:               pushName,
         repoPath:               pushRepo,
         tags:                   pushTags,
         strategy:               strategy,

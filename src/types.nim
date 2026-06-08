@@ -416,6 +416,8 @@ type
 
   DockerContextUploadConfig* = ref object
     registryUri*:            string
+    registryName*:           string      ## con4m section name, used in tar cache filename
+    pushName*:               string      ## con4m section name, used in tar cache filename
     repoPath*:               string
     tags*:                   seq[string]
     strategy*:               string      ## resolved upload strategy (never "auto")

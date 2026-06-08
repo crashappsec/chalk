@@ -754,7 +754,8 @@ proc layerPutFileStream*(
     fileStream:  FileStringStream,
 ): DockerDigestedJson =
   let
-    layer          = layer.withDigest(fileStream.sha256Hex())
+    layer          = if layer.digest != "": layer
+                     else: layer.withDigest(fileStream.sha256Hex())
     size           = len(fileStream)
     # fyi docker cli seems to upload as monolithic upload :shrug:
     chunkSize      = int(attrGet[Con4mSize]("docker.registry_layer_chunk_size"))

@@ -48,6 +48,7 @@ from .utils.dict import (
     ANY,
     MISSING,
     Contains,
+    ContainsDict,
     IfExists,
     IntCompare,
     Iso8601,
@@ -2473,6 +2474,35 @@ def test_build_context_upload(
     assert "utils.py" in libs_files
     assert "vendor/dep.py" in libs_files
     assert not any(f == ".git" or f.startswith(".git/") for f in libs_files)
+
+    # --- context manifest annotations ---
+    # Each context manifest must carry the correct artifactType and
+    # dev.crashoverride.chalk.build-context.name annotation.
+    context_manifest = Docker.imagetools_inspect(
+        f"{REGISTRY_AUTH}/context@sha256:{attest_digest}",
+    ).json()
+    assert ContainsDict(context_manifest).contains(
+        {
+            "artifactType": "application/vnd.crashoverride.chalk.build-context.v1",
+            "annotations": {
+                "org.opencontainers.image.created": Iso8601(),
+                "dev.crashoverride.chalk.build-context.name": ".",
+            },
+        }
+    )
+
+    libs_manifest = Docker.imagetools_inspect(
+        f"{REGISTRY_AUTH}/context@sha256:{libs_attest_digest}",
+    ).json()
+    assert ContainsDict(libs_manifest).contains(
+        {
+            "artifactType": "application/vnd.crashoverride.chalk.build-context.v1",
+            "annotations": {
+                "org.opencontainers.image.created": Iso8601(),
+                "dev.crashoverride.chalk.build-context.name": "libs",
+            },
+        }
+    )
 
     # tar sizes are positive integers; large_file.bin exceeds max_file_size and
     # must be reported in skipped files with its sha256 hash and byte size

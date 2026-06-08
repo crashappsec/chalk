@@ -77,6 +77,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
     try:
       chalk.collectRunTimeArtifactInfo()
       if chalk.isChalked() and result == 0:
+        cleanBuildContextCache()
         try:
           chalk.collectedData.merge(chalk.completeBuildContextUploads(
             source = chalk.extract,

@@ -4940,8 +4940,13 @@ Files skipped during build context upload because they exceeded the
 * context name (`"."` for the main context, named value for `--build-context` extras)
 * file path relative to the context root
 * per-file info object with two fields:
-  - `hash` - SHA-256 hex digest of the file
+  - `hash` - SHA-256 hex digest of the file contents
   - `size` - file size in bytes
+
+The SHA-256 digest is recorded intentionally: it identifies the exact
+version of each omitted file and allows it to be matched against files
+in the source repository or artifact store in the future, providing an
+audit trail even for content that was too large to upload.
 
 For example:
 
@@ -5019,7 +5024,7 @@ With the `local` strategy:
       "my-org/my-app": {
         ".": {
           "strategy":      "local",
-          "tar_path":      "/tmp/chalk-build-contexts/2025-01-15T14-32-07/<chalk-id>-main.tar.gz",
+          "tar_path":      "/tmp/chalk-build-contexts/2025-01-15T14-32-07/<chalk-id>-<registry>-<push>-main-<8hexchars>.tar.gz",
           "tar_hash":      "a1b2c3d4...",
           "skipped_files": {}
         }
@@ -5040,6 +5045,8 @@ With the `disk` strategy:
           "strategy":                "disk",
           "context_path":            "/path/to/build/context",
           "dockerfile_path":         "/path/to/build/context/Dockerfile",
+          "registry_name":           "myregistry",
+          "push_name":               "mypush",
           "size_threshold":          104857600,
           "additional_dockerignore": [".git"],
           "honor_dockerignore":      true,

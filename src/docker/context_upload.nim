@@ -102,11 +102,15 @@ proc readDockerignorePatterns(
     contextPath:    string,
     dockerfilePath: string = "",
 ): seq[string] =
-  ## Read ignore patterns from the context-root ignore file.
-  ## BuildKit priority: <dockerfileName>.dockerignore > .dockerignore.
+  ## Read ignore patterns from the appropriate ignore file.
+  ## Docker priority: <dockerfileDir>/<basename(dockerfile)>.dockerignore >
+  ## <contextRoot>/.dockerignore.
+  ## The Dockerfile-specific file lives next to the Dockerfile, not in the
+  ## context root.  Reference:
+  ## https://docs.docker.com/build/concepts/context/#dockerignore-files
   var ignorePath = ""
   if dockerfilePath != "" and dockerfilePath != stdinIndicator:
-    let candidate = contextPath / (lastPathPart(dockerfilePath) & ".dockerignore")
+    let candidate = parentDir(dockerfilePath) / (lastPathPart(dockerfilePath) & ".dockerignore")
     if fileExists(candidate):
       ignorePath = candidate
   if ignorePath == "":
@@ -126,9 +130,10 @@ proc readDockerignorePatterns(
       result.add(p.removePrefix('/'))
 
 proc contextNameSlug(name: string): string =
-  ## Produce a filename-safe slug from a context name.
-  ## "." (the main context) becomes "main"; other characters outside
-  ## [a-zA-Z0-9_-] are replaced with "_".
+  ## Produce a human-readable filename-safe slug from a context name.
+  ## "." (the primary build context) becomes "main"; other characters
+  ## outside [a-zA-Z0-9_-] are replaced with "_".
+  ## Use alongside contextNameHash for a collision-free identifier.
   if name == ".":
     return "main"
   result = ""
@@ -137,6 +142,12 @@ proc contextNameSlug(name: string): string =
       result.add(c)
     else:
       result.add('_')
+
+proc contextNameHash(name: string): string =
+  ## Return the first 8 hex characters of the SHA-256 of `name`.
+  ## Used as a suffix to disambiguate slugs that collide after sanitisation
+  ## (e.g. "." and "main" both slug to "main").
+  sha256(name)[0 ..< 8]
 
 proc contextToTarGz*(
     chalk:                  ChalkObj,
@@ -147,21 +158,25 @@ proc contextToTarGz*(
     maxFileSize:            int64  = 0,
     sizeThreshold:          int64  = 0,
     dockerfilePath:         string = "",
+    registryName:           string = "",
+    pushName:               string = "",
 ): (string, seq[SkippedFile]) =
   ## Archive a context directory to a temp .tar.gz and return its path along
   ## with the list of files skipped due to maxFileSize.
   ## Raises ContextTooLargeError immediately when the compressed output
   ## exceeds sizeThreshold, cleaning up the partial file before raising.
   let
-    chalkId = unpack[string](chalk.lookupCollectedKey("CHALK_ID").get(pack("")))
-    slug    = contextNameSlug(contextName)
-    dateDir = contextCacheDir() / now().utc.format(CONTEXT_CACHE_DIR_FMT)
+    chalkId     = unpack[string](chalk.lookupCollectedKey("CHALK_ID").get(pack("")))
+    contextSlug = contextNameSlug(contextName)
+    contextHash = contextNameHash(contextName)
+    configSlug  = contextNameSlug(registryName) & "-" & contextNameSlug(pushName)
+    dateDir     = contextCacheDir() / now().utc.format(CONTEXT_CACHE_DIR_FMT)
   createDir(dateDir)
   var patterns: seq[string]
   if honorDockerignore:
     patterns.add(readDockerignorePatterns(contextPath, dockerfilePath))
   patterns.add(additionalDockerignore)
-  let outPath = dateDir / (chalkId & "-" & slug & ".tar.gz")
+  let outPath = dateDir / (chalkId & "-" & configSlug & "-" & contextSlug & "-" & contextHash & ".tar.gz")
   try:
     let skippedFiles = writeTarGz(
       outPath       = outPath,
@@ -242,6 +257,8 @@ proc uploadBuildContextsAtBuildTime*(
           maxFileSize            = int64(config.maxFileSize),
           sizeThreshold          = int64(config.sizeThreshold),
           dockerfilePath         = ctx.dockerFileLoc,
+          registryName           = config.registryName,
+          pushName               = config.pushName,
         )
         try:
           let layer = DockerManifest(
@@ -272,6 +289,8 @@ proc uploadBuildContextsAtBuildTime*(
           maxFileSize            = int64(config.maxFileSize),
           sizeThreshold          = int64(config.sizeThreshold),
           dockerfilePath         = ctx.dockerFileLoc,
+          registryName           = config.registryName,
+          pushName               = config.pushName,
         )
         entry = %*{
           "strategy":      "local",
@@ -287,6 +306,8 @@ proc uploadBuildContextsAtBuildTime*(
           "strategy":                "disk",
           "context_path":            contextPath,
           "dockerfile_path":         (if ctx.dockerFileLoc == stdinIndicator: "" else: ctx.dockerFileLoc),
+          "registry_name":           config.registryName,
+          "push_name":               config.pushName,
           "size_threshold":          config.sizeThreshold,
           "additional_dockerignore": config.additionalDockerignore,
           "honor_dockerignore":      config.honorDockerignore,
@@ -347,7 +368,7 @@ proc completeBuildContextUpload(
   ## Returns (digest, tarSize, skippedFiles) where digest is the context manifest
   ## digest (without sha256: prefix), tarSize is the tarball size in bytes, and
   ## skippedFiles is the list of files skipped due to maxFileSize (disk strategy only).
-  ## Returns ("", 0, @[]) on failure.
+  ## Raises ValueError on malformed snapshot data.
   let
     strategy = snapshot{"strategy"}.getStr("")
     platform = if chalk.platform != nil: chalk.platform else: DockerPlatform()
@@ -359,8 +380,10 @@ proc completeBuildContextUpload(
       blobDigest = snapshot{"blob_digest"}.getStr("")
       blobSize   = snapshot{"blob_size"}.getInt(0)
     if blobDigest == "":
-      warn("docker: context snapshot missing blobDigest for registry strategy")
-      return ("", 0, @[])
+      raise newException(
+        ValueError,
+        "context snapshot is missing blob_digest for registry strategy",
+      )
     # Layer is already in the registry; mark as fetched so put() is skipped.
     let
       layer       = DockerManifest(
@@ -403,7 +426,7 @@ proc completeBuildContextUpload(
       tarSize = int(getFileSize(tarPath))
       layer   = DockerManifest(
         kind:       DockerManifestType.layer,
-        name:       image,
+        name:       image.withDigest(actualHash),
         mediaType:  CONTEXT_LAYER_TYPE,
         fileStream: newFileStringStream(tarPath),
       )
@@ -434,6 +457,8 @@ proc completeBuildContextUpload(
       honorDockerignore      = snapshot{"honor_dockerignore"}.getBool(false)
       maxFileSize            = int64(snapshot{"max_file_size"}.getInt(0))
       dockerfilePath         = snapshot{"dockerfile_path"}.getStr("")
+      snapshotRegistryName   = snapshot{"registry_name"}.getStr("")
+      snapshotPushName       = snapshot{"push_name"}.getStr("")
       (tarPath, skippedFiles) = contextToTarGz(
         chalk                  = chalk,
         contextName            = contextName,
@@ -443,6 +468,8 @@ proc completeBuildContextUpload(
         maxFileSize            = maxFileSize,
         sizeThreshold          = int64(sizeThreshold),
         dockerfilePath         = dockerfilePath,
+        registryName           = snapshotRegistryName,
+        pushName               = snapshotPushName,
       )
     try:
       let
@@ -466,8 +493,10 @@ proc completeBuildContextUpload(
       removeFile(tarPath)
 
   else:
-    warn("docker: unknown strategy in build context snapshot: " & strategy)
-    return ("", 0, @[])
+    raise newException(
+      ValueError,
+      "unknown strategy in build context snapshot: '" & strategy & "'",
+    )
 
 proc completeBuildContextUploads*(
     chalk:  ChalkObj,

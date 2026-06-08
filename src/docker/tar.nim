@@ -297,8 +297,10 @@ proc hasNegationForDir*(norm: string, patterns: seq[string]): bool =
   ## `norm` when:
   ##   - it has no '/' (matches by basename at any depth, so can reach inside
   ##     any excluded directory), or
-  ##   - it explicitly starts with `norm/` (targets files inside this dir), or
-  ##   - it contains '**' (can cross directory boundaries).
+  ##   - it contains '**' (can cross directory boundaries), or
+  ##   - it is a slash pattern whose directory prefix at the same depth as
+  ##     `norm` glob-matches `norm` (e.g. `!logs_*/f` reaches inside
+  ##     `logs_app/`).
   for pat in patterns:
     if not pat.startsWith('!'):
       continue
@@ -309,11 +311,36 @@ proc hasNegationForDir*(norm: string, patterns: seq[string]): bool =
       ## No-slash negations match by basename at any depth and can re-include
       ## files inside any excluded directory.
       return true
-    if p.startsWith(norm & "/"):
-      return true
     if "**" in p:
       return true
+    ## Check if the prefix of `p` at the same directory depth as `norm`
+    ## glob-matches `norm`.  This handles wildcarded slash patterns such as
+    ## `!logs_*/important.log` that can re-include files inside `logs_app/`.
+    let normDepth = norm.count('/') + 1
+    var
+      slashes = 0
+      idx     = 0
+    while idx < p.len:
+      if p[idx] == '/':
+        inc slashes
+        if slashes == normDepth:
+          break
+      inc idx
+    if slashes == normDepth:
+      let prefix = p[0 ..< idx]
+      if globMatch(norm, prefix):
+        return true
   return false
+
+proc checkSizeThreshold(gz: GzFile, sizeThreshold: int64) =
+  if sizeThreshold <= 0:
+    return
+  discard gzflush(gz, 2)  ## Z_SYNC_FLUSH: flush to fd so gzoffset is accurate
+  if gzoffset(gz) > sizeThreshold:
+    raise newException(
+      TarSizeLimitError,
+      "archive exceeded size_threshold of " & $sizeThreshold & " bytes",
+    )
 
 proc needsLongLink(relPath: string, isDir: bool): bool =
   ## Returns true when relPath cannot be stored in ustar prefix+name fields.
@@ -377,6 +404,7 @@ proc addDirToTar(
           isDir   = true,
           mtime   = mtime,
         ))
+        gz.checkSizeThreshold(sizeThreshold)
       ## Only recurse into an excluded directory when a negation pattern
       ## could re-include files inside it (e.g. "logs/" with "!logs/*.log").
       ## Pruning here avoids walking .git, node_modules, etc. unnecessarily.
@@ -421,13 +449,7 @@ proc addDirToTar(
           gzWriteZeros(gz, pad)
       finally:
         fh.close()
-      if sizeThreshold > 0:
-        discard gzflush(gz, 2)  ## Z_SYNC_FLUSH: flush to fd so gzoffset is accurate
-      if sizeThreshold > 0 and gzoffset(gz) > sizeThreshold:
-        raise newException(
-          TarSizeLimitError,
-          "archive exceeded size_threshold of " & $sizeThreshold & " bytes",
-        )
+      gz.checkSizeThreshold(sizeThreshold)
 
     of pcLinkToFile, pcLinkToDir:
       if isExcluded(norm, patterns):
@@ -446,6 +468,7 @@ proc addDirToTar(
         mtime      = mtime,
         linkTarget = target,
       ))
+      gz.checkSizeThreshold(sizeThreshold)
 
 ## ---------------------------------------------------------------------------
 ## Public API
@@ -471,6 +494,7 @@ proc writeTarGz*(
   try:
     addDirToTar(gz, contextPath, "", patterns, maxFileSize, sizeThreshold, result)
     gzWriteZeros(gz, tarBlock * 2)  ## POSIX end-of-archive: two zero blocks
+    gz.checkSizeThreshold(sizeThreshold)
     ok = true
   finally:
     let rc = gzclose(gz)
