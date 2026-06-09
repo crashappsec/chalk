@@ -1,7 +1,8 @@
 keyspec _X_BUILD_OBSERVABLES {
-  kind:  RunTimeHost
-  type:  string
-  callback: func build_observables
+  kind:              RunTimeHost
+  type:              string
+  only_object_store: true
+  callback:          func build_observables
 }
 
 func build_observables(contexts) {
@@ -27,7 +28,7 @@ func build_observables(contexts) {
   }
   new_path := "/mnt/curiosity/" + run_id + "-" + job + "-" + attempt + "-observables.br"
   if is_file(new_path) {
-    return base64(read_file(new_path))
+    return read_file(new_path)
   }
   return ""
 }
