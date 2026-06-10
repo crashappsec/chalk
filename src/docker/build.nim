@@ -617,13 +617,18 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   cleanBuildContextCache()
   # Upload context blobs / create local tarballs on baseChalk before
   # copyPerPlatform so all platform copies inherit the snapshot state.
+  var
+    uploadedBlobs: seq[DockerImage]
+    localTarPaths: seq[string]
   for config in baseChalk.iterContextUploadRepos():
     try:
       baseChalk.collectedData.merge(
         uploadBuildContextsAtBuildTime(
-          chalk  = baseChalk,
-          ctx    = ctx,
-          config = config,
+          chalk         = baseChalk,
+          ctx           = ctx,
+          config        = config,
+          uploadedBlobs = uploadedBlobs,
+          localTarPaths = localTarPaths,
         ),
         deep = true,
       )
@@ -719,6 +724,8 @@ proc dockerBuild*(ctx: DockerInvocation): int =
         discard
 
   if result != 0:
+    cleanupUploadedBlobs(uploadedBlobs)
+    cleanupLocalTars(localTarPaths)
     raise newException(
       ValueError,
       "wrapped docker build exited with " & $result

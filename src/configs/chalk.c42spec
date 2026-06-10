@@ -2297,12 +2297,15 @@ Controls when the build context tarball is created and uploaded relative to
   otherwise.
 * `registry` — at build time, upload the context blob to the target registry
   immediately; at push time, create the attestation manifest referencing the
-  already-uploaded blob.
+  already-uploaded blob.  If the docker build fails, Chalk automatically
+  deletes the uploaded blob to avoid leaving unreferenced data in the
+  registry (registries that do not support deletion log a warning instead).
 * `local` — at build time, save the context as a `.tar.gz` under
   `<tmpdir>/chalk-build-contexts/`; at push time, upload the blob and create
   the attestation manifest.  The tarball is kept after push so the same
   image can be pushed to multiple registries without re-archiving.  Cleanup
-  is governed by `docker.build_context_cache_max_age`.
+  is governed by `docker.build_context_cache_max_age`.  If the docker build
+  fails, the tarball is deleted immediately.
 * `disk` — at push time, read the context directory from disk (using the path
   recorded at build time), create a tarball, upload, and push the manifest.
   Users who choose this strategy accept the risk that the context directory

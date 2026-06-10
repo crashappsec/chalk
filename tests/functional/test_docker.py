@@ -2530,3 +2530,77 @@ def test_build_context_upload(
             },
         },
     )
+
+
+@pytest.mark.parametrize("strategy", ["registry", "local"])
+def test_build_context_upload_cleanup(
+    chalk_copy: Chalk,
+    strategy: str,
+    random_hex: str,
+    server_http: str,
+    tmp_data_dir: Path,
+):
+    """Blobs/tars created at build time are deleted when the build fails."""
+    # Use a subdirectory so the chalk binary in tmp_data_dir is not included.
+    context_dir = tmp_data_dir / "context"
+    context_dir.mkdir()
+    (context_dir / "app.py").write_text("print('hello')\n")
+
+    tag = f"{REGISTRY}/context_cleanup_{random_hex}:latest"
+    env = {
+        "CHALK_SERVER": server_http,
+        "CONTEXT_STRATEGY": strategy,
+    }
+    config = CONFIGS / "docker_context.c4m"
+
+    # Build with a Dockerfile that succeeds at FROM but fails at RUN,
+    # guaranteeing the pre-build upload/tar work ran before the failure.
+    _, build_result = chalk_copy.docker_build(
+        content="FROM alpine\nRUN false\n",
+        context=context_dir,
+        tag=tag,
+        config=config,
+        env=env,
+        buildx=True,
+        run_docker=False,
+        expected_success=False,
+        ignore_errors=True,
+    )
+
+    logs = build_result.logs
+
+    if strategy == "registry":
+        assert (
+            "build context blob uploaded" in logs
+        ), "chalk must upload a context blob before docker build starts"
+        assert (
+            "cleaned up" in logs and "registry blob" in logs
+        ), "chalk must delete the blob after the build fails"
+        digest_match = re.search(
+            r"build context blob uploaded: sha256:([0-9a-f]+)",
+            logs,
+        )
+        assert digest_match, "could not parse blob digest from chalk logs"
+        assert not Docker.blob_exists(
+            registry=REGISTRY_AUTH,
+            repo="context",
+            digest=digest_match.group(1),
+        ), f"registry blob should have been deleted but is still accessible"
+
+    else:
+        assert (
+            "build context tarball cached at:" in logs
+        ), "chalk must create a local tarball before docker build starts"
+        assert (
+            "cleaned up" in logs and "local tar" in logs
+        ), "chalk must delete the tarball after the build fails"
+        tar_match = re.search(
+            r"build context tarball cached at: (\S+)",
+            logs,
+        )
+        assert tar_match, "could not parse tar path from chalk logs"
+        assert not Path(
+            tar_match.group(1)
+        ).exists(), (
+            f"local tar {tar_match.group(1)} should have been deleted but still exists"
+        )

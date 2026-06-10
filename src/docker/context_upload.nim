@@ -24,6 +24,7 @@ import "."/[
   base,
   ids,
   manifest,
+  registry,
   tar,
 ]
 
@@ -221,10 +222,39 @@ proc newContextManifest(
     layers: @[layer],
   )
 
+proc cleanupUploadedBlobs*(blobs: seq[DockerImage]) =
+  try:
+    var deleted = 0
+    for blob in blobs:
+      if layerDelete(blob):
+        inc deleted
+    if deleted > 0:
+      info("docker: cleaned up " & $deleted & " registry blob(s) from failed build")
+  except:
+    error("docker: failed to clean up registry blobs: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+
+proc cleanupLocalTars*(paths: seq[string]) =
+  try:
+    var deleted = 0
+    for path in paths:
+      try:
+        removeFile(path)
+        inc deleted
+      except:
+        dumpExOnDebug()
+    if deleted > 0:
+      info("docker: cleaned up " & $deleted & " local tar(s) from failed build")
+  except:
+    error("docker: failed to clean up local tars: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+
 proc uploadBuildContextsAtBuildTime*(
-    chalk:  ChalkObj,
-    ctx:    DockerInvocation,
-    config: DockerContextUploadConfig,
+    chalk:         ChalkObj,
+    ctx:           DockerInvocation,
+    config:        DockerContextUploadConfig,
+    uploadedBlobs: var seq[DockerImage],
+    localTarPaths: var seq[string],
 ): ChalkDict =
   ## Called at `chalk docker build` time **before** the chalk mark is embedded
   ## in the image.  Performs the upload work that can be done without knowing
@@ -269,6 +299,7 @@ proc uploadBuildContextsAtBuildTime*(
             fileStream: newFileStringStream(tarPath),
           )
           layer.put()
+          uploadedBlobs.add(layer.asImage())
           entry = %*{
             "strategy":      "registry",
             "blob_digest":   layer.digest.extractDockerHash(),
@@ -293,6 +324,7 @@ proc uploadBuildContextsAtBuildTime*(
           registryName           = config.registryName,
           pushName               = config.pushName,
         )
+        localTarPaths.add(tarPath)
         entry = %*{
           "strategy":      "local",
           "tar_path":      tarPath,

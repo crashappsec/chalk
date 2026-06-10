@@ -538,5 +538,11 @@ class Docker:
             return [m.name for m in tf.getmembers()]
 
     @staticmethod
+    def blob_exists(registry: str, repo: str, digest: str) -> bool:
+        """Return True if a blob with the given digest exists in the registry."""
+        ref = f"{registry}/{repo}@sha256:{digest}"
+        return bool(run(["crane", "blob", "--insecure", ref], check=False, binary=True))
+
+    @staticmethod
     def is_overlayfs() -> bool:
         return is_overlayfs()

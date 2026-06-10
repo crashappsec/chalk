@@ -152,18 +152,22 @@ Because `chalk docker build` and `chalk docker push` can run as
 separate commands, the timing of the context upload is configurable
 via `docker_context_upload.strategy`:
 
-| Strategy   | Build time                                  | Push time                                             | Tarball lifetime                    |
-| ---------- | ------------------------------------------- | ----------------------------------------------------- | ----------------------------------- |
-| `registry` | Create tarball, upload blob, delete tarball | Create and push attestation manifest                  | Deleted after blob upload           |
-| `local`    | Create tarball, save to cache dir           | Upload blob + push attestation manifest; tarball kept | TTL (`build_context_cache_max_age`) |
-| `disk`     | Record context path in chalk mark           | Create tarball, upload, push manifest, delete tarball | Deleted after blob upload           |
-| `auto`     | CI detected -> `registry`; else -> `local`  | (see above)                                           | (see above)                         |
+| Strategy   | Build time                                  | Push time                                             | Tarball lifetime                                                |
+| ---------- | ------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
+| `registry` | Create tarball, upload blob, delete tarball | Create and push attestation manifest                  | Deleted after blob upload; registry blob deleted if build fails |
+| `local`    | Create tarball, save to cache dir           | Upload blob + push attestation manifest; tarball kept | TTL (`build_context_cache_max_age`); deleted if build fails     |
+| `disk`     | Record context path in chalk mark           | Create tarball, upload, push manifest, delete tarball | Deleted after blob upload                                       |
+| `auto`     | CI detected -> `registry`; else -> `local`  | (see above)                                           | (see above)                                                     |
 
 **`registry` strategy** is best for CI environments where the build
 host has network access to the target registry. The tarball is created
 and the blob uploaded during `chalk docker build`, so the blob is
 already in the registry when `chalk docker push` runs. Only the
-manifest creation is deferred to push time.
+manifest creation is deferred to push time. If the docker build itself
+fails, Chalk automatically issues a `DELETE` for each uploaded blob so
+they do not remain in the registry unreferenced. Registries that do not
+support blob deletion (`405 Method Not Allowed`) log a warning and the
+blob is left for the registry's GC cycle.
 
 **`local` strategy** is the default for non-CI environments. CI is detected
 by the presence of any of the following environment variables: `CI`,
@@ -175,7 +179,8 @@ tarball is written to a date-stamped subdirectory under
 avoids requiring registry credentials at build time. The tarball is
 **not** deleted after push — it is reused when the same image is pushed
 to multiple registries, and cleaned up by the TTL-based cache cleanup
-(`docker.build_context_cache_max_age`).
+(`docker.build_context_cache_max_age`). If the docker build fails, the
+tarball is deleted immediately since there is no image to push.
 
 **`disk` strategy** reads the context directory from disk at push
 time. This is suitable for single-machine workflows where the context
@@ -427,9 +432,12 @@ completes the attestation manifest creation.
   content may differ from the build-time context if the directory was
   mutated between build and push.
 - The `registry` strategy uploads the blob during `chalk docker build`.
-  If the subsequent push never runs (build aborted, push disabled, or a
-  different repository targeted), the blob remains in the registry
+  If the build itself fails, Chalk automatically deletes the uploaded blob.
+  If the build succeeds but the subsequent push never runs (push disabled
+  or a different repository targeted), the blob remains in the registry
   unreferenced until the registry's garbage-collection cycle removes it.
+  Registries that do not support blob deletion return `405 Method Not
+Allowed`; Chalk logs a warning and leaves the blob for GC.
 - **Trust assumption:** Push-time context completion reads
   `DOCKER_BUILD_CONTEXT_SNAPSHOTS` from the chalk mark embedded in the
   image and trusts its contents. For the `local` strategy Chalk verifies

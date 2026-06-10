@@ -853,6 +853,22 @@ proc layerPutJson*(layer:       DockerImage,
     body        = $data,
   )
 
+proc layerDelete*(layer: DockerImage): bool =
+  try:
+    let (_, response) = layer.request(
+      useCase           = RegistryUseCase.ReadWrite,
+      httpMethod        = HttpDelete,
+      path              = "/blobs/" & layer.imageRef,
+      acceptStatusCodes = @[200..299, 404..405],
+    )
+    if response.code() == Http405:
+      warn("docker: registry does not support blob deletion for " & $layer)
+      return false
+    return true
+  except:
+    dumpExOnDebug()
+    return false
+
 proc manifestPut*(image:       DockerImage,
                   contentType: string,
                   data:        JsonNode,
