@@ -2391,10 +2391,12 @@ def test_build_context_upload(
         # libs failure must be recorded at build time, not silently dropped
         assert build_result.report.has(
             _OP_FAILED_KEYS={
-                "_REPO_BUILD_CONTEXTS": {
-                    "code": "CONTEXT_TOO_LARGE",
-                    "error": re.compile(r"libs"),
-                },
+                "_REPO_BUILD_CONTEXTS": [
+                    {
+                        "code": "CONTEXT_TOO_LARGE",
+                        "error": re.compile(r"libs"),
+                    }
+                ],
             },
         )
         return

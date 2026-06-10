@@ -2059,7 +2059,7 @@ variable that controls console logging output.
 
 keyspec FAILED_KEYS {
   kind:     ChalkTimeArtifact
-  type:     dict[string, `x]
+  type:     dict[string, list[`x]]
   standard: true
   since:    "0.4.13"
   shortdoc: "Keys and errors why chalk could not collect them"
@@ -2067,9 +2067,17 @@ keyspec FAILED_KEYS {
 In some cases there are known reasons why chalk cannot collect
 some metadata. For example chalk might not be able to collect
 AWS EC2 instance metadata if IMDSv2 is disabled for that instance.
-This key reports all known errors and reason why that key could
+This key reports all known errors and reasons why that key could
 not be collected so that further action can be taken to be able
 to collect that metadata in the future.
+
+Each entry maps a key name to a list of error objects. Using a list
+allows multiple distinct failures for the same key to be recorded
+without later errors overwriting earlier ones. Each error object has:
+
+- `code` - a machine-readable error code string
+- `error` - a human-readable error message
+- `description` - a longer explanation and remediation hint
 """
 }
 
@@ -5893,7 +5901,7 @@ shares the same log-level configuration.
 
 keyspec _OP_FAILED_KEYS {
   kind:     RunTimeHost
-  type:     dict[string, `x]
+  type:     dict[string, list[`x]]
   standard: true
   since:    "0.4.13"
   shortdoc: "Keys and errors why chalk could not collect them"
@@ -5901,9 +5909,17 @@ keyspec _OP_FAILED_KEYS {
 In some cases there are known reasons why chalk cannot collect
 some metadata. For example chalk might not be able to collect
 AWS EC2 instance metadata if IMDSv2 is disabled for that instance.
-This key reports all known errors and reason why that key could
+This key reports all known errors and reasons why that key could
 not be collected so that further action can be taken to be able
 to collect that metadata in the future.
+
+Each entry maps a key name to a list of error objects. Using a list
+allows multiple distinct failures for the same key to be recorded
+without later errors overwriting earlier ones. Each error object has:
+
+- `code` - a machine-readable error code string
+- `error` - a human-readable error message
+- `description` - a longer explanation and remediation hint
 """
 }
 

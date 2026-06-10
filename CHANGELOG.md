@@ -2,6 +2,16 @@
 
 ## 1.1.1
 
+### Breaking Changes
+
+- `FAILED_KEYS` and `_OP_FAILED_KEYS` now store a **list** of error objects
+  per key instead of a single object. The value for each key changes from
+  `{code, error, description}` to `[{code, error, description}, ...]`.
+  This allows multiple distinct failures for the same key to be recorded
+  (e.g. a context that is both too large and fails to upload) without the
+  later error silently overwriting the earlier one. Consumers reading these
+  keys must handle the new list format.
+
 ### New Features
 
 - Build context upload as OCI attestation. When `docker_context_upload` is

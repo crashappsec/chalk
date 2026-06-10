@@ -236,10 +236,7 @@ proc uploadBuildContextsAtBuildTime*(
   let
     repoImage = parseImage(config.registryUri & "/" & config.repoPath)
     registry  = repoImage.registry
-  var
-    snapshots             = newJObject()
-    tooLargeContexts:     seq[string]
-    uploadFailedContexts: seq[string]
+  var snapshots = newJObject()
   for contextName, contextPath in contexts:
     var entry: ContextSnapshotEntry = nil
     try:
@@ -319,14 +316,31 @@ proc uploadBuildContextsAtBuildTime*(
         warn("docker: unknown docker_context_upload.strategy: " & config.strategy)
 
     except ContextTooLargeError:
-      error("docker: " & getCurrentExceptionMsg())
+      let msg = getCurrentExceptionMsg()
+      error("docker: " & msg)
       dumpExOnDebug()
-      tooLargeContexts.add(contextName)
+      addFailedKey(
+        "_REPO_BUILD_CONTEXTS",
+        code        = "CONTEXT_TOO_LARGE",
+        error       = contextName & ": " & msg,
+        description = (
+          "Build context tarball exceeded the configured size_threshold. " &
+          "Increase the threshold or reduce the context size to enable upload."
+        ),
+      )
     except:
-      let errMsg = getCurrentExceptionMsg()
-      error("docker: build context '" & contextName & "' upload failed: " & errMsg)
+      let msg = getCurrentExceptionMsg()
+      error("docker: build context '" & contextName & "' upload failed: " & msg)
       dumpExOnDebug()
-      uploadFailedContexts.add(contextName & ": " & errMsg)
+      addFailedKey(
+        "_REPO_BUILD_CONTEXTS",
+        code        = "CONTEXT_UPLOAD_FAILED",
+        error       = contextName & ": " & msg,
+        description = (
+          "Build context blob could not be uploaded. Check registry " &
+          "credentials and network access."
+        ),
+      )
 
     if entry != nil:
       if registry notin snapshots:
@@ -335,27 +349,6 @@ proc uploadBuildContextsAtBuildTime*(
         snapshots[registry][config.repoPath] = newJObject()
       snapshots[registry][config.repoPath][contextName] = entry
 
-  if tooLargeContexts.len > 0:
-    addFailedKey(
-      "_REPO_BUILD_CONTEXTS",
-      code        = "CONTEXT_TOO_LARGE",
-      error       = "build contexts exceeded size_threshold: " & tooLargeContexts.join(", "),
-      description = (
-        "One or more build context tarballs exceeded the configured " &
-        "size_threshold. Increase the threshold or reduce " &
-        "the context size to enable upload."
-      ),
-    )
-  if uploadFailedContexts.len > 0:
-    addFailedKey(
-      "_REPO_BUILD_CONTEXTS",
-      code        = "CONTEXT_UPLOAD_FAILED",
-      error       = "build context blob upload failed: " & uploadFailedContexts.join("; "),
-      description = (
-        "One or more build context blobs could not be uploaded. Check " &
-        "registry credentials and network access."
-      ),
-    )
   result.setIfNeeded("DOCKER_BUILD_CONTEXT_SNAPSHOTS", snapshots.nimJsonToBox())
 
 proc completeBuildContextUpload(
@@ -512,11 +505,9 @@ proc completeBuildContextUploads*(
   let snapshots = parseJson(source["DOCKER_BUILD_CONTEXT_SNAPSHOTS"].boxToJson())
 
   var
-    buildContexts         = ContextResults()
-    sizeResults           = SizeResults()
-    skippedResults        = newJObject()
-    tooLargeContexts:     seq[string]
-    uploadFailedContexts: seq[string]
+    buildContexts  = ContextResults()
+    sizeResults    = SizeResults()
+    skippedResults = newJObject()
 
   for image in chalk.repos.manifests:
     if image.registry notin snapshots:
@@ -568,41 +559,32 @@ proc completeBuildContextUploads*(
                image.registry & "/" & repoPath &
                " image digest " & image.digest)
         except ContextTooLargeError:
-          error("docker: " & getCurrentExceptionMsg())
+          let msg = getCurrentExceptionMsg()
+          error("docker: " & msg)
           dumpExOnDebug()
-          tooLargeContexts.add(contextName)
+          addFailedKey(
+            "_REPO_BUILD_CONTEXTS",
+            code        = "CONTEXT_TOO_LARGE",
+            error       = contextName & ": " & msg,
+            description = (
+              "Build context tarball exceeded the configured size_threshold. " &
+              "Increase the threshold or reduce the context size to enable upload."
+            ),
+          )
         except:
-          let
-            exMsg  = getCurrentExceptionMsg()
-            errMsg = (
-              "build context '" & contextName & "' upload failed for " &
-              image.registry & "/" & repoPath & ": " & exMsg
-            )
-          error("docker: " & errMsg)
+          let msg = getCurrentExceptionMsg()
+          error("docker: build context '" & contextName & "' upload failed for " &
+                image.registry & "/" & repoPath & ": " & msg)
           dumpExOnDebug()
-          uploadFailedContexts.add(contextName & ": " & exMsg)
-
-  if tooLargeContexts.len > 0:
-    addFailedKey(
-      "_REPO_BUILD_CONTEXTS",
-      code        = "CONTEXT_TOO_LARGE",
-      error       = "build contexts exceeded size_threshold: " & tooLargeContexts.join(", "),
-      description = (
-        "One or more build context tarballs exceeded the configured " &
-        "size_threshold. Increase the threshold or reduce " &
-        "the context size to enable upload."
-      ),
-    )
-  if uploadFailedContexts.len > 0:
-    addFailedKey(
-      "_REPO_BUILD_CONTEXTS",
-      code        = "CONTEXT_UPLOAD_FAILED",
-      error       = "build context upload failed: " & uploadFailedContexts.join("; "),
-      description = (
-        "One or more build contexts could not be uploaded. Check registry " &
-        "credentials and network access."
-      ),
-    )
+          addFailedKey(
+            "_REPO_BUILD_CONTEXTS",
+            code        = "CONTEXT_UPLOAD_FAILED",
+            error       = contextName & ": " & msg,
+            description = (
+              "Build context could not be uploaded. Check registry " &
+              "credentials and network access."
+            ),
+          )
   result.setIfNeeded("_REPO_BUILD_CONTEXTS", buildContexts)
   result.setIfNeeded("_REPO_BUILD_CONTEXT_TAR_SIZES", sizeResults)
   result.setIfNeeded("_REPO_BUILD_CONTEXT_SKIPPED_FILES", skippedResults.nimJsonToBox())
