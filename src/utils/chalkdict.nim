@@ -33,7 +33,7 @@ proc merge*(self: ChalkDict, other: ChalkDict, deep = false): ChalkDict {.discar
         mine   = unpack[ChalkDict](self[k])
         theirs = unpack[ChalkDict](v)
       if deep:
-        mine.merge(theirs)
+        mine.merge(theirs, deep = true)
       else:
         for kk, vv in theirs:
           mine[kk] = vv

@@ -252,6 +252,29 @@ proc testWriteTarGz() =
 
 
 ## ---------------------------------------------------------------------------
+## testDanglingSymlink
+
+proc testDanglingSymlink() =
+  let tmpDir  = getTempDir() / "test_tar_dangling_" & $getCurrentProcessId()
+  let outPath = getTempDir() / "test_dangling_out_" & $getCurrentProcessId() & ".tar.gz"
+  createDir(tmpDir)
+  defer:
+    removeDir(tmpDir)
+    if fileExists(outPath): removeFile(outPath)
+  createSymlink("/nonexistent/path/that/does/not/exist", tmpDir / "dangling")
+  writeFile(tmpDir / "real.txt", "hello\n")
+  discard writeTarGz(
+    outPath     = outPath,
+    contextPath = tmpDir,
+    patterns    = @[],
+  )
+  let (tarOut, tarRc) = execCmdEx("tar tvf " & outPath)
+  check tarRc == 0
+  check "dangling" in tarOut
+  check "/nonexistent/path/that/does/not/exist" in tarOut
+  check "real.txt" in tarOut
+
+## ---------------------------------------------------------------------------
 ## testSizeThreshold
 
 proc testSizeThreshold() =
@@ -419,6 +442,7 @@ proc main() =
   testHasNegationForDir()
   testToOctal()
   testWriteTarGz()
+  testDanglingSymlink()
   testMaxFileSize()
   testLongPaths()
   testSizeThreshold()

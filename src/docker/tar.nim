@@ -135,8 +135,8 @@ proc buildTarHeader(
     result[124 + i] = sizeStr[i]
   result[135] = ' '
 
-  ## Mtime (136..147): 11-digit octal + space
-  let mtimeStr = toOctal(mtime, 11)
+  ## Mtime (136..147): 11-digit octal + space; clamp pre-1970 times to 0.
+  let mtimeStr = toOctal(max(0, mtime), 11)
   for i in 0 ..< 11:
     result[136 + i] = mtimeStr[i]
   result[147] = ' '
@@ -185,77 +185,99 @@ proc buildTarHeader(
 ## ---------------------------------------------------------------------------
 ## Glob pattern matching
 
-proc globMatchImpl(path, pattern: string, si, pi: int): bool =
-  var si = si
-  var pi = pi
-  while pi < pattern.len and si < path.len:
-    if pattern[pi] == '*':
-      let doubleStar = pi + 1 < pattern.len and pattern[pi + 1] == '*'
-      if doubleStar:
-        pi += 2
-        ## Consume the '/' after '**' if present.  When a slash was
-        ## consumed the remaining sub-pattern must start on a path-
-        ## component boundary (e.g. '**/.foo' must not match 'bar.foo').
-        ## Without a slash (e.g. '**file') any position is valid, which
-        ## is how Go's suffixMatch handles the case.
-        let hadSlash = pi < pattern.len and pattern[pi] == '/'
-        if hadSlash:
-          inc pi
-        if pi >= pattern.len:
-          return true
-        while si <= path.len:
-          if not hadSlash or si == 0 or path[si - 1] == '/':
-            if globMatchImpl(path, pattern, si, pi):
-              return true
-          inc si
-        return false
-      else:
-        inc pi
-        while si < path.len and path[si] != '/':
-          if globMatchImpl(path, pattern, si, pi):
-            return true
-          inc si
-        return globMatchImpl(path, pattern, si, pi)
-    elif pattern[pi] == '?' and path[si] != '/':
-      inc pi
-      inc si
-    elif pattern[pi] == '[':
-      inc pi  ## skip '['
-      let negate = pi < pattern.len and (pattern[pi] == '!' or pattern[pi] == '^')
-      if negate: inc pi
-      var classMatched = false
-      var first = true
-      while pi < pattern.len and (first or pattern[pi] != ']'):
-        first = false
-        if pattern[pi] == '\\' and pi + 1 < pattern.len:
-          inc pi
-          if path[si] == pattern[pi]: classMatched = true
-          inc pi
-        elif pi + 2 < pattern.len and pattern[pi + 1] == '-' and pattern[pi + 2] != ']':
-          if path[si] >= pattern[pi] and path[si] <= pattern[pi + 2]: classMatched = true
-          pi += 3
+proc globMatchImpl(
+    path:    string,
+    pattern: string,
+    si, pi:  int,
+    memo:    var seq[int8],
+): bool =
+  ## memo uses 0 = unvisited, 1 = true, 2 = false so zero-init suffices.
+  let memoIdx = si * (pattern.len + 1) + pi
+  if memo[memoIdx] != 0:
+    return memo[memoIdx] == 1
+  block match:
+    var si = si
+    var pi = pi
+    while pi < pattern.len and si < path.len:
+      if pattern[pi] == '*':
+        let doubleStar = pi + 1 < pattern.len and pattern[pi + 1] == '*'
+        if doubleStar:
+          pi += 2
+          ## Consume the '/' after '**' if present.  When a slash was
+          ## consumed the remaining sub-pattern must start on a path-
+          ## component boundary (e.g. '**/.foo' must not match 'bar.foo').
+          ## Without a slash (e.g. '**file') any position is valid, which
+          ## is how Go's suffixMatch handles the case.
+          let hadSlash = pi < pattern.len and pattern[pi] == '/'
+          if hadSlash:
+            inc pi
+          if pi >= pattern.len:
+            result = true
+            break match
+          while si <= path.len:
+            if not hadSlash or si == 0 or path[si - 1] == '/':
+              if globMatchImpl(path, pattern, si, pi, memo):
+                result = true
+                break match
+            inc si
+          result = false
+          break match
         else:
-          if path[si] == pattern[pi]: classMatched = true
           inc pi
-      if pi >= pattern.len:
-        return false  ## unterminated '[': no match
-      inc pi  ## skip ']'
-      let classHit = if negate: not classMatched else: classMatched
-      if path[si] == '/' or not classHit: return false
-      inc si
-    elif pattern[pi] == '\\' and pi + 1 < pattern.len:
-      inc pi  ## skip '\'
-      if path[si] != pattern[pi]: return false
+          while si < path.len and path[si] != '/':
+            if globMatchImpl(path, pattern, si, pi, memo):
+              result = true
+              break match
+            inc si
+          result = globMatchImpl(path, pattern, si, pi, memo)
+          break match
+      elif pattern[pi] == '?' and path[si] != '/':
+        inc pi
+        inc si
+      elif pattern[pi] == '[':
+        inc pi  ## skip '['
+        let negate = pi < pattern.len and (pattern[pi] == '!' or pattern[pi] == '^')
+        if negate: inc pi
+        var classMatched = false
+        var first = true
+        while pi < pattern.len and (first or pattern[pi] != ']'):
+          first = false
+          if pattern[pi] == '\\' and pi + 1 < pattern.len:
+            inc pi
+            if path[si] == pattern[pi]: classMatched = true
+            inc pi
+          elif pi + 2 < pattern.len and pattern[pi + 1] == '-' and pattern[pi + 2] != ']':
+            if path[si] >= pattern[pi] and path[si] <= pattern[pi + 2]: classMatched = true
+            pi += 3
+          else:
+            if path[si] == pattern[pi]: classMatched = true
+            inc pi
+        if pi >= pattern.len:
+          result = false  ## unterminated '[': no match
+          break match
+        inc pi  ## skip ']'
+        let classHit = if negate: not classMatched else: classMatched
+        if path[si] == '/' or not classHit:
+          result = false
+          break match
+        inc si
+      elif pattern[pi] == '\\' and pi + 1 < pattern.len:
+        inc pi  ## skip '\'
+        if path[si] != pattern[pi]:
+          result = false
+          break match
+        inc pi
+        inc si
+      elif pattern[pi] == path[si]:
+        inc pi
+        inc si
+      else:
+        result = false
+        break match
+    while pi < pattern.len and pattern[pi] == '*':
       inc pi
-      inc si
-    elif pattern[pi] == path[si]:
-      inc pi
-      inc si
-    else:
-      return false
-  while pi < pattern.len and pattern[pi] == '*':
-    inc pi
-  return pi == pattern.len and si == path.len
+    result = pi == pattern.len and si == path.len
+  memo[memoIdx] = if result: 1 else: 2
 
 proc globMatch*(path, pattern: string): bool =
   ## Match path against a glob pattern.
@@ -264,7 +286,8 @@ proc globMatch*(path, pattern: string): bool =
   ## ** matches any run of characters including path separators.
   ## [abc], [a-z], [!a-z] match character classes (/ never matches inside []).
   ## \x matches the literal character x.
-  globMatchImpl(path, pattern, 0, 0)
+  var memo = newSeq[int8]((path.len + 1) * (pattern.len + 1))
+  globMatchImpl(path, pattern, 0, 0, memo)
 
 proc isExcluded*(relPath: string, patterns: seq[string]): bool =
   ## Returns true if relPath should be excluded given the ordered pattern list.
@@ -483,10 +506,16 @@ proc addDirToTar(
             break
           gz.gzWriteAll(chunk[0 ..< n])
           written += int64(n)
-        let pad = (tarBlock - int(written mod tarBlock)) mod tarBlock
+        if written != size:
+          raise newException(
+            IOError,
+            "file size changed during context upload (context is mutating): " &
+            norm & " (expected " & $size & " bytes, got " & $written & ")",
+          )
+        let pad = (tarBlock - int(size mod tarBlock)) mod tarBlock
         if pad > 0:
           gzWriteZeros(gz, pad)
-        entryBytes += written + int64(pad)
+        entryBytes += size + int64(pad)
       finally:
         fh.close()
       pending += entryBytes
@@ -498,7 +527,7 @@ proc addDirToTar(
         continue
       let
         target = expandSymlink(full)
-        mtime  = full.getLastModificationTime().toUnix()
+        mtime  = getFileInfo(full, followSymlink = false).lastWriteTime.toUnix()
       trace("docker: context upload: adding symlink " & norm & " -> " & target)
       var entryBytes = int64(tarBlock)
       if needsLongLink(relPath = norm, isDir = false):
