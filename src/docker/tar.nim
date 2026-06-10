@@ -51,7 +51,7 @@ const
 ## ---------------------------------------------------------------------------
 ## Internal helpers
 
-proc toOctal(n: int64, width: int): string =
+proc toOctal*(n: int64, width: int): string =
   result = newString(width)
   var v = n
   for i in countdown(width - 1, 0):

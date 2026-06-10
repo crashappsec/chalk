@@ -379,10 +379,45 @@ proc testLongPaths() =
   check expected in files
 
 
+## ---------------------------------------------------------------------------
+## testToOctal
+
+proc testToOctal() =
+  ## Normal values fit in their field widths.
+  check toOctal(0, 11)    == "00000000000"
+  check toOctal(7, 11)    == "00000000007"
+  check toOctal(8, 11)    == "00000000010"
+  check toOctal(511, 11)  == "00000000777"
+  check toOctal(512, 11)  == "00000001000"
+
+  ## Maximum value for an 11-digit octal field: 8^11 - 1 = 8589934591 (~8 GiB).
+  let maxVal = int64(8589934591)  ## 077777777777 octal
+  check toOctal(maxVal, 11) == "77777777777"
+
+  ## One byte over the 11-digit limit must raise.
+  var raised = false
+  try:
+    discard toOctal(maxVal + 1, 11)
+  except ValueError:
+    raised = true
+  check raised
+
+  ## 6-digit checksum field: max 262143 (0777777 octal).
+  check toOctal(0, 6)      == "000000"
+  check toOctal(262143, 6) == "777777"
+  raised = false
+  try:
+    discard toOctal(262144, 6)
+  except ValueError:
+    raised = true
+  check raised
+
+
 proc main() =
   testGlobMatch()
   runEquivalencyTests()
   testHasNegationForDir()
+  testToOctal()
   testWriteTarGz()
   testMaxFileSize()
   testLongPaths()
