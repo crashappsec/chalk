@@ -1,6 +1,6 @@
 keyspec _X_CURIOSITY_LOGS {
-  kind:  RunTimeHost
-  type:  string
+  kind:     RunTimeHost
+  type:     string
   callback: func curiosity_logs
 }
 
@@ -12,7 +12,12 @@ func curiosity_logs(contexts) {
   # Old format: single fixed path (pre per-job naming)
   old_path := "/mnt/curiosity/curiosity_logs.bundle"
   if is_file(old_path) {
-    return base64(read_file(old_path))
+    # chalk pre-1.0 uploaded json which requires base64 wrapping
+    if starts_with(version(), "0.") {
+      return base64(read_file(old_path))
+    } else {
+      return read_file(old_path)
+    }
   }
 
   # New format: per-job, same dir
@@ -24,7 +29,12 @@ func curiosity_logs(contexts) {
   }
   new_path := "/mnt/curiosity/" + run_id + "-" + job + "-" + attempt + "-curiosity_logs.bundle"
   if is_file(new_path) {
-    return base64(read_file(new_path))
+    # chalk pre-1.0 uploaded json which requires base64 wrapping
+    if starts_with(version(), "0.") {
+      return base64(read_file(new_path))
+    } else {
+      return read_file(new_path)
+    }
   }
   return ""
 }
