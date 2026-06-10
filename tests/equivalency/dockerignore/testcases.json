@@ -90,6 +90,72 @@
     "expected": true
   },
   {
+    "comment": "**/x/**/y matches a/x/b/y",
+    "patterns": ["**/x/**/y"],
+    "path": "a/x/b/y",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y matches x/b/y (outer ** matches empty)",
+    "patterns": ["**/x/**/y"],
+    "path": "x/b/y",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y matches a/b/x/c/d/y (multiple components between)",
+    "patterns": ["**/x/**/y"],
+    "path": "a/b/x/c/d/y",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y matches x/y (both ** match empty)",
+    "patterns": ["**/x/**/y"],
+    "path": "x/y",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y does not match a/b/c (no x or y)",
+    "patterns": ["**/x/**/y"],
+    "path": "a/b/c",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y does not match x/a/b/c (x present but no y after)",
+    "patterns": ["**/x/**/y"],
+    "path": "x/a/b/c",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y does not match a/b/y (y present but no x before)",
+    "patterns": ["**/x/**/y"],
+    "path": "a/b/y",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y does not match y/x (x comes after y)",
+    "patterns": ["**/x/**/y"],
+    "path": "y/x",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y/**/z matches a/x/b/y/c/z",
+    "patterns": ["**/x/**/y/**/z"],
+    "path": "a/x/b/y/c/z",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y/**/z does not match a/b/c/d/e/f (no x, y, z)",
+    "patterns": ["**/x/**/y/**/z"],
+    "path": "a/b/c/d/e/f",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y does not match deep path with no x or y",
+    "patterns": ["**/x/**/y"],
+    "path": "a/a/a/a/a/a/a/a/a/a",
+    "expected": false
+  },
+  {
     "comment": "**file matches file (suffix, any position)",
     "patterns": ["**file"],
     "path": "file",

@@ -185,99 +185,57 @@ proc buildTarHeader(
 ## ---------------------------------------------------------------------------
 ## Glob pattern matching
 
-proc globMatchImpl(
+proc matchOneChar(
     path:    string,
     pattern: string,
     si, pi:  int,
-    memo:    var seq[int8],
-): bool =
-  ## memo uses 0 = unvisited, 1 = true, 2 = false so zero-init suffices.
-  let memoIdx = si * (pattern.len + 1) + pi
-  if memo[memoIdx] != 0:
-    return memo[memoIdx] == 1
-  block match:
-    var si = si
-    var pi = pi
-    while pi < pattern.len and si < path.len:
-      if pattern[pi] == '*':
-        let doubleStar = pi + 1 < pattern.len and pattern[pi + 1] == '*'
-        if doubleStar:
-          pi += 2
-          ## Consume the '/' after '**' if present.  When a slash was
-          ## consumed the remaining sub-pattern must start on a path-
-          ## component boundary (e.g. '**/.foo' must not match 'bar.foo').
-          ## Without a slash (e.g. '**file') any position is valid, which
-          ## is how Go's suffixMatch handles the case.
-          let hadSlash = pi < pattern.len and pattern[pi] == '/'
-          if hadSlash:
-            inc pi
-          if pi >= pattern.len:
-            result = true
-            break match
-          while si <= path.len:
-            if not hadSlash or si == 0 or path[si - 1] == '/':
-              if globMatchImpl(path, pattern, si, pi, memo):
-                result = true
-                break match
-            inc si
-          result = false
-          break match
-        else:
-          inc pi
-          while si < path.len and path[si] != '/':
-            if globMatchImpl(path, pattern, si, pi, memo):
-              result = true
-              break match
-            inc si
-          result = globMatchImpl(path, pattern, si, pi, memo)
-          break match
-      elif pattern[pi] == '?' and path[si] != '/':
-        inc pi
-        inc si
-      elif pattern[pi] == '[':
-        inc pi  ## skip '['
-        let negate = pi < pattern.len and (pattern[pi] == '!' or pattern[pi] == '^')
-        if negate: inc pi
-        var classMatched = false
-        var first = true
-        while pi < pattern.len and (first or pattern[pi] != ']'):
-          first = false
-          if pattern[pi] == '\\' and pi + 1 < pattern.len:
-            inc pi
-            if path[si] == pattern[pi]: classMatched = true
-            inc pi
-          elif pi + 2 < pattern.len and pattern[pi + 1] == '-' and pattern[pi + 2] != ']':
-            if path[si] >= pattern[pi] and path[si] <= pattern[pi + 2]: classMatched = true
-            pi += 3
-          else:
-            if path[si] == pattern[pi]: classMatched = true
-            inc pi
-        if pi >= pattern.len:
-          result = false  ## unterminated '[': no match
-          break match
-        inc pi  ## skip ']'
-        let classHit = if negate: not classMatched else: classMatched
-        if path[si] == '/' or not classHit:
-          result = false
-          break match
-        inc si
-      elif pattern[pi] == '\\' and pi + 1 < pattern.len:
-        inc pi  ## skip '\'
-        if path[si] != pattern[pi]:
-          result = false
-          break match
-        inc pi
-        inc si
-      elif pattern[pi] == path[si]:
-        inc pi
-        inc si
+): tuple[matched: bool, newPi: int] =
+  ## Match path[si] against the pattern element starting at pi.
+  ## Returns (matched, newPi). Does not handle '*' -- caller manages wildcards.
+  if si >= path.len or pi >= pattern.len:
+    return (false, pi)
+  case pattern[pi]
+  of '?':
+    if path[si] == '/':
+      return (false, pi)
+    return (true, pi + 1)
+  of '[':
+    var p = pi + 1
+    let negate = p < pattern.len and (pattern[p] == '!' or pattern[p] == '^')
+    if negate:
+      inc p
+    var classMatched = false
+    var first = true
+    while p < pattern.len and (first or pattern[p] != ']'):
+      first = false
+      if pattern[p] == '\\' and p + 1 < pattern.len:
+        inc p
+        if path[si] == pattern[p]:
+          classMatched = true
+        inc p
+      elif p + 2 < pattern.len and pattern[p + 1] == '-' and pattern[p + 2] != ']':
+        if path[si] >= pattern[p] and path[si] <= pattern[p + 2]:
+          classMatched = true
+        p += 3
       else:
-        result = false
-        break match
-    while pi < pattern.len and pattern[pi] == '*':
-      inc pi
-    result = pi == pattern.len and si == path.len
-  memo[memoIdx] = if result: 1 else: 2
+        if path[si] == pattern[p]:
+          classMatched = true
+        inc p
+    if p >= pattern.len:
+      return (false, pi)  ## unterminated '[': no match
+    inc p  ## skip ']'
+    let classHit = if negate: not classMatched else: classMatched
+    if path[si] == '/' or not classHit:
+      return (false, pi)
+    return (true, p)
+  of '\\':
+    if pi + 1 < pattern.len and path[si] == pattern[pi + 1]:
+      return (true, pi + 2)
+    return (false, pi)
+  else:
+    if path[si] == pattern[pi]:
+      return (true, pi + 1)
+    return (false, pi)
 
 proc globMatch*(path, pattern: string): bool =
   ## Match path against a glob pattern.
@@ -286,8 +244,90 @@ proc globMatch*(path, pattern: string): bool =
   ## ** matches any run of characters including path separators.
   ## [abc], [a-z], [!a-z] match character classes (/ never matches inside []).
   ## \x matches the literal character x.
-  var memo = newSeq[int8]((path.len + 1) * (pattern.len + 1))
-  globMatchImpl(path, pattern, 0, 0, memo)
+  ##
+  ## Uses an iterative anchor-stack approach: one saved (si, pi) entry per
+  ## '**' encountered, O(k) space where k = number of '**' segments.
+  type DStarAnchor = tuple[pi: int, si: int, hadSlash: bool]
+  var
+    si     = 0
+    pi     = 0
+    starPi = -1
+    starSi = -1
+    dstars: seq[DStarAnchor]
+
+  while true:
+    ## Consume wildcards at current pattern position.
+    if pi < pattern.len and pattern[pi] == '*':
+      if pi + 1 < pattern.len and pattern[pi + 1] == '*':
+        ## Double star: save anchor and skip past '**[/]'.
+        var dpi = pi + 2
+        ## Consume the '/' after '**' if present.  When a slash was
+        ## consumed the remaining sub-pattern must start on a path-
+        ## component boundary (e.g. '**/.foo' must not match 'bar.foo').
+        ## Without a slash (e.g. '**file') any position is valid.
+        let hadSlash = dpi < pattern.len and pattern[dpi] == '/'
+        if hadSlash:
+          inc dpi
+        if dpi >= pattern.len:
+          return true  ## '**' at end of pattern matches everything remaining
+        dstars.add((pi: dpi, si: si, hadSlash: hadSlash))
+        pi = dpi
+        starPi = -1
+        starSi = -1
+      else:
+        ## Single star: save anchor and skip past '*'.
+        starPi = pi + 1
+        starSi = si
+        inc pi
+      continue
+
+    ## Try to match one path character against the current pattern element.
+    if si < path.len:
+      let (matched, newPi) = matchOneChar(path, pattern, si, pi)
+      if matched:
+        pi = newPi
+        inc si
+        continue
+
+    ## Check whether both pattern and path are exhausted.
+    ## Trailing lone '*'s (not '**') are allowed to match empty.
+    block checkComplete:
+      var pp = pi
+      while pp < pattern.len and pattern[pp] == '*' and
+            (pp + 1 >= pattern.len or pattern[pp + 1] != '*'):
+        inc pp
+      if pp == pattern.len and si == path.len:
+        return true
+
+    ## Mismatch: backtrack.
+    ## 1. Single-star anchor: advance one non-'/' path character and retry.
+    if starPi >= 0 and starSi < path.len and path[starSi] != '/':
+      inc starSi
+      si = starSi
+      pi = starPi
+      continue
+
+    ## 2. Double-star stack: advance the most-recent anchor to the next
+    ##    valid path position and retry.  For hadSlash anchors only
+    ##    component boundaries (si == 0 or path[si-1] == '/') are valid.
+    block tryDstar:
+      while dstars.len > 0:
+        inc dstars[^1].si
+        if dstars[^1].si > path.len:
+          dstars.setLen(dstars.len - 1)
+          starPi = -1
+          starSi = -1
+          continue
+        if dstars[^1].hadSlash and
+           dstars[^1].si > 0 and
+           path[dstars[^1].si - 1] != '/':
+          continue  ## not a component boundary; try next position
+        si = dstars[^1].si
+        pi = dstars[^1].pi
+        starPi = -1
+        starSi = -1
+        break tryDstar
+      return false
 
 proc isExcluded*(relPath: string, patterns: seq[string]): bool =
   ## Returns true if relPath should be excluded given the ordered pattern list.
