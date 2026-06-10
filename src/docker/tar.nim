@@ -387,7 +387,7 @@ proc hasNegationForDir*(norm: string, patterns: seq[string]): bool =
       ## then be re-included via the ancestor check in isExcluded.
       if globMatch(norm, p):
         return true
-    if "**" in p:
+    elif "**" in p:
       return true
     ## Check if the prefix of `p` at the same directory depth as `norm`
     ## glob-matches `norm`.  This handles wildcarded slash patterns such as
