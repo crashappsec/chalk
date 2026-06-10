@@ -46,8 +46,9 @@ const
 ##
 ## registry: strategy, blob_digest, blob_size, skipped_files
 ## local:    strategy, tar_path, tar_hash, skipped_files
-## disk:     strategy, context_path, dockerfile_path, size_threshold,
-##           additional_dockerignore, honor_dockerignore, max_file_size
+## disk:     strategy, context_path, dockerfile_path, registry_name, push_name,
+##           size_threshold, additional_dockerignore, honor_dockerignore,
+##           max_file_size
 
 type
   ContextTooLargeError = object of CatchableError
@@ -186,10 +187,13 @@ proc contextToTarGz*(
       sizeThreshold = sizeThreshold,
     )
     return (outPath, skippedFiles)
-  except TarSizeLimitError:
+  except:
     if fileExists(outPath):
       removeFile(outPath)
-    raise newException(ContextTooLargeError, getCurrentExceptionMsg())
+    dumpExOnDebug()
+    if getCurrentException() of TarSizeLimitError:
+      raise newException(ContextTooLargeError, getCurrentExceptionMsg())
+    raise
 
 proc newContextManifest(
     image:       DockerImage,
@@ -447,7 +451,7 @@ proc completeBuildContextUpload(
     let
       sizeThreshold          = snapshot{"size_threshold"}.getInt(0)
       additionalDockerignore = snapshot{"additional_dockerignore"}.getStrElems()
-      honorDockerignore      = snapshot{"honor_dockerignore"}.getBool(false)
+      honorDockerignore      = snapshot{"honor_dockerignore"}.getBool(true)
       maxFileSize            = int64(snapshot{"max_file_size"}.getInt(0))
       dockerfilePath         = snapshot{"dockerfile_path"}.getStr("")
       snapshotRegistryName   = snapshot{"registry_name"}.getStr("")

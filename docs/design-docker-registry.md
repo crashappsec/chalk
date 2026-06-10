@@ -408,7 +408,7 @@ completes the attestation manifest creation.
 | Key                              | Kind       | Type                                                          | Description                                                                                                 |
 | -------------------------------- | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `DOCKER_BUILD_CONTEXT_SNAPSHOTS` | chalk-time | `dict[string, dict[string, dict[string, dict[string, \`x]]]]` | Intermediate upload state: `registry -> repo -> context name -> strategy config`                            |
-| `_REPO_BUILD_CONTEXTS`           | runtime    | `dict[string, dict[string, dict[string, string]]}`            | Context manifest digests: `registry -> repo -> context name -> context manifest digest (no sha256: prefix)` |
+| `_REPO_BUILD_CONTEXTS`           | runtime    | `dict[string, dict[string, dict[string, string]]]`            | Context manifest digests: `registry -> repo -> context name -> context manifest digest (no sha256: prefix)` |
 
 ### Limitations
 

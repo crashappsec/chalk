@@ -185,14 +185,9 @@ proc buildTarHeader(
 ## ---------------------------------------------------------------------------
 ## Glob pattern matching
 
-proc globMatch*(path, pattern: string): bool =
-  ## Match path against a glob pattern.
-  ## * matches any run of non-separator characters.
-  ## ? matches any single non-separator character.
-  ## ** matches any run of characters including path separators.
-  ## [abc], [a-z], [!a-z] match character classes (/ never matches inside []).
-  ## \x matches the literal character x.
-  var pi, si = 0
+proc globMatchImpl(path, pattern: string, si, pi: int): bool =
+  var si = si
+  var pi = pi
   while pi < pattern.len and si < path.len:
     if pattern[pi] == '*':
       let doubleStar = pi + 1 < pattern.len and pattern[pi + 1] == '*'
@@ -210,17 +205,17 @@ proc globMatch*(path, pattern: string): bool =
           return true
         while si <= path.len:
           if not hadSlash or si == 0 or path[si - 1] == '/':
-            if globMatch(path[si .. ^1], pattern[pi .. ^1]):
+            if globMatchImpl(path, pattern, si, pi):
               return true
           inc si
         return false
       else:
         inc pi
         while si < path.len and path[si] != '/':
-          if globMatch(path[si .. ^1], pattern[pi .. ^1]):
+          if globMatchImpl(path, pattern, si, pi):
             return true
           inc si
-        return globMatch(path[si .. ^1], pattern[pi .. ^1])
+        return globMatchImpl(path, pattern, si, pi)
     elif pattern[pi] == '?' and path[si] != '/':
       inc pi
       inc si
@@ -261,6 +256,15 @@ proc globMatch*(path, pattern: string): bool =
   while pi < pattern.len and pattern[pi] == '*':
     inc pi
   return pi == pattern.len and si == path.len
+
+proc globMatch*(path, pattern: string): bool =
+  ## Match path against a glob pattern.
+  ## * matches any run of non-separator characters.
+  ## ? matches any single non-separator character.
+  ## ** matches any run of characters including path separators.
+  ## [abc], [a-z], [!a-z] match character classes (/ never matches inside []).
+  ## \x matches the literal character x.
+  globMatchImpl(path, pattern, 0, 0)
 
 proc isExcluded*(relPath: string, patterns: seq[string]): bool =
   ## Returns true if relPath should be excluded given the ordered pattern list.
