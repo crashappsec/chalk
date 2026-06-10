@@ -2358,9 +2358,12 @@ over anything in `.dockerignore`.
 Pattern syntax follows Docker `.dockerignore` conventions (see
 `honor_dockerignore` for the full rule reference).  Key points:
 
-- Patterns without a `/` (after stripping leading/trailing slashes) are
-  matched against the basename of each path at any depth -- e.g. `*.pyc`
-  excludes `src/main.pyc`, not just root-level `.pyc` files.
+- All patterns are matched against the full relative path from the context
+  root.  Because `*` and `?` never cross `/`, a no-slash pattern like `*.pyc`
+  only matches root-level entries (`foo.pyc`), NOT `src/main.pyc`.  A path is
+  also excluded when an ancestor directory matches the pattern (e.g. excluding
+  `logs` also excludes `logs/debug.log`), but the ancestor check still uses the
+  full path, so `*.pyc` does not exclude `a/b/c.pyc`.
 - Patterns with a `/` are matched against the full relative path from the
   context root -- e.g. `build/*.o` only matches inside a root-level `build/`.
 - `*` matches any sequence of non-`/` characters; `?` matches a single
@@ -2401,24 +2404,27 @@ Pattern file format:
 Pattern matching rules (mirrors Moby `fileutils.PatternMatcher` /
 Go `filepath.Match` extended with `**`):
 
-- **No-slash patterns** (no `/` after stripping): matched against the
-  basename (last path component) at any depth.  Example: `.git` excludes
-  `vendor/.git` as well as the root `.git`.
-- **Slash patterns** (contain `/` after stripping): matched against the
-  full relative path from the context root.  Example: `build/*.o` only
-  matches files directly inside a root-level `build/` directory.
-- A path also matches if any ancestor directory matches the pattern (using
-  the same no-slash vs. slash rule).
+- All patterns are matched against the full relative path from the context
+  root.  Because `*` and `?` never cross `/`, a no-slash pattern like `.git`
+  only matches the root-level `.git` entry -- NOT `vendor/.git` or `a/.git`.
+  Likewise `*.tmp` excludes `foo.tmp` but not `a/b/foo.tmp`.
+- Slash patterns (containing `/` after stripping) are also matched against the
+  full relative path.  Example: `build/*.o` only matches files directly inside
+  a root-level `build/` directory.
+- A path also matches if any ancestor directory matches the pattern (full-path
+  check): excluding `logs` also excludes `logs/debug.log`, but does not exclude
+  `a/logs/debug.log`.
 - Glob characters: `*` (non-`/` run), `?` (single non-`/`), `**` (path-
   crossing run), `[abc]`/`[a-z]`/`[!abc]` (character classes, `/` never
   matches inside `[]`), backslash (literal character escape).
 - Patterns beginning with `!` re-include previously excluded paths.
 - Evaluation is ordered; the **last matching pattern wins**.
 - When a directory is excluded, Chalk skips recursing into it unless a
-  negation pattern could re-include entries inside: no-slash negation
-  (basename match at any depth), negation containing `**`, or a slash
-  negation whose directory prefix at the same depth glob-matches the
-  excluded directory (e.g. `!logs_*/f` recurses into `logs_app/`).
+  negation pattern could re-include entries inside: a no-slash negation
+  whose pattern matches the directory name itself (e.g. `!logs` recurses
+  into `logs/`), a negation containing `**`, or a slash negation whose
+  directory prefix at the same depth glob-matches the excluded directory
+  (e.g. `!logs_*/f` recurses into `logs_app/`).
 """
   }
 }

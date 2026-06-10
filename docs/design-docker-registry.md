@@ -202,10 +202,11 @@ chalk configuration always has the final say over what is included or excluded.
 
 Chalk prunes recursion into an excluded directory unless a negation pattern
 could re-include files inside it. A negation pattern can reach inside an
-excluded directory when it has no `/` (basename patterns match at any depth),
-contains `**`, or is a slash pattern whose directory prefix at the same depth
-as the excluded directory glob-matches the directory name (e.g.
-`!logs_*/important.log` reaches inside `logs_app/`). This matches Docker's
+excluded directory when the pattern glob-matches the directory name itself
+(no-`/` patterns), contains `**`, or is a slash pattern whose directory prefix
+at the same depth as the excluded directory glob-matches the directory name
+(e.g. `!logs_*/important.log` reaches inside `logs_app/`). This matches
+Docker's
 own pruning behaviour.
 
 #### Ignore-file selection
@@ -229,34 +230,33 @@ Rules for parsing the ignore file
 - Lines beginning with `#` are treated as comments and ignored.
 - Leading `/` is stripped from each pattern: all paths are relative to the
   context root, so a leading slash is meaningless.
-- Trailing `/` signals directory intent but is stripped before matching; the
-  resulting pattern is then subject to the no-slash matching rule below.
+- Trailing `/` signals directory intent but is stripped before matching.
 
 #### Pattern matching rules
 
-Chalk implements the same matching logic as Moby's `fileutils.PatternMatcher`
-([source](https://github.com/moby/moby/blob/master/pkg/fileutils/fileutils.go)).
-Glob expansion uses Go's `filepath.Match` extended with `**`
-([reference](https://pkg.go.dev/path/filepath#Match)):
+Chalk implements the same matching logic as Moby's `patternmatcher.MatchesOrParentMatches`
+([source](https://github.com/moby/patternmatcher)).
+Glob expansion uses Go's `filepath.Match` extended with `**`:
 
 **No-slash vs. slash patterns**
 
-The most important rule:
+All patterns -- with or without `/` -- are matched against the **full relative
+path** from the context root. `*` never crosses `/`. Examples:
 
-- **Pattern contains no `/`** (after stripping leading and trailing `/`):
-  matched against the **basename** (last path component) of the candidate at
-  any depth. For example, `*.pyc` excludes `src/main.pyc`, and `.git` excludes
-  `vendor/.git` as well as the root `.git`.
-- **Pattern contains a `/`**: matched against the **full relative path** from
-  the context root. For example, `build/*.o` only matches files directly inside
-  a root-level `build/` directory.
+- `*.pyc` only excludes root-level `*.pyc` files (`src/main.pyc` is NOT
+  excluded).
+- `.git` only excludes a root-level `.git` entry (`vendor/.git` is NOT
+  excluded).
+- `build/*.o` only matches files directly inside a root-level `build/`
+  directory.
 
 **Ancestor matching**
 
-A file also matches a pattern if any of its **ancestor directories** matches
-the same pattern (using the same no-slash vs. slash rule). This is how `logs/`
-(stripped to `logs`, no slash - basename rule applies) covers
-`a/logs/debug.log`: the ancestor `a/logs` has basename `logs`, which matches.
+A file also matches a pattern if any of its **ancestor directory paths**
+matches the same pattern via a full-path match. For example, pattern `logs`
+excludes `logs/debug.log` because the ancestor path `logs` equals `logs`.
+However, `logs` does NOT exclude `a/logs/debug.log` because the ancestor path
+`a/logs` does not equal `logs`.
 
 **Glob characters**
 
@@ -282,8 +282,9 @@ later positive pattern overrides an earlier negation.
 When a directory entry matches an exclusion pattern, Chalk skips recursing into
 it entirely unless any negation pattern could re-include files inside:
 
-- A negation pattern **without** `/` can match files inside any directory (via
-  basename rule), so recursion is always kept when such a pattern exists.
+- A negation pattern **without** `/` whose glob matches the excluded directory
+  name itself causes recursion (the directory would be re-included, so its
+  children must be visited).
 - A negation pattern containing `**` can cross directory boundaries, so
   recursion is always kept when such a pattern exists.
 - A negation pattern **with** `/` whose directory prefix at the same depth as
@@ -303,15 +304,16 @@ And `additional_dockerignore: ["*.tmp", "!keep.tmp"]`, the effective
 pattern list is:
 
 ```
-logs/               # from .dockerignore - excludes any dir named logs at any depth
+logs/               # from .dockerignore - excludes root-level 'logs' dir and its children
 !logs/important.log # from .dockerignore - re-includes logs/important.log (full path)
-*.tmp               # from chalk config - excludes *.tmp files at any depth
-!keep.tmp           # from chalk config - re-includes keep.tmp at any depth
+*.tmp               # from chalk config - excludes root-level *.tmp files
+!keep.tmp           # from chalk config - re-includes root-level keep.tmp
 ```
 
 Because chalk config patterns come last, `!keep.tmp` overrides any earlier
-exclusion of `keep.tmp`, and `*.tmp` overrides `.dockerignore` rules for
-`.tmp` files at any depth.
+exclusion of `keep.tmp`. Note that `*.tmp` only excludes root-level `.tmp`
+files (not `subdir/foo.tmp`), and `logs/` only excludes the root-level `logs`
+directory (not `a/logs/`).
 
 ### Per-file Size Limit
 

@@ -1,79 +1,72 @@
-import std/[os, osproc, strutils]
+import std/[
+  os,
+  osproc,
+  strutils,
+]
 import ../../src/docker/tar
+import ../equivalency/dockerignore/check_nim
 
 template check(cond: untyped) =
   doAssert cond, "failed: " & astToStr(cond)
 
+## ---------------------------------------------------------------------------
+## testGlobMatch
+##
+## Tests the raw globMatch() function (path-component-aware pattern matching
+## without ancestor-directory propagation).
+##
+## Test cases derived from moby/patternmatcher matchTests
+## (https://github.com/moby/patternmatcher/blob/main/patternmatcher_test.go),
+## which test the low-level filepath.Match-like pattern matching.
+## Cases that depend on the ancestor-propagation logic of Matches() /
+## MatchesOrParentMatches() are tested via runEquivalencyTests() below.
+
 proc testGlobMatch() =
-  ## Exact matches
-  check globMatch("foo", "foo")
-  check not globMatch("foo", "bar")
+  ## Exact match
+  check globMatch("abc", "abc")
+  check not globMatch("abc", "def")
   check globMatch("", "")
-  check not globMatch("foo", "")
-  check not globMatch("", "foo")
+  check not globMatch("abc", "")
+  check not globMatch("", "abc")
+  check globMatch("abc.def", "abc.def")
+  check not globMatch("abc.def", "abcdef")
+  check not globMatch("abc.def", "abcZdef")
 
   ## * matches any run of non-separator characters
-  check globMatch("foo.nim", "*.nim")
-  check globMatch("foo", "*")
-  check not globMatch("a/foo.nim", "*.nim")
-  check not globMatch("foo/bar", "*")
-
-  ## * at end
-  check globMatch("foo/bar", "foo/*")
-  check not globMatch("foo/bar/baz", "foo/*")
-
-  ## * in middle
-  check globMatch("foo.nim", "foo.*")
-  check globMatch("fooxbar", "foo*bar")
-  check not globMatch("foo/bar", "foo*bar")
+  check globMatch("abc", "*")
+  check not globMatch("a/b", "*")
+  check globMatch("abc", "*c")
+  check globMatch("a", "a*")
+  check globMatch("abc", "a*")
+  check not globMatch("ab/c", "a*")      ## * never crosses /
+  check globMatch("abc/b", "a*/b")
+  check not globMatch("a/c/b", "a*/b")
+  check globMatch("axbxcxdxe/f", "a*b*c*d*e*/f")
+  check globMatch("axbxcxdxexxx/f", "a*b*c*d*e*/f")
+  check not globMatch("axbxcxdxe/xxx/f", "a*b*c*d*e*/f")
+  check not globMatch("axbxcxdxexxx/fff", "a*b*c*d*e*/f")
+  check globMatch("abxbbxdbxebxczzx", "a*b?c*x")
+  check not globMatch("abxbbxdbxebxczzy", "a*b?c*x")
+  check globMatch("xxx", "*x")
 
   ## ? matches any single non-separator character
-  check globMatch("foo", "f?o")
-  check globMatch("fao", "f?o")
-  check not globMatch("fo", "f?o")
-  check not globMatch("fooo", "f?o")
-  check not globMatch("f/o", "f?o")
+  check globMatch("abcZdef", "abc?def")
+  check not globMatch("abcdef", "abc?def")
+  check not globMatch("a/b", "a?b")     ## ? never crosses /
+  check not globMatch("a/b", "a*b")     ## * never crosses /
 
-  ## ** matches across path separators
-  check globMatch("a/b/c.nim", "**/*.nim")
-  check globMatch("foo.nim", "**/*.nim")
-  check globMatch("a/b/c", "**")
-  check globMatch("foo", "**")
-  check globMatch("a/b/c/d", "a/**/d")
-  check globMatch("a/d", "a/**/d")
-  check not globMatch("a/b/c/e", "a/**/d")
+  ## character classes [abc], [a-z], [!a-z]
+  check globMatch("abc", "ab[c]")
+  check globMatch("abc", "ab[b-d]")
+  check not globMatch("abc", "ab[e-g]")
+  check not globMatch("abc", "ab[^c]")
+  check not globMatch("abc", "ab[^b-d]")
+  check globMatch("abc", "ab[^e-g]")
+  check not globMatch("/", "[abc]")     ## / never matches inside []
 
-  ## ** at end
-  check globMatch("a/b/c", "a/**")
-  check globMatch("a/b", "a/**")
-  check not globMatch("b/c", "a/**")
-
-  ## Trailing characters after **
-  check globMatch("src/docker/tar.nim", "src/**/*.nim")
-  check not globMatch("src/docker/tar.c", "src/**/*.nim")
-
-  ## Character classes [abc]
-  check globMatch("a", "[abc]")
-  check globMatch("b", "[abc]")
-  check globMatch("c", "[abc]")
-  check not globMatch("d", "[abc]")
-  check not globMatch("/", "[abc]")
-
-  ## Character class range [a-z]
-  check globMatch("m", "[a-z]")
-  check not globMatch("M", "[a-z]")
-  check globMatch("9", "[0-9]")
-  check not globMatch("a", "[0-9]")
-
-  ## Negated class [!abc]
-  check not globMatch("a", "[!abc]")
-  check globMatch("d", "[!abc]")
-  check not globMatch("/", "[!abc]")
-
-  ## Classes inside longer patterns
-  check globMatch("foo.c", "foo.[ch]")
-  check globMatch("foo.h", "foo.[ch]")
-  check not globMatch("foo.x", "foo.[ch]")
+  ## dot patterns
+  check globMatch(".foo", ".*")
+  check not globMatch("foo", ".*")
 
   ## Escape \x matches literal x
   check globMatch("*", "\\*")
@@ -81,76 +74,72 @@ proc testGlobMatch() =
   check globMatch("?", "\\?")
   check not globMatch("a", "\\?")
 
-proc testIsExcluded() =
-  ## No patterns: never excluded
-  check not isExcluded("foo", @[])
-  check not isExcluded("foo/bar", @[])
+  ## ** at end: matches everything rooted at prefix
+  check globMatch("abc/def", "abc/**")
+  check globMatch("abc/def/ghi", "abc/**")
+  check not globMatch("abc", "abc/**")  ## requires at least one component
 
-  ## Single positive pattern
-  check isExcluded(".git", @[".git"])
-  check not isExcluded("src", @[".git"])
+  ## ** at start: suffix match (no '/' after **): any position including mid-component
+  check globMatch("file", "**")
+  check globMatch("dir/file", "**")
+  check globMatch("dir/dir/file", "**")
+  check globMatch("file", "**file")
+  check globMatch("dir/file", "**file")
+  check globMatch("dir/dir/file", "**file")
+  check globMatch("dir/dir/file.txt", "**/file*.txt")
+  check not globMatch("dir/dir/file.txt", "**/**/*.txt2")
 
-  ## Docker semantics: no-slash patterns match by basename at any depth.
-  check isExcluded("a/.git", @[".git"])          ## basename .git matches
-  check isExcluded("a/b/.git", @[".git"])        ## basename .git matches
-  check isExcluded("a/.git/config", @[".git"])   ## ancestor .git basename match
-  check not isExcluded("a/b/src", @[".git"])     ## no match
-  ## Ancestor check: files inside a matched dir are also excluded.
-  check isExcluded(".git/config", @[".git"])
-  check isExcluded(".git/hooks/pre-commit", @[".git"])
+  ## **/ prefix: boundary match only (suffix must start at a path boundary)
+  check globMatch("dir/file", "**/file")
+  check globMatch("dir/dir/file", "**/file")
+  check globMatch(".foo", "**/.foo")
+  check not globMatch("bar.foo", "**/.foo")   ## bar.foo does not have '/.foo' as suffix
+  check globMatch("dir/.foo", "**/.foo")
+  check globMatch("foo/bar", "**/foo/bar")
+  check globMatch("dir/foo/bar", "**/foo/bar")
+  check globMatch("dir/dir2/foo/bar", "**/foo/bar")
 
-  ## Trailing-slash stripped; no-slash pattern matches by basename at any depth.
-  check isExcluded("logs/app.log", @["logs/"])
-  check isExcluded("a/logs/app.log", @["logs/"])  ## ancestor basename match
+  ## ** in middle
+  check globMatch("dir/dir2/file", "**/dir2/*")
+  check globMatch("dir/dir2/dir3/file", "**/dir2/**")
+  check globMatch("dir/dir/file.txt", "**/**/*.txt")
+  check globMatch("file.txt", "**/*.txt")
+  check globMatch("file.txt", "**/**/*.txt")
 
-  ## Pattern with an internal '/' matches the full relative path only
-  check isExcluded("build/output.o", @["build/*.o"])
-  check not isExcluded("a/build/output.o", @["build/*.o"])
+  ## a** (** not at position 0): anchored prefix then wildcard-suffix
+  check globMatch("a/file.txt", "a**/*.txt")
+  check globMatch("a/dir/file.txt", "a**/*.txt")
+  check globMatch("a/dir/dir/file.txt", "a**/*.txt")
+  check not globMatch("a/dir/file.txt", "a/*.txt")   ## single * does not cross /
+  check globMatch("a/file.txt", "a/*.txt")
 
-  ## Glob pattern without '/' matches by basename at any depth
-  check isExcluded("foo.tmp", @["*.tmp"])
-  check isExcluded("a/b/foo.tmp", @["*.tmp"])  ## basename match
-  check not isExcluded("foo.nim", @["*.tmp"])
-
-  ## Last-match-wins: later patterns override earlier ones
-  check not isExcluded(
-    "logs/important.log",
-    @["logs/", "!logs/important.log"],
+  ## special characters that are regex meta but not glob meta
+  check globMatch("a(b)c/def", "a(b)c/def")
+  check not globMatch("a(b)c/xyz", "a(b)c/def")
+  check globMatch("a.|)$(}+{bc", "a.|)$(}+{bc")
+  check globMatch(
+    "dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl",
+    "dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl",
   )
-  check isExcluded(
-    "logs/other.log",
-    @["logs/", "!logs/important.log"],
-  )
-
-  ## Negation re-includes after exclusion
-  check not isExcluded(
-    "keep.tmp",
-    @["*.tmp", "!keep.tmp"],
-  )
-  check isExcluded(
-    "other.tmp",
-    @["*.tmp", "!keep.tmp"],
-  )
-
-  ## Chalk config patterns (appended last) take final precedence
-  ## over .dockerignore patterns
-  check isExcluded(
-    "logs/important.log",
-    @["logs/", "!logs/important.log", "logs/"],
-  )
-  check not isExcluded(
-    "logs/important.log",
-    @["logs/", "logs/", "!logs/important.log"],
+  check globMatch(
+    "dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl",
+    "dist/*.whl",
   )
 
-  ## ** glob in isExcluded
-  check isExcluded("a/b/secret.key", @["**/*.key"])
-  check not isExcluded("a/b/secret.pub", @["**/*.key"])
+
+## ---------------------------------------------------------------------------
+## testHasNegationForDir
+##
+## Tests hasNegationForDir(), which decides whether to recurse into a
+## directory that is otherwise excluded.
 
 proc testHasNegationForDir() =
-  ## No-slash negation: always recurse (basename can match at any depth).
-  check hasNegationForDir("logs", @["!*.log"])
-  check hasNegationForDir("a/b", @["!important"])
+  ## No-slash negation: recurse only when the pattern matches norm itself.
+  check not hasNegationForDir("logs", @["!*.log"])    ## '*.log' doesn't match 'logs'
+  check not hasNegationForDir("a/b", @["!important"]) ## 'important' doesn't match 'a/b'
+  check hasNegationForDir("logs", @["!logs"])         ## 'logs' matches 'logs'
+  check hasNegationForDir("foo", @["!foo"])
+  check not hasNegationForDir("bar", @["!foo"])
 
   ## Literal-prefix slash negation: recurse into the targeted dir.
   check hasNegationForDir("logs", @["!logs/important.log"])
@@ -158,20 +147,27 @@ proc testHasNegationForDir() =
 
   ## ** negation: always recurse.
   check hasNegationForDir("logs", @["!**/important.log"])
+  check hasNegationForDir("a/b", @["!**/important.log"])
 
-  ## Wildcarded slash negation: recurse when the prefix glob-matches norm.
-  check hasNegationForDir("logs_app",  @["!logs_*/important.log"])
+  ## Wildcarded slash negation: recurse when prefix glob-matches norm.
+  check hasNegationForDir("logs_app", @["!logs_*/important.log"])
   check not hasNegationForDir("other", @["!logs_*/important.log"])
 
   ## Multi-level norm with wildcarded prefix.
-  check hasNegationForDir("a/b2",    @["!a/b[0-9]/file.txt"])
+  check hasNegationForDir("a/b2", @["!a/b[0-9]/file.txt"])
   check not hasNegationForDir("a/c", @["!a/b[0-9]/file.txt"])
+
+  ## Empty pattern list: never recurse.
+  check not hasNegationForDir("logs", @[])
 
   ## Positive patterns are ignored.
   check not hasNegationForDir("logs", @["logs/"])
 
+
+## ---------------------------------------------------------------------------
+## testWriteTarGz
+
 proc listTarGzFiles(path: string): seq[string] =
-  ## Return all entry names from a .tar.gz archive using the system tar command.
   let (output, exitCode) = execCmdEx("tar tf " & path)
   doAssert exitCode == 0, "tar tf failed: " & output
   result = @[]
@@ -195,7 +191,7 @@ proc testWriteTarGz() =
     removeDir(tmpDir)
     removeFile(outPath)
 
-  ## With negation: logs/ excluded but *.log files re-included.
+  ## With slash-prefix negation: logs/ excluded but logs/*.log re-included.
   discard writeTarGz(
     outPath     = outPath,
     contextPath = tmpDir,
@@ -203,17 +199,14 @@ proc testWriteTarGz() =
   )
   let files = listTarGzFiles(outPath)
 
-  ## Files that must be present
   check "app.py" in files
   check "logs/debug.log" in files
   check "logs/app.log" in files
-
-  ## Files that must be absent
   check "logs/temp.tmp" notin files
   check "secrets/api_key.txt" notin files
   check "secrets" notin files
 
-  ## Without negation: entire logs/ subtree must be absent.
+  ## Without negation: entire logs/ subtree absent.
   discard writeTarGz(
     outPath     = outPath,
     contextPath = tmpDir,
@@ -227,8 +220,7 @@ proc testWriteTarGz() =
   check "logs/temp.tmp" notin files2
   check "secrets/api_key.txt" notin files2
 
-  ## Wildcarded slash negation: logs_app/ excluded, but !logs_*/important.log
-  ## re-includes the one file whose parent dir glob-matches logs_*.
+  ## Wildcarded slash negation: logs_app/ excluded, !logs_*/important.log re-includes.
   createDir(tmpDir / "logs_app")
   writeFile(tmpDir / "logs_app" / "important.log", "keep\n")
   writeFile(tmpDir / "logs_app" / "debug.log",     "drop\n")
@@ -240,6 +232,27 @@ proc testWriteTarGz() =
   let files3 = listTarGzFiles(outPath)
   check "logs_app/important.log" in files3
   check "logs_app/debug.log" notin files3
+
+  ## Symlink: entry appears in archive with correct target.
+  let symlinkDir = getTempDir() / "test_tar_symlink_content_" & $getCurrentProcessId()
+  createDir(symlinkDir)
+  defer:
+    removeDir(symlinkDir)
+  createSymlink("/etc/hostname", symlinkDir / "link_to_hostname")
+  discard writeTarGz(
+    outPath     = outPath,
+    contextPath = symlinkDir,
+    patterns    = @[],
+  )
+  let (tarVerbose, tarRc) = execCmdEx("tar tvf " & outPath)
+  check tarRc == 0
+  ## tar -tv output includes the symlink target after ' -> '
+  check "link_to_hostname" in tarVerbose
+  check "/etc/hostname" in tarVerbose
+
+
+## ---------------------------------------------------------------------------
+## testSizeThreshold
 
 proc testSizeThreshold() =
   let tmpDir = getTempDir() / "test_tar_threshold"
@@ -298,11 +311,81 @@ proc testSizeThreshold() =
   check fileExists(outPath)
   removeFile(outPath)
 
+## ---------------------------------------------------------------------------
+## testMaxFileSize
+
+proc testMaxFileSize() =
+  let tmpDir  = getTempDir() / "test_tar_maxfile_" & $getCurrentProcessId()
+  let outPath = getTempDir() / "test_maxfile_out_" & $getCurrentProcessId() & ".tar.gz"
+  createDir(tmpDir)
+  defer:
+    removeDir(tmpDir)
+    removeFile(outPath)
+
+  ## small.txt: 10 bytes -- below limit
+  ## large.txt: 2000 bytes -- above limit
+  writeFile(tmpDir / "small.txt", repeat('x', 10))
+  writeFile(tmpDir / "large.txt", repeat('y', 2000))
+
+  let skipped = writeTarGz(
+    outPath     = outPath,
+    contextPath = tmpDir,
+    patterns    = @[],
+    maxFileSize = 100,
+  )
+
+  ## large.txt must appear in the skipped list
+  check skipped.len == 1
+  check skipped[0].path == "large.txt"
+  check skipped[0].size == 2000
+  ## hash must be a non-empty hex string
+  check skipped[0].hash.len > 0
+  for c in skipped[0].hash:
+    check c in {'0'..'9', 'a'..'f'}
+
+  ## archive must contain small.txt but not large.txt
+  let files = listTarGzFiles(outPath)
+  check "small.txt" in files
+  check "large.txt" notin files
+
+
+## ---------------------------------------------------------------------------
+## testLongPaths
+
+proc testLongPaths() =
+  ## Paths longer than 100 chars require a GNU LongLink preamble entry.
+  ## Verify that writeTarGz emits a readable archive for such paths.
+  let tmpDir  = getTempDir() / "test_tar_longpath_" & $getCurrentProcessId()
+  let outPath = getTempDir() / "test_longpath_out_" & $getCurrentProcessId() & ".tar.gz"
+
+  ## Build a path that exceeds the 100-char ustar name field.
+  let longDir = "a_reasonably_long_directory_name_that_pushes_limits" /
+                "another_long_subdirectory_name_to_exceed_one_hundred"
+  createDir(tmpDir / longDir)
+  writeFile(tmpDir / longDir / "file_with_a_long_name_too.txt", "data\n")
+  defer:
+    removeDir(tmpDir)
+    removeFile(outPath)
+
+  discard writeTarGz(
+    outPath     = outPath,
+    contextPath = tmpDir,
+    patterns    = @[],
+  )
+
+  let files = listTarGzFiles(outPath)
+  let expected = longDir / "file_with_a_long_name_too.txt"
+  check expected.len > 100
+  check expected in files
+
+
 proc main() =
   testGlobMatch()
-  testIsExcluded()
+  runEquivalencyTests()
   testHasNegationForDir()
   testWriteTarGz()
+  testMaxFileSize()
+  testLongPaths()
   testSizeThreshold()
 
 main()

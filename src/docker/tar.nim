@@ -46,6 +46,7 @@ const
   tarLinkNameLen = 100
   tarPrefixLen   = 155
   tarChunkSize   = 65536
+  flushInterval  = 1024 * 1024  ## 1 MiB of uncompressed data between size checks
 
 ## ---------------------------------------------------------------------------
 ## Internal helpers
@@ -197,13 +198,20 @@ proc globMatch*(path, pattern: string): bool =
       let doubleStar = pi + 1 < pattern.len and pattern[pi + 1] == '*'
       if doubleStar:
         pi += 2
-        if pi < pattern.len and pattern[pi] == '/':
+        ## Consume the '/' after '**' if present.  When a slash was
+        ## consumed the remaining sub-pattern must start on a path-
+        ## component boundary (e.g. '**/.foo' must not match 'bar.foo').
+        ## Without a slash (e.g. '**file') any position is valid, which
+        ## is how Go's suffixMatch handles the case.
+        let hadSlash = pi < pattern.len and pattern[pi] == '/'
+        if hadSlash:
           inc pi
         if pi >= pattern.len:
           return true
         while si <= path.len:
-          if globMatch(path[si .. ^1], pattern[pi .. ^1]):
-            return true
+          if not hadSlash or si == 0 or path[si - 1] == '/':
+            if globMatch(path[si .. ^1], pattern[pi .. ^1]):
+              return true
           inc si
         return false
       else:
@@ -256,33 +264,32 @@ proc globMatch*(path, pattern: string): bool =
 
 proc isExcluded*(relPath: string, patterns: seq[string]): bool =
   ## Returns true if relPath should be excluded given the ordered pattern list.
-  ## Matches Docker .dockerignore semantics:
+  ## Implements the same semantics as moby's patternmatcher.MatchesOrParentMatches
+  ## (github.com/moby/patternmatcher). Rules:
   ## - Patterns are processed in order; the last match wins.
   ## - A leading '!' negates the pattern (re-includes a previously excluded path).
   ## - Trailing '/' is stripped before matching (it only signals directory intent).
-  ## - Patterns WITHOUT a '/' are matched against the basename (last path
-  ##   component) at any depth, matching Docker's filepath.Match behavior.
-  ## - Patterns WITH a '/' are matched against the full relative path.
-  ## - A path also matches if any of its ancestor directories matches the
-  ##   pattern (by full path for slash patterns, by basename for no-slash ones).
+  ## - All patterns -- with or without '/' -- are matched against the FULL
+  ##   relative path. '*' never crosses '/'. So '*.log' only excludes root-level
+  ##   '*.log' files, not 'subdir/foo.log'.
+  ## - A path also matches if any of its ancestor directories matches the pattern
+  ##   via a FULL-PATH match (e.g. pattern 'logs' excludes 'logs/debug.log'
+  ##   because ancestor 'logs' == 'logs', but does NOT exclude 'a/logs/debug.log'
+  ##   because ancestor 'a/logs' != 'logs').
   let norm = relPath.replace('\\', '/')
   result = false
   for pat in patterns:
     let
       negate   = pat.startsWith('!')
       p        = (if negate: pat[1 .. ^1] else: pat).strip(chars = {'/'})
-      hasSlash = '/' in p
     if p.len == 0:
       continue
     var matched = globMatch(norm, p)
-    if not matched and not hasSlash:
-      matched = globMatch(lastPathPart(norm), p)
     if not matched:
       var slash = norm.find('/')
       while slash > 0:
         let ancestor = norm[0 ..< slash]
-        if globMatch(ancestor, p) or
-            (not hasSlash and globMatch(lastPathPart(ancestor), p)):
+        if globMatch(ancestor, p):
           matched = true
           break
         slash = norm.find('/', slash + 1)
@@ -295,8 +302,8 @@ proc hasNegationForDir*(norm: string, patterns: seq[string]): bool =
   ##
   ## Under Docker .dockerignore semantics a negation pattern can reach inside
   ## `norm` when:
-  ##   - it has no '/' (matches by basename at any depth, so can reach inside
-  ##     any excluded directory), or
+  ##   - it has no '/' and glob-matches norm itself (meaning norm would be
+  ##     re-included, so its children must be visited too), or
   ##   - it contains '**' (can cross directory boundaries), or
   ##   - it is a slash pattern whose directory prefix at the same depth as
   ##     `norm` glob-matches `norm` (e.g. `!logs_*/f` reaches inside
@@ -308,9 +315,11 @@ proc hasNegationForDir*(norm: string, patterns: seq[string]): bool =
     if p.len == 0:
       continue
     if '/' notin p:
-      ## No-slash negations match by basename at any depth and can re-include
-      ## files inside any excluded directory.
-      return true
+      ## A no-slash negation can re-include files inside norm/ only
+      ## when the pattern matches norm itself -- all descendants would
+      ## then be re-included via the ancestor check in isExcluded.
+      if globMatch(norm, p):
+        return true
     if "**" in p:
       return true
     ## Check if the prefix of `p` at the same directory depth as `norm`
@@ -333,6 +342,8 @@ proc hasNegationForDir*(norm: string, patterns: seq[string]): bool =
   return false
 
 proc checkSizeThreshold(gz: GzFile, sizeThreshold: int64) =
+  ## Unconditionally flush gzip output and raise TarSizeLimitError if the
+  ## compressed output exceeds sizeThreshold.  Used at end of archive.
   if sizeThreshold <= 0:
     return
   discard gzflush(gz, 2)  ## Z_SYNC_FLUSH: flush to fd so gzoffset is accurate
@@ -341,6 +352,24 @@ proc checkSizeThreshold(gz: GzFile, sizeThreshold: int64) =
       TarSizeLimitError,
       "archive exceeded size_threshold of " & $sizeThreshold & " bytes",
     )
+
+proc maybeCheckSize(
+    gz:            GzFile,
+    sizeThreshold: int64,
+    pending:       var int64,
+) =
+  ## Flush and check compressed size only when enough uncompressed data has
+  ## accumulated since the last flush (flushInterval bytes).  Batching flushes
+  ## avoids Z_SYNC_FLUSH overhead on every small entry (dirs, symlinks).
+  if sizeThreshold <= 0 or pending < flushInterval:
+    return
+  discard gzflush(gz, 2)  ## Z_SYNC_FLUSH
+  if gzoffset(gz) > sizeThreshold:
+    raise newException(
+      TarSizeLimitError,
+      "archive exceeded size_threshold of " & $sizeThreshold & " bytes",
+    )
+  pending = 0
 
 proc needsLongLink(relPath: string, isDir: bool): bool =
   ## Returns true when relPath cannot be stored in ustar prefix+name fields.
@@ -355,11 +384,13 @@ proc needsLongLink(relPath: string, isDir: bool): bool =
       return false
   return true
 
-proc writeLongLinkEntry(gz: GzFile, fullPath: string) =
+proc writeLongLinkEntry(gz: GzFile, fullPath: string): int64 =
   ## Emit a GNU tar ././@LongLink preamble for paths that exceed ustar limits.
   ## Readers use this entry's data block as the name for the entry that follows.
+  ## Returns the number of uncompressed bytes written.
   let
     data = fullPath & "\0"
+    pad  = (tarBlock - (data.len mod tarBlock)) mod tarBlock
     hdr  = buildTarHeader(
       relPath  = "././@LongLink",
       size     = int64(data.len),
@@ -369,9 +400,9 @@ proc writeLongLinkEntry(gz: GzFile, fullPath: string) =
     )
   gz.gzWriteAll(hdr)
   gz.gzWriteAll(data)
-  let pad = (tarBlock - (data.len mod tarBlock)) mod tarBlock
   if pad > 0:
     gzWriteZeros(gz, pad)
+  return int64(tarBlock + data.len + pad)
 
 ## ---------------------------------------------------------------------------
 ## Directory walk
@@ -384,6 +415,7 @@ proc addDirToTar(
     maxFileSize:   int64,
     sizeThreshold: int64,
     skippedFiles:  var seq[SkippedFile],
+    pending:       var int64,
 ) =
   for kind, entry in walkDir(baseDir / relDir, relative = true):
     let
@@ -396,20 +428,22 @@ proc addDirToTar(
       let excluded = isExcluded(norm, patterns)
       if not excluded:
         let mtime = full.getLastModificationTime().toUnix()
+        var entryBytes = int64(tarBlock)
         if needsLongLink(relPath = norm, isDir = true):
-          gz.writeLongLinkEntry(norm & "/")
+          entryBytes += gz.writeLongLinkEntry(norm & "/")
         gz.gzWriteAll(buildTarHeader(
           relPath = norm,
           size    = 0,
           isDir   = true,
           mtime   = mtime,
         ))
-        gz.checkSizeThreshold(sizeThreshold)
+        pending += entryBytes
+        maybeCheckSize(gz, sizeThreshold, pending)
       ## Only recurse into an excluded directory when a negation pattern
       ## could re-include files inside it (e.g. "logs/" with "!logs/*.log").
       ## Pruning here avoids walking .git, node_modules, etc. unnecessarily.
       if not excluded or hasNegationForDir(norm, patterns):
-        addDirToTar(gz, baseDir, rel, patterns, maxFileSize, sizeThreshold, skippedFiles)
+        addDirToTar(gz, baseDir, rel, patterns, maxFileSize, sizeThreshold, skippedFiles, pending)
 
     of pcFile:
       if isExcluded(norm, patterns):
@@ -426,8 +460,9 @@ proc addDirToTar(
               " bytes > max_file_size:" & $maxFileSize & " bytes)")
         skippedFiles.add((path: norm, size: size, hash: hash))
         continue
+      var entryBytes = int64(tarBlock)
       if needsLongLink(relPath = norm, isDir = false):
-        gz.writeLongLinkEntry(norm)
+        entryBytes += gz.writeLongLinkEntry(norm)
       gz.gzWriteAll(buildTarHeader(
         relPath = norm,
         size    = size,
@@ -447,9 +482,11 @@ proc addDirToTar(
         let pad = (tarBlock - int(written mod tarBlock)) mod tarBlock
         if pad > 0:
           gzWriteZeros(gz, pad)
+        entryBytes += written + int64(pad)
       finally:
         fh.close()
-      gz.checkSizeThreshold(sizeThreshold)
+      pending += entryBytes
+      maybeCheckSize(gz, sizeThreshold, pending)
 
     of pcLinkToFile, pcLinkToDir:
       if isExcluded(norm, patterns):
@@ -459,8 +496,9 @@ proc addDirToTar(
         target = expandSymlink(full)
         mtime  = full.getLastModificationTime().toUnix()
       trace("docker: context upload: adding symlink " & norm & " -> " & target)
+      var entryBytes = int64(tarBlock)
       if needsLongLink(relPath = norm, isDir = false):
-        gz.writeLongLinkEntry(norm)
+        entryBytes += gz.writeLongLinkEntry(norm)
       gz.gzWriteAll(buildTarHeader(
         relPath    = norm,
         size       = 0,
@@ -468,7 +506,8 @@ proc addDirToTar(
         mtime      = mtime,
         linkTarget = target,
       ))
-      gz.checkSizeThreshold(sizeThreshold)
+      pending += entryBytes
+      maybeCheckSize(gz, sizeThreshold, pending)
 
 ## ---------------------------------------------------------------------------
 ## Public API
@@ -490,9 +529,11 @@ proc writeTarGz*(
   let gz = gzopen(outPath.cstring, "wb")
   if gz == nil:
     raise newException(IOError, "could not open " & outPath & " for gzip writing")
-  var ok = false
+  var
+    ok      = false
+    pending = int64(0)
   try:
-    addDirToTar(gz, contextPath, "", patterns, maxFileSize, sizeThreshold, result)
+    addDirToTar(gz, contextPath, "", patterns, maxFileSize, sizeThreshold, result, pending)
     gzWriteZeros(gz, tarBlock * 2)  ## POSIX end-of-archive: two zero blocks
     gz.checkSizeThreshold(sizeThreshold)
     ok = true
