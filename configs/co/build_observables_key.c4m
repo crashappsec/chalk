@@ -1,6 +1,6 @@
 keyspec _X_BUILD_OBSERVABLES {
-  kind:  RunTimeHost
-  type:  string
+  kind:     RunTimeHost
+  type:     string
   callback: func build_observables
 }
 
@@ -17,7 +17,12 @@ func build_observables(contexts) {
   # Old format: observables/ subdir, no job
   old_path := "/mnt/curiosity/observables/" + run_id + "-" + attempt + "-observables.br"
   if is_file(old_path) {
-    return base64(read_file(old_path))
+    # chalk pre-1.0 uploaded json which requires base64 wrapping
+    if starts_with(version(), "0.") {
+      return base64(read_file(old_path))
+    } else {
+      return read_file(old_path)
+    }
   }
 
   # New format: root, per-job
@@ -27,7 +32,12 @@ func build_observables(contexts) {
   }
   new_path := "/mnt/curiosity/" + run_id + "-" + job + "-" + attempt + "-observables.br"
   if is_file(new_path) {
-    return base64(read_file(new_path))
+    # chalk pre-1.0 uploaded json which requires base64 wrapping
+    if starts_with(version(), "0.") {
+      return base64(read_file(new_path))
+    } else {
+      return read_file(new_path)
+    }
   }
   return ""
 }
