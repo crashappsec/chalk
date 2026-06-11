@@ -65,7 +65,7 @@ type
     string,
     OrderedTableRef[
       string,
-      OrderedTableRef[string, int],
+      OrderedTableRef[string, int64],
     ],
   ]
 
@@ -392,7 +392,7 @@ proc completeBuildContextUpload(
     image:       DockerImage,
     snapshot:    ContextSnapshotEntry,
     contextName: string,
-): (string, int, seq[SkippedFile]) =
+): (string, int64, seq[SkippedFile]) =
   ## Complete a single context upload by creating the attestation manifest.
   ## Returns (digest, tarSize, skippedFiles) where digest is the context manifest
   ## digest (without sha256: prefix), tarSize is the tarball size in bytes, and
@@ -452,7 +452,7 @@ proc completeBuildContextUpload(
         "; the tarball may have been tampered with or replaced",
       )
     let
-      tarSize = int(getFileSize(tarPath))
+      tarSize = getFileSize(tarPath)
       layer   = DockerManifest(
         kind:       DockerManifestType.layer,
         name:       image.withDigest(actualHash),
@@ -502,7 +502,7 @@ proc completeBuildContextUpload(
       )
     try:
       let
-        tarSize = int(getFileSize(tarPath))
+        tarSize = getFileSize(tarPath)
         layer   = DockerManifest(
           kind:       DockerManifestType.layer,
           name:       image,
@@ -571,11 +571,11 @@ proc completeBuildContextUploads*(
           buildContexts[image.registry][repoPath][contextName] = attestDigest
           discard sizeResults.hasKeyOrPut(
             image.registry,
-            newOrderedTable[string, OrderedTableRef[string, int]](),
+            newOrderedTable[string, OrderedTableRef[string, int64]](),
           )
           discard sizeResults[image.registry].hasKeyOrPut(
             repoPath,
-            newOrderedTable[string, int](),
+            newOrderedTable[string, int64](),
           )
           sizeResults[image.registry][repoPath][contextName] = tarSize
           # Collect skipped files: disk strategy returns them directly;
