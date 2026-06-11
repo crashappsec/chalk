@@ -706,26 +706,35 @@ proc layerGetFileString*(layer:    DockerImage,
   extractAll(tarPath, untarPath)
   result = tryToLoadFile(namePath)
 
-proc layerPutStart(layer: DockerImage,
-                  ): Uri =
+proc layerPutStart(layer: DockerImage): (Uri, int) =
   let (_, initResponse) = layer.request(
     useCase     = RegistryUseCase.ReadWrite,
     httpMethod  = HttpPost,
     path        = "/blobs/uploads/",
     contentType = "application/octet-stream",
   )
+  var location: Uri
   try:
-    result = parseUri(initResponse.headers["Location"])
+    location = parseUri(initResponse.headers["Location"])
   except:
     raise newException(
       ValueError,
       "could not determine layer upload url due to: " & getCurrentExceptionMsg()
     )
-  if not result.path.startsWith("/"):
+  if not location.path.startsWith("/"):
     raise newException(
       ValueError,
-      "upload Location is expected to be absolute path. Got: " & result.path
+      "upload Location is expected to be absolute path. Got: " & location.path
     )
+  let minChunkSize =
+    if initResponse.headers.hasKey("oci-chunk-min-length"):
+      try:
+        parseInt(initResponse.headers["oci-chunk-min-length"])
+      except:
+        0
+    else:
+      0
+  return (location, minChunkSize)
 
 proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): (int, int) =
   if not response.headers.hasKey("Range"):
@@ -733,7 +742,9 @@ proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): 
       ValueError,
       "could not upload layer as reponse doesnt have expected Range header"
     )
-  let (validRange, _, rangeEnd) = response.headers["Range"].scanTuple("$i-$i")
+  # accept both OCI "N-M" and RFC 7233 "bytes=N-M" formats
+  let raw = response.headers["Range"].removePrefix("bytes=")
+  let (validRange, _, rangeEnd) = raw.scanTuple("$i-$i")
   if not validRange:
     raise newException(
       ValueError,
@@ -778,14 +789,15 @@ proc layerPutFileStream*(
   except RegistryResponseError:
     trace("docker: layer doesnt exist. uploading " & $layer)
     var
-      location   = layer.layerPutStart()
-      startAt    = 0
-      attempts   = 1
-      httpMethod = HttpPatch
-      response:    Response
-    while startAt < size - 1:
+      (location, minChunkSize) = layer.layerPutStart()
+      effectiveChunkSize       = max(chunkSize, minChunkSize)
+      startAt                  = 0
+      attempts                 = 1
+      httpMethod               = HttpPatch
+      response:                  Response
+    while startAt < size:
       let
-        endAt   = min(startAt + chunkSize, size) - 1
+        endAt   = min(startAt + effectiveChunkSize, size) - 1
         isFinal = endAt == size - 1
       if isFinal:
         location   = location.withQueryPair("digest", layer.imageRef)
@@ -810,7 +822,8 @@ proc layerPutFileStream*(
       if response.code() == Http416:
         trace("docker: chunk not fully uploaded: " & response.body())
         (startAt, attempts)   = response.nextStartAt(startAt, attempts)
-        location              = parseUri(response.headers["Location"])
+        if response.headers.hasKey("Location"):
+          location            = parseUri(response.headers["Location"])
       else:
         if response.headers.hasKey("Range"):
           (startAt, attempts) = response.nextStartAt(startAt, attempts)
