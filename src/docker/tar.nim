@@ -11,6 +11,7 @@
 
 import std/[
   os,
+  posix,
   strutils,
   times,
 ]
@@ -99,9 +100,11 @@ proc buildTarHeader(
     name.add('/')
 
   ## Split long paths using ustar prefix field (prefix/name, each null-terminated).
+  ## Search limit is tarPrefixLen: any '/' at a higher index would produce a
+  ## prefix longer than the 155-byte prefix field, which is invalid.
   if name.len > tarNameLen:
     var splitAt = -1
-    let maxSearch = min(name.high - 1, tarNameLen + tarPrefixLen - 1)
+    let maxSearch = min(name.high - 1, tarPrefixLen)
     for i in countdown(maxSearch, 0):
       if name[i] == '/' and (name.len - i - 1) < tarNameLen:
         splitAt = i
@@ -109,7 +112,9 @@ proc buildTarHeader(
     if splitAt > 0:
       prefix = name[0 ..< splitAt]
       name   = name[splitAt + 1 .. ^1]
-    ## If still too long, name is truncated; rare for real contexts.
+    ## If no valid ustar split exists, a GNU LongLink preamble will have been
+    ## written by the caller; the name here is truncated to 100 chars and
+    ## extractors use the preamble for the full name.
 
   ## Name field (0..99)
   for i in 0 ..< min(name.len, tarNameLen):
@@ -329,6 +334,45 @@ proc globMatch*(path, pattern: string): bool =
         break tryDstar
       return false
 
+proc isValidPattern*(pattern: string): bool =
+  ## Returns true if pattern is a syntactically valid glob pattern.
+  ## Mirrors the two error cases in Go's filepath.Match (ErrBadPattern):
+  ##   - unclosed '[' character class
+  ##   - trailing '\' escape at end of pattern
+  ## Leading '!' and trailing '/' are stripped before validation.
+  let p = (if pattern.startsWith('!'): pattern[1 .. ^1] else: pattern).strip(chars = {'/'})
+  var i = 0
+  while i < p.len:
+    case p[i]
+    of '[':
+      inc i
+      if i < p.len and p[i] in {'!', '^'}:
+        inc i
+      var
+        closed = false
+        first  = true
+      while i < p.len:
+        if not first and p[i] == ']':
+          closed = true
+          inc i
+          break
+        first = false
+        if p[i] == '\\':
+          inc i
+          if i >= p.len:
+            return false
+        inc i
+      if not closed:
+        return false
+    of '\\':
+      inc i
+      if i >= p.len:
+        return false
+      inc i
+    else:
+      inc i
+  return true
+
 proc isExcluded*(relPath: string, patterns: seq[string]): bool =
   ## Returns true if relPath should be excluded given the ordered pattern list.
   ## Implements the same semantics as moby's patternmatcher.MatchesOrParentMatches
@@ -445,31 +489,39 @@ proc needsLongLink(relPath: string, isDir: bool): bool =
     name.add('/')
   if name.len <= tarNameLen:
     return false
-  let maxSearch = min(name.high - 1, tarNameLen + tarPrefixLen - 1)
+  let maxSearch = min(name.high - 1, tarPrefixLen)
   for i in countdown(maxSearch, 0):
     if name[i] == '/' and (name.len - i - 1) < tarNameLen:
       return false
   return true
 
-proc writeLongLinkEntry(gz: GzFile, fullPath: string): int64 =
-  ## Emit a GNU tar ././@LongLink preamble for paths that exceed ustar limits.
-  ## Readers use this entry's data block as the name for the entry that follows.
+proc writeLongLinkPreamble(gz: GzFile, data: string, typeFlag: char): int64 =
+  ## Emit a GNU tar ././@LongLink preamble block.
+  ## typeFlag 'L' = long path name, 'K' = long symlink target.
   ## Returns the number of uncompressed bytes written.
   let
-    data = fullPath & "\0"
-    pad  = (tarBlock - (data.len mod tarBlock)) mod tarBlock
-    hdr  = buildTarHeader(
+    payload = data & "\0"
+    pad     = (tarBlock - (payload.len mod tarBlock)) mod tarBlock
+    hdr     = buildTarHeader(
       relPath  = "././@LongLink",
-      size     = int64(data.len),
+      size     = int64(payload.len),
       isDir    = false,
       mtime    = 0,
-      typeFlag = 'L',
+      typeFlag = typeFlag,
     )
   gz.gzWriteAll(hdr)
-  gz.gzWriteAll(data)
+  gz.gzWriteAll(payload)
   if pad > 0:
     gzWriteZeros(gz, pad)
-  return int64(tarBlock + data.len + pad)
+  return int64(tarBlock + payload.len + pad)
+
+proc writeLongLinkEntry(gz: GzFile, fullPath: string): int64 =
+  ## Emit a GNU tar ././@LongLink 'L' preamble for a path name that exceeds ustar limits.
+  return gz.writeLongLinkPreamble(fullPath, 'L')
+
+proc writeLongLinkTargetEntry(gz: GzFile, target: string): int64 =
+  ## Emit a GNU tar ././@LongLink 'K' preamble for a symlink target that exceeds 100 bytes.
+  return gz.writeLongLinkPreamble(target, 'K')
 
 ## ---------------------------------------------------------------------------
 ## Directory walk
@@ -516,10 +568,15 @@ proc addDirToTar(
       if isExcluded(norm, patterns):
         trace("docker: context upload: excluding " & norm)
         continue
+      var st: Stat
+      if stat(full, st) != 0 or not S_ISREG(st.st_mode):
+        trace("docker: context upload: skipping non-regular file " & norm)
+        continue
       let
+        size  = int64(st.st_size)
+        mtime = when defined(macosx): int64(st.st_mtimespec.tv_sec)
+                else:                 int64(st.st_mtim.tv_sec)
         fss   = newFileStringStream(full)
-        size  = int64(len(fss))
-        mtime = full.getLastModificationTime().toUnix()
       if maxFileSize > 0 and size > maxFileSize:
         let hash = fss.sha256Hex()
         trace("docker: context upload: skipping large file " & norm &
@@ -572,6 +629,8 @@ proc addDirToTar(
       var entryBytes = int64(tarBlock)
       if needsLongLink(relPath = norm, isDir = false):
         entryBytes += gz.writeLongLinkEntry(norm)
+      if target.len > tarLinkNameLen:
+        entryBytes += gz.writeLongLinkTargetEntry(target)
       gz.gzWriteAll(buildTarHeader(
         relPath    = norm,
         size       = 0,
@@ -599,6 +658,12 @@ proc writeTarGz*(
   ## If sizeThreshold > 0, raises TarSizeLimitError as soon as the compressed
   ## output exceeds the threshold, avoiding writing the full archive.
   ## Returns the list of files that were skipped due to maxFileSize.
+  var validPatterns: seq[string]
+  for p in patterns:
+    if isValidPattern(p):
+      validPatterns.add(p)
+    else:
+      raise newException(ValueError, "invalid dockerignore pattern: " & p)
   let gz = gzopen(outPath.cstring, "wb")
   if gz == nil:
     raise newException(IOError, "could not open " & outPath & " for gzip writing")
@@ -606,7 +671,7 @@ proc writeTarGz*(
     ok      = false
     pending = int64(0)
   try:
-    addDirToTar(gz, contextPath, "", patterns, maxFileSize, sizeThreshold, result, pending)
+    addDirToTar(gz, contextPath, "", validPatterns, maxFileSize, sizeThreshold, result, pending)
     gzWriteZeros(gz, tarBlock * 2)  ## POSIX end-of-archive: two zero blocks
     gz.checkSizeThreshold(sizeThreshold)
     ok = true

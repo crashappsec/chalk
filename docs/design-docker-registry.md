@@ -236,6 +236,14 @@ Rules for parsing the ignore file
 - Leading `/` is stripped from each pattern: all paths are relative to the
   context root, so a leading slash is meaningless.
 - Trailing `/` signals directory intent but is stripped before matching.
+- **Invalid patterns** (unclosed `[` character class or trailing `\` escape)
+  cause the entire context upload to fail with an error, matching Docker's
+  own behavior (`docker build` exits with a non-zero status on the same
+  patterns). Both patterns sourced from the `.dockerignore` file and from
+  `additional_dockerignore` in the Chalk configuration are validated.
+  When `honor_dockerignore` is `false` the `.dockerignore` file is not read
+  at all, so invalid patterns in that file are silently ignored; patterns in
+  `additional_dockerignore` are still validated.
 
 #### Pattern matching rules
 

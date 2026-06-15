@@ -373,6 +373,58 @@ proc testMaxFileSize() =
 
 
 ## ---------------------------------------------------------------------------
+## testNonRegularFiles
+
+proc testNonRegularFiles() =
+  ## FIFOs and other non-regular files must be skipped, not opened (which would hang).
+  let tmpDir  = getTempDir() / "test_tar_nonregular_" & $getCurrentProcessId()
+  let outPath = getTempDir() / "test_nonregular_out_" & $getCurrentProcessId() & ".tar.gz"
+  createDir(tmpDir)
+  defer:
+    removeDir(tmpDir)
+    if fileExists(outPath): removeFile(outPath)
+
+  writeFile(tmpDir / "regular.txt", "hello\n")
+  let (_, rc) = execCmdEx("mkfifo " & (tmpDir / "myfifo"))
+  check rc == 0
+
+  discard writeTarGz(
+    outPath     = outPath,
+    contextPath = tmpDir,
+    patterns    = @[],
+  )
+
+  let files = listTarGzFiles(outPath)
+  check "regular.txt" in files
+  check "myfifo" notin files
+
+## ---------------------------------------------------------------------------
+## testLongSymlinkTarget
+
+proc testLongSymlinkTarget() =
+  ## Symlink targets longer than 100 bytes require a GNU LongLink 'K' preamble.
+  let tmpDir  = getTempDir() / "test_tar_longlinktarget_" & $getCurrentProcessId()
+  let outPath = getTempDir() / "test_longlinktarget_out_" & $getCurrentProcessId() & ".tar.gz"
+  createDir(tmpDir)
+  defer:
+    removeDir(tmpDir)
+    if fileExists(outPath): removeFile(outPath)
+
+  let longTarget = "/a/very/long/symlink/target/path/that/exceeds/one/hundred/bytes/" &
+                   "to/trigger/the/gnu/tar/k/type/long/link/entry/handling/here"
+  check longTarget.len > 100
+  createSymlink(longTarget, tmpDir / "link_with_long_target")
+  discard writeTarGz(
+    outPath     = outPath,
+    contextPath = tmpDir,
+    patterns    = @[],
+  )
+  let (tarOut, tarRc) = execCmdEx("tar tvf " & outPath)
+  check tarRc == 0
+  check "link_with_long_target" in tarOut
+  check longTarget in tarOut
+
+## ---------------------------------------------------------------------------
 ## testLongPaths
 
 proc testLongPaths() =
@@ -401,6 +453,72 @@ proc testLongPaths() =
   check expected.len > 100
   check expected in files
 
+
+## ---------------------------------------------------------------------------
+## testIsValidPattern
+
+proc testIsValidPattern() =
+  ## Valid patterns.
+  check isValidPattern("*.log")
+  check isValidPattern("foo/bar")
+  check isValidPattern("[abc]")
+  check isValidPattern("[!abc]")
+  check isValidPattern("[a-z]")
+  check isValidPattern("[\\]]")    ## escaped ] inside class
+  check isValidPattern("!*.log")   ## negation prefix stripped before validation
+  check isValidPattern("logs/")    ## trailing slash stripped before validation
+  check isValidPattern("**")
+  check isValidPattern("foo\\bar") ## valid escape mid-pattern
+
+  ## Invalid: unclosed '['.
+  check not isValidPattern("[abc")
+  check not isValidPattern("[")
+  check not isValidPattern("foo[bar")
+
+  ## Invalid: trailing '\'.
+  check not isValidPattern("foo\\")
+  check not isValidPattern("\\")
+
+  ## Invalid inside negation / with trailing slash.
+  check not isValidPattern("![abc")
+  check not isValidPattern("[abc/")
+
+## ---------------------------------------------------------------------------
+## testInvalidPatternFiltering
+
+proc testInvalidPatternFiltering() =
+  ## writeTarGz must raise on invalid patterns, matching Docker's behavior
+  ## (Docker fails the entire build when .dockerignore contains a bad pattern).
+  let tmpDir  = getTempDir() / "test_tar_invalidpat_" & $getCurrentProcessId()
+  let outPath = getTempDir() / "test_invalidpat_out_" & $getCurrentProcessId() & ".tar.gz"
+  createDir(tmpDir)
+  defer:
+    removeDir(tmpDir)
+    if fileExists(outPath): removeFile(outPath)
+
+  writeFile(tmpDir / "keep.txt", "hello\n")
+
+  var raised = false
+  try:
+    discard writeTarGz(
+      outPath     = outPath,
+      contextPath = tmpDir,
+      patterns    = @["[unclosed"],
+    )
+  except ValueError:
+    raised = true
+  check raised
+
+  raised = false
+  try:
+    discard writeTarGz(
+      outPath     = outPath,
+      contextPath = tmpDir,
+      patterns    = @["foo\\"],
+    )
+  except ValueError:
+    raised = true
+  check raised
 
 ## ---------------------------------------------------------------------------
 ## testToOctal
@@ -436,15 +554,80 @@ proc testToOctal() =
   check raised
 
 
+## ---------------------------------------------------------------------------
+## testPathBoundaries
+
+proc testPathBoundaries() =
+  ## Verifies that writeTarGz round-trips filenames that stress the ustar
+  ## name/prefix split and the GNU LongLink fallback:
+  ##   - exactly 100-char name: fits in name field, no LongLink
+  ##   - exactly 101-char single component: no slash to split on, needs LongLink
+  ##   - prefix overflow: only '/' at position 156 (> tarPrefixLen=155),
+  ##     so no valid ustar split exists; must use LongLink
+  ##   - 255-char path with '/' at 155: largest ustar-native path
+  ##   - 256-char path with '/' at 155: name part is 100, not < 100, needs LongLink
+  ##   - filename with embedded newline: binary name round-trips correctly
+  let tmpDir     = getTempDir() / "test_tar_pathbound_" & $getCurrentProcessId()
+  let outPath    = getTempDir() / "test_pathbound_" & $getCurrentProcessId() & ".tar.gz"
+  let extractDir = getTempDir() / "test_pathbound_ext_" & $getCurrentProcessId()
+  createDir(tmpDir)
+  createDir(extractDir)
+  defer:
+    removeDir(tmpDir)
+    removeDir(extractDir)
+    if fileExists(outPath): removeFile(outPath)
+
+  let name100    = repeat('a', 100)
+  let name101    = repeat('b', 101)
+  let dirOver155 = repeat('c', 156)
+  let dir155     = repeat('d', 155)
+  let name99     = repeat('e', 99)
+  let dir155b    = repeat('f', 155)
+  let name100b   = repeat('g', 100)
+
+  writeFile(tmpDir / name100, "100\n")
+  writeFile(tmpDir / name101, "101\n")
+  createDir(tmpDir / dirOver155)
+  writeFile(tmpDir / dirOver155 / "f.txt", "overflow\n")
+  createDir(tmpDir / dir155)
+  writeFile(tmpDir / dir155 / name99, "255\n")
+  createDir(tmpDir / dir155b)
+  writeFile(tmpDir / dir155b / name100b, "256\n")
+  writeFile(tmpDir / "foo\nbar.txt", "newline\n")
+
+  check (dir155  & "/" & name99).len   == 255
+  check (dir155b & "/" & name100b).len == 256
+
+  discard writeTarGz(
+    outPath     = outPath,
+    contextPath = tmpDir,
+    patterns    = @[],
+  )
+
+  let (_, rc) = execCmdEx("tar xf " & outPath & " -C " & extractDir)
+  check rc == 0
+  check fileExists(extractDir / name100)
+  check fileExists(extractDir / name101)
+  check fileExists(extractDir / dirOver155 / "f.txt")
+  check fileExists(extractDir / dir155     / name99)
+  check fileExists(extractDir / dir155b    / name100b)
+  check fileExists(extractDir / "foo\nbar.txt")
+
+
 proc main() =
   testGlobMatch()
   runEquivalencyTests()
   testHasNegationForDir()
   testToOctal()
+  testIsValidPattern()
+  testInvalidPatternFiltering()
   testWriteTarGz()
   testDanglingSymlink()
   testMaxFileSize()
   testLongPaths()
+  testLongSymlinkTarget()
+  testNonRegularFiles()
   testSizeThreshold()
+  testPathBoundaries()
 
 main()

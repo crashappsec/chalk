@@ -613,6 +613,14 @@ proc request(self:              DockerImage,
     raise newException(RegistryResponseError, registryError)
   raise newException(ValueError, "could not find working registry configuration for " & $self)
 
+proc validateDigest(digest: string): string =
+  if not digest.startsWith("sha256:") or digest.len != 71:
+    raise newException(ValueError, "invalid digest from registry: " & digest)
+  for c in digest[7 .. ^1]:
+    if c notin {'0' .. '9', 'a' .. 'f'}:
+      raise newException(ValueError, "invalid digest from registry: " & digest)
+  return digest
+
 proc manifestHead*(image:    DockerImage,
                    useCase = RegistryUseCase.ReadOnly,
                    ): DockerDigestedJson =
@@ -630,19 +638,27 @@ proc manifestHead*(image:    DockerImage,
       ),
     )
     contentType = response.headers["Content-Type"]
-    digest      = response.headers["Docker-Content-Digest"]
+    digest      = validateDigest(response.headers["Docker-Content-Digest"])
   if contentType notin CONTENT_TYPE_MAPPING:
     # TODO do heuristics on response payload as there are bound to be new mime types
     raise newException(
       ValueError,
       msg & " returned unsupported registry content type: " & contentType
     )
+  let size =
+    try:
+      parseInt(response.headers["Content-Length"])
+    except:
+      raise newException(
+        ValueError,
+        "invalid Content-Length from registry: " & response.headers["Content-Length"]
+      )
   return newDockerDigestedJson(
     data      = JsonNode(nil),
     digest    = digest,
     mediaType = contentType,
     kind      = CONTENT_TYPE_MAPPING[contentType],
-    size      = parseInt(response.headers["Content-Length"]),
+    size      = size,
   )
 
 proc manifestGet*(image:    DockerImage,
@@ -729,7 +745,7 @@ proc layerPutStart(layer: DockerImage): (Uri, int) =
   let minChunkSize =
     if initResponse.headers.hasKey("oci-chunk-min-length"):
       try:
-        parseInt(initResponse.headers["oci-chunk-min-length"])
+        max(0, parseInt(initResponse.headers["oci-chunk-min-length"]))
       except:
         0
     else:
@@ -752,6 +768,12 @@ proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): 
       response.headers["Range"]
     )
   let nextStartAt = rangeEnd + 1
+  if nextStartAt < startAt:
+    raise newException(
+      ValueError,
+      "could not upload layer as Range response header went backwards: " &
+      response.headers["Range"]
+    )
   var attempts = attempts
   if nextStartAt == startAt:
     attempts += 1
@@ -779,15 +801,25 @@ proc layerPutFileStream*(
       accept      = contentType,
     )
     trace("docker: layer already exists. nothing to upload")
+    let existingSize =
+      try:
+        parseInt(response.headers["Content-Length"])
+      except:
+        raise newException(
+          ValueError,
+          "invalid Content-Length from registry: " & response.headers["Content-Length"]
+        )
     return newDockerDigestedJson(
       data      = JsonNode(nil),
       digest    = layer.digest,
       mediaType = response.headers["Content-Type"],
-      size      = parseInt(response.headers["Content-Length"]),
+      size      = existingSize,
       kind      = DockerManifestType.layer,
     )
   except RegistryResponseError:
     trace("docker: layer doesnt exist. uploading " & $layer)
+    if size == 0:
+      raise newException(ValueError, "cannot upload zero-sized layer for " & $layer)
     var
       (location, minChunkSize) = layer.layerPutStart()
       effectiveChunkSize       = max(chunkSize, minChunkSize)
@@ -823,14 +855,14 @@ proc layerPutFileStream*(
         trace("docker: chunk not fully uploaded: " & response.body())
         (startAt, attempts)   = response.nextStartAt(startAt, attempts)
         if response.headers.hasKey("Location"):
-          location            = parseUri(response.headers["Location"])
+          location = parseUri(response.headers["Location"])
       else:
         if response.headers.hasKey("Range"):
           (startAt, attempts) = response.nextStartAt(startAt, attempts)
         else:
           (startAt, attempts) = (endAt + 1, 1)
         if response.headers.hasKey("Location"):
-          location            = parseUri(response.headers["Location"])
+          location = parseUri(response.headers["Location"])
       if attempts > 2:
         raise newException(
           ValueError,
@@ -842,7 +874,7 @@ proc layerPutFileStream*(
     # > uploaded blob which may differ from the provided digest.
     return newDockerDigestedJson(
       data      = JsonNode(nil),
-      digest    = response.headers["Docker-Content-Digest"],
+      digest    = validateDigest(response.headers["Docker-Content-Digest"]),
       mediaType = contentType,
       kind      = DockerManifestType.layer,
       size      = len(fileStream),
@@ -912,7 +944,7 @@ proc manifestPut*(image:       DockerImage,
     )
     return newDockerDigestedJson(
       data      = data,
-      digest    = response.headers["Docker-Content-Digest"],
+      digest    = validateDigest(response.headers["Docker-Content-Digest"]),
       mediaType = contentType,
       kind      = CONTENT_TYPE_MAPPING[contentType],
       size      = len(body),
