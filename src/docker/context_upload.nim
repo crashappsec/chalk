@@ -407,7 +407,7 @@ proc completeBuildContextUpload(
   of "registry":
     let
       blobDigest = snapshot{"blob_digest"}.getStr("")
-      blobSize   = snapshot{"blob_size"}.getInt(0)
+      blobSize   = int64(snapshot{"blob_size"}.getInt(0))
     if blobDigest == "":
       raise newException(
         ValueError,
