@@ -344,20 +344,18 @@ When `docker_context_upload.size_threshold` is set (default `100mb`), Chalk meas
 the `.tar.gz` tarball after it is created and skips the upload if the size
 exceeds the threshold. The failure is recorded in `_OP_FAILED_KEYS` under the
 key `_REPO_BUILD_CONTEXTS` with code `CONTEXT_TOO_LARGE`, including the context
-name, path, actual size, and configured threshold.
+name and configured threshold.
 
 For the `registry` and `local` strategies the check runs at build time
 immediately after the tarball is created. For the `disk` strategy the threshold
 is stored in the chalk mark snapshot and checked at push time when the tarball
 is created. Setting the threshold to `0` disables the check entirely.
 
-The threshold is checked after each complete file entry (header + data +
-padding) is written rather than after every compressed chunk. Checking
-mid-file would require flushing zlib's internal buffers on every chunk,
-which prevents the compressor from accumulating enough data for efficient
-compression. The per-file check granularity is a deliberate trade-off:
-use `max_file_size` to guard against individual oversized files when
-tighter control is needed.
+The threshold is checked approximately every 1 MiB of uncompressed data
+written, not after every file entry. Flushing zlib on every entry would
+prevent the compressor from accumulating enough data for efficient
+compression. Use `max_file_size` to guard against individual oversized
+files when tighter control is needed.
 
 ### Context Cache and Cleanup
 
@@ -374,7 +372,7 @@ directory structure:
 ```
 
 The filename embeds a human-readable slug of the context name followed by
-the first 8 hex characters of its SHA-1, ensuring uniqueness even when two
+the first 8 hex characters of its SHA-256, ensuring uniqueness even when two
 context names produce the same slug after sanitisation (e.g. `"."` and a
 context named `"main"` both slug to `"main"` but have different hashes).
 
@@ -418,10 +416,12 @@ completes the attestation manifest creation.
 
 ### Chalk Keys
 
-| Key                              | Kind       | Type                                                          | Description                                                                                                 |
-| -------------------------------- | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `DOCKER_BUILD_CONTEXT_SNAPSHOTS` | chalk-time | `dict[string, dict[string, dict[string, dict[string, \`x]]]]` | Intermediate upload state: `registry -> repo -> context name -> strategy config`                            |
-| `_REPO_BUILD_CONTEXTS`           | runtime    | `dict[string, dict[string, dict[string, string]]]`            | Context manifest digests: `registry -> repo -> context name -> context manifest digest (no sha256: prefix)` |
+| Key                                 | Kind       | Type                                                          | Description                                                                                                 |
+| ----------------------------------- | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `DOCKER_BUILD_CONTEXT_SNAPSHOTS`    | chalk-time | `dict[string, dict[string, dict[string, dict[string, \`x]]]]` | Intermediate upload state: `registry -> repo -> context name -> strategy config`                            |
+| `_REPO_BUILD_CONTEXTS`              | runtime    | `dict[string, dict[string, dict[string, string]]]`            | Context manifest digests: `registry -> repo -> context name -> context manifest digest (no sha256: prefix)` |
+| `_REPO_BUILD_CONTEXT_TAR_SIZES`     | runtime    | `dict[string, dict[string, dict[string, int]]]`               | Tarball sizes in bytes: `registry -> repo -> context name -> size`                                          |
+| `_REPO_BUILD_CONTEXT_SKIPPED_FILES` | runtime    | `dict[string, dict[string, dict[string, dict[string, \`x]]]]` | Files skipped due to `max_file_size`: `registry -> repo -> context name -> file path -> {hash, size}`       |
 
 ### Limitations
 
@@ -436,6 +436,10 @@ completes the attestation manifest creation.
 - Multi-platform builds upload all contexts once (on the base chalk
   object before per-platform copies are made); each platform image then
   references the same pre-uploaded blobs at push time.
+- Non-regular files (FIFOs, Unix sockets, character and block devices) are
+  silently skipped. Build contexts containing such entries will have them
+  omitted from the uploaded archive without any error or entry in
+  `_REPO_BUILD_CONTEXT_SKIPPED_FILES`.
 - The `disk` strategy does not verify context integrity; the uploaded
   content may differ from the build-time context if the directory was
   mutated between build and push.

@@ -2331,8 +2331,8 @@ A value of `0` disables the check and always uploads regardless of size.
     shortdoc: "Skip individual files larger than this size in the context tarball"
     doc:      """
 Per-file size limit when creating the build context `.tar.gz` archive.
-Any individual file whose size exceeds this threshold is silently omitted
-from the tarball.  A value of `0` (the default) disables the check and
+Any individual file whose size exceeds this threshold is omitted from
+the tarball.  A value of `0` (the default) disables the check and
 includes all files regardless of size.
 
 This is useful for skipping unexpectedly large files (compiled binaries,
@@ -2340,8 +2340,8 @@ model weights, data dumps) that would otherwise push the total archive
 over `size_threshold` without requiring explicit exclude patterns for
 every such file.
 
-Skipped files are not silently dropped: their path, byte size, and
-SHA-256 digest are recorded in `_REPO_BUILD_CONTEXT_SKIPPED_FILES`.
+Skipped files are recorded (not silently dropped): their path, byte size,
+and SHA-256 digest are stored in `_REPO_BUILD_CONTEXT_SKIPPED_FILES`.
 The digest serves two purposes: it identifies the exact file version
 that was omitted, and it allows the skipped file to be matched against
 files in the source repository or artifact store in the future.
