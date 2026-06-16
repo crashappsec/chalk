@@ -494,9 +494,13 @@ proc exists*(self: DockerImage): bool =
   return self != ("", "", "")
 
 proc asOciAttestation*(self: DockerImage): DockerImage =
+  if self.digest == "":
+    raise newException(ValueError, "asOciAttestation requires a digest: " & $self)
   return self.withBare().withTag("sha256-" & self.digest)
 
 proc asCosignAttestation*(self: DockerImage): DockerImage =
+  if self.digest == "":
+    raise newException(ValueError, "asCosignAttestation requires a digest: " & $self)
   return self.withBare().withTag("sha256-" & self.digest & ".att")
 
 proc asRepoTag*(items: seq[DockerImage]): seq[string] =

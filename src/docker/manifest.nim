@@ -764,16 +764,17 @@ proc flushAttestationTags*() =
   pendingAttestationTags.clear()
 
 proc addAttestation*(subject: DockerImage, item: DockerManifest) =
-  let
-    useOciTag = attrGet[bool]("docker.attestation_use_oci_tag")
-    referrers = supportsReferrers(subject)
+  let useOciTag = attrGet[bool]("docker.attestation_use_oci_tag")
 
   item.name = subject.withBare()
   item.link()
   info("attestation: pushing attestation for " & $subject)
   item.put()
 
-  if not referrers or useOciTag:
+  # Check after put() so that the OCI-Subject response header from the
+  # registry has a chance to warm the referrers cache before we decide
+  # whether to also push the legacy sha256-<digest> tag.
+  if not supportsReferrers(subject) or useOciTag:
     addAttestationToTag(
       subject = subject,
       item    = item,
