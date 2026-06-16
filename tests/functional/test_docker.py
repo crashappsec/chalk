@@ -2315,7 +2315,7 @@ def test_build_context_upload(
     long_subname = "b" * 101 + ".py"
     (context_dir / "sub" / long_subname).write_text("# long sub name\n")
     # symlink target > 100 bytes: requires GNU LongLink 'K' entry
-    long_link_target = "/a/very/long/symlink/target/path/that/exceeds/one/hundred/bytes/to/trigger/gnu/tar/k/type"
+    long_link_target = "/a/very/long/symlink/target/path/that/exceeds/one/hundred/bytes/to/trigger/gnu/tar/k/type/entry/handling"
     assert len(long_link_target) > 100
     (context_dir / "link_with_long_target").symlink_to(long_link_target)
     (context_dir / ".dockerignore").write_text(
