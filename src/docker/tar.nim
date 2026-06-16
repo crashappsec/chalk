@@ -574,11 +574,12 @@ proc addDirToTar(
         continue
       let
         size  = int64(st.st_size)
-        mtime = when defined(macosx): int64(st.st_mtimespec.tv_sec)
-                else:                 int64(st.st_mtim.tv_sec)
-        fss   = newFileStringStream(full)
+        # Nim's posix binding names this field st_mtim on every platform and
+        # importc-maps it to the correct C field (st_mtimespec on macOS/BSD,
+        # st_mtim on Linux), so no `when defined(macosx)` split is needed.
+        mtime = int64(st.st_mtim.tv_sec)
       if maxFileSize > 0 and size > maxFileSize:
-        let hash = fss.sha256Hex()
+        let hash = newFileStringStream(full).sha256Hex()
         trace("docker: context upload: skipping large file " & norm &
               " (sha256:" & hash & " size:" & $size &
               " bytes > max_file_size:" & $maxFileSize & " bytes)")
