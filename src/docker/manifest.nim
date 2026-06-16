@@ -253,7 +253,10 @@ proc newManifest(name: DockerImage, data: DigestedJson): DockerManifest =
     )
     list.setJson(data)
     list.setAnnotations(json)
-    for item in json["manifests"].items():
+    let manifests = json{"manifests"}
+    if manifests == nil or manifests.kind != JArray:
+      return list
+    for item in manifests.items():
       let platform = item{"platform"}
       list.manifests.add(DockerManifest(
         kind:         DockerManifestType.image,
@@ -765,7 +768,7 @@ proc addAttestation*(subject: DockerImage, item: DockerManifest) =
     useOciTag = attrGet[bool]("docker.attestation_use_oci_tag")
     referrers = supportsReferrers(subject)
 
-  item.name = subject.withTag("").withDigest("")
+  item.name = subject.withBare()
   item.link()
   info("attestation: pushing attestation for " & $subject)
   item.put()

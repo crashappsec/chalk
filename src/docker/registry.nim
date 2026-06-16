@@ -501,7 +501,7 @@ var referrersCache = initTable[string, bool]()
 proc checkReferrersSupport(image: DockerImage, response: Response) =
   if not response.headers.hasKey("OCI-Subject"):
     return
-  let key = image.withTag("").withDigest("").asRepoRef()
+  let key = image.withBare().asRepoRef()
   referrersCache[key] = true
 
 proc request(self:              DockerImage,
@@ -993,7 +993,7 @@ proc referrersGet*(image:        DockerImage,
     return nil
 
 proc supportsReferrers*(image: DockerImage): bool =
-  let key = image.withTag("").withDigest("").asRepoRef()
+  let key = image.withBare().asRepoRef()
   if key in referrersCache:
     return referrersCache[key]
   result = referrersGet(image) != nil
