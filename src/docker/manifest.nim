@@ -141,7 +141,10 @@ proc setImageConfig(self: DockerManifest, data: DigestedJson) =
   if self.kind != DockerManifestType.image:
     raise newException(AssertionDefect, "can only set image config on image manifests")
   let
-    configJson = data.json{"config"}
+    configJson = data.json{"config"}.assertIs(
+      JObject,
+      "malformed registry image manifest response: 'config' field",
+    )
     config     = DockerManifest(
       kind:       DockerManifestType.config,
       name:       self.name,
@@ -177,7 +180,10 @@ proc setImageLayers(self: DockerManifest, data: DigestedJson) =
   if self.kind != DockerManifestType.image:
     raise newException(AssertionDefect, "can only set image layers on image manifests")
   self.layers = @[]
-  for layer in data.json{"layers"}.items():
+  for layer in data.json{"layers"}.assertIs(
+    JArray,
+    "malformed registry image manifest response: 'layers' field",
+  ).items():
     self.layers.add(DockerManifest(
       kind:          DockerManifestType.layer,
       name:          self.name,
@@ -253,9 +259,10 @@ proc newManifest(name: DockerImage, data: DigestedJson): DockerManifest =
     )
     list.setJson(data)
     list.setAnnotations(json)
-    let manifests = json{"manifests"}
-    if manifests == nil or manifests.kind != JArray:
-      return list
+    let manifests = json{"manifests"}.assertIs(
+      JArray,
+      "malformed registry manifest list response: 'manifests' field",
+    )
     for item in manifests.items():
       let platform = item{"platform"}
       list.manifests.add(DockerManifest(
@@ -978,7 +985,9 @@ proc fetchAttestationManifests(
       artifactType = artifactType,
     )
     if data != nil:
-      return newManifest(subject, data)
+      let manifest = newManifest(subject, data)
+      if manifest.allImages().all().len > 0:
+        return manifest
   return fetchListOrImageManifest(
     subject.asOciAttestation(),
     fetchConfig = false,

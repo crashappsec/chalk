@@ -646,7 +646,7 @@ proc manifestHead*(image:    DockerImage,
       ),
     )
     contentType = response.headers["Content-Type"]
-    digest      = response.headers["Docker-Content-Digest"]
+    digest      = validateDigest(response.headers["Docker-Content-Digest"])
   checkReferrersSupport(image, response)
   if contentType notin CONTENT_TYPE_MAPPING:
     # TODO do heuristics on response payload as there are bound to be new mime types
