@@ -1,0 +1,614 @@
+[
+  {
+    "comment": "** matches everything",
+    "patterns": ["**"],
+    "path": "file",
+    "expected": true
+  },
+  {
+    "comment": "** matches nested path",
+    "patterns": ["**"],
+    "path": "dir/file",
+    "expected": true
+  },
+  {
+    "comment": "** matches deeply nested path",
+    "patterns": ["**"],
+    "path": "dir/dir/file",
+    "expected": true
+  },
+  {
+    "comment": "**/ (trailing slash stripped to **) matches file",
+    "patterns": ["**/"],
+    "path": "file",
+    "expected": true
+  },
+  {
+    "comment": "**/ matches nested path",
+    "patterns": ["**/"],
+    "path": "dir/file",
+    "expected": true
+  },
+  {
+    "comment": "**/** matches dir/file",
+    "patterns": ["**/**"],
+    "path": "dir/file",
+    "expected": true
+  },
+  {
+    "comment": "dir/** matches child",
+    "patterns": ["dir/**"],
+    "path": "dir/file",
+    "expected": true
+  },
+  {
+    "comment": "dir/** matches nested child",
+    "patterns": ["dir/**"],
+    "path": "dir/dir2/file",
+    "expected": true
+  },
+  {
+    "comment": "abc/** does not match abc itself (requires at least one component)",
+    "patterns": ["abc/**"],
+    "path": "abc",
+    "expected": false
+  },
+  {
+    "comment": "abc/** matches abc/def",
+    "patterns": ["abc/**"],
+    "path": "abc/def",
+    "expected": true
+  },
+  {
+    "comment": "abc/** matches abc/def/ghi",
+    "patterns": ["abc/**"],
+    "path": "abc/def/ghi",
+    "expected": true
+  },
+  {
+    "comment": "**/dir matches dir via ancestor (dir/file has ancestor dir)",
+    "patterns": ["**/dir"],
+    "path": "dir/file",
+    "expected": true
+  },
+  {
+    "comment": "**/dir matches dir itself",
+    "patterns": ["**/dir"],
+    "path": "dir",
+    "expected": true
+  },
+  {
+    "comment": "**/dir2/* matches dir/dir2/file",
+    "patterns": ["**/dir2/*"],
+    "path": "dir/dir2/file",
+    "expected": true
+  },
+  {
+    "comment": "**/dir2/** matches dir/dir2/dir3/file",
+    "patterns": ["**/dir2/**"],
+    "path": "dir/dir2/dir3/file",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y matches a/x/b/y",
+    "patterns": ["**/x/**/y"],
+    "path": "a/x/b/y",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y matches x/b/y (outer ** matches empty)",
+    "patterns": ["**/x/**/y"],
+    "path": "x/b/y",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y matches a/b/x/c/d/y (multiple components between)",
+    "patterns": ["**/x/**/y"],
+    "path": "a/b/x/c/d/y",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y matches x/y (both ** match empty)",
+    "patterns": ["**/x/**/y"],
+    "path": "x/y",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y does not match a/b/c (no x or y)",
+    "patterns": ["**/x/**/y"],
+    "path": "a/b/c",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y does not match x/a/b/c (x present but no y after)",
+    "patterns": ["**/x/**/y"],
+    "path": "x/a/b/c",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y does not match a/b/y (y present but no x before)",
+    "patterns": ["**/x/**/y"],
+    "path": "a/b/y",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y does not match y/x (x comes after y)",
+    "patterns": ["**/x/**/y"],
+    "path": "y/x",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y/**/z matches a/x/b/y/c/z",
+    "patterns": ["**/x/**/y/**/z"],
+    "path": "a/x/b/y/c/z",
+    "expected": true
+  },
+  {
+    "comment": "**/x/**/y/**/z does not match a/b/c/d/e/f (no x, y, z)",
+    "patterns": ["**/x/**/y/**/z"],
+    "path": "a/b/c/d/e/f",
+    "expected": false
+  },
+  {
+    "comment": "**/x/**/y does not match deep path with no x or y",
+    "patterns": ["**/x/**/y"],
+    "path": "a/a/a/a/a/a/a/a/a/a",
+    "expected": false
+  },
+  {
+    "comment": "**file matches file (suffix, any position)",
+    "patterns": ["**file"],
+    "path": "file",
+    "expected": true
+  },
+  {
+    "comment": "**file matches dir/file",
+    "patterns": ["**file"],
+    "path": "dir/file",
+    "expected": true
+  },
+  {
+    "comment": "**file matches dir/dir/file",
+    "patterns": ["**file"],
+    "path": "dir/dir/file",
+    "expected": true
+  },
+  {
+    "comment": "**/file matches dir/file (boundary suffix)",
+    "patterns": ["**/file"],
+    "path": "dir/file",
+    "expected": true
+  },
+  {
+    "comment": "**/file matches dir/dir/file",
+    "patterns": ["**/file"],
+    "path": "dir/dir/file",
+    "expected": true
+  },
+  {
+    "comment": "**/file* matches dir/dir/file",
+    "patterns": ["**/file*"],
+    "path": "dir/dir/file",
+    "expected": true
+  },
+  {
+    "comment": "**/file* matches dir/dir/file.txt",
+    "patterns": ["**/file*"],
+    "path": "dir/dir/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "**/file*txt matches dir/dir/file.txt",
+    "patterns": ["**/file*txt"],
+    "path": "dir/dir/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "**/file*.txt matches dir/dir/file.txt",
+    "patterns": ["**/file*.txt"],
+    "path": "dir/dir/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "**/file*.txt* matches dir/dir/file.txt",
+    "patterns": ["**/file*.txt*"],
+    "path": "dir/dir/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "**/**/*.txt matches dir/dir/file.txt",
+    "patterns": ["**/**/*.txt"],
+    "path": "dir/dir/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "**/**/*.txt2 does not match dir/dir/file.txt",
+    "patterns": ["**/**/*.txt2"],
+    "path": "dir/dir/file.txt",
+    "expected": false
+  },
+  {
+    "comment": "**/*.txt matches file.txt (single segment)",
+    "patterns": ["**/*.txt"],
+    "path": "file.txt",
+    "expected": true
+  },
+  {
+    "comment": "**/**/*.txt matches file.txt",
+    "patterns": ["**/**/*.txt"],
+    "path": "file.txt",
+    "expected": true
+  },
+  {
+    "comment": "a**/*.txt matches a/file.txt",
+    "patterns": ["a**/*.txt"],
+    "path": "a/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "a**/*.txt matches a/dir/file.txt",
+    "patterns": ["a**/*.txt"],
+    "path": "a/dir/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "a**/*.txt matches a/dir/dir/file.txt",
+    "patterns": ["a**/*.txt"],
+    "path": "a/dir/dir/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "a/*.txt does not match a/dir/file.txt (single * stops at /)",
+    "patterns": ["a/*.txt"],
+    "path": "a/dir/file.txt",
+    "expected": false
+  },
+  {
+    "comment": "a/*.txt matches a/file.txt",
+    "patterns": ["a/*.txt"],
+    "path": "a/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "a/*.txt** matches a/file.txt",
+    "patterns": ["a/*.txt**"],
+    "path": "a/file.txt",
+    "expected": true
+  },
+  {
+    "comment": "a[b-d]e does not match ae",
+    "patterns": ["a[b-d]e"],
+    "path": "ae",
+    "expected": false
+  },
+  {
+    "comment": "a[b-d]e matches ace",
+    "patterns": ["a[b-d]e"],
+    "path": "ace",
+    "expected": true
+  },
+  {
+    "comment": "a[b-d]e does not match aae",
+    "patterns": ["a[b-d]e"],
+    "path": "aae",
+    "expected": false
+  },
+  {
+    "comment": "a[^b-d]e matches aze (negated range)",
+    "patterns": ["a[^b-d]e"],
+    "path": "aze",
+    "expected": true
+  },
+  {
+    "comment": ".* matches .foo",
+    "patterns": [".*"],
+    "path": ".foo",
+    "expected": true
+  },
+  {
+    "comment": ".* does not match foo",
+    "patterns": [".*"],
+    "path": "foo",
+    "expected": false
+  },
+  {
+    "comment": "abc.def does not match abcdef",
+    "patterns": ["abc.def"],
+    "path": "abcdef",
+    "expected": false
+  },
+  {
+    "comment": "abc.def matches abc.def",
+    "patterns": ["abc.def"],
+    "path": "abc.def",
+    "expected": true
+  },
+  {
+    "comment": "abc.def does not match abcZdef",
+    "patterns": ["abc.def"],
+    "path": "abcZdef",
+    "expected": false
+  },
+  {
+    "comment": "abc?def matches abcZdef",
+    "patterns": ["abc?def"],
+    "path": "abcZdef",
+    "expected": true
+  },
+  {
+    "comment": "abc?def does not match abcdef",
+    "patterns": ["abc?def"],
+    "path": "abcdef",
+    "expected": false
+  },
+  {
+    "comment": "**/foo/bar matches foo/bar",
+    "patterns": ["**/foo/bar"],
+    "path": "foo/bar",
+    "expected": true
+  },
+  {
+    "comment": "**/foo/bar matches dir/foo/bar",
+    "patterns": ["**/foo/bar"],
+    "path": "dir/foo/bar",
+    "expected": true
+  },
+  {
+    "comment": "**/foo/bar matches dir/dir2/foo/bar",
+    "patterns": ["**/foo/bar"],
+    "path": "dir/dir2/foo/bar",
+    "expected": true
+  },
+  {
+    "comment": "**/.foo matches .foo",
+    "patterns": ["**/.foo"],
+    "path": ".foo",
+    "expected": true
+  },
+  {
+    "comment": "**/.foo does not match bar.foo (no path boundary before .foo)",
+    "patterns": ["**/.foo"],
+    "path": "bar.foo",
+    "expected": false
+  },
+  {
+    "comment": "**/.foo matches dir/.foo",
+    "patterns": ["**/.foo"],
+    "path": "dir/.foo",
+    "expected": true
+  },
+  {
+    "comment": "a(b)c/def matches a(b)c/def (parens are literals)",
+    "patterns": ["a(b)c/def"],
+    "path": "a(b)c/def",
+    "expected": true
+  },
+  {
+    "comment": "a(b)c/def does not match a(b)c/xyz",
+    "patterns": ["a(b)c/def"],
+    "path": "a(b)c/xyz",
+    "expected": false
+  },
+  {
+    "comment": "special regex chars are treated as literals",
+    "patterns": ["a.|)$(}+{bc"],
+    "path": "a.|)$(}+{bc",
+    "expected": true
+  },
+  {
+    "comment": "exact whl path matches",
+    "patterns": ["dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl"],
+    "path": "dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl",
+    "expected": true
+  },
+  {
+    "comment": "dist/*.whl matches whl file",
+    "patterns": ["dist/*.whl"],
+    "path": "dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl",
+    "expected": true
+  },
+  {
+    "comment": "no patterns: never excluded",
+    "patterns": [],
+    "path": "foo",
+    "expected": false
+  },
+  {
+    "comment": "no patterns: never excluded (nested)",
+    "patterns": [],
+    "path": "foo/bar",
+    "expected": false
+  },
+  {
+    "comment": ".git excludes root .git",
+    "patterns": [".git"],
+    "path": ".git",
+    "expected": true
+  },
+  {
+    "comment": ".git excludes .git/config via ancestor match",
+    "patterns": [".git"],
+    "path": ".git/config",
+    "expected": true
+  },
+  {
+    "comment": ".git excludes .git/hooks/pre-commit via ancestor match",
+    "patterns": [".git"],
+    "path": ".git/hooks/pre-commit",
+    "expected": true
+  },
+  {
+    "comment": ".git does NOT exclude a/.git (a/.git != .git -- full path match only)",
+    "patterns": [".git"],
+    "path": "a/.git",
+    "expected": false
+  },
+  {
+    "comment": ".git does NOT exclude a/b/.git",
+    "patterns": [".git"],
+    "path": "a/b/.git",
+    "expected": false
+  },
+  {
+    "comment": ".git does NOT exclude a/.git/config",
+    "patterns": [".git"],
+    "path": "a/.git/config",
+    "expected": false
+  },
+  {
+    "comment": "logs/ (stripped to logs) excludes root logs dir",
+    "patterns": ["logs/"],
+    "path": "logs",
+    "expected": true
+  },
+  {
+    "comment": "logs/ excludes logs/app.log via ancestor match",
+    "patterns": ["logs/"],
+    "path": "logs/app.log",
+    "expected": true
+  },
+  {
+    "comment": "logs/ does NOT exclude a/logs (a/logs != logs)",
+    "patterns": ["logs/"],
+    "path": "a/logs",
+    "expected": false
+  },
+  {
+    "comment": "logs/ does NOT exclude a/logs/app.log",
+    "patterns": ["logs/"],
+    "path": "a/logs/app.log",
+    "expected": false
+  },
+  {
+    "comment": "*.tmp excludes root-level foo.tmp",
+    "patterns": ["*.tmp"],
+    "path": "foo.tmp",
+    "expected": true
+  },
+  {
+    "comment": "*.tmp does NOT exclude a/b/foo.tmp (no ancestor matches *.tmp)",
+    "patterns": ["*.tmp"],
+    "path": "a/b/foo.tmp",
+    "expected": false
+  },
+  {
+    "comment": "*.tmp does not match foo.nim",
+    "patterns": ["*.tmp"],
+    "path": "foo.nim",
+    "expected": false
+  },
+  {
+    "comment": "build/*.o matches build/output.o",
+    "patterns": ["build/*.o"],
+    "path": "build/output.o",
+    "expected": true
+  },
+  {
+    "comment": "build/*.o does NOT match a/build/output.o (full path match only)",
+    "patterns": ["build/*.o"],
+    "path": "a/build/output.o",
+    "expected": false
+  },
+  {
+    "comment": "**/*.key matches a/b/secret.key",
+    "patterns": ["**/*.key"],
+    "path": "a/b/secret.key",
+    "expected": true
+  },
+  {
+    "comment": "**/*.key does not match a/b/secret.pub",
+    "patterns": ["**/*.key"],
+    "path": "a/b/secret.pub",
+    "expected": false
+  },
+  {
+    "comment": "multi: ** then !subtree -- path inside subtree is not excluded",
+    "patterns": ["**", "!util/docker/web"],
+    "path": "util/docker/web/foo",
+    "expected": false
+  },
+  {
+    "comment": "multi: ** then !subtree then re-include -- file re-included by last pattern",
+    "patterns": ["**", "!util/docker/web", "util/docker/web/foo"],
+    "path": "util/docker/web/foo",
+    "expected": true
+  },
+  {
+    "comment": "multi: ** then !exact-whl -- whl is not excluded",
+    "patterns": ["**", "!dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl"],
+    "path": "dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl",
+    "expected": false
+  },
+  {
+    "comment": "multi: ** then !glob-whl -- whl is not excluded",
+    "patterns": ["**", "!dist/*.whl"],
+    "path": "dist/proxy.py-2.4.0rc3.dev36+g08acad9-py3-none-any.whl",
+    "expected": false
+  },
+  {
+    "comment": "multi: logs/ then !logs/important.log -- important.log is re-included",
+    "patterns": ["logs/", "!logs/important.log"],
+    "path": "logs/important.log",
+    "expected": false
+  },
+  {
+    "comment": "multi: logs/ then !logs/important.log -- other.log remains excluded",
+    "patterns": ["logs/", "!logs/important.log"],
+    "path": "logs/other.log",
+    "expected": true
+  },
+  {
+    "comment": "multi: *.tmp then !keep.tmp -- keep.tmp is re-included",
+    "patterns": ["*.tmp", "!keep.tmp"],
+    "path": "keep.tmp",
+    "expected": false
+  },
+  {
+    "comment": "multi: *.tmp then !keep.tmp -- other.tmp remains excluded",
+    "patterns": ["*.tmp", "!keep.tmp"],
+    "path": "other.tmp",
+    "expected": true
+  },
+  {
+    "comment": "multi: last positive pattern wins over earlier negation",
+    "patterns": ["logs/", "!logs/important.log", "logs/"],
+    "path": "logs/important.log",
+    "expected": true
+  },
+  {
+    "comment": "multi: last negation wins",
+    "patterns": ["logs/", "logs/", "!logs/important.log"],
+    "path": "logs/important.log",
+    "expected": false
+  },
+  {
+    "comment": "multi: docs excluded then README re-included",
+    "patterns": ["docs", "!docs/README.md"],
+    "path": "docs/README.md",
+    "expected": false
+  },
+  {
+    "comment": "multi: docs/ excluded then README re-included",
+    "patterns": ["docs/", "!docs/README.md"],
+    "path": "docs/README.md",
+    "expected": false
+  },
+  {
+    "comment": "multi: docs/* excluded then README re-included",
+    "patterns": ["docs/*", "!docs/README.md"],
+    "path": "docs/README.md",
+    "expected": false
+  },
+  {
+    "comment": "multi: negation then positive -- last positive wins",
+    "patterns": ["!fileutils.go", "*.go"],
+    "path": "fileutils.go",
+    "expected": true
+  },
+  {
+    "comment": "multi: positive then negation -- last negation wins",
+    "patterns": ["*.go", "!fileutils.go"],
+    "path": "fileutils.go",
+    "expected": false
+  }
+]

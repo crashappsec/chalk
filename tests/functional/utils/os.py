@@ -51,6 +51,7 @@ class Program:
     env: dict[str, str]
     shell: bool
     log_level: Literal["info", "debug"] = "info"
+    binary: bool = False
 
     def asdict(self):
         return asdict(self)
@@ -109,6 +110,8 @@ class Program:
 
     @property
     def text(self) -> str:
+        if self.binary:
+            return "<binary>"
         return self._strip_ansi(self.stdout.decode().strip())
 
     @property
@@ -215,6 +218,7 @@ def run(
     log_level: Literal["info", "debug"] = "info",
     attempts: int = 1,
     sleep_between_attempts: int = 1,
+    binary: bool = False,
 ) -> Program:
     """
     Run cmd in a subprocess asyncronously.
@@ -338,6 +342,7 @@ def run(
             shell=shell,
             env=env_vars,
             log_level=log_level,
+            binary=binary,
         )
 
         if check:

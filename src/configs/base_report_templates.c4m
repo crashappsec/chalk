@@ -382,6 +382,10 @@ report and subtract from it.
   key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
+  key._REPO_BUILD_CONTEXTS.use                = true
+  key._REPO_BUILD_CONTEXT_TAR_SIZES.use       = true
+  key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
+  key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
   key._FOUND_BASE_MARK.use                    = true
   key._SIGNATURES.use                         = true
@@ -1069,6 +1073,10 @@ doc: """
   key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
+  key._REPO_BUILD_CONTEXTS.use                = true
+  key._REPO_BUILD_CONTEXT_TAR_SIZES.use       = true
+  key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
+  key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
   key._FOUND_BASE_MARK.use                    = true
   key._SIGNATURES.use                         = true
@@ -1619,6 +1627,10 @@ container.
   key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
+  key._REPO_BUILD_CONTEXTS.use                = true
+  key._REPO_BUILD_CONTEXT_TAR_SIZES.use       = true
+  key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
+  key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
   key._FOUND_BASE_MARK.use                    = true
   key._SIGNATURES.use                         = true
@@ -2157,6 +2169,10 @@ and keep the run-time key.
   key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
+  key._REPO_BUILD_CONTEXTS.use                = true
+  key._REPO_BUILD_CONTEXT_TAR_SIZES.use       = true
+  key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
+  key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
   key._FOUND_BASE_MARK.use                    = true
   key._SIGNATURES.use                         = true
@@ -2356,6 +2372,10 @@ running insert commands.
   key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
+  key._REPO_BUILD_CONTEXTS.use                = true
+  key._REPO_BUILD_CONTEXT_TAR_SIZES.use       = true
+  key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
+  key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
   key._X509_SUBJECT.use                       = true
   key._X509_SUBJECT_ALTERNATIVE_NAME .use     = true
@@ -2468,6 +2488,10 @@ running commands that do NOT insert chalk marks.
   key._REPO_URLS.use                          = true
   key._REPO_TAGS.use                          = true
   key._REPO_DIGESTS.use                       = true
+  key._REPO_BUILD_CONTEXTS.use                = true
+  key._REPO_BUILD_CONTEXT_TAR_SIZES.use       = true
+  key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
+  key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
   key.OLD_CHALK_METADATA_HASH.use             = true
   key.OLD_CHALK_METADATA_ID.use               = true

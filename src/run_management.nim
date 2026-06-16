@@ -283,16 +283,24 @@ proc idFormat*(rawHash: string): string =
 proc isChalkingOp*(): bool =
   return commandName in attrGet[seq[string]]("valid_chalk_command_names")
 
-proc addFailedKey*(key: string, code: string, error: string, description: string) =
-  let errObject = getErrorObject()
-  var failure   = ChalkDict()
-  failure["code"] = pack(code)
-  failure["error"] = pack(error)
-  failure["description"] = pack(description)
-  if not isChalkingOp() or errObject.isNone():
-    failedKeys[key] = pack(failure)
+proc addFailedEntry(dict: var ChalkDict, key: string, failure: ChalkDict) =
+  if key in dict:
+    var existing = unpack[seq[ChalkDict]](dict[key])
+    existing.add(failure)
+    dict[key] = pack(existing)
   else:
-    errObject.get().failedKeys[key] = pack(failure)
+    dict[key] = pack(@[failure])
+
+proc addFailedKey*(key: string, code: string, error: string, description: string) =
+  var failure = ChalkDict()
+  failure["code"]        = pack(code)
+  failure["error"]       = pack(error)
+  failure["description"] = pack(description)
+  let errObject = getErrorObject()
+  if not isChalkingOp() or errObject.isNone():
+    addFailedEntry(failedKeys, key, failure)
+  else:
+    addFailedEntry(errObject.get().failedKeys, key, failure)
 
 proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
   let

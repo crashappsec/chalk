@@ -104,8 +104,8 @@ proc extractAnnotations(ctx: DockerInvocation) =
 
 proc extractExtraContexts(ctx: DockerInvocation) =
   ctx.foundExtraContexts = newOrderedTable[string, string]()
-  if "build-contexts" in ctx.processedFlags:
-    let raw = unpack[seq[string]](ctx.processedFlags["build-contents"].getValue())
+  if "build-context" in ctx.processedFlags:
+    let raw = unpack[seq[string]](ctx.processedFlags["build-context"].getValue())
     for item in raw:
       if len(item) == 0:
         continue

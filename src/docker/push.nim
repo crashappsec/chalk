@@ -15,6 +15,7 @@ import ".."/[
 ]
 import "."/[
   base,
+  context_upload,
   exe,
   login,
   scan,
@@ -75,8 +76,16 @@ proc dockerPush*(ctx: DockerInvocation): int =
 
     try:
       chalk.collectRunTimeArtifactInfo()
+      if chalk.isChalked() and result == 0:
+        cleanBuildContextCache()
+        try:
+          chalk.collectedData.merge(chalk.completeBuildContextUploads(
+            source = chalk.extract,
+          ))
+        except:
+          error("docker: build context attestation failed: " & getCurrentExceptionMsg())
+          dumpExOnDebug()
       collectRunTimeHostInfo()
-
     finally:
       for i in imagesToPrune:
         try:

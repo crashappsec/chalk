@@ -10,6 +10,7 @@
 ## https://docker-docs.uclv.cu/registry/spec/manifest-v2-2/
 ## https://docs.docker.com/reference/cli/dockerd/#daemon-configuration-file
 ## https://docs.docker.com/build/buildkit/toml-configuration/
+## https://github.com/opencontainers/distribution-spec/blob/main/spec.md
 
 import std/[
   nativesockets,
@@ -65,7 +66,7 @@ type
     fallthrough*: bool # whether to fallthrough to next config on http errors
 
 const
-  TIMEOUT = 3000 # sec
+  TIMEOUT = 3000 # ms
   CONTENT_TYPE_MAPPING* = {
     "application/vnd.docker.distribution.manifest.list.v2+json": DockerManifestType.list,
     "application/vnd.docker.distribution.manifest.v2+json": DockerManifestType.image,
@@ -505,6 +506,7 @@ proc request(self:              DockerImage,
              body               = "",
              range              = 0 .. 0,
              size               = 0,
+             timeout            = TIMEOUT,
              acceptStatusCodes: openArray[Slice[int]] = @[200..299],
              ): (string, Response) =
   let cacheKey = (self, httpMethod, path, useCase)
@@ -538,13 +540,16 @@ proc request(self:              DockerImage,
         if body != "":
           if contentType != "":
             headers["Content-Type"] = contentType
-          # only include content-range header not chunked uploads
-          # e.g. ghcr doesnt accept content-range for monolithic uploads
-          if range.a > 0 or range.b > 0 and range.b - range.a + 1 != size:
-            var contentRange = "bytes " & $range.a & "-" & $range.b
-            if size > 0:
-              contentRange &= "/" & $size
-            headers["Content-Range"] = contentRange
+          # OCI distribution spec requires "{first}-{last}" format (no "bytes " prefix,
+          # no "/{total}" suffix). See:
+          # https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-blobs
+          # Only include for chunked uploads; omit for monolithic uploads because
+          # some registries (e.g. ghcr) reject Content-Range on monolithic PUT.
+          let
+            hasRange    = range.a > 0 or range.b > 0
+            isPartial   = range.b - range.a + 1 != size
+          if hasRange and isPartial:
+            headers["Content-Range"] = $range.a & "-" & $range.b
           headers["Content-Length"] = $len(body)
         for k, v in headers.pairs():
           msg &= " " & k & ":" & v
@@ -563,7 +568,7 @@ proc request(self:              DockerImage,
             headers           = headers.update(config.authHeadersFor(normalized)).update(wwwAuth),
             pinnedCert        = config.pinnedCert,
             verifyMode        = config.verifyMode,
-            timeout           = TIMEOUT,
+            timeout           = timeout,
             retries           = 2,
             acceptStatusCodes = acceptStatusCodes,
           )
@@ -608,6 +613,14 @@ proc request(self:              DockerImage,
     raise newException(RegistryResponseError, registryError)
   raise newException(ValueError, "could not find working registry configuration for " & $self)
 
+proc validateDigest(digest: string): string =
+  if not digest.startsWith("sha256:") or digest.len != 71:
+    raise newException(ValueError, "invalid digest from registry: " & digest)
+  for c in digest[7 .. ^1]:
+    if c notin {'0' .. '9', 'a' .. 'f'}:
+      raise newException(ValueError, "invalid digest from registry: " & digest)
+  return digest
+
 proc manifestHead*(image:    DockerImage,
                    useCase = RegistryUseCase.ReadOnly,
                    ): DockerDigestedJson =
@@ -625,19 +638,27 @@ proc manifestHead*(image:    DockerImage,
       ),
     )
     contentType = response.headers["Content-Type"]
-    digest      = response.headers["Docker-Content-Digest"]
+    digest      = validateDigest(response.headers["Docker-Content-Digest"])
   if contentType notin CONTENT_TYPE_MAPPING:
     # TODO do heuristics on response payload as there are bound to be new mime types
     raise newException(
       ValueError,
       msg & " returned unsupported registry content type: " & contentType
     )
+  let size =
+    try:
+      parseInt(response.headers["Content-Length"])
+    except:
+      raise newException(
+        ValueError,
+        "invalid Content-Length from registry: " & response.headers["Content-Length"]
+      )
   return newDockerDigestedJson(
     data      = JsonNode(nil),
     digest    = digest,
     mediaType = contentType,
     kind      = CONTENT_TYPE_MAPPING[contentType],
-    size      = parseInt(response.headers["Content-Length"]),
+    size      = size,
   )
 
 proc manifestGet*(image:    DockerImage,
@@ -701,26 +722,35 @@ proc layerGetFileString*(layer:    DockerImage,
   extractAll(tarPath, untarPath)
   result = tryToLoadFile(namePath)
 
-proc layerPutStart(layer: DockerImage,
-                  ): Uri =
+proc layerPutStart(layer: DockerImage): (Uri, int) =
   let (_, initResponse) = layer.request(
     useCase     = RegistryUseCase.ReadWrite,
     httpMethod  = HttpPost,
     path        = "/blobs/uploads/",
     contentType = "application/octet-stream",
   )
+  var location: Uri
   try:
-    result = parseUri(initResponse.headers["Location"])
+    location = parseUri(initResponse.headers["Location"])
   except:
     raise newException(
       ValueError,
       "could not determine layer upload url due to: " & getCurrentExceptionMsg()
     )
-  if not result.path.startsWith("/"):
+  if not location.path.startsWith("/"):
     raise newException(
       ValueError,
-      "upload Location is expected to be absolute path. Got: " & result.path
+      "upload Location is expected to be absolute path. Got: " & location.path
     )
+  let minChunkSize =
+    if initResponse.headers.hasKey("oci-chunk-min-length"):
+      try:
+        max(0, parseInt(initResponse.headers["oci-chunk-min-length"]))
+      except:
+        0
+    else:
+      0
+  return (location, minChunkSize)
 
 proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): (int, int) =
   if not response.headers.hasKey("Range"):
@@ -728,7 +758,9 @@ proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): 
       ValueError,
       "could not upload layer as reponse doesnt have expected Range header"
     )
-  let (validRange, _, rangeEnd) = response.headers["Range"].scanTuple("$i-$i")
+  # accept both OCI "N-M" and RFC 7233 "bytes=N-M" formats
+  let raw = response.headers["Range"].removePrefix("bytes=")
+  let (validRange, _, rangeEnd) = raw.scanTuple("$i-$i")
   if not validRange:
     raise newException(
       ValueError,
@@ -736,6 +768,12 @@ proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): 
       response.headers["Range"]
     )
   let nextStartAt = rangeEnd + 1
+  if nextStartAt < startAt:
+    raise newException(
+      ValueError,
+      "could not upload layer as Range response header went backwards: " &
+      response.headers["Range"]
+    )
   var attempts = attempts
   if nextStartAt == startAt:
     attempts += 1
@@ -743,15 +781,18 @@ proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): 
     attempts = 1
   return (nextStartAt, attempts)
 
-proc layerPutFileStream*(layer:       DockerImage,
-                         contentType: string,
-                         fileStream:  FileStringStream,
-                         # fyi docker cli seems to upload as monolithic upload :shrug:
-                         chunkSize    = 5 * MEGABYTE,
-                        ): DockerDigestedJson =
+proc layerPutFileStream*(
+    layer:       DockerImage,
+    contentType: string,
+    fileStream:  FileStringStream,
+): DockerDigestedJson =
   let
-    layer = layer.withDigest(fileStream.sha256Hex())
-    size  = len(fileStream)
+    layer          = if layer.digest != "": layer
+                     else: layer.withDigest(fileStream.sha256Hex())
+    size           = len(fileStream)
+    # fyi docker cli seems to upload as monolithic upload :shrug:
+    chunkSize      = int(attrGet[Con4mSize]("docker.registry_layer_chunk_size"))
+    layerTimeoutMs = int(attrGet[Con4mDuration]("docker.registry_layer_upload_timeout")) div 1000
   try:
     let (_, response) = layer.request(
       useCase     = RegistryUseCase.ReadWrite,
@@ -760,24 +801,35 @@ proc layerPutFileStream*(layer:       DockerImage,
       accept      = contentType,
     )
     trace("docker: layer already exists. nothing to upload")
+    let existingSize =
+      try:
+        parseInt(response.headers["Content-Length"])
+      except:
+        raise newException(
+          ValueError,
+          "invalid Content-Length from registry: " & response.headers["Content-Length"]
+        )
     return newDockerDigestedJson(
       data      = JsonNode(nil),
       digest    = layer.digest,
       mediaType = response.headers["Content-Type"],
-      size      = parseInt(response.headers["Content-Length"]),
+      size      = existingSize,
       kind      = DockerManifestType.layer,
     )
   except RegistryResponseError:
     trace("docker: layer doesnt exist. uploading " & $layer)
+    if size == 0:
+      raise newException(ValueError, "cannot upload zero-sized layer for " & $layer)
     var
-      location   = layer.layerPutStart()
-      startAt    = 0
-      attempts   = 1
-      httpMethod = HttpPatch
-      response:    Response
-    while startAt < size - 1:
+      (location, minChunkSize) = layer.layerPutStart()
+      effectiveChunkSize       = max(chunkSize, minChunkSize)
+      startAt                  = 0
+      attempts                 = 1
+      httpMethod               = HttpPatch
+      response:                  Response
+    while startAt < size:
       let
-        endAt   = min(startAt + chunkSize, size) - 1
+        endAt   = min(startAt + effectiveChunkSize, size) - 1
         isFinal = endAt == size - 1
       if isFinal:
         location   = location.withQueryPair("digest", layer.imageRef)
@@ -792,6 +844,7 @@ proc layerPutFileStream*(layer:       DockerImage,
           size              = size,
           contentType       = "application/octet-stream",
           acceptStatusCodes = [200..299, 416..416],
+          timeout           = layerTimeoutMs,
         )
       except:
         raise newException(
@@ -801,14 +854,15 @@ proc layerPutFileStream*(layer:       DockerImage,
       if response.code() == Http416:
         trace("docker: chunk not fully uploaded: " & response.body())
         (startAt, attempts)   = response.nextStartAt(startAt, attempts)
-        location              = parseUri(response.headers["Location"])
+        if response.headers.hasKey("Location"):
+          location = parseUri(response.headers["Location"])
       else:
         if response.headers.hasKey("Range"):
           (startAt, attempts) = response.nextStartAt(startAt, attempts)
         else:
           (startAt, attempts) = (endAt + 1, 1)
         if response.headers.hasKey("Location"):
-          location            = parseUri(response.headers["Location"])
+          location = parseUri(response.headers["Location"])
       if attempts > 2:
         raise newException(
           ValueError,
@@ -820,7 +874,7 @@ proc layerPutFileStream*(layer:       DockerImage,
     # > uploaded blob which may differ from the provided digest.
     return newDockerDigestedJson(
       data      = JsonNode(nil),
-      digest    = response.headers["Docker-Content-Digest"],
+      digest    = validateDigest(response.headers["Docker-Content-Digest"]),
       mediaType = contentType,
       kind      = DockerManifestType.layer,
       size      = len(fileStream),
@@ -843,6 +897,22 @@ proc layerPutJson*(layer:       DockerImage,
     contentType = contentType,
     body        = $data,
   )
+
+proc layerDelete*(layer: DockerImage): bool =
+  try:
+    let (_, response) = layer.request(
+      useCase           = RegistryUseCase.ReadWrite,
+      httpMethod        = HttpDelete,
+      path              = "/blobs/" & layer.imageRef,
+      acceptStatusCodes = @[200..299, 404..405],
+    )
+    if response.code() == Http405:
+      warn("docker: registry does not support blob deletion for " & $layer)
+      return false
+    return true
+  except:
+    dumpExOnDebug()
+    return false
 
 proc manifestPut*(image:       DockerImage,
                   contentType: string,
@@ -874,7 +944,7 @@ proc manifestPut*(image:       DockerImage,
     )
     return newDockerDigestedJson(
       data      = data,
-      digest    = response.headers["Docker-Content-Digest"],
+      digest    = validateDigest(response.headers["Docker-Content-Digest"]),
       mediaType = contentType,
       kind      = CONTENT_TYPE_MAPPING[contentType],
       size      = len(body),

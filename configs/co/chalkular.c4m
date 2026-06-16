@@ -40,6 +40,9 @@ docker {
     }
     docker_push chalkular {
       ~tags: ["{CHALK_RAND}"]
+      docker_context_upload {
+        ~enabled: true
+      }
     }
   }
 }

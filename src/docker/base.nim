@@ -78,32 +78,74 @@ proc runMungedDockerInvocation*(ctx: DockerInvocation): int =
     trace("docker: stdin: \n" & stdin)
   result = runCmdNoOutputCapture(exe, args, stdin)
 
-
-proc getAllDockerContexts*(ctx: DockerInvocation): seq[string] =
-  result = @[]
-  if ctx.gitContext != nil:
-    result.add(ctx.gitContext.tmpGitDir)
-  else:
-    if ctx.foundContext != "" and ctx.foundContext != "-":
-      result.add(resolvePath(ctx.foundContext))
-  for k, v in ctx.foundExtraContexts:
-    result.add(resolvePath(v))
-
 proc getUsableDockerContexts*(ctx: DockerInvocation): seq[string] =
+  ## Returns local folders that chalk plugins can scan for metadata.
+  ## For git contexts this is the raw .git directory, which allows plugins
+  ## such as the git plugin to extract commit IDs and other VCS metadata.
+  ## Stdin ("-"), remote URLs (containing ":"), and unresolvable paths are
+  ## skipped with a warning.
+  ## See also getLocalDockerContexts, which returns the user-code directories
+  ## (work trees) used for file traversal and build-context upload.
   result = @[]
-  for context in ctx.getAllDockerContexts():
-    if context == "-":
+  let mainContext =
+    if ctx.gitContext != nil: ctx.gitContext.tmpGitDir
+    elif ctx.foundContext != "": ctx.foundContext
+    else: ""
+  if mainContext != "":
+    if mainContext == "-":
       warn("docker: currently cannot use contexts passed via stdin.")
-      continue
-    if ':' in context:
-      warn("docker: cannot use remote context: " & context & " (skipping)")
-      continue
+    elif ':' in mainContext:
+      warn("docker: cannot use remote context: " & mainContext & " (skipping)")
+    else:
+      try:
+        discard mainContext.resolvePath().getFileInfo()
+        result.add(mainContext)
+      except:
+        warn("docker: cannot find context directory for chalking: " & mainContext)
+  if ctx.foundExtraContexts != nil:
+    for k, v in ctx.foundExtraContexts:
+      if v == "-":
+        warn("docker: currently cannot use contexts passed via stdin.")
+        continue
+      if ':' in v:
+        warn("docker: cannot use remote context: " & v & " (skipping)")
+        continue
+      try:
+        discard v.resolvePath().getFileInfo()
+        result.add(v)
+      except:
+        warn("docker: cannot find context directory for chalking: " & v)
+        continue
+
+proc getLocalDockerContexts*(ctx: DockerInvocation): TableRef[string, string] =
+  ## Returns local directory build contexts as name -> path, for upload or
+  ## file traversal.  Git URL contexts are excluded entirely: their content
+  ## is already captured in git state, so uploading would be redundant.
+  ## The primary use-case is uploading contexts that may have been mutated
+  ## relative to git (local directories).  Non-directory contexts (stdin,
+  ## oci-layout://, docker-image://, etc.) are also skipped.
+  ## See also getUsableDockerContexts, which returns raw .git dirs for plugin scanning.
+  result = newTable[string, string]()
+  # Git contexts are skipped: the content is already captured in git state.
+  # Only local directory contexts (mutated relative to git) are worth uploading.
+  if ctx.gitContext == nil and ctx.foundContext != "" and
+      ctx.foundContext != "-" and ':' notin ctx.foundContext:
     try:
-      discard context.resolvePath().getFileInfo()
-      result.add(context)
+      let path = resolvePath(ctx.foundContext)
+      if dirExists(path):
+        result["."] = path
     except:
-      warn("docker: cannot find context directory for chalking: " & context)
-      continue
+      warn("docker: cannot resolve context path: " & ctx.foundContext)
+      dumpExOnDebug()
+  if ctx.foundExtraContexts != nil:
+    for name, path in ctx.foundExtraContexts:
+      try:
+        let resolved = resolvePath(path)
+        if dirExists(resolved):
+          result[name] = resolved
+      except:
+        warn("docker: cannot resolve extra context path '" & name & "': " & path)
+        dumpExOnDebug()
 
 proc isMultiPlatform*(ctx: DockerInvocation): bool =
   return len(ctx.foundPlatforms) > 1

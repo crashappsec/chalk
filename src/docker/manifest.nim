@@ -717,6 +717,28 @@ proc put*(self: DockerManifest) =
       check = false,
     )
 
+proc appendToAttestationManifestList*(image: DockerImage,
+                                      item: DockerManifest,
+                                      ): DockerManifest {.discardable.} =
+  ## Fetch (or create) the OCI attestation manifest list for `image` and append
+  ## `item` to it, then push the updated list.  `image` must have a digest set.
+  ## Returns the manifest list that was pushed.
+  let attSpec = image.asOciAttestation()
+  try:
+    result = attSpec.fetchListManifest(fetchManifests = true)
+    trace("attestation: adding to existing manifest list at " & $attSpec)
+  except RegistryResponseError:
+    result = DockerManifest(
+      name:      attSpec,
+      kind:      DockerManifestType.list,
+      mediaType: "application/vnd.oci.image.index.v1+json",
+      manifests: @[],
+    )
+    trace("attestation: creating new manifest list at " & $attSpec)
+  result.add(item)
+  info("attestation: pushing attestation for " & $image & " to " & $result.name)
+  result.put()
+
 proc findSibling(self: DockerManifest, reference = "attestation-manifest"): DockerManifest =
   return (
     self.allImages()

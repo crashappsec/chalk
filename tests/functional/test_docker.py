@@ -48,7 +48,9 @@ from .utils.dict import (
     ANY,
     MISSING,
     Contains,
+    ContainsDict,
     IfExists,
+    IntCompare,
     Iso8601,
     Length,
     Values,
@@ -2259,3 +2261,353 @@ def test_version_bare(chalk_default: Chalk):
         params=["version"],
     )
     assert run
+
+
+@pytest.mark.parametrize(
+    "strategy, push, exceed_size",
+    [
+        # separate build + push: all strategies are meaningfully different
+        ("registry", False, False),
+        ("local", False, False),
+        ("disk", False, False),
+        # combined --push: strategies collapse to same behaviour; test one
+        ("local", True, False),
+        # only libs exceeds size_threshold: primary context succeeds, libs fails
+        ("local", False, True),
+    ],
+)
+def test_build_context_upload(
+    chalk_copy: Chalk,
+    strategy: str,
+    push: bool,
+    exceed_size: bool,
+    random_hex: str,
+    server_http: str,
+    tmp_data_dir: Path,
+):
+    # Use subdirectories as build contexts so the chalk binary placed in
+    # tmp_data_dir by the chalk_copy fixture is not included in any tar.
+    context_dir = tmp_data_dir / "context"
+    context_dir.mkdir()
+    libs_dir = tmp_data_dir / "libs"
+    libs_dir.mkdir()
+
+    # Primary context: a git repo with source files, a .dockerignore,
+    # and files that should be excluded by each mechanism.
+    (context_dir / "app.py").write_text("print('hello')\n")
+    (context_dir / "src").mkdir()
+    (context_dir / "src" / "main.py").write_text("def main(): pass\n")
+    (context_dir / "README.md").write_text("# test\n")
+    # files excluded/re-included via .dockerignore
+    (context_dir / "logs").mkdir()
+    (context_dir / "logs" / "debug.log").write_text("log output\n")
+    (context_dir / "logs" / "app.log").write_text("app output\n")
+    (context_dir / "logs" / "temp.tmp").write_text("scratch\n")
+    (context_dir / "secrets").mkdir()
+    (context_dir / "secrets" / "api_key.txt").write_text("s3cr3t\n")
+    # file larger than max_file_size (<<1kb>> in docker_context.c4m) must be skipped
+    (context_dir / "large_file.bin").write_bytes(b"x" * 2048)
+    # single-component name > 100 bytes: requires GNU LongLink 'L' entry
+    long_name = "a" * 101 + ".py"
+    (context_dir / long_name).write_text("# long name\n")
+    # name component in a subdirectory still > 100 bytes
+    (context_dir / "sub").mkdir()
+    long_subname = "b" * 101 + ".py"
+    (context_dir / "sub" / long_subname).write_text("# long sub name\n")
+    # symlink target > 100 bytes: requires GNU LongLink 'K' entry
+    long_link_target = "/a/very/long/symlink/target/path/that/exceeds/one/hundred/bytes/to/trigger/gnu/tar/k/type/entry/handling"
+    assert len(long_link_target) > 100
+    (context_dir / "link_with_long_target").symlink_to(long_link_target)
+    (context_dir / ".dockerignore").write_text(
+        "\n".join(
+            [
+                "logs/",
+                "!logs/*.log",
+                "secrets/",
+            ]
+        )
+    )
+    (Git(context_dir).init().add().commit("init"))
+
+    # Named extra context "libs": simple directory with a library file.
+    (libs_dir / "utils.py").write_text("def helper(): pass\n")
+    (libs_dir / "vendor").mkdir()
+    (libs_dir / "vendor" / "dep.py").write_text("# vendored\n")
+    (Git(libs_dir).init().add().commit("init"))
+
+    name = f"context_upload_{random_hex}"
+    tag = f"{REGISTRY}/{name}:latest"
+    if exceed_size:
+        # only libs gets bulk incompressible files to push it over size_threshold
+        # (<<5kb>> in docker_context.c4m); each file is under max_file_size (<<1kb>>)
+        # so they are included individually but together exceed the total threshold.
+        # primary context stays well under size_threshold to test partial failure.
+        for i in range(10):
+            (libs_dir / f"bulk_{i:02d}.bin").write_bytes(os.urandom(768))
+
+    env = {
+        "CHALK_SERVER": server_http,
+        "CONTEXT_STRATEGY": strategy,
+    }
+    config = CONFIGS / "docker_context.c4m"
+
+    digests, build_result = chalk_copy.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
+        context=context_dir,
+        named_contexts={"libs": libs_dir},
+        tag=tag,
+        push=push,
+        run_docker=False,
+        config=config,
+        env=env,
+        buildx=True,
+        ignore_errors=exceed_size,
+    )
+
+    if not push:
+        _, push_result = chalk_copy.docker_push(
+            tag,
+            env=env,
+            digests=digests,
+            config=config,
+            ignore_errors=exceed_size,
+        )
+    else:
+        push_result = build_result
+
+    # named extra contexts are always captured regardless of upload outcome
+    assert build_result.mark.has(
+        DOCKER_ADDITIONAL_CONTEXTS={"libs": re.compile(r".+")},
+    )
+
+    if exceed_size:
+        # partial failure: only libs exceeds size_threshold; primary context succeeds
+        assert push_result.mark.has(
+            _REPO_BUILD_CONTEXTS={
+                REGISTRY_AUTH: {
+                    "context": {
+                        ".": re.compile(r"^[a-f0-9]{64}$"),
+                        "libs": MISSING,
+                    },
+                },
+            },
+        )
+        # libs failure must be recorded at build time, not silently dropped
+        assert build_result.report.has(
+            _OP_FAILED_KEYS={
+                "_REPO_BUILD_CONTEXTS": [
+                    {
+                        "code": "CONTEXT_TOO_LARGE",
+                        "error": re.compile(r"libs"),
+                    }
+                ],
+            },
+        )
+        return
+
+    # snapshots are embedded in the chalk mark at build time;
+    # "context" is the repository name from docker_context.c4m
+    assert build_result.mark.has(
+        DOCKER_BUILD_CONTEXT_SNAPSHOTS={
+            REGISTRY_AUTH: {
+                "context": {
+                    ".": {
+                        "strategy": strategy,
+                    },
+                    "libs": {
+                        "strategy": strategy,
+                    },
+                },
+            },
+        },
+    )
+
+    # completed context attestation digests reported at push time
+    assert push_result.mark.has(
+        _REPO_BUILD_CONTEXTS={
+            REGISTRY_AUTH: {
+                "context": {
+                    ".": re.compile(r"^[a-f0-9]{64}$"),
+                    "libs": re.compile(r"^[a-f0-9]{64}$"),
+                },
+            },
+        },
+    )
+
+    # --- primary context (".") ---
+    attest_digest = push_result.mark["_REPO_BUILD_CONTEXTS"][REGISTRY_AUTH]["context"][
+        "."
+    ]
+    context_files = Docker.list_files_in_tar_layer(
+        registry=REGISTRY_AUTH,
+        repo="context",
+        attest_digest=attest_digest,
+    )
+
+    # source files must be present
+    assert "app.py" in context_files
+    assert "src/main.py" in context_files
+    assert "README.md" in context_files
+
+    # .git directory must be excluded (default additional_dockerignore)
+    assert not any(f == ".git" or f.startswith(".git/") for f in context_files)
+
+    # file larger than max_file_size (<<1kb>>) must be skipped
+    assert "large_file.bin" not in context_files
+
+    # logs/ is excluded but logs/*.log is re-included via wildcard negation
+    assert "logs/debug.log" in context_files
+    assert "logs/app.log" in context_files
+    assert "logs/temp.tmp" not in context_files
+
+    # secrets/ is excluded entirely
+    assert not any(f == "secrets" or f.startswith("secrets/") for f in context_files)
+
+    # long filenames (>100 bytes) stored via GNU LongLink 'L' must round-trip correctly
+    assert long_name in context_files
+    assert f"sub/{long_subname}" in context_files
+
+    # symlink with target > 100 bytes stored via GNU LongLink 'K' must round-trip correctly
+    assert "link_with_long_target" in context_files
+
+    # --- named context ("libs") ---
+    libs_attest_digest = push_result.mark["_REPO_BUILD_CONTEXTS"][REGISTRY_AUTH][
+        "context"
+    ]["libs"]
+    libs_files = Docker.list_files_in_tar_layer(
+        registry=REGISTRY_AUTH,
+        repo="context",
+        attest_digest=libs_attest_digest,
+    )
+
+    assert "utils.py" in libs_files
+    assert "vendor/dep.py" in libs_files
+    assert not any(f == ".git" or f.startswith(".git/") for f in libs_files)
+
+    # --- context manifest annotations ---
+    # Each context manifest must carry the correct artifactType and
+    # dev.crashoverride.chalk.build-context.name annotation.
+    context_manifest = Docker.imagetools_inspect(
+        f"{REGISTRY_AUTH}/context@sha256:{attest_digest}",
+    ).json()
+    assert ContainsDict(context_manifest).contains(
+        {
+            "artifactType": "application/vnd.crashoverride.chalk.build-context.v1",
+            "annotations": {
+                "org.opencontainers.image.created": Iso8601(),
+                "dev.crashoverride.chalk.build-context.name": ".",
+            },
+        }
+    )
+
+    libs_manifest = Docker.imagetools_inspect(
+        f"{REGISTRY_AUTH}/context@sha256:{libs_attest_digest}",
+    ).json()
+    assert ContainsDict(libs_manifest).contains(
+        {
+            "artifactType": "application/vnd.crashoverride.chalk.build-context.v1",
+            "annotations": {
+                "org.opencontainers.image.created": Iso8601(),
+                "dev.crashoverride.chalk.build-context.name": "libs",
+            },
+        }
+    )
+
+    # tar sizes are positive integers; large_file.bin exceeds max_file_size and
+    # must be reported in skipped files with its sha256 hash and byte size
+    assert push_result.mark.has(
+        _REPO_BUILD_CONTEXT_TAR_SIZES={
+            REGISTRY_AUTH: {
+                "context": {
+                    ".": IntCompare(0, operator.gt),
+                    "libs": IntCompare(0, operator.gt),
+                },
+            },
+        },
+        _REPO_BUILD_CONTEXT_SKIPPED_FILES={
+            REGISTRY_AUTH: {
+                "context": {
+                    ".": {
+                        "large_file.bin": {
+                            "hash": re.compile(r"^[a-f0-9]{64}$"),
+                            "size": 2048,
+                        },
+                    },
+                },
+            },
+        },
+    )
+
+
+@pytest.mark.parametrize("strategy", ["registry", "local"])
+def test_build_context_upload_cleanup(
+    chalk_copy: Chalk,
+    strategy: str,
+    random_hex: str,
+    server_http: str,
+    tmp_data_dir: Path,
+):
+    """Blobs/tars created at build time are deleted when the build fails."""
+    # Use a subdirectory so the chalk binary in tmp_data_dir is not included.
+    context_dir = tmp_data_dir / "context"
+    context_dir.mkdir()
+    (context_dir / "app.py").write_text("print('hello')\n")
+
+    tag = f"{REGISTRY}/context_cleanup_{random_hex}:latest"
+    env = {
+        "CHALK_SERVER": server_http,
+        "CONTEXT_STRATEGY": strategy,
+    }
+    config = CONFIGS / "docker_context.c4m"
+
+    # Build with a Dockerfile that succeeds at FROM but fails at RUN,
+    # guaranteeing the pre-build upload/tar work ran before the failure.
+    _, build_result = chalk_copy.docker_build(
+        content="FROM alpine\nRUN false\n",
+        context=context_dir,
+        tag=tag,
+        config=config,
+        env=env,
+        buildx=True,
+        run_docker=False,
+        expected_success=False,
+        ignore_errors=True,
+    )
+
+    logs = build_result.logs
+
+    if strategy == "registry":
+        assert (
+            "build context blob uploaded" in logs
+        ), "chalk must upload a context blob before docker build starts"
+        assert (
+            "cleaned up" in logs and "registry blob" in logs
+        ), "chalk must delete the blob after the build fails"
+        digest_match = re.search(
+            r"build context blob uploaded: sha256:([0-9a-f]+)",
+            logs,
+        )
+        assert digest_match, "could not parse blob digest from chalk logs"
+        assert not Docker.blob_exists(
+            registry=REGISTRY_AUTH,
+            repo="context",
+            digest=digest_match.group(1),
+        ), f"registry blob should have been deleted but is still accessible"
+
+    else:
+        assert (
+            "build context tarball cached at:" in logs
+        ), "chalk must create a local tarball before docker build starts"
+        assert (
+            "cleaned up" in logs and "local tar" in logs
+        ), "chalk must delete the tarball after the build fails"
+        tar_match = re.search(
+            r"build context tarball cached at: (\S+)",
+            logs,
+        )
+        assert tar_match, "could not parse tar path from chalk logs"
+        assert not Path(
+            tar_match.group(1)
+        ).exists(), (
+            f"local tar {tar_match.group(1)} should have been deleted but still exists"
+        )

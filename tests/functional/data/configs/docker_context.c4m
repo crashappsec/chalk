@@ -1,0 +1,20 @@
+docker {
+  docker_registry local {
+    enabled: env_exists("CHALK_SERVER")
+    uri: env("IP") + ":5048"
+    login_method: "get"
+    docker_login_get {
+      uri: env("CHALK_SERVER") + "/registry/auth"
+    }
+    docker_push context {
+      repository: "context"
+      tags: ["context:{chalk_rand}"]
+      docker_context_upload {
+        enabled:        true
+        strategy:       env("CONTEXT_STRATEGY")
+        max_file_size:  <<1kb>>
+        size_threshold: <<5kb>>
+      }
+    }
+  }
+}

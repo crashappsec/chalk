@@ -2008,6 +2008,42 @@ is invoked on an image instead of a file-system path.
 """
   }
 
+  field registry_layer_chunk_size {
+    type:     Size
+    default:  <<5mb>>
+    shortdoc: "Chunk size for registry layer uploads"
+    doc:      """
+Size of each chunk sent in a PATCH request when uploading a layer blob to
+a Docker registry. Larger values reduce round-trips but require more memory
+and may time out on slow connections.
+"""
+  }
+
+  field registry_layer_upload_timeout {
+    type:     Duration
+    default:  << 30 sec >>
+    shortdoc: "Timeout for a single registry layer chunk upload"
+    doc:      """
+Timeout applied to each individual chunk PATCH/PUT request when uploading
+a layer blob to a Docker registry. Increase this when uploading large build
+contexts over slow connections.
+"""
+  }
+
+  field build_context_cache_max_age {
+    type:     Duration
+    default:  << 1 hrs >>
+    shortdoc: "Max age of cached build context tarballs"
+    doc:      """
+When `docker_context_upload.strategy` is `local` or `auto` (and the build is not in
+CI), Chalk saves the build context as a `.tar.gz` under
+`<tmpdir>/chalk-build-contexts/`. This setting controls how long those cached
+tarballs are kept before being deleted.
+
+The cleanup runs at the start of each `chalk docker build` and `chalk docker push`.
+"""
+  }
+
 }
 
 docker_login_types := ["", "get"]
@@ -2168,6 +2204,8 @@ retags the image and runs `docker push` for each configured image reference.
 Any locally-created tags are pruned once all pushes are complete.
 """
 
+  allow docker_context_upload
+
   field enabled {
     type:    bool
     default: true
@@ -2202,6 +2240,194 @@ For example, `"myapp-{BRANCH}"` substitutes the `BRANCH` chalk key.
 Key names are case-insensitive - `{BRANCH}` and `{branch}` are equivalent.
 Any characters in the substituted value that are not alphanumeric, `.`,
 `_`, or `-` are replaced with `-` to produce a valid Docker tag.
+"""
+  }
+
+}
+
+singleton docker_context_upload {
+  user_def_ok: true
+  doc:         """
+Configuration for uploading the Docker build context as an OCI attestation
+attached to the pushed image.  Declare this section inside a `docker_push`
+block to enable context upload for that push target.
+
+When present (and `enabled` is `true`), Chalk archives the build context
+as a `.tar.gz` and uploads it as an OCI artifact with
+`artifactType: application/vnd.crashoverride.chalk.build-context.v1`,
+stored at the attestation tag `sha256-<image-manifest-digest>`.
+
+Both the main build context and any extra contexts added via
+`--build-context name=path` are uploaded for local directory contexts.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable or disable context upload for this push target"
+    doc:      """
+Set to `true` to enable context upload.  Defaults to `false` so that
+declaring the section without setting this field does not silently
+activate uploads.
+"""
+  }
+
+  field mode {
+    type:    string
+    default: "full"
+    choices: ["full"]
+    shortdoc: "Build context upload mode"
+    doc:     """
+Controls which parts of the build context are uploaded.  Currently only
+`"full"` is supported, which archives the entire context directory.
+"""
+  }
+
+  field strategy {
+    type:    string
+    default: "auto"
+    choices: ["auto", "registry", "local", "disk"]
+    shortdoc: "Strategy for build context upload timing"
+    doc:     """
+Controls when the build context tarball is created and uploaded relative to
+`chalk docker build` and `chalk docker push`:
+
+* `auto` — uses `registry` in CI environments (where `CI`, `GITHUB_ACTIONS`,
+  `GITLAB_CI`, `JENKINS_URL`, or similar env vars are set) and `local`
+  otherwise.
+* `registry` — at build time, upload the context blob to the target registry
+  immediately; at push time, create the attestation manifest referencing the
+  already-uploaded blob.  If the docker build fails, Chalk automatically
+  deletes the uploaded blob to avoid leaving unreferenced data in the
+  registry (registries that do not support deletion log a warning instead).
+* `local` — at build time, save the context as a `.tar.gz` under
+  `<tmpdir>/chalk-build-contexts/`; at push time, upload the blob and create
+  the attestation manifest.  The tarball is kept after push so the same
+  image can be pushed to multiple registries without re-archiving.  Cleanup
+  is governed by `docker.build_context_cache_max_age`.  If the docker build
+  fails, the tarball is deleted immediately.
+* `disk` — at push time, read the context directory from disk (using the path
+  recorded at build time), create a tarball, upload, and push the manifest.
+  Users who choose this strategy accept the risk that the context directory
+  may have been modified between build and push.
+"""
+  }
+
+  field size_threshold {
+    type:     Size
+    default:  <<100mb>>
+    shortdoc: "Skip context upload when tarball exceeds this size"
+    doc:      """
+Maximum size of the build context `.tar.gz` archive to upload, in bytes.
+If the tarball exceeds this threshold, the context upload is skipped and
+the failure is recorded in `_OP_FAILED_KEYS` via the failed-key mechanism.
+A value of `0` disables the check and always uploads regardless of size.
+"""
+  }
+
+  field max_file_size {
+    type:     Size
+    default:  <<0mb>>
+    shortdoc: "Skip individual files larger than this size in the context tarball"
+    doc:      """
+Per-file size limit when creating the build context `.tar.gz` archive.
+Any individual file whose size exceeds this threshold is omitted from
+the tarball.  A value of `0` (the default) disables the check and
+includes all files regardless of size.
+
+This is useful for skipping unexpectedly large files (compiled binaries,
+model weights, data dumps) that would otherwise push the total archive
+over `size_threshold` without requiring explicit exclude patterns for
+every such file.
+
+Skipped files are recorded (not silently dropped): their path, byte size,
+and SHA-256 digest are stored in `_REPO_BUILD_CONTEXT_SKIPPED_FILES`.
+The digest serves two purposes: it identifies the exact file version
+that was omitted, and it allows the skipped file to be matched against
+files in the source repository or artifact store in the future.
+"""
+  }
+
+  field additional_dockerignore {
+    type:     list[string]
+    default:  [".git"]
+    shortdoc: "Extra glob patterns appended after .dockerignore when creating the tarball"
+    doc:      """
+Additional glob patterns applied after the `.dockerignore` patterns when
+creating the build context `.tar.gz` archive.  Because patterns are evaluated
+in order with last-match-wins semantics, these patterns take final precedence
+over anything in `.dockerignore`.
+
+Pattern syntax follows Docker `.dockerignore` conventions (see
+`honor_dockerignore` for the full rule reference).  Key points:
+
+- All patterns are matched against the full relative path from the context
+  root.  Because `*` and `?` never cross `/`, a no-slash pattern like `*.pyc`
+  only matches root-level entries (`foo.pyc`), NOT `src/main.pyc`.  A path is
+  also excluded when an ancestor directory matches the pattern (e.g. excluding
+  `logs` also excludes `logs/debug.log`), but the ancestor check still uses the
+  full path, so `*.pyc` does not exclude `a/b/c.pyc`.
+- Patterns with a `/` are matched against the full relative path from the
+  context root -- e.g. `build/*.o` only matches inside a root-level `build/`.
+- `*` matches any sequence of non-`/` characters; `?` matches a single
+  non-`/` character; `**` matches across path separators (including `/`);
+  `[abc]`/`[a-z]`/`[!abc]` are character classes; a backslash escapes the next character literally.
+- A leading `!` negates the rule, re-including a previously excluded path.
+
+The default `[".git"]` excludes the Git repository metadata directory,
+which is typically not needed in the uploaded context and can be large.
+"""
+  }
+
+  field honor_dockerignore {
+    type:     bool
+    default:  true
+    shortdoc: "Apply .dockerignore patterns when creating the context tarball"
+    doc:      """
+When `true`, Chalk reads the context-root ignore file and applies its patterns
+before the `additional_dockerignore` patterns.  This ensures the uploaded
+context matches what Docker itself would have used for the build.
+
+Ignore-file selection (Docker priority):
+
+1. `<dockerfileDir>/<basename(dockerfile)>.dockerignore` next to the
+   Dockerfile, if it exists (only when a named `-f` flag was given and the
+   Dockerfile is not stdin).  For example, `-f docker/prod.Dockerfile`
+   checks for `docker/prod.Dockerfile.dockerignore`.
+2. `.dockerignore` in the context root, if it exists.
+3. No ignore file -- nothing is excluded by this step.
+
+Pattern file format:
+
+- Blank lines and lines beginning with `#` are ignored.
+- Leading `/` is stripped from each pattern (all paths are context-relative).
+- Trailing `/` signals directory intent; it is stripped before matching, and
+  the resulting pattern then follows the no-slash matching rule below.
+
+Pattern matching rules (mirrors Moby `fileutils.PatternMatcher` /
+Go `filepath.Match` extended with `**`):
+
+- All patterns are matched against the full relative path from the context
+  root.  Because `*` and `?` never cross `/`, a no-slash pattern like `.git`
+  only matches the root-level `.git` entry -- NOT `vendor/.git` or `a/.git`.
+  Likewise `*.tmp` excludes `foo.tmp` but not `a/b/foo.tmp`.
+- Slash patterns (containing `/` after stripping) are also matched against the
+  full relative path.  Example: `build/*.o` only matches files directly inside
+  a root-level `build/` directory.
+- A path also matches if any ancestor directory matches the pattern (full-path
+  check): excluding `logs` also excludes `logs/debug.log`, but does not exclude
+  `a/logs/debug.log`.
+- Glob characters: `*` (non-`/` run), `?` (single non-`/`), `**` (path-
+  crossing run), `[abc]`/`[a-z]`/`[!abc]` (character classes, `/` never
+  matches inside `[]`), backslash (literal character escape).
+- Patterns beginning with `!` re-include previously excluded paths.
+- Evaluation is ordered; the **last matching pattern wins**.
+- When a directory is excluded, Chalk skips recursing into it unless a
+  negation pattern could re-include entries inside: a no-slash negation
+  whose pattern matches the directory name itself (e.g. `!logs` recurses
+  into `logs/`), a negation containing `**`, or a slash negation whose
+  directory prefix at the same depth glob-matches the excluded directory
+  (e.g. `!logs_*/f` recurses into `logs_app/`).
 """
   }
 }
@@ -4745,6 +4971,7 @@ func object_store_check(path, val) {
     return "No such object store configured: '" + val + "'"
   }
 }
+
 
 func auth_object_check(path) {
   result := ""
