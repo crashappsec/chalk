@@ -326,7 +326,7 @@ proc signBySigStore*(chalk: ChalkObj,
       "dsseEnvelope": dsse,
     })
   result.setIfNotEmpty("_SIGNATURES", %(@[dsse]))
-  subject.asImage().appendToAttestationManifestList(
+  subject.asImage().addAttestation(
     DockerManifest(
       kind:         DockerManifestType.image,
       mediaType:    "application/vnd.oci.image.manifest.v1+json",

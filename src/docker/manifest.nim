@@ -33,8 +33,9 @@ type FilterManifests = ref object
 
 # cache is by repo ref as its normalized in buildx imagetools command
 var
-  jsonCache     = initTable[string, DigestedJson]()
-  manifestCache = initTable[string, DockerManifest]()
+  jsonCache              = initTable[string, DigestedJson]()
+  manifestCache          = initTable[string, DockerManifest]()
+  pendingAttestationTags = initOrderedTable[string, DockerManifest]()
 
 proc getCompressedSize(self: DockerManifest): int =
   if self.kind != DockerManifestType.image:
@@ -716,28 +717,64 @@ proc put*(self: DockerManifest) =
       ),
       check = false,
     )
+  self.isFetched = true
 
-proc appendToAttestationManifestList*(image: DockerImage,
-                                      item: DockerManifest,
-                                      ): DockerManifest {.discardable.} =
-  ## Fetch (or create) the OCI attestation manifest list for `image` and append
-  ## `item` to it, then push the updated list.  `image` must have a digest set.
-  ## Returns the manifest list that was pushed.
-  let attSpec = image.asOciAttestation()
-  try:
-    result = attSpec.fetchListManifest(fetchManifests = true)
-    trace("attestation: adding to existing manifest list at " & $attSpec)
-  except RegistryResponseError:
-    result = DockerManifest(
-      name:      attSpec,
-      kind:      DockerManifestType.list,
-      mediaType: "application/vnd.oci.image.index.v1+json",
-      manifests: @[],
+proc addAttestationToTag(subject: DockerImage, item: DockerManifest) =
+  ## Fetch (or create) the OCI attestation manifest list for `subject` and
+  ## append `item` to it.  `subject` must have a digest set.  The updated list
+  ## is not pushed immediately; call `flushAttestationTags` to push all pending
+  ## tags at once, avoiding duplicate writes to immutable-tag registries.
+  let
+    attSpec = subject.asOciAttestation()
+    key     = $attSpec
+  if key in pendingAttestationTags:
+    trace("attestation: appending to cached manifest list at " & $attSpec)
+    pendingAttestationTags[key].add(item)
+  else:
+    var manifest =
+      try:
+        let m = attSpec.fetchListManifest(fetchManifests = true)
+        trace("attestation: adding to existing manifest list at " & $attSpec)
+        m
+      except RegistryResponseError:
+        trace("attestation: creating new manifest list at " & $attSpec)
+        DockerManifest(
+          name:      attSpec,
+          kind:      DockerManifestType.list,
+          mediaType: "application/vnd.oci.image.index.v1+json",
+          manifests: @[],
+        )
+    manifest.add(item)
+    pendingAttestationTags[key] = manifest
+
+proc flushAttestationTags*() =
+  ## Push all deferred attestation manifest list tags accumulated via
+  ## `addAttestationToTag`.  All tags are attempted regardless of individual
+  ## failures; errors are logged and swallowed.
+  for key, manifest in pendingAttestationTags:
+    info("attestation: pushing attestation tag " & key)
+    try:
+      manifest.put()
+    except:
+      error("attestation: could not push attestation tag " & key & ": " & getCurrentExceptionMsg())
+      dumpExOnDebug()
+  pendingAttestationTags.clear()
+
+proc addAttestation*(subject: DockerImage, item: DockerManifest) =
+  let
+    useOciTag = attrGet[bool]("docker.attestation_use_oci_tag")
+    referrers = supportsReferrers(subject)
+
+  item.name = subject.withTag("").withDigest("")
+  item.link()
+  info("attestation: pushing attestation for " & $subject)
+  item.put()
+
+  if not referrers or useOciTag:
+    addAttestationToTag(
+      subject = subject,
+      item    = item,
     )
-    trace("attestation: creating new manifest list at " & $attSpec)
-  result.add(item)
-  info("attestation: pushing attestation for " & $image & " to " & $result.name)
-  result.put()
 
 proc findSibling(self: DockerManifest, reference = "attestation-manifest"): DockerManifest =
   return (
@@ -927,13 +964,28 @@ iterator fetchCosignDsseInTotoMark(image: DockerImage): (JsonNode, string) =
       trace("docker: could not get intoto statement from cosign sigstore attestation from " &
             $image & " due to " & getCurrentExceptionMsg())
 
-iterator fetchOCIDsseInTotoMark(image: DockerImage): (JsonNode, string) =
-  let spec = image.asOciAttestation()
-  trace("docker: getting intoto statement from cosign OCI attestation for " & $spec)
+proc fetchAttestationManifests(
+    subject:      DockerImage,
+    artifactType = "",
+): DockerManifest =
+  if supportsReferrers(subject):
+    let data = referrersGet(
+      image        = subject,
+      artifactType = artifactType,
+    )
+    if data != nil:
+      return newManifest(subject, data)
+  return fetchListOrImageManifest(
+    subject.asOciAttestation(),
+    fetchConfig = false,
+  )
+
+iterator fetchOCIDsseInTotoMark(subject: DockerImage): (JsonNode, string) =
+  trace("docker: getting intoto statement from OCI attestation for " & $subject)
   # in cosign v3 which uses OCI there could be multiple manifests
   # but each having only one attestation layer
   for manifest in (
-    fetchListOrImageManifest(spec, fetchConfig = false)
+    fetchAttestationManifests(subject)
     .allImages()
     .filterByAllAnnotations(
       {
@@ -960,10 +1012,10 @@ iterator fetchOCIDsseInTotoMark(image: DockerImage): (JsonNode, string) =
           envelope{"dsseEnvelope"}
           .assertIs(JObject, "Bad dsse in-toto envelope type")
         )
-      yield (dsse, dsse.getMarkFromDsseInToto(image))
+      yield (dsse, dsse.getMarkFromDsseInToto(subject))
     except:
       trace("docker: could not get intoto statement from OCI attestation from " &
-            $image & " due to " & getCurrentExceptionMsg())
+            $subject & " due to " & getCurrentExceptionMsg())
 
 iterator fetchDsseInTotoMark*(image:        DockerImage,
                               fetchOci    = true,

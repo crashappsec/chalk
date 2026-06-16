@@ -496,6 +496,14 @@ var jsonCache = initTable[
   (DockerImage, HttpMethod, string, RegistryUseCase),
   (string, Response)
 ]()
+var referrersCache = initTable[string, bool]()
+
+proc checkReferrersSupport(image: DockerImage, response: Response) =
+  if not response.headers.hasKey("OCI-Subject"):
+    return
+  let key = image.withTag("").withDigest("").asRepoRef()
+  referrersCache[key] = true
+
 proc request(self:              DockerImage,
              httpMethod:        HttpMethod,
              path               = "",
@@ -638,7 +646,8 @@ proc manifestHead*(image:    DockerImage,
       ),
     )
     contentType = response.headers["Content-Type"]
-    digest      = validateDigest(response.headers["Docker-Content-Digest"])
+    digest      = response.headers["Docker-Content-Digest"]
+  checkReferrersSupport(image, response)
   if contentType notin CONTENT_TYPE_MAPPING:
     # TODO do heuristics on response payload as there are bound to be new mime types
     raise newException(
@@ -671,6 +680,7 @@ proc manifestGet*(image:    DockerImage,
     path       = "/manifests/" & image.imageRef,
     accept     = accept,
   )
+  checkReferrersSupport(image, response)
   return newDockerDigestedJson(
     data      = response.body(),
     digest    = image.imageRef,
@@ -942,6 +952,7 @@ proc manifestPut*(image:       DockerImage,
           image.imageRef
       ),
     )
+    checkReferrersSupport(image, response)
     return newDockerDigestedJson(
       data      = data,
       digest    = validateDigest(response.headers["Docker-Content-Digest"]),
@@ -949,6 +960,48 @@ proc manifestPut*(image:       DockerImage,
       kind      = CONTENT_TYPE_MAPPING[contentType],
       size      = len(body),
     )
+
+proc referrersGet*(image:        DockerImage,
+                   artifactType = "",
+                  ): DockerDigestedJson =
+  ## Returns the OCI referrers index for image, or nil if the registry
+  ## does not support the referrers API.  image.digest must be set.
+  ## artifactType filters the result to referrers with a matching artifactType.
+  let path =
+    if artifactType != "":
+      "/referrers/" & image.imageRef & "?artifactType=" & encodeUrl(artifactType, usePlus = false)
+    else:
+      "/referrers/" & image.imageRef
+  try:
+    let (_, response) = image.request(
+      useCase           = RegistryUseCase.ReadOnly,
+      httpMethod        = HttpGet,
+      path              = path,
+      accept            = "application/vnd.oci.image.index.v1+json",
+      acceptStatusCodes = @[200..299, 404..404],
+    )
+    if not response.code().is2xx():
+      return nil
+    return newDockerDigestedJson(
+      data      = response.body(),
+      digest    = response.body().sha256Hex(),
+      mediaType = "application/vnd.oci.image.index.v1+json",
+      kind      = DockerManifestType.list,
+    )
+  except:
+    dumpExOnDebug()
+    return nil
+
+proc supportsReferrers*(image: DockerImage): bool =
+  let key = image.withTag("").withDigest("").asRepoRef()
+  if key in referrersCache:
+    return referrersCache[key]
+  result = referrersGet(image) != nil
+  referrersCache[key] = result
+  if result:
+    trace("attestation: registry supports OCI referrers API for " & $image)
+  else:
+    trace("attestation: registry does not support OCI referrers API for " & $image)
 
 proc toChalkDict(self: RegistryConfig): ChalkDict =
   result = ChalkDict()

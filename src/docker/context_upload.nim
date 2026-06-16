@@ -205,7 +205,7 @@ proc newContextManifest(
   ## Build an OCI image manifest wrapping a context tarball layer.
   DockerManifest(
     kind:         DockerManifestType.image,
-    name:         image.asOciAttestation(),
+    name:         image.withTag("").withDigest(""),
     mediaType:    "application/vnd.oci.image.manifest.v1+json",
     artifactType: CONTEXT_ARTIFACT_TYPE,
     subject:      subject,
@@ -429,7 +429,7 @@ proc completeBuildContextUpload(
         layer       = layer,
         contextName = contextName,
       )
-    discard image.appendToAttestationManifestList(ctxManifest)
+    image.addAttestation(ctxManifest)
     return (ctxManifest.digest.extractDockerHash(), blobSize, @[])
 
   of "local":
@@ -466,7 +466,7 @@ proc completeBuildContextUpload(
       layer       = layer,
       contextName = contextName,
     )
-    discard image.appendToAttestationManifestList(ctxManifest)
+    image.addAttestation(ctxManifest)
     return (ctxManifest.digest.extractDockerHash(), tarSize, @[])
 
   of "disk":
@@ -516,7 +516,7 @@ proc completeBuildContextUpload(
         layer       = layer,
         contextName = contextName,
       )
-      discard image.appendToAttestationManifestList(ctxManifest)
+      image.addAttestation(ctxManifest)
       return (ctxManifest.digest.extractDockerHash(), tarSize, skippedFiles)
     finally:
       removeFile(tarPath)
