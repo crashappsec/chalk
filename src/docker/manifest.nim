@@ -740,6 +740,10 @@ proc addAttestationToTag(subject: DockerImage, item: DockerManifest) =
   let
     attSpec = subject.asOciAttestation()
     key     = $attSpec
+  when defined(debug):
+    trace("attestation: queueing item manifest.digest=" & item.digest &
+          " layer.digest=" & item.layers[0].digest &
+          " at tag=" & key)
   if key in pendingAttestationTags:
     trace("attestation: appending to cached manifest list at " & $attSpec)
     pendingAttestationTags[key].add(item)
@@ -780,6 +784,10 @@ proc addAttestation*(subject: DockerImage, item: DockerManifest) =
   item.link()
   info("attestation: pushing attestation for " & $subject)
   item.put()
+  when defined(debug):
+    trace("attestation: pushed attestation for " & $subject &
+          " manifest.digest=" & item.digest &
+          " layer.digest=" & item.layers[0].digest)
 
   # Check after put() so that the OCI-Subject response header from the
   # registry has a chance to warm the referrers cache before we decide

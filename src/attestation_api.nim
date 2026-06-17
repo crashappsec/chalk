@@ -305,7 +305,8 @@ proc signBySigStore*(chalk: ChalkObj,
     })
     payload     = $data
     payloadType = "application/vnd.in-toto+json"
-    signature   = attestationKey.sign(dsse(payload, payloadType = payloadType))
+    pae         = dsse(payload, payloadType = payloadType)
+    signature   = attestationKey.sign(pae)
     dsse        = %*({
       "payload":     base64.encode(payload),
       "payloadType": payloadType,
@@ -325,6 +326,10 @@ proc signBySigStore*(chalk: ChalkObj,
       },
       "dsseEnvelope": dsse,
     })
+  when defined(debug):
+    trace("attestation: signing for repo=" & subject.name.repo &
+          " pae=" & pae &
+          " sig=" & signature)
   result.setIfNotEmpty("_SIGNATURES", %(@[dsse]))
   subject.asImage().addAttestation(
     DockerManifest(

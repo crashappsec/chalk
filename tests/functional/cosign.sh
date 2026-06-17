@@ -132,10 +132,14 @@ fi
 to_sign() {
     payload_type=$(echo "$dsse" | jq -r '.payloadType')
     payload=$(echo "$dsse" | jq -r '.payload' | base64 -d)
+    # DSSE PAE requires byte length, not Unicode character count.
+    # ${#var} undercounts multi-byte UTF-8 sequences, so use wc -c.
+    payload_type_len=$(printf '%s' "$payload_type" | wc -c)
+    payload_len=$(printf '%s' "$payload" | wc -c)
     printf "DSSEv1 %d %s %d %s" \
-        "${#payload_type}" \
+        "$payload_type_len" \
         "$payload_type" \
-        "${#payload}" \
+        "$payload_len" \
         "$payload" \
         | tee >(
             cat > /dev/stderr
