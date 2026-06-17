@@ -784,7 +784,7 @@ proc addAttestation*(subject: DockerImage, item: DockerManifest) =
   # Check after put() so that the OCI-Subject response header from the
   # registry has a chance to warm the referrers cache before we decide
   # whether to also push the legacy sha256-<digest> tag.
-  if not supportsReferrers(subject) or useOciTag:
+  if useOciTag or not supportsReferrers(subject):
     addAttestationToTag(
       subject = subject,
       item    = item,
