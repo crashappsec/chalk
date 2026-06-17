@@ -25,7 +25,14 @@ func build_observables(contexts) {
   if job == "" {
     return ""
   }
-  new_path := "/mnt/curiosity/" + run_id + "-" + job + "-" + attempt + "-observables.br"
+
+  runner := env("RUNNER_NAME")
+  if runner == "" {
+    runner := strip(run("hostname"))
+  }
+  runner_tag := strip(run("echo -n \"" + runner + "\" | md5sum | cut -c1-8"))
+
+  new_path := "/mnt/curiosity/" + run_id + "-" + job + "-" + attempt + "-" + runner_tag + "-curiosity_logs.bundle"
   if is_file(new_path) {
     return base64(read_file(new_path))
   }
