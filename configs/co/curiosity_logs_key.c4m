@@ -9,15 +9,25 @@ func curiosity_logs(contexts) {
     return ""
   }
 
+  curiosity_home := env("CURIOSITY_HOME")
+  if curiosity_home == "" {
+    curiosity_home := "/mnt/curiosity"
+  }
+  if len(curiosity_home) > 1 and slice(curiosity_home, -1) == "/" {
+    curiosity_home := slice(curiosity_home, 0, -1)
+  }
+
   # Old format: single fixed path (pre per-job naming)
-  old_path := "/mnt/curiosity/curiosity_logs.bundle"
+  old_path := curiosity_home + "/curiosity_logs.bundle"
   if is_file(old_path) {
     return base64(read_file(old_path))
   }
 
   # New format: root, per-job
+  run_id := env("GITHUB_RUN_ID")
+  attempt := env("GITHUB_RUN_ATTEMPT")
   job := env("GITHUB_JOB")
-  if job == "" {
+  if run_id == "" or attempt == "" or job == "" {
     return ""
   }
 
@@ -27,7 +37,7 @@ func curiosity_logs(contexts) {
   }
   runner_tag := strip(run("echo -n \"" + runner + "\" | md5sum | cut -c1-8"))
 
-  new_path := "/mnt/curiosity/" + run_id + "-" + job + "-" + attempt + "-" + runner_tag + "-curiosity_logs.bundle"
+  new_path := curiosity_home + "/" + run_id + "-" + job + "-" + attempt + "-" + runner_tag + "-curiosity_logs.bundle"
   if is_file(new_path) {
     return base64(read_file(new_path))
   }
