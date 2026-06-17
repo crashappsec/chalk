@@ -420,6 +420,10 @@ proc writeReportCache*() =
       except:
         discard
 
+    # tmpname (system temp dir) and fname (configured cache location) may be
+    # on different filesystems.  createTempFile above succeeded so the temp
+    # dir is writable; EROFS here means fname's filesystem is read-only.
+    # tryRemoveFile(tmpname) works because tmpname is on the writable temp fs.
     try:
       removeFile(fname)
       moveFile(tmpname, fname)
@@ -427,17 +431,13 @@ proc writeReportCache*() =
       warn("Will attempt to report on cache contents next invocation.")
     except OSError as e:
       if e.errorCode == cint(EROFS):
-        if not cacheReadOnly:
-          cacheReadOnly = true
-          warn(
-            "report cache disabled: cache location is on a read-only " &
-            "filesystem (" & fname & ")"
-          )
-        discard tryRemoveFile(tmpname)
-        dumpExOnDebug()
-      else:
-        panicPublish(newCacheContents, tmpname, fname, getCurrentExceptionMsg())
-        dumpExOnDebug()
+        cacheReadOnly = true
+        warn(
+          "report cache disabled: cache location is on a read-only " &
+          "filesystem (" & fname & ")"
+        )
+      panicPublish(newCacheContents, tmpname, fname, getCurrentExceptionMsg())
+      dumpExOnDebug()
 
   else:
     try:
