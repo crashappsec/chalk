@@ -263,6 +263,9 @@ proc withTag*(self: DockerImage, tag: string): DockerImage =
 proc isPinned*(self: DockerImage): bool =
   return self.digest != "" or self.repo == "scratch"
 
+proc withBare*(self: DockerImage): DockerImage =
+  return (self.repo, "", "")
+
 proc withDigest*(self: DockerImage, digest: string): DockerImage =
   return (self.repo, self.tag, digest.extractDockerHash())
 
@@ -491,10 +494,14 @@ proc exists*(self: DockerImage): bool =
   return self != ("", "", "")
 
 proc asOciAttestation*(self: DockerImage): DockerImage =
-  return self.withTag("sha256-" & self.digest).withDigest("")
+  if self.digest == "":
+    raise newException(ValueError, "asOciAttestation requires a digest: " & $self)
+  return self.withBare().withTag("sha256-" & self.digest)
 
 proc asCosignAttestation*(self: DockerImage): DockerImage =
-  return self.withTag("sha256-" & self.digest & ".att").withDigest("")
+  if self.digest == "":
+    raise newException(ValueError, "asCosignAttestation requires a digest: " & $self)
+  return self.withBare().withTag("sha256-" & self.digest & ".att")
 
 proc asRepoTag*(items: seq[DockerImage]): seq[string] =
   result = @[]

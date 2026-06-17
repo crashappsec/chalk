@@ -368,7 +368,6 @@ type
 
   DockerDigestedJson* = ref object of DigestedJson
     mediaType*: string
-    kind*:      DockerManifestType
 
   DockerManifestType* = enum
     list, image, config, layer

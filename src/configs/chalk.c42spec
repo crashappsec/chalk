@@ -2044,6 +2044,22 @@ The cleanup runs at the start of each `chalk docker build` and `chalk docker pus
 """
   }
 
+  field attestation_use_oci_tag {
+    type:    bool
+    default: true
+    shortdoc: "Also push the OCI attestation tag when the referrers API is supported"
+    doc:     """
+When the target registry supports the OCI Referrers API
+(`GET /v2/{name}/referrers/{digest}`), Chalk attaches attestations as
+referrer manifests using the `subject` field.  When this option is `true`
+(the default), Chalk also maintains the legacy attestation tag
+(`sha256-<digest>`) so that clients that only understand the tag schema
+can still find the attestation.  The tag push is best-effort: errors are
+logged and never fail the operation.  Set to `false` to skip
+the tag push entirely when the referrers API is available.
+"""
+  }
+
 }
 
 docker_login_types := ["", "get"]

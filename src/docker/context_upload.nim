@@ -205,7 +205,6 @@ proc newContextManifest(
   ## Build an OCI image manifest wrapping a context tarball layer.
   DockerManifest(
     kind:         DockerManifestType.image,
-    name:         image.asOciAttestation(),
     mediaType:    "application/vnd.oci.image.manifest.v1+json",
     artifactType: CONTEXT_ARTIFACT_TYPE,
     subject:      subject,
@@ -215,7 +214,6 @@ proc newContextManifest(
     }),
     config: DockerManifest(
       kind:      DockerManifestType.config,
-      name:      image,
       mediaType: CONTEXT_CONFIG_TYPE,
       json:      newJObject(),
     ),
@@ -417,7 +415,6 @@ proc completeBuildContextUpload(
     let
       layer       = DockerManifest(
         kind:      DockerManifestType.layer,
-        name:      image,
         mediaType: CONTEXT_LAYER_TYPE,
         digest:    "sha256:" & blobDigest,
         size:      blobSize,
@@ -429,7 +426,7 @@ proc completeBuildContextUpload(
         layer       = layer,
         contextName = contextName,
       )
-    discard image.appendToAttestationManifestList(ctxManifest)
+    image.addAttestation(ctxManifest)
     return (ctxManifest.digest.extractDockerHash(), blobSize, @[])
 
   of "local":
@@ -455,7 +452,7 @@ proc completeBuildContextUpload(
       tarSize = getFileSize(tarPath)
       layer   = DockerManifest(
         kind:       DockerManifestType.layer,
-        name:       image.withDigest(actualHash),
+        name:       image.withBare().withDigest(actualHash),
         mediaType:  CONTEXT_LAYER_TYPE,
         fileStream: newFileStringStream(tarPath),
       )
@@ -466,7 +463,7 @@ proc completeBuildContextUpload(
       layer       = layer,
       contextName = contextName,
     )
-    discard image.appendToAttestationManifestList(ctxManifest)
+    image.addAttestation(ctxManifest)
     return (ctxManifest.digest.extractDockerHash(), tarSize, @[])
 
   of "disk":
@@ -505,18 +502,16 @@ proc completeBuildContextUpload(
         tarSize = getFileSize(tarPath)
         layer   = DockerManifest(
           kind:       DockerManifestType.layer,
-          name:       image,
           mediaType:  CONTEXT_LAYER_TYPE,
           fileStream: newFileStringStream(tarPath),
         )
-      layer.put()
-      let ctxManifest = newContextManifest(
-        image       = image,
-        subject     = subject,
-        layer       = layer,
-        contextName = contextName,
-      )
-      discard image.appendToAttestationManifestList(ctxManifest)
+        ctxManifest = newContextManifest(
+          image       = image,
+          subject     = subject,
+          layer       = layer,
+          contextName = contextName,
+        )
+      image.addAttestation(ctxManifest)
       return (ctxManifest.digest.extractDockerHash(), tarSize, skippedFiles)
     finally:
       removeFile(tarPath)

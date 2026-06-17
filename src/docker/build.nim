@@ -34,6 +34,7 @@ import "."/[
   image,
   inspect,
   login,
+  manifest,
   platform,
   registry,
   scan,
@@ -781,6 +782,7 @@ proc dockerBuild*(ctx: DockerInvocation): int =
         chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
         chalk.collectRunTimeArtifactInfo()
   collectRunTimeHostInfo()
+  flushAttestationTags()
 
   if wrapVirtual and result == 0:
     for platform, chalk in chalksByPlatform:

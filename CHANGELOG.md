@@ -82,6 +82,19 @@
 
   ([#669](https://github.com/crashappsec/chalk/pull/669))
 
+- OCI Referrers API support for attestations. When the target registry
+  supports `GET /v2/{name}/referrers/{digest}`, Chalk attaches attestations
+  as referrer manifests (using the `subject` field) instead of relying
+  solely on the legacy `sha256-<digest>` tag. The referrers path is detected
+  automatically via the `OCI-Subject` response header.
+
+  New configuration field on `docker`:
+  - `attestation_use_oci_tag` - when the referrers API is available, also
+    maintain the legacy attestation tag for clients that do not support the
+    referrers API (default: `true`)
+
+  ([#674](https://github.com/crashappsec/chalk/pull/674))
+
 ## 1.1.0
 
 **June 8, 2026**

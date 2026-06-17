@@ -496,6 +496,14 @@ var jsonCache = initTable[
   (DockerImage, HttpMethod, string, RegistryUseCase),
   (string, Response)
 ]()
+var referrersCache = initTable[string, bool]()
+
+proc checkReferrersSupport(image: DockerImage, response: Response) =
+  if not response.headers.hasKey("OCI-Subject"):
+    return
+  let key = image.withBare().asRepoRef()
+  referrersCache[key] = true
+
 proc request(self:              DockerImage,
              httpMethod:        HttpMethod,
              path               = "",
@@ -625,7 +633,7 @@ proc manifestHead*(image:    DockerImage,
                    useCase = RegistryUseCase.ReadOnly,
                    ): DockerDigestedJson =
   let
-    (msg, response) = image.request(
+    (_, response) = image.request(
       useCase    = useCase,
       httpMethod = HttpHead,
       path       = "/manifests/" & image.imageRef,
@@ -637,27 +645,18 @@ proc manifestHead*(image:    DockerImage,
         "*/*"
       ),
     )
-    contentType = response.headers["Content-Type"]
-    digest      = validateDigest(response.headers["Docker-Content-Digest"])
-  if contentType notin CONTENT_TYPE_MAPPING:
-    # TODO do heuristics on response payload as there are bound to be new mime types
-    raise newException(
-      ValueError,
-      msg & " returned unsupported registry content type: " & contentType
-    )
-  let size =
-    try:
-      parseInt(response.headers["Content-Length"])
-    except:
-      raise newException(
-        ValueError,
-        "invalid Content-Length from registry: " & response.headers["Content-Length"]
-      )
+    contentType = response.headers.mustGet("Content-Type", "registry HEAD response missing Content-Type header")
+    digest      = validateDigest(response.headers.mustGet("Docker-Content-Digest", "registry HEAD response missing Docker-Content-Digest header"))
+  # HEAD normally doesnt return referrers header but checking just in-case
+  checkReferrersSupport(image, response)
+  let size = response.headers.mustGetInt(
+    "Content-Length",
+    "registry HEAD response missing Content-Length header",
+  )
   return newDockerDigestedJson(
     data      = JsonNode(nil),
     digest    = digest,
     mediaType = contentType,
-    kind      = CONTENT_TYPE_MAPPING[contentType],
     size      = size,
   )
 
@@ -671,11 +670,12 @@ proc manifestGet*(image:    DockerImage,
     path       = "/manifests/" & image.imageRef,
     accept     = accept,
   )
+  # GET normally doesnt return referrers header but checking just in-case
+  checkReferrersSupport(image, response)
   return newDockerDigestedJson(
     data      = response.body(),
-    digest    = image.imageRef,
+    digest    = response.body().sha256Hex(),
     mediaType = accept,
-    kind      = CONTENT_TYPE_MAPPING[accept],
   )
 
 proc layerGetString*(layer:    DockerImage,
@@ -801,20 +801,15 @@ proc layerPutFileStream*(
       accept      = contentType,
     )
     trace("docker: layer already exists. nothing to upload")
-    let existingSize =
-      try:
-        parseInt(response.headers["Content-Length"])
-      except:
-        raise newException(
-          ValueError,
-          "invalid Content-Length from registry: " & response.headers["Content-Length"]
-        )
+    let existingSize = response.headers.mustGetInt(
+      "Content-Length",
+      "registry HEAD response missing Content-Length header",
+    )
     return newDockerDigestedJson(
       data      = JsonNode(nil),
       digest    = layer.digest,
-      mediaType = response.headers["Content-Type"],
+      mediaType = response.headers.mustGet("Content-Type", "registry HEAD response missing Content-Type header"),
       size      = existingSize,
-      kind      = DockerManifestType.layer,
     )
   except RegistryResponseError:
     trace("docker: layer doesnt exist. uploading " & $layer)
@@ -874,9 +869,8 @@ proc layerPutFileStream*(
     # > uploaded blob which may differ from the provided digest.
     return newDockerDigestedJson(
       data      = JsonNode(nil),
-      digest    = validateDigest(response.headers["Docker-Content-Digest"]),
+      digest    = validateDigest(response.headers.mustGet("Docker-Content-Digest", "registry PUT response missing Docker-Content-Digest header")),
       mediaType = contentType,
-      kind      = DockerManifestType.layer,
       size      = len(fileStream),
     )
 
@@ -942,13 +936,54 @@ proc manifestPut*(image:       DockerImage,
           image.imageRef
       ),
     )
+    checkReferrersSupport(image, response)
     return newDockerDigestedJson(
       data      = data,
-      digest    = validateDigest(response.headers["Docker-Content-Digest"]),
+      digest    = validateDigest(response.headers.mustGet("Docker-Content-Digest", "registry PUT response missing Docker-Content-Digest header")),
       mediaType = contentType,
-      kind      = CONTENT_TYPE_MAPPING[contentType],
       size      = len(body),
     )
+
+proc referrersGet*(image:        DockerImage,
+                   artifactType = "",
+                  ): DockerDigestedJson =
+  ## Returns the OCI referrers index for image, or nil if the registry
+  ## does not support the referrers API.  image.digest must be set.
+  ## artifactType filters the result to referrers with a matching artifactType.
+  let path =
+    if artifactType != "":
+      "/referrers/" & image.imageRef & "?artifactType=" & encodeUrl(artifactType, usePlus = false)
+    else:
+      "/referrers/" & image.imageRef
+  try:
+    let (_, response) = image.request(
+      useCase           = RegistryUseCase.ReadOnly,
+      httpMethod        = HttpGet,
+      path              = path,
+      accept            = "application/vnd.oci.image.index.v1+json",
+      acceptStatusCodes = @[200..299, 404..404],
+    )
+    if not response.code().is2xx():
+      return nil
+    return newDockerDigestedJson(
+      data      = response.body(),
+      digest    = response.body().sha256Hex(),
+      mediaType = "application/vnd.oci.image.index.v1+json",
+    )
+  except:
+    dumpExOnDebug()
+    return nil
+
+proc supportsReferrers*(image: DockerImage): bool =
+  let key = image.withBare().asRepoRef()
+  if key in referrersCache:
+    return referrersCache[key]
+  result = referrersGet(image) != nil
+  referrersCache[key] = result
+  if result:
+    trace("attestation: registry supports OCI referrers API for " & $image)
+  else:
+    trace("attestation: registry does not support OCI referrers API for " & $image)
 
 proc toChalkDict(self: RegistryConfig): ChalkDict =
   result = ChalkDict()

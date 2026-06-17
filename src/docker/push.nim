@@ -18,6 +18,7 @@ import "."/[
   context_upload,
   exe,
   login,
+  manifest,
   scan,
   util,
 ]
@@ -86,6 +87,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
           error("docker: build context attestation failed: " & getCurrentExceptionMsg())
           dumpExOnDebug()
       collectRunTimeHostInfo()
+      flushAttestationTags()
     finally:
       for i in imagesToPrune:
         try:
