@@ -95,6 +95,17 @@
 
   ([#674](https://github.com/crashappsec/chalk/pull/674))
 
+### Bug Fixes
+
+- File sinks and the report cache no longer emit continuous errors when chalk
+  runs in a container with a read-only root filesystem. A file sink whose
+  destination directory is not writable is now disabled at startup with a
+  single warning. Similarly, if the report cache location is on a read-only
+  filesystem, the cache is disabled with a single warning rather than
+  repeatedly failing on every publish attempt.
+
+  ([#676](https://github.com/crashappsec/chalk/pull/676))
+
 ## 1.1.0
 
 **June 8, 2026**

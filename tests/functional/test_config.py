@@ -521,6 +521,67 @@ def test_profiles(
     validate_chalk_report_keys(delete.report, configs["delete"])
 
 
+def test_readonly_filesystem_sinks(chalk_default: Chalk):
+    """
+    chalk should not emit repeated errors when file sinks point to a read-only
+    filesystem.  The sink should be disabled with a single warning on startup.
+    """
+    _, result = Docker.run(
+        image="busybox",
+        entrypoint="/bin/sh",
+        params=["-c", "/chalk --no-color --log-level=warn env"],
+        tty=False,
+        read_only=True,
+        tmpfs=["/tmp"],
+        volumes={
+            chalk_default.binary: "/chalk",
+            CONFIGS / "validation/readonly_fs_sink.c4m": "/etc/chalk.c4m",
+        },
+    )
+
+    # The sink should be disabled exactly once with a warning, not spammed on
+    # every publish attempt.  Each JSON log line is one chalk warn() call.
+    disabled_warnings = [
+        line
+        for line in result.logs.splitlines()
+        if "ro_file_sink" in line and "not writable" in line
+    ]
+    assert len(disabled_warnings) == 1, (
+        f"expected exactly one sink-disabled warning for ro_file_sink, "
+        f"got {len(disabled_warnings)}\n{result.logs}"
+    )
+
+
+def test_readonly_filesystem_report_cache(chalk_default: Chalk):
+    """
+    chalk should not panic or emit repeated errors when the report cache
+    location is on a read-only filesystem.  A single warning should appear
+    and chalk should disable the cache for the rest of the run.
+    """
+    _, result = Docker.run(
+        image="busybox",
+        entrypoint="/bin/sh",
+        params=["-c", "/chalk --no-color --log-level=warn env"],
+        tty=False,
+        read_only=True,
+        tmpfs=["/tmp"],
+        volumes={
+            chalk_default.binary: "/chalk",
+            CONFIGS / "validation/readonly_fs_cache.c4m": "/etc/chalk.c4m",
+        },
+    )
+
+    cache_warnings = [
+        line
+        for line in result.logs.splitlines()
+        if "report cache disabled" in line and "read-only filesystem" in line
+    ]
+    assert len(cache_warnings) == 1, (
+        f"expected exactly one report-cache-disabled warning, "
+        f"got {len(cache_warnings)}\n{result.logs}"
+    )
+
+
 def test_no_certs(chalk_default: Chalk, server_chalkdust: str):
     """
     chalk should be able to connect to chalkdust even when system has no system certs

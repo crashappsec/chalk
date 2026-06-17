@@ -1,0 +1,7 @@
+sink_config ro_file_sink {
+  sink: "file"
+  filename: "/etc/chalk.log"
+  enabled: true
+}
+
+subscribe("report", "ro_file_sink")

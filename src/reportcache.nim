@@ -22,6 +22,7 @@
 ## 'current' sinks need to catch up.  If so, we UNSUBSCRIBE them from
 ## the current topic, and re-subscribe them to a topic just for them.
 
+import std/posix
 import "."/[
   sinks,
   types,
@@ -62,9 +63,10 @@ find / -name "chalk-report-cache*.jsonl" 2>/dev/null
 type ReportCacheInfo = TableRef[string, seq[string]]
 
 var
-  reportCache: Table[string, ReportCacheInfo]
-  cacheOpenFailed = false
-  dirtyCache = false # Controls whether the cache will WRITE.
+  reportCache:     Table[string, ReportCacheInfo]
+  cacheOpenFailed  = false
+  cacheReadOnly    = false
+  dirtyCache       = false
 
 
 template doPanicWrite(s: string) =
@@ -167,8 +169,18 @@ proc loadReportCache(fname: string) =
               cacheObj[topic].add(msg)
             else:
               cacheObj[topic] = @[msg]
+    # nimutils obtainLockFile raises ValueError (not OSError) for any open()
+    # failure, so we use osLastError() to check errno rather than e.errorCode.
     except ValueError:
-      trace(fname & ": file lock obtained, but no report cache to read.")
+      if osLastError() == OSErrorCode(EROFS):
+        if not cacheReadOnly:
+          cacheReadOnly = true
+          warn(
+            "report cache disabled: cache location is on a read-only " &
+            "filesystem (" & fname & ")"
+          )
+      else:
+        trace(fname & ": file lock obtained, but no report cache to read.")
     except:
       error("When opening chalk report cache for read: " &
             getCurrentExceptionMsg())
@@ -350,9 +362,8 @@ proc safePublish*(topic, msg: string) =
   # the sink is still broken, then the sink config will still live in
   # the sinkErrors field at this point.
 
-  if len(sinkErrors) != 0:
-    if len(sinkErrors) != 0:
-      addSinkErrorsToCache(topic, msg)
+  if len(sinkErrors) != 0 and not cacheReadOnly:
+    addSinkErrorsToCache(topic, msg)
 
 proc writeReportCache*() =
   # This is called after all reporting is done, to handle stashing any
@@ -365,8 +376,9 @@ proc writeReportCache*() =
   if not attrGet[bool]("use_report_cache"):
     return
 
-  # If nothing published, the reporting cache may not have been loaded, in
-  # which case there's nothing do do.
+  if cacheReadOnly:
+    return
+
   if cacheOpenFailed and len(reportCache) != 0:
     error(msgPossibleLoss)
 
@@ -390,6 +402,15 @@ proc writeReportCache*() =
       (tmpfile, tmpname) = createTempFile("chalk-report-cache", ".jsonl")
       tmpfile.write(newCacheContents)
     except:
+      if osLastError() == OSErrorCode(EROFS):
+        if not cacheReadOnly:
+          cacheReadOnly = true
+          warn(
+            "report cache disabled: cache location is on a read-only " &
+            "filesystem (" & fname & ")"
+          )
+        dumpExOnDebug()
+        return
       panicPublish(newCacheContents, "", fname, getCurrentExceptionMsg())
       dumpExOnDebug()
       return
@@ -404,8 +425,19 @@ proc writeReportCache*() =
       moveFile(tmpname, fname)
       warn("Some reports failed to publish, and are cached in: " & fname)
       warn("Will attempt to report on cache contents next invocation.")
-    except:
-      panicPublish(newCacheContents, tmpname, fname, getCurrentExceptionMsg())
+    except OSError as e:
+      if e.errorCode == cint(EROFS):
+        if not cacheReadOnly:
+          cacheReadOnly = true
+          warn(
+            "report cache disabled: cache location is on a read-only " &
+            "filesystem (" & fname & ")"
+          )
+        discard tryRemoveFile(tmpname)
+        dumpExOnDebug()
+      else:
+        panicPublish(newCacheContents, tmpname, fname, getCurrentExceptionMsg())
+        dumpExOnDebug()
 
   else:
     try:

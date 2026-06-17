@@ -354,6 +354,8 @@ class Docker:
         cwd: Optional[Path] = None,
         env: Optional[dict[str, str]] = None,
         networks: Optional[list[str]] = None,
+        read_only: bool = False,
+        tmpfs: Optional[list[str]] = None,
     ):
         cmd = ["docker", "create"]
         if name:
@@ -374,6 +376,10 @@ class Docker:
             cmd += ["-e", f"{k}={v}"]
         for i in networks or []:
             cmd += ["--network", i]
+        if read_only:
+            cmd += ["--read-only"]
+        for mount in tmpfs or []:
+            cmd += ["--tmpfs", mount]
         cmd += [image]
         cmd += params or []
         container_id = run(cmd).text
