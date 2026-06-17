@@ -219,6 +219,8 @@ proc fetch(self:            DockerManifest,
       self.setAnnotations(data.json)
       self.setImageConfig(data)
       self.setImageLayers(data)
+      if self.artifactType == "":
+        self.artifactType = data.json{"artifactType"}.getStr()
     if fetchConfig:
       self.config.fetch()
       self.setImagePlatform(self.config.configPlatform, check = checkPlatform)
@@ -252,10 +254,11 @@ proc newManifest(name: DockerImage, data: DigestedJson): DockerManifest =
   if "manifests" in json:
     trace("docker: " & $name & " is a manifest list")
     let list = DockerManifest(
-      kind:       DockerManifestType.list,
-      name:       name,
-      mediaType:  json{"mediaType"}.getStr(),
-      manifests:  @[],
+      kind:         DockerManifestType.list,
+      name:         name,
+      mediaType:    json{"mediaType"}.getStr(),
+      artifactType: json{"artifactType"}.getStr(),
+      manifests:    @[],
     )
     list.setJson(data)
     list.setAnnotations(json)
@@ -270,7 +273,7 @@ proc newManifest(name: DockerImage, data: DigestedJson): DockerManifest =
         name:         name,
         list:         list,
         mediaType:    item{"mediaType"}.getStr(),
-        artifactType: json{"artifactType"}.getStr(),
+        artifactType: item{"artifactType"}.getStr(),
         digest:       item{"digest"}.getStr(),
         size:         item{"size"}.getInt(),
         platform:     DockerPlatform(
