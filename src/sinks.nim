@@ -455,6 +455,7 @@ proc setupDefaultLogConfigs*() =
 
 proc ioSetup*(bgColor = "darkslategray") =
   once:
+    setDefaultUserAgent("chalk/" & getChalkExeVersion() & " " & getDefaultUserAgent())
     useCrashTheme()
     addDefaultSinks()
     addDefaultAuths()

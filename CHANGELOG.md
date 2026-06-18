@@ -95,6 +95,11 @@
 
   ([#674](https://github.com/crashappsec/chalk/pull/674))
 
+- All outgoing HTTP requests now include a `User-Agent` header identifying
+  the chalk version, e.g. `chalk/1.1.1 Nim-httpclient/2.2.6`.
+
+  ([#678](https://github.com/crashappsec/chalk/pull/678))
+
 ### Bug Fixes
 
 - File sinks and the report cache no longer emit continuous errors when chalk
