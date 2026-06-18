@@ -1,0 +1,10 @@
+sink_config failing_post {
+  enabled: true
+  sink:    "post"
+  uri:     "http://127.0.0.1:1/chalk"
+}
+
+subscribe("report", "failing_post")
+
+use_report_cache          = true
+report_cache_location     = "/etc/chalk-cache.jsonl"

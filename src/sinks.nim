@@ -184,7 +184,21 @@ template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
 
   line
 
+proc isSinkDestWritable(sinkPath: string): bool =
+  let dir = parentDir(sinkPath)
+  if dir == "" or not dirExists(dir):
+    return true
+  return posix.access(cstring(dir), W_OK) == 0
+
 proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
+  if cfg.mySink.name in ["file", "rotating_log"]:
+    cfg.enabled = false
+    warn(
+      "sink '" & cfg.name & "' disabled after write failure " &
+      "(filesystem may be read-only or inaccessible): " & err
+    )
+    return
+
   let quiet = t.name in quietTopics
   if not quiet:
     sinkErrors.add(cfg)
@@ -320,6 +334,12 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         opts[k] = resolvePath(opts[k])
       except:
         warn(opts[k] & ": could not resolve sink filename. disabling sink")
+        enabled = false
+      if enabled and not isSinkDestWritable(opts[k]):
+        warn(
+          "sink '" & name & "': destination '" & opts[k] &
+          "' is not writable (filesystem may be read-only), disabling sink"
+        )
         enabled = false
     else:
       opts[k] = attrGetOpt[string](section & "." & k).getOrElse("")
