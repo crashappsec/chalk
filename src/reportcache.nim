@@ -169,10 +169,8 @@ proc loadReportCache(fname: string) =
               cacheObj[topic].add(msg)
             else:
               cacheObj[topic] = @[msg]
-    # nimutils obtainLockFile raises ValueError (not OSError) for any open()
-    # failure, so we use osLastError() to check errno rather than e.errorCode.
-    except ValueError:
-      if osLastError() == OSErrorCode(EROFS):
+    except OSError as e:
+      if e.errorCode == cint(EROFS):
         if not cacheReadOnly:
           cacheReadOnly = true
           warn(
@@ -180,7 +178,9 @@ proc loadReportCache(fname: string) =
             "filesystem (" & fname & ")"
           )
       else:
-        trace(fname & ": file lock obtained, but no report cache to read.")
+        trace(fname & ": could not load report cache: " & getCurrentExceptionMsg())
+    except ValueError:
+      trace(fname & ": file lock obtained, but no report cache to read.")
     except:
       error("When opening chalk report cache for read: " &
             getCurrentExceptionMsg())
@@ -401,8 +401,8 @@ proc writeReportCache*() =
     try:
       (tmpfile, tmpname) = createTempFile("chalk-report-cache", ".jsonl")
       tmpfile.write(newCacheContents)
-    except:
-      if osLastError() == OSErrorCode(EROFS):
+    except OSError as e:
+      if e.errorCode == cint(EROFS):
         if not cacheReadOnly:
           cacheReadOnly = true
           warn(
