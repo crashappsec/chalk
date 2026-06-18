@@ -45,7 +45,7 @@ func build_observables(contexts) {
   }
   runner_tag := strip(run("echo -n \"" + runner + "\" | md5sum | cut -c1-8"))
 
-  new_path := curiosity_home + "/" + run_id + "-" + job + "-" + attempt + "-" + runner_tag + "-curiosity_logs.bundle"
+  new_path := curiosity_home + "/" + run_id + "-" + job + "-" + attempt + "-" + runner_tag + "-observables.br"
   if is_file(new_path) {
     # chalk pre-1.0 uploaded json which requires base64 wrapping
     if starts_with(version(), "0.") {
