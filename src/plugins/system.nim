@@ -111,7 +111,6 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
     `ts?`     = obj.lookupCollectedKey("TIMESTAMP_WHEN_CHALKED")
     `path?`   = obj.lookupCollectedKey("PATH_WHEN_CHALKED")
     `hash?`   = obj.lookupCollectedKey("HASH")
-    `tenant?` = obj.lookupCollectedKey("TENANT_ID_WHEN_CHALKED")
     `random?` = obj.lookupCollectedKey("CHALK_RAND")
   var
     subs: seq[(string, string)] = @[]
@@ -119,7 +118,6 @@ proc applySubstitutions(obj: ChalkObj) {.inline.} =
   if `cid?`.isSome():    subs.add(("{chalk_id}", unpack[string](`cid?`.get())))
   if `ts?`.isSome():     subs.add(("{now}", $(unpack[int](`ts?`.get()))))
   if `path?`.isSome():   subs.add(("{path}", unpack[string](`path?`.get())))
-  if `tenant?`.isSome(): subs.add(("{tenant}", unpack[string](`tenant?`.get())))
   if `random?`.isSome(): subs.add(("{random}", unpack[string](`random?`.get())))
   if `hash?`.isSome():   subs.add(("{hash}", unpack[string](`hash?`.get())))
 
@@ -231,6 +229,7 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   result.setIfNeeded("_OP_EXE_PATH",          getAppDir())
   result.setIfNeeded("_OP_ARGV",              @[getMyAppPath()] & commandLineParams())
   result.setIfNeeded("_OP_HOSTNAME",          getHostname())
+  result.setIfNeeded("_OP_PUBLIC_IPV4_ADDR",  getMyIpV4Addr())
   result.setIfNeeded("_OP_UNMARKED_COUNT",    len(getUnmarked()))
   result.setIfNeeded("_TIMESTAMP",            startTime.toUnixInMs())
   result.setIfNeeded("_DATE",                 startTime.forReport().format(timesDateFormat))
@@ -268,7 +267,7 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result.setIfNeeded("DATETIME_WHEN_CHALKED", startTime.forReport().format(timesIso8601Format))
   result.setIfNeeded("TIMESTAMP_WHEN_CHALKED", startTime.toUnixInMs())
   result.setIfNeeded("PLATFORM_WHEN_CHALKED", getChalkPlatform())
-  result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", pack(getMyIpV4Addr()))
+  result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", getMyIpV4Addr())
 
   when defined(posix):
     result.setIfNeeded("HOST_SYSNAME_WHEN_CHALKED", uinfo.sysname)

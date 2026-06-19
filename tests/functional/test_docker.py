@@ -1416,13 +1416,23 @@ def test_k8s(chalk_copy: Chalk, server_http: str, tmp_path: Path):
     )
 
 
-def test_docker_labels(chalk: Chalk, random_hex: str):
+def test_docker_labels(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     tag = f"{REGISTRY}/test_image_{random_hex}"
 
-    # build container with env vars
+    # use a fresh git repo as build context so BRANCH is always available,
+    # even in CI where the main checkout runs on a detached HEAD
+    context_dir = tmp_data_dir / "context"
+    shutil.copytree(DOCKERFILES / "valid" / "sample_1", context_dir)
+    git = Git(context_dir)
+    git.init(branch="main")
+    git.add()
+    git.commit()
+    commit_id = git.latest_commit
+
     _, build = chalk.docker_build(
         buildx=True,
         dockerfile=DOCKERFILES / "valid" / "sample_1" / "Dockerfile",
+        context=context_dir,
         tag=tag,
         config=CONFIGS / "docker_heartbeat.c4m",
         labels={"foo": "bar"},
@@ -1441,6 +1451,11 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
         },
         DOCKER_ANNOTATIONS={"hello": "there"},
         _IMAGE_ANNOTATIONS={"hello": "there"},
+        DOCKER_CHALK_ADDED_LABELS={
+            "HELLO": "CRASH_OVERRIDE_TEST_LABEL",
+            "COMMIT_ID": commit_id,
+            "BRANCH": "main",
+        },
     )
 
     inspected = Docker.inspect(tag)

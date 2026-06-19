@@ -496,23 +496,6 @@ See `docs/design-caller-attestation.md`.
 """
 }
 
-keyspec TENANT_ID_WHEN_CHALKED {
-    kind:     ChalkTimeHost
-    type:     string
-    standard: true
-    since:    "0.1.0"
-    shortdoc: "Tenant info added at mark time"
-    doc:      """
-A user-defined unique identifier, intended to represent a unique user
-in multi-tenant environments. This key is set only at the time in
-which a chalk operation occurs. Its value can be used at that time for
-various URL substitutions (for instance, in the `CHALK_PTR` key).
-
-The default OSS configuration never sets this value, but it can be
-configured manually, or in binaries created by tooling.
-"""
-}
-
 keyspec CHALK_ID {
     required_in_chalk_mark: true
     kind:                   ChalkTimeArtifact
@@ -607,8 +590,6 @@ at the time of chalking:
  of chalking.
  - **{hash}** is replaced with the software artifact's `HASH` field (the Chalk
  hash; see `chalk help hashing`).
- - **{tenant}** is replaced with the software artifact's
- `TENANT_ID_WHEN_CHALKED` field, as set at the time of chalking.
  - **{random}** is replaced with the value of `CHALK_RAND`, as set at the
  time of chalking.
 
@@ -656,6 +637,7 @@ For items chalked when they were in a embedded into a ZIP file, this is the
 """
 }
 
+# TODO: not yet set by any codec; requires ST->GGUF conversion detection
 keyspec DERIVED_FROM_CHALK_ID {
     kind:        ChalkTimeArtifact
     never_early: true
@@ -5263,20 +5245,6 @@ For example:
 """
 }
 
-keyspec _FOUND_BASE_MARK {
-    kind:     RunTimeArtifact
-    type:     tuple[string, string]
-    standard: true
-    since:    "0.1.0"
-    doc:      """
-When extracting from a docker image that is unmarked at the top layer,
-if lower layers are searched, this will be set to the found values of
-CHALK_ID and METADATA_ID, in the highest layer where a mark was found.
-
-These values will not have been validated.
-"""
-}
-
 keyspec _SIGNATURES {
     kind:     RunTimeArtifact
     type:     list[dict[string, string]]
@@ -5393,21 +5361,6 @@ Currently, this filtering is not handled per-report, meaning
 collect both at chalk time.
 """
 }
-
-keyspec _TENANT_ID {
-    kind:     RunTimeHost
-    type:     string
-    standard: true
-    since:    "0.1.0"
-    shortdoc: "Tenant info during the current chalk operation"
-    doc:      """
-Akin to `TENANT_ID_WHEN_CHALKED`, but will not be added to a chalk
-mark, and can be set for any given operation. The default OSS
-configuration never sets this value, but it can be configured
-manually, or in binaries created by tooling.
-"""
-}
-
 
 keyspec _OPERATION {
     kind:             RunTimeHost
@@ -7718,55 +7671,6 @@ keyspec $CHALK_ENCRYPTED_PRIVATE_KEY {
    since:                  "0.1.0"
    doc:                    """
 Also necessary for attestations.
-"""
-}
-
-keyspec $CHALK_DATA_API_KEY {
-   required_in_self_mark:  true
-   kind:                   ChalkTimeArtifact
-   type:                   string
-   standard:               true
-   system:                 true
-   since:                  "0.3.0"
-   doc:                    """
-API key used to optionally save/load attestation keys to cloud.
-"""
-}
-
-keyspec $CHALK_API_REFRESH_TOKEN {
-   required_in_self_mark:  true
-   kind:                   ChalkTimeArtifact
-   type:                   string
-   standard:               true
-   system:                 true
-   since:                  "0.1.4"
-   doc:                    """
-Key to hold the OIDC refresh token for non-user present API
-re-authentication.
-"""
-}
-
-keyspec $CHALK_ATTESTATION_TOKEN {
-   required_in_self_mark:  true
-   kind:                   ChalkTimeArtifact
-   type:                   string
-   standard:               true
-   system:                 true
-   since:                  "0.1.0"
-   doc:                    """
-...
-"""
-}
-
-keyspec $CHALK_SECRET_ENDPOINT_URI {
-   required_in_self_mark:  true
-   kind:                   ChalkTimeArtifact
-   type:                   string
-   standard:               true
-   system:                 true
-   since:                  "0.1.0"
-   doc:                    """
-...
 """
 }
 

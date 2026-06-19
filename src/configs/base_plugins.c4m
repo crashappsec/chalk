@@ -648,8 +648,6 @@ Note on _EXEC_DEPLOYMENT_ID:
 # {now}     -> value of TIMESTAMP
 # {path}    -> value of PATH_WHEN_CHALKED
 # {hash}    -> value of HASH
-# {tenant}  -> value of TENANT_ID_WHEN_CHALKED
-#
 #
 # While we don't enforce that, if you want to ensure callbacks are called,
 # and that provided values clobber plugin values, you can leave the

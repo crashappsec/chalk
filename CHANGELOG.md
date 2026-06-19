@@ -100,7 +100,25 @@
 
   ([#678](https://github.com/crashappsec/chalk/pull/678))
 
+- `DOCKER_CHALK_ADDED_LABELS` is now populated with the labels chalk injects
+  during `docker build`, keyed by the original (pre-prefix) key name.
+
+  ([#679](https://github.com/crashappsec/chalk/pull/679))
+
 ### Bug Fixes
+
+- `_OP_PUBLIC_IPV4_ADDR` was defined but never set; it is now populated in
+  every chalk operation report.
+
+  ([#679](https://github.com/crashappsec/chalk/pull/679))
+
+- Three docker image keys were silently absent due to name mismatches between
+  the keyspec and the collector:
+  - `_IMAGE_HOSTNAME`
+  - `_IMAGE_EXPOSED_PORTS`
+  - `_INSTANCE_IP`
+
+  ([#679](https://github.com/crashappsec/chalk/pull/679))
 
 - File sinks and the report cache no longer emit continuous errors when chalk
   runs in a container with a read-only root filesystem. A file sink whose
