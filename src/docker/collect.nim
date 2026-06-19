@@ -52,11 +52,11 @@ let dockerImageAutoMap: JsonToChalkKeysMapping = {
   "Config:Shell":                               ("_IMAGE_SHELL", identity),
   "Config:Entrypoint":                          ("_IMAGE_ENTRYPOINT", identity),
   "Config:Cmd":                                 ("_IMAGE_CMD", identity),
-  "Config:Hostname":                            ("_IMAGE_HOSTNAMES", JsonTransformer((x: JsonNode) =>
+  "Config:Hostname":                            ("_IMAGE_HOSTNAME", JsonTransformer((x: JsonNode) =>
                                                    `%`(extractDockerHashList(x.getStrElems())))),
   "Config:Domainname":                          ("_IMAGE_DOMAINNAME", identity),
   "Config:User":                                ("_IMAGE_USER", identity),
-  "Config:ExposedPorts":                        ("_IMAGE_EXPOSEDPORTS", identity),
+  "Config:ExposedPorts":                        ("_IMAGE_EXPOSED_PORTS", identity),
   "Config:Env":                                 ("_IMAGE_ENV", identity),
   "Config:Image":                               ("_IMAGE_NAME", identity),
   "Config:Healthcheck:Test":                    ("_IMAGE_HEALTHCHECK_TEST", identity),
@@ -197,7 +197,7 @@ let dockerContainerAutoMap: JsonToChalkKeysMapping = {
   "NetworkSettings:Gateway":                    ("_INSTANCE_GATEWAY", identity),
   "NetworkSettings:GlobalIPv6Address":          ("_INSTANCE_GLOBAL_IPV6_ADDRESS", identity),
   "NetworkSettings:GlobalIPv6PrefixLen":        ("_INSTANCE_GLOBAL_IPV6_PREFIX_LEN", identity),
-  "NetworkSettings:IPAddress":                  ("_INSTANCE_IPADDRESS", identity),
+  "NetworkSettings:IPAddress":                  ("_INSTANCE_IP", identity),
   "NetworkSettings:IPPrefixLen":                ("_INSTANCE_IP_PREFIX_LEN", identity),
   "NetworkSettings:IPv6Gateway":                ("_INSTANCE_IPV6_GATEWAY", identity),
   "NetworkSettings:MacAddress":                 ("_INSTANCE_MAC", identity),

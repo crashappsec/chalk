@@ -473,6 +473,7 @@ type
       vctlDockerFileLoc*:     string # path within version control
       inDockerFile*:          string
       addedPlatform*:         OrderedTableRef[string, seq[string]]
+      addedLabels*:           OrderedTableRef[string, string]
       addedInstructions*:     seq[string]
       updateDockerignore*:    bool
       existingDockerignore*:  string

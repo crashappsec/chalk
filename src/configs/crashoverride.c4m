@@ -510,7 +510,6 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
   ~key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   ~key._REPO_LIST_DIGESTS.use                  = true
-  ~key._FOUND_BASE_MARK.use                    = true
   ~key._SIGNATURES.use                         = true
   ~key._INVALID_SIGNATURE.use                  = true
   ~key._VALIDATED_SIGNATURE.use                = true
@@ -542,7 +541,6 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.$CHALK_LOAD_COUNT.use                   = true
   ~key.$CHALK_PUBLIC_KEY.use                   = true
   ~key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = false
-  ~key.$CHALK_ATTESTATION_TOKEN.use            = true
   ~key.$CHALK_COMPONENT_CACHE.use              = false
   ~key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = false
   ~key.$CHALK_MEMOIZE.use                      = false

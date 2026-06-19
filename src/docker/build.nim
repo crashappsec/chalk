@@ -170,8 +170,11 @@ proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
 
 proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   trace("docker: adding virtual label args via --label flags")
+  ctx.addedLabels = newOrderedTable[string, string]()
   let labelOpt = attrGetOpt[TableRef[string, string]]("docker.custom_labels")
   if labelOpt.isSome():
+    for k, v in labelOpt.get():
+      ctx.addedLabels[k] = v
     ctx.newCmdLine.addLabelArgs(labelOpt.get())
   let labelTemplName = attrGet[string]("docker.label_template")
   if labelTemplName == "":
@@ -180,6 +183,10 @@ proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
     labelTemplate = "mark_template." & labelTemplName
     hostLabelsToAdd = hostInfo.filterByTemplate(labelTemplate)
     artLabelsToAdd  = chalk.collectedData.filterByTemplate(labelTemplate)
+  for k, v in hostLabelsToAdd:
+    ctx.addedLabels[k] = if v.kind == MkStr: unpack[string](v) else: v.boxToJson()
+  for k, v in artLabelsToAdd:
+    ctx.addedLabels[k] = if v.kind == MkStr: unpack[string](v) else: v.boxToJson()
   var args: seq[string] = @[]
   args.addLabelArgs(hostLabelsToAdd)
   args.addLabelArgs(artLabelsToAdd)
@@ -189,8 +196,11 @@ proc addVirtualLabels(ctx: DockerInvocation, chalk: ChalkObj) =
 
 proc addLabels(ctx: DockerInvocation, chalk: ChalkObj) =
   trace("docker: adding labels to Dockerfile")
+  ctx.addedLabels = newOrderedTable[string, string]()
   let labelOpt = attrGetOpt[TableRef[string, string]]("docker.custom_labels")
   if labelOpt.isSome():
+    for k, v in labelOpt.get():
+      ctx.addedLabels[k] = v
     ctx.addedInstructions.addLabelCmds(labelOpt.get())
   let labelTemplName = attrGet[string]("docker.label_template")
   if labelTemplName == "":
@@ -199,6 +209,10 @@ proc addLabels(ctx: DockerInvocation, chalk: ChalkObj) =
     labelTemplate    = "mark_template." & labelTemplName
     hostLabelsToAdd  = hostInfo.filterByTemplate(labelTemplate)
     artLabelsToAdd   = chalk.collectedData.filterByTemplate(labelTemplate)
+  for k, v in hostLabelsToAdd:
+    ctx.addedLabels[k] = if v.kind == MkStr: unpack[string](v) else: v.boxToJson()
+  for k, v in artLabelsToAdd:
+    ctx.addedLabels[k] = if v.kind == MkStr: unpack[string](v) else: v.boxToJson()
   var added: seq[string] = @[]
   added.addLabelCmds(hostLabelsToAdd)
   added.addLabelCmds(artLabelsToAdd)
@@ -459,6 +473,7 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
 proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   let dict = chalk.collectedData
   dict.setIfNeeded("DOCKER_CHALK_ADDED_TO_DOCKERFILE", ctx.addedInstructions)
+  dict.setIfNeeded("DOCKER_CHALK_ADDED_LABELS",        ctx.addedLabels)
   dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerFile())
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =

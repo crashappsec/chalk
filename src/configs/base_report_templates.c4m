@@ -46,7 +46,6 @@ report and subtract from it.
   key.INJECTOR_COMMIT_ID.use                  = true
   key.INJECTOR_ARGV.use                       = true
   key.INJECTOR_ENV.use                        = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
   key.CHALK_ID.use                            = true
   key.TIMESTAMP_WHEN_CHALKED.use              = true
   key.CHALK_PTR.use                           = true
@@ -387,14 +386,12 @@ report and subtract from it.
   key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
   key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
-  key._FOUND_BASE_MARK.use                    = true
   key._SIGNATURES.use                         = true
   key._INVALID_SIGNATURE.use                  = true
   key._ACTION_ID.use                          = true
   key._EXEC_ID.use                            = true
   key._ARGV.use                               = true
   key._ENV.use                                = true
-  key._TENANT_ID.use                          = true
   key._OPERATION.use                          = true
   key._OP_EXIT_CODE.use                       = true
   key._TIMESTAMP.use                          = true
@@ -543,10 +540,6 @@ report and subtract from it.
   key.$CHALK_LOAD_COUNT.use                   = true
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
-  key.$CHALK_DATA_API_KEY.use                 = true
-  key.$CHALK_API_REFRESH_TOKEN.use            = false
-  key.$CHALK_ATTESTATION_TOKEN.use            = true
-  key.$CHALK_SECRET_ENDPOINT_URI.use          = true
   key.$CHALK_COMPONENT_CACHE.use              = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
   key.$CHALK_MEMOIZE.use                      = true
@@ -579,7 +572,6 @@ doc: """
   key.INJECTOR_COMMIT_ID.use                  = true
   key.INJECTOR_ARGV.use                       = true
   key.INJECTOR_ENV.use                        = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
   key.EXTERNAL_TOOL_DURATION.use              = true
   key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
@@ -588,7 +580,6 @@ doc: """
   key._EXEC_ID.use                            = true
   key._ARGV.use                               = true
   key._ENV.use                                = true
-  key._TENANT_ID.use                          = true
   key._OPERATION.use                          = true
   key._OP_EXIT_CODE.use                       = true
   key._TIMESTAMP.use                          = true
@@ -740,7 +731,6 @@ doc: """
   key.INJECTOR_COMMIT_ID.use                  = true
   key.INJECTOR_ARGV.use                       = true
   key.INJECTOR_ENV.use                        = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
   key.CHALK_ID.use                            = true
   key.TIMESTAMP_WHEN_CHALKED.use              = true
   key.CHALK_PTR.use                           = true
@@ -1078,7 +1068,6 @@ doc: """
   key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
   key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
-  key._FOUND_BASE_MARK.use                    = true
   key._SIGNATURES.use                         = true
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
@@ -1106,7 +1095,6 @@ doc: """
   key.$CHALK_LOAD_COUNT.use                   = true
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
-  key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
   key.$CHALK_MEMOIZE.use                      = true
@@ -1160,7 +1148,6 @@ container.
   key.INJECTOR_COMMIT_ID.use                  = true
   key.INJECTOR_ARGV.use                       = true
   key.INJECTOR_ENV.use                        = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
   key.EXTERNAL_TOOL_DURATION.use              = true
   key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
@@ -1171,7 +1158,6 @@ container.
   key._EXEC_ID.use                            = true
   key._ARGV.use                               = true
   key._ENV.use                                = true
-  key._TENANT_ID.use                          = true
   key._OPERATION.use                          = true
   key._TIMESTAMP.use                          = true
   key._DATE.use                               = false # Go with _DATETIME
@@ -1632,7 +1618,6 @@ container.
   key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
   key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
-  key._FOUND_BASE_MARK.use                    = true
   key._SIGNATURES.use                         = true
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
@@ -1647,7 +1632,6 @@ container.
   key.$CHALK_LOAD_COUNT.use                   = true
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
-  key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
   key.$CHALK_MEMOIZE.use                      = true
@@ -1706,14 +1690,12 @@ and keep the run-time key.
   key.INJECTOR_COMMIT_ID.use                  = true
   key.INJECTOR_ARGV.use                       = true
   key.INJECTOR_ENV.use                        = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
 
   # Runtime host keys.
   key._ACTION_ID.use                          = true
   key._EXEC_ID.use                            = true
   key._ARGV.use                               = true
   key._ENV.use                                = true
-  key._TENANT_ID.use                          = true
   key._OPERATION.use                          = true
   key._TIMESTAMP.use                          = true
   key._DATE.use                               = false # Go with _DATETIME
@@ -2174,7 +2156,6 @@ and keep the run-time key.
   key._REPO_BUILD_CONTEXT_SKIPPED_FILES.use   = true
   key.DOCKER_BUILD_CONTEXT_SNAPSHOTS.use      = true
   key._REPO_LIST_DIGESTS.use                  = true
-  key._FOUND_BASE_MARK.use                    = true
   key._SIGNATURES.use                         = true
   key._INVALID_SIGNATURE.use                  = true
   key._VALIDATED_SIGNATURE.use                = true
@@ -2189,7 +2170,6 @@ and keep the run-time key.
   key.$CHALK_LOAD_COUNT.use                   = true
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
-  key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = false
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
   key.$CHALK_MEMOIZE.use                      = true
@@ -2248,7 +2228,6 @@ report_template usage {
   ~key._OPERATION.use                         = true
   ~key._TIMESTAMP.use                         = true
   ~key._OP_CHALK_COUNT.use                    = true
-  ~key._TENANT_ID.use                         = true
   ~key._OP_CHALKER_COMMIT_ID.use              = true
   ~key._OP_CHALKER_VERSION.use                = true
   ~key._OP_PLATFORM.use                       = true

@@ -45,7 +45,6 @@ or vice versa.
   key.INJECTOR_COMMIT_ID.use                  = true
   key.INJECTOR_ARGV.use                       = true
   key.INJECTOR_ENV.use                        = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
   key.CHALK_ID.use                            = true
   key.TIMESTAMP_WHEN_CHALKED.use              = true
   key.CHALK_PTR.use                           = true
@@ -166,7 +165,6 @@ mark_template mark_large {
   key.INJECTOR_ARGV.use                       = true
   key.INJECTOR_ENV.use                        = true
   key.INJECTOR_PUBLIC_KEY.use                 = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
   key.TIMESTAMP_WHEN_CHALKED.use              = true
   key.CHALK_PTR.use                           = true
   key.PATH_WHEN_CHALKED.use                   = true
@@ -259,7 +257,6 @@ mark_template mark_large {
   key.$CHALK_LOAD_COUNT.use                   = true
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
-  key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
   key.$CHALK_MEMOIZE.use                      = true
@@ -289,7 +286,6 @@ use the mark template named `reproducable`.
   key.PLATFORM_WHEN_CHALKED.use               = true
   key.INJECTOR_COMMIT_ID.use                  = true
   key.INJECTOR_PUBLIC_KEY.use                 = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
   key.ARTIFACT_TYPE.use                       = true
   key.HASH.use                                = true
   key.ORIGIN_URI.use                          = true
@@ -358,7 +354,6 @@ use the mark template named `reproducable`.
   key.$CHALK_LOAD_COUNT.use                   = true
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
-  key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
   key.$CHALK_MEMOIZE.use                      = true
@@ -380,7 +375,6 @@ the time and the nonce removed.
   key.PLATFORM_WHEN_CHALKED.use               = true
   key.INJECTOR_COMMIT_ID.use                  = true
   key.INJECTOR_PUBLIC_KEY.use                 = true
-  key.TENANT_ID_WHEN_CHALKED.use              = true
   key.ARTIFACT_TYPE.use                       = true
   key.HASH.use                                = true
   key.ORIGIN_URI.use                          = true
@@ -429,7 +423,6 @@ the time and the nonce removed.
   key.$CHALK_LOAD_COUNT.use                   = true
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
-  key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
   key.$CHALK_MEMOIZE.use                      = true
@@ -454,7 +447,6 @@ This is the default for `docker` chalk marks.
   key.$CHALK_LOAD_COUNT.use                   = true
   key.$CHALK_PUBLIC_KEY.use                   = true
   key.$CHALK_ENCRYPTED_PRIVATE_KEY.use        = true
-  key.$CHALK_ATTESTATION_TOKEN.use            = true
   key.$CHALK_COMPONENT_CACHE.use              = true
   key.$CHALK_SAVED_COMPONENT_PARAMETERS.use   = true
   key.$CHALK_MEMOIZE.use                      = true

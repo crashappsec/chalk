@@ -1441,6 +1441,11 @@ def test_docker_labels(chalk: Chalk, random_hex: str):
         },
         DOCKER_ANNOTATIONS={"hello": "there"},
         _IMAGE_ANNOTATIONS={"hello": "there"},
+        DOCKER_CHALK_ADDED_LABELS={
+            "HELLO": "CRASH_OVERRIDE_TEST_LABEL",
+            "COMMIT_ID": str,
+            "BRANCH": str,
+        },
     )
 
     inspected = Docker.inspect(tag)
