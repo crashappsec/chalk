@@ -2,6 +2,8 @@
 
 ## 1.1.1
 
+**June 22, 2026**
+
 ### Breaking Changes
 
 - `FAILED_KEYS` and `_OP_FAILED_KEYS` now store a **list** of error objects
