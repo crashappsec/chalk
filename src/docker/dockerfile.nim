@@ -730,6 +730,10 @@ proc topLevelCmdParse(s: string): (string, string) =
         name &= $(item)
       continue
 
+    # skip any additional whitespace between command name and arguments
+    if rest.len == 0 and item.isWhiteSpace():
+      continue
+
     rest &= $(item)
 
   return (name.toUpperAscii(), rest)
