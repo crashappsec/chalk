@@ -120,6 +120,12 @@
 
   ([#679](https://github.com/crashappsec/chalk/pull/679))
 
+- `FROM --platform=<var>` instructions with multiple spaces between `FROM` and
+  `--platform` were incorrectly parsed: the flag was not recognized and the
+  platform flag string was used as the image name instead.
+
+  ([#681](https://github.com/crashappsec/chalk/pull/681))
+
 - File sinks and the report cache no longer emit continuous errors when chalk
   runs in a container with a read-only root filesystem. A file sink whose
   destination directory is not writable is now disabled at startup with a
