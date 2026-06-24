@@ -1,0 +1,14 @@
+docker {
+  docker_registry ecr {
+    enabled: env_exists("AWS_ECR_REPO")
+    uri:     env("AWS_ECR_REPO")
+    docker_push context {
+      repository: "chalk-tests"
+      tags:       ["context:{chalk_rand}"]
+      docker_context_upload {
+        enabled:  true
+        strategy: "registry"
+      }
+    }
+  }
+}

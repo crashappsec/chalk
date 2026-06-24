@@ -722,7 +722,7 @@ proc layerGetFileString*(layer:    DockerImage,
   extractAll(tarPath, untarPath)
   result = tryToLoadFile(namePath)
 
-proc layerPutStart(layer: DockerImage): (Uri, int) =
+proc layerPutStart(layer: DockerImage): tuple[location: Uri, minChunkSize: int] =
   let (_, initResponse) = layer.request(
     useCase     = RegistryUseCase.ReadWrite,
     httpMethod  = HttpPost,
@@ -821,6 +821,7 @@ proc layerPutFileStream*(
       startAt                  = 0
       attempts                 = 1
       httpMethod               = HttpPatch
+      trustSentPosition        = false
       response:                  Response
     while startAt < size:
       let
@@ -829,6 +830,8 @@ proc layerPutFileStream*(
       if isFinal:
         location   = location.withQueryPair("digest", layer.imageRef)
         httpMethod = HttpPut
+      else:
+        httpMethod = HttpPatch
       try:
         (_, response) = layer.request(
           useCase           = RegistryUseCase.ReadWrite,
@@ -848,22 +851,31 @@ proc layerPutFileStream*(
         )
       if response.code() == Http416:
         trace("docker: chunk not fully uploaded: " & response.body())
-        (startAt, attempts)   = response.nextStartAt(startAt, attempts)
-        if response.headers.hasKey("Location"):
-          location = parseUri(response.headers["Location"])
+        (startAt, attempts) = response.nextStartAt(startAt, attempts)
+        if attempts > 2:
+          raise newException(
+            ValueError,
+            "could not upload layer: registry rejected chunk at position " &
+            $startAt & " after " & $attempts & " attempts",
+          )
       else:
-        if response.headers.hasKey("Range"):
-          (startAt, attempts) = response.nextStartAt(startAt, attempts)
+        if trustSentPosition or not response.headers.hasKey("Range"):
+          startAt  = endAt + 1
+          attempts = 1
         else:
-          (startAt, attempts) = (endAt + 1, 1)
-        if response.headers.hasKey("Location"):
-          location = parseUri(response.headers["Location"])
-      if attempts > 2:
-        raise newException(
-          ValueError,
-          "could not upload layer as upload Range is not incrementing after " &
-          $attempts & " attempts"
-        )
+          (startAt, attempts) = response.nextStartAt(startAt, attempts)
+          if attempts > 2:
+            # Range not advancing after retries — registry accepted the chunks
+            # but reports stale Range values (seen on ECR, which stores data
+            # correctly but delays Range updates).  Switch to tracking position
+            # by what we sent rather than what the registry reports.
+            # https://github.com/aws/containers-roadmap/issues/2831
+            trace("docker: Range not advancing, switching to sent-position tracking")
+            trustSentPosition = true
+            startAt           = endAt + 1
+            attempts          = 1
+      if response.headers.hasKey("Location"):
+        location = parseUri(response.headers["Location"])
     # https://docker-docs.uclv.cu/registry/spec/api/
     # > The Docker-Content-Digest header returns the canonical digest of the
     # > uploaded blob which may differ from the provided digest.

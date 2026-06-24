@@ -1,5 +1,17 @@
 # Chalk Release Notes
 
+## 1.1.2
+
+### Bug Fixes
+
+- Build context upload to ECR no longer fails for blobs larger than one chunk.
+  ECR stores each PATCH chunk correctly but reports a stale `Range` header
+  that does not advance, causing spec-compliant clients to re-send chunks at
+  the wrong offset and receive a `416`. Chalk now detects a non-advancing
+  `Range` after one retry and switches to tracking position by what was sent
+  rather than what the registry reports.
+  ([aws/containers-roadmap#2831](https://github.com/aws/containers-roadmap/issues/2831))
+
 ## 1.1.1
 
 **June 22, 2026**

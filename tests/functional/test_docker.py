@@ -2,6 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import hashlib
 import itertools
 import json
 import operator
@@ -62,6 +63,8 @@ from .utils.os import run
 
 
 logger = get_logger()
+
+SHA256 = re.compile(r"^[a-f0-9]{64}$")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -1357,8 +1360,6 @@ def test_k8s(chalk_copy: Chalk, server_http: str, tmp_path: Path):
     config_file = tmp_path / "config.yaml"
     config_file.write_text("db_host: postgres.default.svc.cluster.local\n")
 
-    sha256 = re.compile(r"^[a-f0-9]{64}$")
-
     _, result = Docker.run(
         image=digests.id,
         check=False,
@@ -1402,17 +1403,17 @@ def test_k8s(chalk_copy: Chalk, server_http: str, tmp_path: Path):
         # NODE_IP is a downward API var and must be excluded from hashes
         _K8S_CONTAINER_ENV_VAR_HASHES={
             "NODE_IP": MISSING,
-            "APP_ENV": sha256,
-            "LOG_LEVEL": sha256,
-            "DB_HOST": sha256,
-            "DB_PASSWORD": sha256,
+            "APP_ENV": SHA256,
+            "LOG_LEVEL": SHA256,
+            "DB_HOST": SHA256,
+            "DB_PASSWORD": SHA256,
             "SLEEP": MISSING,  # only k8s vars are reported
         },
         # only the subPath mount has a real file in the test container
         _K8S_CONTAINER_VOLUME_MOUNT_HASHES={
-            "/etc/config/config.yaml": sha256,
+            "/etc/config/config.yaml": SHA256,
         },
-        _EXEC_DEPLOYMENT_ID=sha256,
+        _EXEC_DEPLOYMENT_ID=SHA256,
     )
 
 
@@ -2401,7 +2402,7 @@ def test_build_context_upload(
             _REPO_BUILD_CONTEXTS={
                 REGISTRY_AUTH: {
                     "context": {
-                        ".": re.compile(r"^[a-f0-9]{64}$"),
+                        ".": SHA256,
                         "libs": MISSING,
                     },
                 },
@@ -2442,8 +2443,8 @@ def test_build_context_upload(
         _REPO_BUILD_CONTEXTS={
             REGISTRY_AUTH: {
                 "context": {
-                    ".": re.compile(r"^[a-f0-9]{64}$"),
-                    "libs": re.compile(r"^[a-f0-9]{64}$"),
+                    ".": SHA256,
+                    "libs": SHA256,
                 },
             },
         },
@@ -2544,7 +2545,7 @@ def test_build_context_upload(
                 "context": {
                     ".": {
                         "large_file.bin": {
-                            "hash": re.compile(r"^[a-f0-9]{64}$"),
+                            "hash": SHA256,
                             "size": 2048,
                         },
                     },
@@ -2552,6 +2553,74 @@ def test_build_context_upload(
             },
         },
     )
+
+
+@pytest.mark.skipif(
+    not aws_secrets_configured() or not AWS_ECR_REPO,
+    reason="AWS ECR not configured",
+)
+def test_build_context_upload_ecr(
+    chalk_copy: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+):
+    # Use a subdirectory so the chalk binary placed in tmp_data_dir by the
+    # chalk_copy fixture is not included in the build context tar.
+    context_dir = tmp_data_dir / "context"
+    context_dir.mkdir()
+
+    (context_dir / "app.py").write_text("print('hello')\n")
+    # 33 MB of incompressible random data forces multi-chunk upload to ECR.
+    # ECR's OCI-Chunk-Min-Length is 10 MB so the tar.gz requires 4 chunks:
+    # PATCH 1 (10 MB) succeeds, PATCH 2 (10 MB) is accepted by ECR with 201
+    # but the Range response header does not advance (ECR bug), chalk retries
+    # once, detects the stall, and switches to tracking position by what was
+    # sent.  PATCH 3, PATCH 4 / final PUT complete the upload correctly.
+    file_data = [os.urandom(11 * 1024 * 1024) for _ in range(3)]
+    for i, data in enumerate(file_data):
+        (context_dir / f"data_{i:02d}.bin").write_bytes(data)
+
+    name = f"context_upload_ecr_{random_hex}"
+    tag = f"{AWS_ECR_REPO}/chalk-tests:{name}"
+    env = {"AWS_ECR_REPO": AWS_ECR_REPO}
+    config = CONFIGS / "docker_context_ecr.c4m"
+
+    _, build_result = chalk_copy.docker_build(
+        dockerfile=DOCKERFILES / "valid" / "empty" / "Dockerfile",
+        context=context_dir,
+        tag=tag,
+        push=True,
+        run_docker=False,
+        config=config,
+        env=env,
+        buildx=True,
+    )
+
+    assert build_result.mark.has(
+        _REPO_BUILD_CONTEXTS={
+            AWS_ECR_REPO: {
+                "chalk-tests": {
+                    ".": SHA256,
+                },
+            },
+        },
+    )
+    attest_digest = build_result.mark["_REPO_BUILD_CONTEXTS"][AWS_ECR_REPO][
+        "chalk-tests"
+    ]["."]
+
+    contents = Docker.get_tar_layer_contents(
+        registry=AWS_ECR_REPO,
+        repo="chalk-tests",
+        attest_digest=attest_digest,
+        insecure=False,
+    )
+
+    assert contents["app.py"] == b"print('hello')\n"
+    for i, data in enumerate(file_data):
+        expected = hashlib.sha256(data).hexdigest()
+        actual = hashlib.sha256(contents[f"data_{i:02d}.bin"]).hexdigest()
+        assert actual == expected, f"data_{i:02d}.bin content mismatch"
 
 
 @pytest.mark.parametrize("strategy", ["registry", "local"])
