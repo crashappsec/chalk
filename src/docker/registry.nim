@@ -789,15 +789,37 @@ proc nextChunkOffset(
     trustSentPosition: bool,
 ): (int, int, bool) =
   ## Decide the next (startAt, attempts, trustSentPosition) after a chunk
-  ## upload response. Both the 416 and the non-416 paths honor the
-  ## trustSentPosition latch: once the registry's Range is known to lag, a
-  ## later 416 carrying that stale Range advances by the bytes we sent rather
-  ## than re-deriving the offset from the stale Range via nextStartAt, which
-  ## would trip its backward-range guard and abort the recovery the latch
-  ## was meant to provide.
-  if trustSentPosition:
-    return (endAt + 1, 1, true)
+  ## upload response.
+  ##
+  ## On a 416 in sent-position mode: the registry's Range header cannot be
+  ## trusted in general, but a 416 whose Range points *within* the chunk we
+  ## just sent (rangeEnd+1 > startAt) means the registry partially stored the
+  ## chunk and is giving us a real resume offset - honor it. If Range is at or
+  ## before startAt the registry is hallucinating (the same stale value that
+  ## engaged the latch), so raise immediately rather than retrying blind.
   if response.code() == Http416:
+    if trustSentPosition:
+      if not response.headers.hasKey("Range"):
+        raise newException(
+          ValueError,
+          "could not upload layer: 416 in sent-position mode missing Range header",
+        )
+      let raw = response.headers["Range"].removePrefix("bytes=")
+      let (validRange, _, rangeEnd) = raw.scanTuple("$i-$i")
+      if not validRange:
+        raise newException(
+          ValueError,
+          "could not upload layer: 416 in sent-position mode with invalid Range: " &
+          response.headers["Range"],
+        )
+      let nextAt = rangeEnd + 1
+      if nextAt > startAt:
+        return (nextAt, 1, true)
+      raise newException(
+        ValueError,
+        "could not upload layer: 416 in sent-position mode with stale Range " &
+        response.headers["Range"] & " at position " & $startAt,
+      )
     let (nextAt, tries) = response.nextStartAt(startAt, attempts)
     if tries > 2:
       raise newException(
@@ -806,8 +828,8 @@ proc nextChunkOffset(
         $nextAt & " after " & $tries & " attempts",
       )
     return (nextAt, tries, false)
-  if not response.headers.hasKey("Range"):
-    return (endAt + 1, 1, false)
+  if trustSentPosition or not response.headers.hasKey("Range"):
+    return (endAt + 1, 1, trustSentPosition)
   let (nextAt, tries) = response.nextStartAt(startAt, attempts)
   if tries > 2:
     return (endAt + 1, 1, true)

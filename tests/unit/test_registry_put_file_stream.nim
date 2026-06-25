@@ -113,24 +113,50 @@ proc test_stale_2xx_latches_trust(): (int, int, bool) =
   return (startAt, attempts, trust)
 
 # ---------------------------------------------------------------------------
-# grouped-001 regression: after the latch, a 416 whose Range still lags must
-# recover by advancing to endAt+1 rather than calling nextStartAt on the stale
-# Range (which would raise "Range response header went backwards").
+# 416 in sent-position mode with a stale Range (rangeEnd+1 <= startAt) raises
+# immediately rather than advancing blind, because the registry is hallucinating
+# the same stale value that caused the latch to engage.
 # ---------------------------------------------------------------------------
-proc test_416_after_trust_sent_position() =
+proc test_416_trusted_stale_range_raises() =
   let (startAt, _, _) = test_stale_2xx_latches_trust()
   assertEq(startAt, 20)
 
-  # A post-latch 416 arrives carrying the same stale Range "0-9".
-  let (nextAt, attempts, trust) = resp("416 Range Not Satisfiable", "0-9").nextChunkOffset(
-    startAt           = startAt,
+  assertRaisesMsg("stale Range 0-9 at position 20"):
+    discard resp("416 Range Not Satisfiable", "0-9").nextChunkOffset(
+      startAt           = startAt,
+      endAt             = 29,
+      attempts          = 1,
+      trustSentPosition = true,
+    )
+
+# ---------------------------------------------------------------------------
+# 416 in sent-position mode with a Range pointing within the current chunk
+# (rangeEnd+1 > startAt) is honored: the registry partially stored the chunk
+# and returned a real resume offset.
+# ---------------------------------------------------------------------------
+proc test_416_trusted_midchunk_range_honors() =
+  # Sent bytes 20-29; registry reports Range "0-24" (confirmed up to byte 24).
+  let (nextAt, attempts, trust) = resp("416 Range Not Satisfiable", "0-24").nextChunkOffset(
+    startAt           = 20,
     endAt             = 29,
     attempts          = 1,
     trustSentPosition = true,
   )
-  assertEq(nextAt, 30)
+  assertEq(nextAt, 25)
   assertEq(attempts, 1)
   assertEq(trust, true)
+
+# ---------------------------------------------------------------------------
+# 416 in sent-position mode with no Range header raises immediately.
+# ---------------------------------------------------------------------------
+proc test_416_trusted_missing_range_raises() =
+  assertRaisesMsg("missing Range header"):
+    discard resp("416 Range Not Satisfiable").nextChunkOffset(
+      startAt           = 20,
+      endAt             = 29,
+      attempts          = 1,
+      trustSentPosition = true,
+    )
 
 # ---------------------------------------------------------------------------
 # The fix must not weaken the legitimate (non-latched) 416 handling: a 416 that
@@ -236,7 +262,9 @@ proc test_chunk_target_final_idempotent() =
 when isMainModule:
   test_advancing_range()
   discard test_stale_2xx_latches_trust()
-  test_416_after_trust_sent_position()
+  test_416_trusted_stale_range_raises()
+  test_416_trusted_midchunk_range_honors()
+  test_416_trusted_missing_range_raises()
   test_416_bounded_abort_without_trust()
   test_416_advancing_retries()
   test_finalize_digest_matches()
