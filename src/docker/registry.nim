@@ -814,17 +814,24 @@ proc nextChunkOffset(
   return (nextAt, tries, false)
 
 proc finalizeBlobDigest(response: Response, layer: DockerImage): string =
-  ## Validate the registry-reported Docker-Content-Digest for a finalized blob
-  ## upload and confirm it matches the locally computed layer digest.
-  ## https://docker-docs.uclv.cu/registry/spec/api/
+  ## Sanity-check the Docker-Content-Digest returned by the registry against
+  ## the locally computed layer digest.
   ##
-  ## The sent-position recovery (trustSentPosition) advances by the bytes we
-  ## sent without reconciling the registry's authoritative Range, so this
-  ## content-addressed PUT is the only integrity gate left. Rather than trust
-  ## the registry to honestly enforce the ?digest= finalize, compare the
-  ## returned digest against the digest we uploaded and fail closed on a
-  ## mismatch, so a partial or lost write cannot be finalized and reported as a
-  ## successful push.
+  ## Per the OCI Distribution Specification, registries MUST verify uploaded
+  ## blob content against the digest provided in the finalize PUT ?digest=
+  ## parameter and MUST return DIGEST_INVALID (400) on mismatch:
+  ##   "Clients MUST include a digest parameter in the query string of the
+  ##    final chunk. The registry MUST verify the content against the provided
+  ##    digest."
+  ## https://github.com/opencontainers/distribution-spec/blob/main/spec.md
+  ##
+  ## A compliant registry therefore already enforces correctness at the
+  ## finalize step and this comparison is redundant for it.  However, a
+  ## non-compliant registry may skip enforcement and simply echo back the
+  ## digest submitted in the ?digest= query parameter - in which case this
+  ## comparison always passes regardless of what bytes were actually stored.
+  ## This is therefore a sanity check that catches honest-but-buggy registries
+  ## and proxies, not a cooperation-independent integrity guarantee.
   result = validateDigest(
     response.headers.mustGet(
       "Docker-Content-Digest",
