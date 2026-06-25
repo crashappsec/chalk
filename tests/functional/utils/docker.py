@@ -524,24 +524,52 @@ class Docker:
         )
 
     @staticmethod
+    def _fetch_tar_layer_bytes(
+        registry: str,
+        repo: str,
+        attest_digest: str,
+        insecure: bool = True,
+    ) -> bytes:
+        insecure_flag = ["--insecure"] if insecure else []
+        ref = f"{registry}/{repo}@sha256:{attest_digest}"
+        manifest = run(["crane", "manifest"] + insecure_flag + [ref]).json()
+        layer_digest = manifest["layers"][0]["digest"].split(":", 1)[1]
+        blob_ref = f"{registry}/{repo}@sha256:{layer_digest}"
+        return run(["crane", "blob"] + insecure_flag + [blob_ref], binary=True).stdout
+
+    @staticmethod
     def list_files_in_tar_layer(
         registry: str,
         repo: str,
         attest_digest: str,
+        insecure: bool = True,
     ) -> list[str]:
-        """Fetch the build-context tar layer from a context manifest digest.
-
-        Downloads the layer blob from the context manifest at
-        ``registry/repo@sha256:<attest_digest>`` via ``crane blob``
-        and returns the list of member paths inside the tar archive.
-        """
-        ref = f"{registry}/{repo}@sha256:{attest_digest}"
-        manifest = run(["crane", "manifest", "--insecure", ref]).json()
-        layer_digest = manifest["layers"][0]["digest"].split(":", 1)[1]
-        blob_ref = f"{registry}/{repo}@sha256:{layer_digest}"
-        blob_bytes = run(["crane", "blob", "--insecure", blob_ref], binary=True).stdout
+        """Return the member paths inside the build-context tar layer."""
+        blob_bytes = Docker._fetch_tar_layer_bytes(
+            registry, repo, attest_digest, insecure
+        )
         with tarfile.open(fileobj=io.BytesIO(blob_bytes), mode="r:gz") as tf:
             return [m.name for m in tf.getmembers()]
+
+    @staticmethod
+    def get_tar_layer_contents(
+        registry: str,
+        repo: str,
+        attest_digest: str,
+        insecure: bool = True,
+    ) -> dict[str, bytes]:
+        """Return a mapping of member path to raw bytes for the build-context tar layer."""
+        blob_bytes = Docker._fetch_tar_layer_bytes(
+            registry, repo, attest_digest, insecure
+        )
+        with tarfile.open(fileobj=io.BytesIO(blob_bytes), mode="r:gz") as tf:
+            result = {}
+            for member in tf.getmembers():
+                if member.isfile():
+                    f = tf.extractfile(member)
+                    if f is not None:
+                        result[member.name] = f.read()
+            return result
 
     @staticmethod
     def blob_exists(registry: str, repo: str, digest: str) -> bool:

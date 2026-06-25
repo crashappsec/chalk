@@ -722,7 +722,7 @@ proc layerGetFileString*(layer:    DockerImage,
   extractAll(tarPath, untarPath)
   result = tryToLoadFile(namePath)
 
-proc layerPutStart(layer: DockerImage): (Uri, int) =
+proc layerPutStart(layer: DockerImage): tuple[location: Uri, minChunkSize: int] =
   let (_, initResponse) = layer.request(
     useCase     = RegistryUseCase.ReadWrite,
     httpMethod  = HttpPost,
@@ -781,6 +781,109 @@ proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): 
     attempts = 1
   return (nextStartAt, attempts)
 
+proc nextChunkOffset(
+    response:          Response,
+    startAt:           int,
+    endAt:             int,
+    attempts:          int,
+    trustSentPosition: bool,
+): (int, int, bool) =
+  ## Decide the next (startAt, attempts, trustSentPosition) after a chunk
+  ## upload response.
+  ##
+  ## On a 416 in sent-position mode: the registry's Range header cannot be
+  ## trusted in general, but a 416 whose Range points *within* the chunk we
+  ## just sent (rangeEnd+1 > startAt) means the registry partially stored the
+  ## chunk and is giving us a real resume offset - honor it. If Range is at or
+  ## before startAt the registry is hallucinating (the same stale value that
+  ## engaged the latch), so raise immediately rather than retrying blind.
+  if response.code() == Http416:
+    if trustSentPosition:
+      if not response.headers.hasKey("Range"):
+        raise newException(
+          ValueError,
+          "could not upload layer: 416 in sent-position mode missing Range header",
+        )
+      let raw = response.headers["Range"].removePrefix("bytes=")
+      let (validRange, _, rangeEnd) = raw.scanTuple("$i-$i")
+      if not validRange:
+        raise newException(
+          ValueError,
+          "could not upload layer: 416 in sent-position mode with invalid Range: " &
+          response.headers["Range"],
+        )
+      let nextAt = rangeEnd + 1
+      if nextAt > startAt:
+        return (nextAt, 1, true)
+      raise newException(
+        ValueError,
+        "could not upload layer: 416 in sent-position mode with stale Range " &
+        response.headers["Range"] & " at position " & $startAt,
+      )
+    let (nextAt, tries) = response.nextStartAt(startAt, attempts)
+    if tries > 2:
+      raise newException(
+        ValueError,
+        "could not upload layer: registry rejected chunk at position " &
+        $nextAt & " after " & $tries & " attempts",
+      )
+    return (nextAt, tries, false)
+  if trustSentPosition or not response.headers.hasKey("Range"):
+    return (endAt + 1, 1, trustSentPosition)
+  let (nextAt, tries) = response.nextStartAt(startAt, attempts)
+  if tries > 2:
+    return (endAt + 1, 1, true)
+  return (nextAt, tries, false)
+
+proc finalizeBlobDigest(response: Response, layer: DockerImage): string =
+  ## Sanity-check the Docker-Content-Digest returned by the registry against
+  ## the locally computed layer digest.
+  ##
+  ## Per the OCI Distribution Specification, registries MUST verify uploaded
+  ## blob content against the digest provided in the finalize PUT ?digest=
+  ## parameter and MUST return DIGEST_INVALID (400) on mismatch:
+  ##   "Clients MUST include a digest parameter in the query string of the
+  ##    final chunk. The registry MUST verify the content against the provided
+  ##    digest."
+  ## https://github.com/opencontainers/distribution-spec/blob/main/spec.md
+  ##
+  ## A compliant registry therefore already enforces correctness at the
+  ## finalize step and this comparison is redundant for it.  However, a
+  ## non-compliant registry may skip enforcement and simply echo back the
+  ## digest submitted in the ?digest= query parameter - in which case this
+  ## comparison always passes regardless of what bytes were actually stored.
+  ## This is therefore a sanity check that catches honest-but-buggy registries
+  ## and proxies, not a cooperation-independent integrity guarantee.
+  result = validateDigest(
+    response.headers.mustGet(
+      "Docker-Content-Digest",
+      "registry PUT response missing Docker-Content-Digest header",
+    )
+  )
+  if result.extractDockerHash() != layer.digest:
+    raise newException(
+      ValueError,
+      "registry-reported blob digest " & result &
+      " does not match uploaded layer digest sha256:" & layer.digest,
+    )
+
+proc chunkUploadTarget(
+    location: Uri,
+    layer:    DockerImage,
+    isFinal:  bool,
+): (HttpMethod, Uri) =
+  ## Derive the per-chunk request method and URL from the stable upload
+  ## `location`. The final chunk finalizes the blob with a content-addressed
+  ## PUT carrying ?digest=; every other chunk streams with PATCH. The digest is
+  ## added here, at the call site, against a fresh copy of the immutable base
+  ## location rather than mutated onto a shared `location`, so a re-looped final
+  ## attempt cannot stack a second ?digest= pair (withQueryPair appends, never
+  ## replaces) nor leak the finalize query onto a non-final PATCH.
+  if isFinal:
+    (HttpPut, location.withQueryPair("digest", layer.imageRef))
+  else:
+    (HttpPatch, location)
+
 proc layerPutFileStream*(
     layer:       DockerImage,
     contentType: string,
@@ -820,20 +923,18 @@ proc layerPutFileStream*(
       effectiveChunkSize       = max(chunkSize, minChunkSize)
       startAt                  = 0
       attempts                 = 1
-      httpMethod               = HttpPatch
+      trustSentPosition        = false
       response:                  Response
     while startAt < size:
       let
-        endAt   = min(startAt + effectiveChunkSize, size) - 1
-        isFinal = endAt == size - 1
-      if isFinal:
-        location   = location.withQueryPair("digest", layer.imageRef)
-        httpMethod = HttpPut
+        endAt                    = min(startAt + effectiveChunkSize, size) - 1
+        isFinal                  = endAt == size - 1
+        (httpMethod, requestUrl) = chunkUploadTarget(location, layer, isFinal)
       try:
         (_, response) = layer.request(
           useCase           = RegistryUseCase.ReadWrite,
           httpMethod        = httpMethod,
-          url               = location,
+          url               = requestUrl,
           body              = fileStream[startAt..endAt],
           range             = startAt..endAt,
           size              = size,
@@ -848,28 +949,25 @@ proc layerPutFileStream*(
         )
       if response.code() == Http416:
         trace("docker: chunk not fully uploaded: " & response.body())
-        (startAt, attempts)   = response.nextStartAt(startAt, attempts)
-        if response.headers.hasKey("Location"):
-          location = parseUri(response.headers["Location"])
-      else:
-        if response.headers.hasKey("Range"):
-          (startAt, attempts) = response.nextStartAt(startAt, attempts)
-        else:
-          (startAt, attempts) = (endAt + 1, 1)
-        if response.headers.hasKey("Location"):
-          location = parseUri(response.headers["Location"])
-      if attempts > 2:
-        raise newException(
-          ValueError,
-          "could not upload layer as upload Range is not incrementing after " &
-          $attempts & " attempts"
-        )
-    # https://docker-docs.uclv.cu/registry/spec/api/
-    # > The Docker-Content-Digest header returns the canonical digest of the
-    # > uploaded blob which may differ from the provided digest.
+      let wasTrusting = trustSentPosition
+      (startAt, attempts, trustSentPosition) = response.nextChunkOffset(
+        startAt           = startAt,
+        endAt             = endAt,
+        attempts          = attempts,
+        trustSentPosition = trustSentPosition,
+      )
+      if trustSentPosition and not wasTrusting:
+        # Range not advancing after retries - registry accepted the chunks
+        # but reports stale Range values (seen on ECR, which stores data
+        # correctly but delays Range updates).  Switch to tracking position
+        # by what we sent rather than what the registry reports.
+        # https://github.com/aws/containers-roadmap/issues/2831
+        trace("docker: Range not advancing, switching to sent-position tracking")
+      if response.headers.hasKey("Location"):
+        location = parseUri(response.headers["Location"])
     return newDockerDigestedJson(
       data      = JsonNode(nil),
-      digest    = validateDigest(response.headers.mustGet("Docker-Content-Digest", "registry PUT response missing Docker-Content-Digest header")),
+      digest    = response.finalizeBlobDigest(layer),
       mediaType = contentType,
       size      = len(fileStream),
     )
