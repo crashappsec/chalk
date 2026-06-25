@@ -2,6 +2,8 @@
 
 ## 1.1.2
 
+**June 25, 2026**
+
 ### Bug Fixes
 
 - Build context upload to ECR no longer fails for blobs larger than one chunk.
