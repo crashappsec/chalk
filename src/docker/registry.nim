@@ -813,6 +813,31 @@ proc nextChunkOffset(
     return (endAt + 1, 1, true)
   return (nextAt, tries, false)
 
+proc finalizeBlobDigest(response: Response, layer: DockerImage): string =
+  ## Validate the registry-reported Docker-Content-Digest for a finalized blob
+  ## upload and confirm it matches the locally computed layer digest.
+  ## https://docker-docs.uclv.cu/registry/spec/api/
+  ##
+  ## The sent-position recovery (trustSentPosition) advances by the bytes we
+  ## sent without reconciling the registry's authoritative Range, so this
+  ## content-addressed PUT is the only integrity gate left. Rather than trust
+  ## the registry to honestly enforce the ?digest= finalize, compare the
+  ## returned digest against the digest we uploaded and fail closed on a
+  ## mismatch, so a partial or lost write cannot be finalized and reported as a
+  ## successful push.
+  result = validateDigest(
+    response.headers.mustGet(
+      "Docker-Content-Digest",
+      "registry PUT response missing Docker-Content-Digest header",
+    )
+  )
+  if result.extractDockerHash() != layer.digest:
+    raise newException(
+      ValueError,
+      "registry-reported blob digest " & result &
+      " does not match uploaded layer digest sha256:" & layer.digest,
+    )
+
 proc layerPutFileStream*(
     layer:       DockerImage,
     contentType: string,
@@ -899,12 +924,9 @@ proc layerPutFileStream*(
         trace("docker: Range not advancing, switching to sent-position tracking")
       if response.headers.hasKey("Location"):
         location = parseUri(response.headers["Location"])
-    # https://docker-docs.uclv.cu/registry/spec/api/
-    # > The Docker-Content-Digest header returns the canonical digest of the
-    # > uploaded blob which may differ from the provided digest.
     return newDockerDigestedJson(
       data      = JsonNode(nil),
-      digest    = validateDigest(response.headers.mustGet("Docker-Content-Digest", "registry PUT response missing Docker-Content-Digest header")),
+      digest    = response.finalizeBlobDigest(layer),
       mediaType = contentType,
       size      = len(fileStream),
     )

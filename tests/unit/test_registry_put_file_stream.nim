@@ -42,6 +42,20 @@ proc resp(status: string, rangeHeader = ""): Response =
   if rangeHeader.len > 0:
     result.headers["Range"] = rangeHeader
 
+proc digestResp(contentDigest: string): Response =
+  result = Response(status: "201 Created", headers: newHttpHeaders())
+  if contentDigest.len > 0:
+    result.headers["Docker-Content-Digest"] = contentDigest
+
+const
+  # a layer whose locally computed digest is blobHash; imageRef renders it as
+  # "sha256:" & blobHash, which is exactly what we send as the ?digest= finalize.
+  blobHash   = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  blobDigest = "sha256:" & blobHash
+  # a structural DockerImage tuple (repo, tag, digest); imageRef renders it as
+  # "sha256:" & blobHash.
+  sampleLayer = (repo: "test", tag: "", digest: blobHash)
+
 # ---------------------------------------------------------------------------
 # A 2xx with an advancing Range advances by the registry-reported position and
 # resets the retry counter, with no latch.
@@ -146,10 +160,39 @@ proc test_416_advancing_retries() =
   assertEq(attempts, 1)
   assertEq(trust, false)
 
+# ---------------------------------------------------------------------------
+# A finalize PUT whose Docker-Content-Digest matches the uploaded layer digest
+# is accepted and returned unchanged.
+# ---------------------------------------------------------------------------
+proc test_finalize_digest_matches() =
+  assertEq(digestResp(blobDigest).finalizeBlobDigest(sampleLayer), blobDigest)
+
+# ---------------------------------------------------------------------------
+# grouped-002 regression: once trustSentPosition is latched the finalize PUT is
+# the only integrity gate, so a well-formed but non-matching Docker-Content-Digest
+# must fail closed instead of being reported as a successful push. validateDigest
+# alone (format-only) does not catch this - the equality check against the
+# uploaded layer digest does.
+# ---------------------------------------------------------------------------
+proc test_finalize_digest_mismatch_raises() =
+  let wrongDigest = "sha256:" & repeat('0', 64)
+  assertRaisesMsg("does not match uploaded layer digest"):
+    discard digestResp(wrongDigest).finalizeBlobDigest(sampleLayer)
+
+# ---------------------------------------------------------------------------
+# A missing Docker-Content-Digest header still fails closed (unchanged).
+# ---------------------------------------------------------------------------
+proc test_finalize_digest_missing_header_raises() =
+  assertRaisesMsg("missing Docker-Content-Digest"):
+    discard digestResp("").finalizeBlobDigest(sampleLayer)
+
 when isMainModule:
   test_advancing_range()
   discard test_stale_2xx_latches_trust()
   test_416_after_trust_sent_position()
   test_416_bounded_abort_without_trust()
   test_416_advancing_retries()
+  test_finalize_digest_matches()
+  test_finalize_digest_mismatch_raises()
+  test_finalize_digest_missing_header_raises()
   echo "test_registry_put_file_stream: all tests passed"
