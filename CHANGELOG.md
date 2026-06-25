@@ -10,7 +10,8 @@
   the wrong offset and receive a `416`. Chalk now detects a non-advancing
   `Range` after one retry and switches to tracking position by what was sent
   rather than what the registry reports.
-  ([aws/containers-roadmap#2831](https://github.com/aws/containers-roadmap/issues/2831))
+  ([#682](https://github.com/crashappsec/chalk/pull/682),
+  [aws/containers-roadmap#2831](https://github.com/aws/containers-roadmap/issues/2831))
 
 ## 1.1.1
 
