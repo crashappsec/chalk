@@ -19,6 +19,7 @@ import std/[
   httpclient,
   strutils,
 ]
+import ../../src/utils/uri
 import ../../src/docker/registry {.all.}
 
 template assertEq(a, b: untyped) =
@@ -46,6 +47,15 @@ proc digestResp(contentDigest: string): Response =
   result = Response(status: "201 Created", headers: newHttpHeaders())
   if contentDigest.len > 0:
     result.headers["Docker-Content-Digest"] = contentDigest
+
+proc digestPairs(s: string): int =
+  ## count "digest=" query-pair occurrences in a rendered URL
+  var i = 0
+  while true:
+    let idx = s.find("digest=", i)
+    if idx < 0: break
+    inc result
+    i = idx + "digest=".len
 
 const
   # a layer whose locally computed digest is blobHash; imageRef renders it as
@@ -186,6 +196,43 @@ proc test_finalize_digest_missing_header_raises() =
   assertRaisesMsg("missing Docker-Content-Digest"):
     discard digestResp("").finalizeBlobDigest(sampleLayer)
 
+# ---------------------------------------------------------------------------
+# grouped-004: the per-chunk request target is derived from the stable upload
+# location at the call site, not by mutating a shared `location`. A non-final
+# chunk is a PATCH to the bare location, carrying no ?digest= finalize query.
+# ---------------------------------------------------------------------------
+proc test_chunk_target_intermediate_is_bare_patch() =
+  let base = parseUri("https://reg.example.com/v2/test/blobs/uploads/uuid?_state=abc")
+  let (httpMethod, url) = chunkUploadTarget(base, sampleLayer, isFinal = false)
+  assertEq(httpMethod, HttpPatch)
+  assertEq($url, $base)
+  assertEq(digestPairs($url), 0)
+
+# ---------------------------------------------------------------------------
+# The final chunk is a PUT whose URL carries exactly one ?digest= finalize pair.
+# ---------------------------------------------------------------------------
+proc test_chunk_target_final_is_put_with_digest() =
+  let base = parseUri("https://reg.example.com/v2/test/blobs/uploads/uuid?_state=abc")
+  let (httpMethod, url) = chunkUploadTarget(base, sampleLayer, isFinal = true)
+  assertEq(httpMethod, HttpPut)
+  assertEq(digestPairs($url), 1)
+  doAssert blobHash in $url, "finalize URL must carry the layer digest hash: " & $url
+
+# ---------------------------------------------------------------------------
+# grouped-004 regression: re-deriving the final target from the SAME stable
+# base location (as happens when a final attempt re-loops without a Location
+# refresh) never stacks a second ?digest= pair, because the digest is added at
+# the call site against a fresh copy rather than mutated onto a shared URL.
+# Pre-fix the shared-`location` mutation appended a duplicate digest on re-loop.
+# ---------------------------------------------------------------------------
+proc test_chunk_target_final_idempotent() =
+  let base = parseUri("https://reg.example.com/v2/test/blobs/uploads/uuid?_state=abc")
+  let (_, first)  = chunkUploadTarget(base, sampleLayer, isFinal = true)
+  let (_, second) = chunkUploadTarget(base, sampleLayer, isFinal = true)
+  assertEq(digestPairs($first), 1)
+  assertEq(digestPairs($second), 1)
+  assertEq($first, $second)
+
 when isMainModule:
   test_advancing_range()
   discard test_stale_2xx_latches_trust()
@@ -195,4 +242,7 @@ when isMainModule:
   test_finalize_digest_matches()
   test_finalize_digest_mismatch_raises()
   test_finalize_digest_missing_header_raises()
+  test_chunk_target_intermediate_is_bare_patch()
+  test_chunk_target_final_is_put_with_digest()
+  test_chunk_target_final_idempotent()
   echo "test_registry_put_file_stream: all tests passed"

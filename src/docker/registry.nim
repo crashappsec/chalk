@@ -838,6 +838,23 @@ proc finalizeBlobDigest(response: Response, layer: DockerImage): string =
       " does not match uploaded layer digest sha256:" & layer.digest,
     )
 
+proc chunkUploadTarget(
+    location: Uri,
+    layer:    DockerImage,
+    isFinal:  bool,
+): (HttpMethod, Uri) =
+  ## Derive the per-chunk request method and URL from the stable upload
+  ## `location`. The final chunk finalizes the blob with a content-addressed
+  ## PUT carrying ?digest=; every other chunk streams with PATCH. The digest is
+  ## added here, at the call site, against a fresh copy of the immutable base
+  ## location rather than mutated onto a shared `location`, so a re-looped final
+  ## attempt cannot stack a second ?digest= pair (withQueryPair appends, never
+  ## replaces) nor leak the finalize query onto a non-final PATCH.
+  if isFinal:
+    (HttpPut, location.withQueryPair("digest", layer.imageRef))
+  else:
+    (HttpPatch, location)
+
 proc layerPutFileStream*(
     layer:       DockerImage,
     contentType: string,
@@ -877,23 +894,18 @@ proc layerPutFileStream*(
       effectiveChunkSize       = max(chunkSize, minChunkSize)
       startAt                  = 0
       attempts                 = 1
-      httpMethod               = HttpPatch
       trustSentPosition        = false
       response:                  Response
     while startAt < size:
       let
-        endAt   = min(startAt + effectiveChunkSize, size) - 1
-        isFinal = endAt == size - 1
-      if isFinal:
-        location   = location.withQueryPair("digest", layer.imageRef)
-        httpMethod = HttpPut
-      else:
-        httpMethod = HttpPatch
+        endAt                    = min(startAt + effectiveChunkSize, size) - 1
+        isFinal                  = endAt == size - 1
+        (httpMethod, requestUrl) = chunkUploadTarget(location, layer, isFinal)
       try:
         (_, response) = layer.request(
           useCase           = RegistryUseCase.ReadWrite,
           httpMethod        = httpMethod,
-          url               = location,
+          url               = requestUrl,
           body              = fileStream[startAt..endAt],
           range             = startAt..endAt,
           size              = size,
