@@ -781,6 +781,38 @@ proc nextStartAt(response: Response, startAt: int, attempts: int, retries = 2): 
     attempts = 1
   return (nextStartAt, attempts)
 
+proc nextChunkOffset(
+    response:          Response,
+    startAt:           int,
+    endAt:             int,
+    attempts:          int,
+    trustSentPosition: bool,
+): (int, int, bool) =
+  ## Decide the next (startAt, attempts, trustSentPosition) after a chunk
+  ## upload response. Both the 416 and the non-416 paths honor the
+  ## trustSentPosition latch: once the registry's Range is known to lag, a
+  ## later 416 carrying that stale Range advances by the bytes we sent rather
+  ## than re-deriving the offset from the stale Range via nextStartAt, which
+  ## would trip its backward-range guard and abort the recovery the latch
+  ## was meant to provide.
+  if trustSentPosition:
+    return (endAt + 1, 1, true)
+  if response.code() == Http416:
+    let (nextAt, tries) = response.nextStartAt(startAt, attempts)
+    if tries > 2:
+      raise newException(
+        ValueError,
+        "could not upload layer: registry rejected chunk at position " &
+        $nextAt & " after " & $tries & " attempts",
+      )
+    return (nextAt, tries, false)
+  if not response.headers.hasKey("Range"):
+    return (endAt + 1, 1, false)
+  let (nextAt, tries) = response.nextStartAt(startAt, attempts)
+  if tries > 2:
+    return (endAt + 1, 1, true)
+  return (nextAt, tries, false)
+
 proc layerPutFileStream*(
     layer:       DockerImage,
     contentType: string,
@@ -851,29 +883,20 @@ proc layerPutFileStream*(
         )
       if response.code() == Http416:
         trace("docker: chunk not fully uploaded: " & response.body())
-        (startAt, attempts) = response.nextStartAt(startAt, attempts)
-        if attempts > 2:
-          raise newException(
-            ValueError,
-            "could not upload layer: registry rejected chunk at position " &
-            $startAt & " after " & $attempts & " attempts",
-          )
-      else:
-        if trustSentPosition or not response.headers.hasKey("Range"):
-          startAt  = endAt + 1
-          attempts = 1
-        else:
-          (startAt, attempts) = response.nextStartAt(startAt, attempts)
-          if attempts > 2:
-            # Range not advancing after retries — registry accepted the chunks
-            # but reports stale Range values (seen on ECR, which stores data
-            # correctly but delays Range updates).  Switch to tracking position
-            # by what we sent rather than what the registry reports.
-            # https://github.com/aws/containers-roadmap/issues/2831
-            trace("docker: Range not advancing, switching to sent-position tracking")
-            trustSentPosition = true
-            startAt           = endAt + 1
-            attempts          = 1
+      let wasTrusting = trustSentPosition
+      (startAt, attempts, trustSentPosition) = response.nextChunkOffset(
+        startAt           = startAt,
+        endAt             = endAt,
+        attempts          = attempts,
+        trustSentPosition = trustSentPosition,
+      )
+      if trustSentPosition and not wasTrusting:
+        # Range not advancing after retries - registry accepted the chunks
+        # but reports stale Range values (seen on ECR, which stores data
+        # correctly but delays Range updates).  Switch to tracking position
+        # by what we sent rather than what the registry reports.
+        # https://github.com/aws/containers-roadmap/issues/2831
+        trace("docker: Range not advancing, switching to sent-position tracking")
       if response.headers.hasKey("Location"):
         location = parseUri(response.headers["Location"])
     # https://docker-docs.uclv.cu/registry/spec/api/

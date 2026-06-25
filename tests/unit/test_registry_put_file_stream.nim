@@ -1,0 +1,155 @@
+## Unit tests for the chunked blob-upload offset decision in
+## `src/docker/registry.nim`.
+##
+## These exercise the real (non-exported) `nextChunkOffset` and `nextStartAt`
+## procs - imported via `{.all.}` - that decide the next upload position after
+## each chunk response. The full `layerPutFileStream` loop only adds HTTP I/O
+## and bookkeeping (endAt computation, Location refresh) around these procs, so
+## driving them directly with scripted `Response` values is a faithful slice of
+## the loop's control flow without standing up a registry.
+##
+## The headline case is the grouped-001 regression: once `trustSentPosition`
+## is latched and `startAt` has advanced past the registry's lagging Range, a
+## later 416 carrying that same stale Range must recover (advance by the bytes
+## we sent) instead of re-deriving the offset from the stale Range and tripping
+## `nextStartAt`'s backward-range guard with "Range response header went
+## backwards".
+
+import std/[
+  httpclient,
+  strutils,
+]
+import ../../src/docker/registry {.all.}
+
+template assertEq(a, b: untyped) =
+  doAssert a == b, $a & " != " & $b
+
+template assertRaisesMsg(needle: string, body: untyped) =
+  block:
+    var
+      raised = false
+      got    = ""
+    try:
+      body
+    except ValueError:
+      raised = true
+      got    = getCurrentExceptionMsg()
+    doAssert raised, "expected ValueError containing: " & needle
+    doAssert needle in got, "expected message containing " & needle & " got: " & got
+
+proc resp(status: string, rangeHeader = ""): Response =
+  result = Response(status: status, headers: newHttpHeaders())
+  if rangeHeader.len > 0:
+    result.headers["Range"] = rangeHeader
+
+# ---------------------------------------------------------------------------
+# A 2xx with an advancing Range advances by the registry-reported position and
+# resets the retry counter, with no latch.
+# ---------------------------------------------------------------------------
+proc test_advancing_range() =
+  let (startAt, attempts, trust) = resp("201 Created", "0-9").nextChunkOffset(
+    startAt           = 0,
+    endAt             = 9,
+    attempts          = 1,
+    trustSentPosition = false,
+  )
+  assertEq(startAt, 10)
+  assertEq(attempts, 1)
+  assertEq(trust, false)
+
+# ---------------------------------------------------------------------------
+# Two 2xx responses with a non-advancing (stale) Range latch
+# trustSentPosition and advance startAt past the registry-reported position.
+# This is the state that the 416 regression depends on, and it works on the
+# non-416 path both before and after the fix - that asymmetry is the bug.
+# ---------------------------------------------------------------------------
+proc test_stale_2xx_latches_trust(): (int, int, bool) =
+  # startAt has reached 10; the registry keeps reporting Range "0-9".
+  var (startAt, attempts, trust) = resp("201 Created", "0-9").nextChunkOffset(
+    startAt           = 10,
+    endAt             = 19,
+    attempts          = 1,
+    trustSentPosition = false,
+  )
+  # Range did not advance: same position, attempts incremented, not yet latched.
+  assertEq(startAt, 10)
+  assertEq(attempts, 2)
+  assertEq(trust, false)
+
+  (startAt, attempts, trust) = resp("201 Created", "0-9").nextChunkOffset(
+    startAt           = startAt,
+    endAt             = 19,
+    attempts          = attempts,
+    trustSentPosition = trust,
+  )
+  # attempts exceeded the stall budget: latch and advance by what we sent.
+  assertEq(startAt, 20)
+  assertEq(attempts, 1)
+  assertEq(trust, true)
+  return (startAt, attempts, trust)
+
+# ---------------------------------------------------------------------------
+# grouped-001 regression: after the latch, a 416 whose Range still lags must
+# recover by advancing to endAt+1 rather than calling nextStartAt on the stale
+# Range (which would raise "Range response header went backwards").
+# ---------------------------------------------------------------------------
+proc test_416_after_trust_sent_position() =
+  let (startAt, _, _) = test_stale_2xx_latches_trust()
+  assertEq(startAt, 20)
+
+  # A post-latch 416 arrives carrying the same stale Range "0-9".
+  let (nextAt, attempts, trust) = resp("416 Range Not Satisfiable", "0-9").nextChunkOffset(
+    startAt           = startAt,
+    endAt             = 29,
+    attempts          = 1,
+    trustSentPosition = true,
+  )
+  assertEq(nextAt, 30)
+  assertEq(attempts, 1)
+  assertEq(trust, true)
+
+# ---------------------------------------------------------------------------
+# The fix must not weaken the legitimate (non-latched) 416 handling: a 416 that
+# keeps reporting the same stale Range is still bounded by the attempt budget
+# and aborts with the "registry rejected chunk" message.
+# ---------------------------------------------------------------------------
+proc test_416_bounded_abort_without_trust() =
+  var (startAt, attempts, trust) = resp("416 Range Not Satisfiable", "0-9").nextChunkOffset(
+    startAt           = 10,
+    endAt             = 19,
+    attempts          = 1,
+    trustSentPosition = false,
+  )
+  assertEq(startAt, 10)
+  assertEq(attempts, 2)
+  assertEq(trust, false)
+
+  assertRaisesMsg("registry rejected chunk at position 10 after 3 attempts"):
+    discard resp("416 Range Not Satisfiable", "0-9").nextChunkOffset(
+      startAt           = startAt,
+      endAt             = 19,
+      attempts          = attempts,
+      trustSentPosition = trust,
+    )
+
+# ---------------------------------------------------------------------------
+# A 416 whose Range advances is retried at the new position without aborting.
+# ---------------------------------------------------------------------------
+proc test_416_advancing_retries() =
+  let (startAt, attempts, trust) = resp("416 Range Not Satisfiable", "0-19").nextChunkOffset(
+    startAt           = 10,
+    endAt             = 19,
+    attempts          = 1,
+    trustSentPosition = false,
+  )
+  assertEq(startAt, 20)
+  assertEq(attempts, 1)
+  assertEq(trust, false)
+
+when isMainModule:
+  test_advancing_range()
+  discard test_stale_2xx_latches_trust()
+  test_416_after_trust_sent_position()
+  test_416_bounded_abort_without_trust()
+  test_416_advancing_retries()
+  echo "test_registry_put_file_stream: all tests passed"
