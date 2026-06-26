@@ -8,16 +8,15 @@ import std/[
   uri,
 ]
 import ".."/[
-  n00b/subproc,
   types,
   utils/base64,
   utils/envvars,
   utils/exe,
   utils/files,
   utils/git,
-  utils/lists,
   utils/redacted,
   utils/strings,
+  utils/lists,
 ]
 import "."/[
   util as dutil,
@@ -54,7 +53,7 @@ proc fetchSshKnownHost(remote: string): string =
     args &= @["-p", uri.port]
   args.add(host)
   trace("Running " & sshKeyscanExeLocation & " " & args.join(" "))
-  let fetched  = subproc.runCommand(sshKeyscanExeLocation, args)
+  let fetched  = runCmdGetEverything(sshKeyscanExeLocation, args)
   if fetched.exitCode != 0:
     return fetched.stdout
   return ""
@@ -117,7 +116,7 @@ proc replaceContextArg*(git: DockerGitContext, args: seq[string]): seq[string] =
 proc run(git:    DockerGitContext,
          args:   seq[string],
          dir:    bool = true,
-         strict: bool = true): n00bProc =
+         strict: bool = true): ExecOutput =
   var
     gitArgs: seq[Redacted] = @[]
     envVars: seq[EnvVar]   = @[]
@@ -163,7 +162,7 @@ proc run(git:    DockerGitContext,
     # therefore the cd here is required so that git operations
     # are isolated in their own directory
     withWorkingDir(git.tmpGitDir):
-      result = subproc.runCommand(getGitExeLocation(), allArgs.raw())
+      result = runCmdGetEverything(getGitExeLocation(), allArgs.raw())
   if strict and result.exitCode != 0:
     error("Failed to run git " & allArgs.redacted().join(" "))
     error(strip(result.stdout & result.stderr))

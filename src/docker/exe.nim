@@ -10,7 +10,6 @@ import std/[
 ]
 import ".."/[
   types,
-  n00b/subproc,
   utils/exe,
   utils/json,
   utils/semver,
@@ -20,8 +19,6 @@ import ".."/[
 import "."/[
   ids,
 ]
-
-export subproc
 
 var
   dockerExeLocation   = ""
@@ -46,15 +43,21 @@ proc getDockerExeLocation*(): string =
 proc runDockerGetEverything*(args: seq[string],
                              stdin = "",
                              silent = true,
-                             ): n00bProc =
-  result = runCommand(
-    getDockerExeLocation(),
-    args,
-    stdin   = stdin,
-    verbose = not silent,
-    capture = {StdOutFD, StdErrFD},
-    proxy   = {StdInFD},
-  )
+                             raiseOnError = false): ExecOutput =
+  let
+    exe = getDockerExeLocation()
+    msg = exe & " " & args.join(" ")
+  if not silent:
+    trace("docker: " & msg)
+    if stdin != "":
+      trace("docker: stdin: \n" & stdin)
+  result = runCmdGetEverything(exe, args, stdin)
+  if not silent and result.exitCode > 0:
+    trace(strutils.strip(result.stderr & result.stdout))
+  if result.exitCode > 0 and raiseOnError:
+    error("docker: " & msg & "\n" & result.stderr)
+    raise newException(ValueError, msg & " - exited with non-zero " & $result.exitCode)
+  return result
 
 proc getBuildXVersion*(): Version =
   once:
