@@ -78,6 +78,16 @@ proc runMungedDockerInvocation*(ctx: DockerInvocation): int =
     trace("docker: stdin: \n" & stdin)
   result = runCmdNoOutputCapture(exe, args, stdin)
 
+proc getAllDockerContexts*(ctx: DockerInvocation): seq[string] =
+  result = @[]
+  if ctx.gitContext != nil:
+    result.add(ctx.gitContext.tmpGitDir)
+  else:
+    if ctx.foundContext != "" and ctx.foundContext != "-":
+      result.add(resolvePath(ctx.foundContext))
+  for k, v in ctx.foundExtraContexts:
+    result.add(resolvePath(v))
+
 proc getUsableDockerContexts*(ctx: DockerInvocation): seq[string] =
   ## Returns local folders that chalk plugins can scan for metadata.
   ## For git contexts this is the raw .git directory, which allows plugins

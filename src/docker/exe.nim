@@ -124,9 +124,9 @@ proc getDockerInfo*(): string =
       return dockerInfo
     let output = runDockerGetEverything(@["info"])
     if output.exitCode != 0:
-      error("docker: could not get docker info " & output.getStderr())
+      error("docker: could not get docker info " & output.stderr)
     else:
-      dockerInfo = output.getStdout()
+      dockerInfo = output.stdout
   return dockerInfo
 
 proc isDockerOverlayFS*(): bool =
@@ -225,7 +225,7 @@ proc getContextName(): string =
       if output.exitCode == 0:
         try:
           let
-            data = output.getStdout.parseJson()
+            data = output.stdout.parseJson()
             name = data{"Name"}.getStr()
           if name != "":
             contextName = name
@@ -252,8 +252,8 @@ proc getBuilderInfo*(ctx: DockerInvocation): string =
         args.add(name)
       let output = runDockerGetEverything(args, silent = false)
       if output.exitCode != 0:
-        trace("docker: could not get buildx builder information: " & output.getStderr())
-      builderInfo = output.getStdout()
+        trace("docker: could not get buildx builder information: " & output.stderr)
+      builderInfo = output.stdout
   return builderInfo
 
 proc getBuildKitVersion*(ctx: DockerInvocation): Version =
@@ -296,7 +296,7 @@ proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
           "-version",
         ])
       if output.exitCode != 0:
-        trace("docker: could not get buildkint frontend versioni " & output.getStderr())
+        trace("docker: could not get buildkint frontend version " & output.stderr)
         frontendVersion = some(parseVersion("0"))
       else:
         let version = getVersionFromLine(output.stdout)
@@ -388,4 +388,4 @@ proc installBinFmt*() =
         "all",
       ])
     if output.exitCode != 0:
-      raise newException(ValueError, "could not install binfmt " & output.getStderr())
+      raise newException(ValueError, "could not install binfmt " & output.stderr)

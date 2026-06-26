@@ -62,6 +62,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+        with:
+          path: chalk
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # 3.3.0
@@ -82,9 +84,11 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
 
       - name: Bake images
+        working-directory: chalk
         run: |
           docker buildx bake chalk --load
 
       - name: Run unit tests
+        working-directory: chalk
         run: |
           make unit-tests
