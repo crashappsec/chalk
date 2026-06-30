@@ -1,5 +1,15 @@
 # Chalk Release Notes
 
+## 1.1.3
+
+### Bug Fixes
+
+- Git metadata collection now uses an embedded libgit2 library instead of
+  hand-parsing git's on-disk format in Nim. The previous implementation did not
+  support all git object types, causing chalk to silently report incomplete git
+  metadata in some repositories.
+  ([#683](https://github.com/crashappsec/chalk/pull/683))
+
 ## 1.1.2
 
 **June 25, 2026**
