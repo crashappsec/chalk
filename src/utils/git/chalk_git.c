@@ -823,6 +823,7 @@ chalk_git_discover_worktree(char *path)
     char           *result = NULL;
 
     git_libgit2_init();
+    git_libgit2_opts(GIT_OPT_SET_OWNER_VALIDATION, 0);
     if (git_repository_discover(&buf, path, 0, NULL) < 0) {
         goto done;
     }
@@ -858,6 +859,7 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     }
 
     git_libgit2_init();
+    git_libgit2_opts(GIT_OPT_SET_OWNER_VALIDATION, 0);
     setup_ssl_certs(chalk_cert_path);
 
     if (git_repository_open(&repo, repo_root) < 0) {
