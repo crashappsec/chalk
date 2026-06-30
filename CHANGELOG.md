@@ -2,6 +2,22 @@
 
 ## 1.1.3
 
+### New Features
+
+- New git working tree keys via embedded libgit2 library.
+  - `VCS_DELETED_FILES` — files present in HEAD that have been deleted in the
+    working tree at chalk time.
+  - `VCS_MODIFIED_FILES` — files tracked by git that have been modified in the
+    working tree or index relative to HEAD.
+  - `VCS_UNTRACKED_FILES` — files present in the working tree that are not
+    tracked by git.
+  - `VCS_DIFF_STAT` — dict with `files`, `insertions`, and `deletions` keys
+    summarising the diff between HEAD and the working tree.
+  - `VCS_DIFF_PATCH` — full unified diff between HEAD and the working tree in
+    standard patch format.
+
+  ([#683](https://github.com/crashappsec/chalk/pull/683))
+
 ### Bug Fixes
 
 - Git metadata collection now uses an embedded libgit2 library instead of
