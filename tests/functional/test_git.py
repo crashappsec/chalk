@@ -1,8 +1,9 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2026, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import os
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -125,6 +126,32 @@ def test_empty_repo(
         TAG_SIGNED=MISSING,
         ORIGIN_URI=MISSING,
         VCS_DIR_WHEN_CHALKED=MISSING,
+    )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_worktree(
+    tmp_data_dir: Path,
+    chalk_copy: Chalk,
+    copy_files: list[Path],
+):
+    git = Git(tmp_data_dir).init(branch="main").add().commit()
+    wt_dir = tmp_data_dir / "wt"
+    git.worktree(wt_dir, branch="feature")
+
+    artifact = wt_dir / copy_files[0].name
+    shutil.copy(copy_files[0], artifact)
+
+    result = chalk_copy.insert(artifact)
+    assert result.mark.has(
+        BRANCH="feature",
+        COMMIT_ID=git.latest_commit,
+        AUTHOR=git.author,
+        COMMITTER=git.committer,
+        DATE_AUTHORED=Iso8601(),
+        DATE_COMMITTED=Iso8601(),
+        VCS_DIR_WHEN_CHALKED=str(wt_dir),
+        ORIGIN_URI="local",
     )
 
 

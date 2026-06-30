@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2025, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -19,6 +19,7 @@ when (NimMinor, NimPatch) >= (6, 14):
 import std/[
   algorithm,
   parseutils,
+  strutils,
   unicode,
 ]
 import "."/[
@@ -456,10 +457,6 @@ proc orderKeys*(dict: ChalkDict,
   result = @[]
   for (_, _, key) in tmp:
     result.add(key)
-
-# %* from the json module; this basically does any escaping
-# we need, which gives us a JsonNode object, that we then convert
-# back to a string, with necessary quotes intact.
 
 proc toJson*(dict: ChalkDict, tplate: string): string =
   result    = ""

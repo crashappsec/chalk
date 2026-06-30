@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2026, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -100,6 +100,10 @@ class Git:
     def pack(self):
         self.run(["git", "gc"])
         return self
+
+    def worktree(self, path: Path, branch: str) -> "Git":
+        self.run(["git", "worktree", "add", "-b", branch, str(path)])
+        return Git(path)
 
     @property
     def latest_commit(self) -> str:
