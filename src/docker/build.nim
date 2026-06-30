@@ -108,7 +108,7 @@ proc processDockerFile(ctx: DockerInvocation) =
       git          = getPluginByName("vctl_git")
       gitPathOpt   = git.gitFirstDir()
     if gitPathOpt.isSome():
-      let repoPath = gitPathOpt.get().parentDir()
+      let repoPath = gitPathOpt.get()
       ctx.vctlDockerFileLoc = getRelativePathBetween(repoPath, ctx.dockerFileLoc)
 
 proc processCmdLine(ctx: DockerInvocation) =
