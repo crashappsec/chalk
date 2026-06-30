@@ -1013,8 +1013,8 @@
 - `DOCKERFILE_PATH` was always reported as `:stdin:` when using docker git
   context, regardless if `Dockerfile` was actually read from `stdin`.
   It will only report `:stdin:` now when reading `Dockerfile` from `stdin`.
-  Otherwise it is omitted and instead ``DOCKERFILE_PATH_WITHIN_VCTL` is
-  reports relative `Dockerfile` path to the remote git context repository.
+  Otherwise it is omitted and instead `DOCKERFILE_PATH_WITHIN_VCTL` is
+  used to report the relative `Dockerfile` path to the remote git context repository.
   ([#523](https://github.com/crashappsec/chalk/pull/523))
 - When any key in confspec fails, error is ignored which allows
   all other confspec keys to be collected. Any single error used to
