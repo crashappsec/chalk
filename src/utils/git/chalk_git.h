@@ -62,6 +62,7 @@ chalk_git_result_t *chalk_git_collect(
     bool  worktree_status,
     bool  diff_stat,
     bool  diff_patch,
+    bool  collect_tags,
     bool  refetch_tags,
     char *chalk_cert_path
 );

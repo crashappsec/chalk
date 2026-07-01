@@ -72,12 +72,19 @@ proc collectVcsData(cache: GitInfo, worktree: string, prefix = ""): ChalkDict =
                      isSubscribedKey(prefix & "VCS_UNTRACKED_FILES"))
     needDiffStat  = isSubscribedKey(prefix & "VCS_DIFF_STAT")
     needDiffPatch = isSubscribedKey(prefix & "VCS_DIFF_PATCH")
-    refetch       = attrGet[bool]("git.refetch_lightweight_tags")
+    needTags      = (isSubscribedKey(prefix & "TAG")             or
+                     isSubscribedKey(prefix & "TAGGER")          or
+                     isSubscribedKey(prefix & "TAG_MESSAGE")      or
+                     isSubscribedKey(prefix & "DATE_TAGGED")      or
+                     isSubscribedKey(prefix & "TIMESTAMP_TAGGED") or
+                     isSubscribedKey(prefix & "TAG_SIGNED"))
+    refetch       = needTags and attrGet[bool]("git.refetch_lightweight_tags")
   result = gitCollect(
     repoRoot       = worktree,
     worktreeStatus = needWorktree,
     diffStat       = needDiffStat,
     diffPatch      = needDiffPatch,
+    collectTags    = needTags,
     refetchTags    = refetch,
   )
   cache.collected[worktree] = result

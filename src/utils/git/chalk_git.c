@@ -879,7 +879,8 @@ done:
 
 chalk_git_result_t *
 chalk_git_collect(char *repo_root, bool worktree_status,
-                  bool diff_stat, bool diff_patch, bool refetch_tags,
+                  bool diff_stat, bool diff_patch,
+                  bool collect_tags, bool refetch_tags,
                   char *chalk_cert_path)
 {
     chalk_git_result_t *result   = calloc(1, sizeof(chalk_git_result_t));
@@ -896,7 +897,7 @@ chalk_git_collect(char *repo_root, bool worktree_status,
 
     git_libgit2_init();
     git_libgit2_opts(GIT_OPT_SET_OWNER_VALIDATION, 0);
-    if (refetch_tags) {
+    if (collect_tags && refetch_tags) {
         setup_ssl_certs(chalk_cert_path);
     }
 
@@ -1005,10 +1006,12 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     }
 
     /* Tags */
-    if (refetch_tags) {
-        refetch_lightweight_tags_on_head(repo, head, git_commit_id(commit));
+    if (collect_tags) {
+        if (refetch_tags) {
+            refetch_lightweight_tags_on_head(repo, head, git_commit_id(commit));
+        }
+        select_latest_tag(&best_tag, result, repo, git_commit_id(commit));
     }
-    select_latest_tag(&best_tag, result, repo, git_commit_id(commit));
 
     if (best_tag.has_value) {
         /* Transfer ownership to result — do not free best_tag fields. */

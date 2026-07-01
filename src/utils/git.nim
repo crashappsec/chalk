@@ -87,6 +87,7 @@ proc chalk_git_collect(
   worktreeStatus: bool,
   diffStat:       bool,
   diffPatch:      bool,
+  collectTags:    bool,
   refetchTags:    bool,
   chalkCertPath:  cstring,
 ): ptr ChalkGitResult {.importc: "chalk_git_collect", cdecl.}
@@ -114,6 +115,7 @@ proc gitCollect*(
     worktreeStatus: bool = false,
     diffStat:       bool = false,
     diffPatch:      bool = false,
+    collectTags:    bool = true,
     refetchTags:    bool = false,
 ): ChalkDict =
   result = ChalkDict()
@@ -122,6 +124,7 @@ proc gitCollect*(
     worktreeStatus = worktreeStatus,
     diffStat       = diffStat or diffPatch,
     diffPatch      = diffPatch,
+    collectTags    = collectTags,
     refetchTags    = refetchTags,
     chalkCertPath  = getGitCertPath().cstring,
   )
