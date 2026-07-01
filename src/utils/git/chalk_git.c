@@ -896,7 +896,9 @@ chalk_git_collect(char *repo_root, bool worktree_status,
 
     git_libgit2_init();
     git_libgit2_opts(GIT_OPT_SET_OWNER_VALIDATION, 0);
-    setup_ssl_certs(chalk_cert_path);
+    if (refetch_tags) {
+        setup_ssl_certs(chalk_cert_path);
+    }
 
     if (git_repository_open(&repo, repo_root) < 0) {
         CAPTURE_GIT_ERROR(result, error_commit, "git_repository_open failed");
