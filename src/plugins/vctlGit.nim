@@ -78,14 +78,18 @@ proc collectVcsData(cache: GitInfo, worktree: string, prefix = ""): ChalkDict =
                      isSubscribedKey(prefix & "DATE_TAGGED")      or
                      isSubscribedKey(prefix & "TIMESTAMP_TAGGED") or
                      isSubscribedKey(prefix & "TAG_SIGNED"))
-    refetch       = needTags and attrGet[bool]("git.refetch_lightweight_tags")
+    refetch           = needTags and attrGet[bool]("git.refetch_lightweight_tags")
+    connectTimeoutMs  = int(attrGet[Con4mDuration]("git.fetch_connect_timeout"))  div 1000
+    transferTimeoutMs = int(attrGet[Con4mDuration]("git.fetch_transfer_timeout")) div 1000
   result = gitCollect(
-    repoRoot       = worktree,
-    worktreeStatus = needWorktree,
-    diffStat       = needDiffStat,
-    diffPatch      = needDiffPatch,
-    collectTags    = needTags,
-    refetchTags    = refetch,
+    repoRoot          = worktree,
+    worktreeStatus    = needWorktree,
+    diffStat          = needDiffStat,
+    diffPatch         = needDiffPatch,
+    collectTags       = needTags,
+    refetchTags       = refetch,
+    connectTimeoutMs  = connectTimeoutMs,
+    transferTimeoutMs = transferTimeoutMs,
   )
   cache.collected[worktree] = result
 

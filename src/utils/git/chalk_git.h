@@ -64,6 +64,8 @@ chalk_git_result_t *chalk_git_collect(
     bool  diff_patch,
     bool  collect_tags,
     bool  refetch_tags,
+    int   connect_timeout_ms,
+    int   transfer_timeout_ms,
     char *chalk_cert_path
 );
 

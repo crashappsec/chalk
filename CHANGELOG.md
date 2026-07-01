@@ -18,6 +18,15 @@
 
   ([#683](https://github.com/crashappsec/chalk/pull/683))
 
+- New `git` configuration fields for controlling network timeouts
+  during lightweight-tag refetch:
+  - `git.fetch_connect_timeout` — maximum time to wait when opening a
+    connection to the remote.
+  - `git.fetch_transfer_timeout` — maximum time allowed for the full
+    data transfer.
+
+  ([#683](https://github.com/crashappsec/chalk/pull/683))
+
 ### Bug Fixes
 
 - Git metadata collection now uses an embedded libgit2 library instead of

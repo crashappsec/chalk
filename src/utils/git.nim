@@ -83,13 +83,15 @@ proc chalk_git_discover_worktree(
 ): cstring {.importc: "chalk_git_discover_worktree", cdecl.}
 
 proc chalk_git_collect(
-  repoRoot:       cstring,
-  worktreeStatus: bool,
-  diffStat:       bool,
-  diffPatch:      bool,
-  collectTags:    bool,
-  refetchTags:    bool,
-  chalkCertPath:  cstring,
+  repoRoot:          cstring,
+  worktreeStatus:    bool,
+  diffStat:          bool,
+  diffPatch:         bool,
+  collectTags:       bool,
+  refetchTags:       bool,
+  connectTimeoutMs:  cint,
+  transferTimeoutMs: cint,
+  chalkCertPath:     cstring,
 ): ptr ChalkGitResult {.importc: "chalk_git_collect", cdecl.}
 
 proc chalk_git_result_free(
@@ -111,22 +113,26 @@ proc gitDiscoverWorkTree*(path: string): string =
   c_free(r)
 
 proc gitCollect*(
-    repoRoot:       string,
-    worktreeStatus: bool = false,
-    diffStat:       bool = false,
-    diffPatch:      bool = false,
-    collectTags:    bool = true,
-    refetchTags:    bool = false,
+    repoRoot:          string,
+    worktreeStatus:    bool = false,
+    diffStat:          bool = false,
+    diffPatch:         bool = false,
+    collectTags:       bool = true,
+    refetchTags:       bool = false,
+    connectTimeoutMs:  int  = 0,
+    transferTimeoutMs: int  = 0,
 ): ChalkDict =
   result = ChalkDict()
   let r = chalk_git_collect(
-    repoRoot       = repoRoot.cstring,
-    worktreeStatus = worktreeStatus,
-    diffStat       = diffStat or diffPatch,
-    diffPatch      = diffPatch,
-    collectTags    = collectTags,
-    refetchTags    = refetchTags,
-    chalkCertPath  = getGitCertPath().cstring,
+    repoRoot          = repoRoot.cstring,
+    worktreeStatus    = worktreeStatus,
+    diffStat          = diffStat or diffPatch,
+    diffPatch         = diffPatch,
+    collectTags       = collectTags,
+    refetchTags       = refetchTags,
+    connectTimeoutMs  = connectTimeoutMs.cint,
+    transferTimeoutMs = transferTimeoutMs.cint,
+    chalkCertPath     = getGitCertPath().cstring,
   )
   if r == nil:
     return

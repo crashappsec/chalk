@@ -46,7 +46,7 @@ static const char gpg_sig_end[]   = "-----END PGP SIGNATURE-----";
  * CApath directories must contain OpenSSL hash-named files (e.g. abc123.0),
  * as created by c_rehash / update-ca-certificates / update-ca-trust. */
 static void
-setup_ssl_certs(const char *chalk_cert_path)
+setup_ssl_certs(chalk_git_result_t *out, const char *chalk_cert_path)
 {
     /* Resolve system cert file: explicit env var takes priority. */
     const char *system_file = getenv("SSL_CERT_FILE");
@@ -89,13 +89,17 @@ setup_ssl_certs(const char *chalk_cert_path)
 
     /* Load system certs (file + dir are both additive, either may be NULL). */
     if (system_file || system_dir) {
-        git_libgit2_opts(GIT_OPT_SET_SSL_CERT_LOCATIONS, system_file, system_dir);
+        if (git_libgit2_opts(GIT_OPT_SET_SSL_CERT_LOCATIONS, system_file, system_dir) < 0) {
+            CAPTURE_GIT_ERROR(out, error_tag, "failed to load system SSL certs");
+        }
     }
 
     /* Load chalk's bundled Mozilla CA store on top of system certs.
      * Additive: does not replace what was loaded above. */
     if (chalk_cert_path && *chalk_cert_path && access(chalk_cert_path, R_OK) == 0) {
-        git_libgit2_opts(GIT_OPT_SET_SSL_CERT_LOCATIONS, chalk_cert_path, NULL);
+        if (git_libgit2_opts(GIT_OPT_SET_SSL_CERT_LOCATIONS, chalk_cert_path, NULL) < 0) {
+            CAPTURE_GIT_ERROR(out, error_tag, "failed to load chalk bundled SSL certs");
+        }
     }
 }
 
@@ -596,8 +600,10 @@ done:
  * the stub lightweight refs created by tools like the GitHub Actions
  * checkout action. */
 static void
-refetch_lightweight_tags_on_head(git_repository *repo, git_reference *head,
-                                  const git_oid *head_oid)
+refetch_lightweight_tags_on_head(chalk_git_result_t *out,
+                                  git_repository *repo, git_reference *head,
+                                  const git_oid *head_oid,
+                                  int connect_timeout_ms, int transfer_timeout_ms)
 {
     git_strarray  tag_names = {0};
     git_remote   *remote    = NULL;
@@ -671,6 +677,13 @@ refetch_lightweight_tags_on_head(git_repository *repo, git_reference *head,
         return;
     }
 
+    if (connect_timeout_ms > 0) {
+        git_libgit2_opts(GIT_OPT_SET_SERVER_CONNECT_TIMEOUT, connect_timeout_ms);
+    }
+    if (transfer_timeout_ms > 0) {
+        git_libgit2_opts(GIT_OPT_SET_SERVER_TIMEOUT, transfer_timeout_ms);
+    }
+
     for (size_t i = 0; i < n_fetch; i++) {
         const char *name       = to_fetch[i];
         size_t      refspec_len = strlen(name) * 2 + strlen("+refs/tags/:refs/tags/") + 1;
@@ -684,7 +697,9 @@ refetch_lightweight_tags_on_head(git_repository *repo, git_reference *head,
         git_strarray     refspecs = {specs, 1};
         git_fetch_options opts    = GIT_FETCH_OPTIONS_INIT;
         opts.download_tags        = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
-        git_remote_fetch(remote, &refspecs, &opts, NULL);
+        if (git_remote_fetch(remote, &refspecs, &opts, NULL) < 0) {
+            CAPTURE_GIT_ERROR(out, error_tag, "git_remote_fetch failed");
+        }
         free(refspec);
     }
 
@@ -881,6 +896,7 @@ chalk_git_result_t *
 chalk_git_collect(char *repo_root, bool worktree_status,
                   bool diff_stat, bool diff_patch,
                   bool collect_tags, bool refetch_tags,
+                  int connect_timeout_ms, int transfer_timeout_ms,
                   char *chalk_cert_path)
 {
     chalk_git_result_t *result   = calloc(1, sizeof(chalk_git_result_t));
@@ -898,7 +914,7 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     git_libgit2_init();
     git_libgit2_opts(GIT_OPT_SET_OWNER_VALIDATION, 0);
     if (collect_tags && refetch_tags) {
-        setup_ssl_certs(chalk_cert_path);
+        setup_ssl_certs(result, chalk_cert_path);
     }
 
     if (git_repository_open(&repo, repo_root) < 0) {
@@ -1008,7 +1024,9 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     /* Tags */
     if (collect_tags) {
         if (refetch_tags) {
-            refetch_lightweight_tags_on_head(repo, head, git_commit_id(commit));
+            refetch_lightweight_tags_on_head(
+              result, repo, head, git_commit_id(commit),
+              connect_timeout_ms, transfer_timeout_ms);
         }
         select_latest_tag(&best_tag, result, repo, git_commit_id(commit));
     }
