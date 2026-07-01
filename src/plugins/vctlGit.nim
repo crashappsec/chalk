@@ -17,8 +17,9 @@ import ".."/[
 ]
 
 type GitInfo = ref object of RootRef
-  repos:    OrderedTable[string, string] # artifact path -> repo worktree root
-  worktrees: OrderedTable[string, bool]  # worktree root -> discovered
+  repos:     OrderedTable[string, string]     # artifact path -> repo worktree root
+  worktrees: OrderedTable[string, bool]       # worktree root -> discovered
+  collected: OrderedTable[string, ChalkDict]  # "worktree|prefix" -> cached result
 
 proc clearCallback(self: Plugin) {.cdecl.} =
   self.internalState = RootRef(GitInfo())
@@ -61,7 +62,9 @@ proc gitFirstDir*(self: Plugin): Option[string] =
     return some(worktree)
   return none(string)
 
-proc setVcsKeys(result: ChalkDict, worktree: string, prefix = "") =
+proc collectVcsData(cache: GitInfo, worktree: string, prefix = ""): ChalkDict =
+  if worktree in cache.collected:
+    return cache.collected[worktree]
   let
     needWorktree  = (isSubscribedKey(prefix & "VCS_MISSING_FILES")   or
                      isSubscribedKey(prefix & "VCS_DELETED_FILES")    or
@@ -70,16 +73,18 @@ proc setVcsKeys(result: ChalkDict, worktree: string, prefix = "") =
     needDiffStat  = isSubscribedKey(prefix & "VCS_DIFF_STAT")
     needDiffPatch = isSubscribedKey(prefix & "VCS_DIFF_PATCH")
     refetch       = attrGet[bool]("git.refetch_lightweight_tags")
-  let data = gitCollect(
+  result = gitCollect(
     repoRoot       = worktree,
     worktreeStatus = needWorktree,
     diffStat       = needDiffStat,
     diffPatch      = needDiffPatch,
     refetchTags    = refetch,
   )
-  for k, v in data:
-    let fullKey = prefix & k
-    result.setIfNeeded(fullKey, v)
+  cache.collected[worktree] = result
+
+proc setVcsKeys(cache: GitInfo, result: ChalkDict, worktree: string, prefix = "") =
+  for k, v in cache.collectVcsData(worktree, prefix):
+    result.setIfNeeded(prefix & k, v)
 
 proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
                                  ChalkDict {.cdecl.} =
@@ -92,13 +97,13 @@ proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
 
   if obj.fsRef == "":
     for worktree, _ in cache.worktrees:
-      result.setVcsKeys(worktree)
+      cache.setVcsKeys(result, worktree)
       break
     return
 
   for worktree, _ in cache.worktrees:
     if obj.isInRepo(worktree):
-      result.setVcsKeys(worktree)
+      cache.setVcsKeys(result, worktree)
       break
 
 proc gitGetRunTimeArtifactInfo*(self:  Plugin,
@@ -122,7 +127,7 @@ proc gitGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]):
   result    = ChalkDict()
   let cache = GitInfo(self.internalState)
   for worktree, _ in cache.worktrees:
-    result.setVcsKeys(worktree, prefix = "_")
+    cache.setVcsKeys(result, worktree, prefix = "_")
     break
 
 proc loadVctlGit*() =
