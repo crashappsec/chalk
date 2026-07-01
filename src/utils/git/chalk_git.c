@@ -385,7 +385,7 @@ resolve_origin(git_repository *repo, git_reference *head)
  * ========================================================================= */
 
 static void
-set_missing_files(chalk_git_result_t *out, git_repository *repo)
+set_status_files(chalk_git_result_t *out, git_repository *repo)
 {
     if (git_repository_is_bare(repo)) {
         return;
@@ -1005,13 +1005,13 @@ chalk_git_collect(char *repo_root, bool worktree_status,
         if (head_rc == GIT_EUNBORNBRANCH || head_rc == GIT_ENOTFOUND) {
             /* Empty repo (no commits yet) -- not an error. */
             if (worktree_status) {
-                set_missing_files(result, repo);
+                set_status_files(result, repo);
             }
             goto cleanup;
         } else if (head_rc < 0) {
             CAPTURE_GIT_ERROR(result, error_commit, "git_repository_head failed");
             if (worktree_status) {
-                set_missing_files(result, repo);
+                set_status_files(result, repo);
             }
             goto cleanup;
         }
@@ -1031,7 +1031,7 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     if (git_reference_peel(&head_obj, head, GIT_OBJECT_COMMIT) < 0) {
         CAPTURE_GIT_ERROR(result, error_commit, "git_reference_peel failed");
         if (worktree_status) {
-            set_missing_files(result, repo);
+            set_status_files(result, repo);
         }
         goto cleanup;
     }
@@ -1102,7 +1102,7 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     }
 
     if (worktree_status) {
-        set_missing_files(result, repo);
+        set_status_files(result, repo);
     }
     if (diff_stat || diff_patch) {
         set_diff_stat(result, repo, commit, diff_patch);
