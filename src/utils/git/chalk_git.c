@@ -966,6 +966,7 @@ chalk_git_discover_worktree(char *path)
 done:
     git_buf_dispose(&buf);
     if (repo) { git_repository_free(repo); }
+    git_libgit2_shutdown();
     return result;
 }
 
