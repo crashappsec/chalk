@@ -310,6 +310,51 @@ trim_tag_message(const char *message, bool *is_signed)
  * Remote / origin resolution.
  * ========================================================================= */
 
+/* Resolve the preferred remote name following the cascade git uses:
+ * branch upstream -> "origin" -> first available.
+ * Returns a strdup'd name or NULL if no remote is configured.
+ * Caller must free(). */
+static char *
+preferred_remote_name(git_repository *repo, git_reference *head)
+{
+    git_buf buf  = GIT_BUF_INIT;
+    char   *name = NULL;
+
+    if (head && git_reference_is_branch(head)) {
+        if (git_branch_upstream_remote(&buf, repo, git_reference_name(head)) == 0
+            && buf.ptr && *buf.ptr)
+        {
+            name = strdup(buf.ptr);
+            goto done;
+        }
+    }
+    {
+        git_remote *r = NULL;
+        if (git_remote_lookup(&r, repo, "origin") == 0) {
+            git_remote_free(r);
+            name = strdup("origin");
+            goto done;
+        }
+    }
+    {
+        git_strarray remotes = {0};
+        if (git_remote_list(&remotes, repo) == 0) {
+            for (size_t i = 0; i < remotes.count; i++) {
+                git_remote *r = NULL;
+                if (git_remote_lookup(&r, repo, remotes.strings[i]) == 0) {
+                    git_remote_free(r);
+                    name = strdup(remotes.strings[i]);
+                    break;
+                }
+            }
+        }
+        git_strarray_free(&remotes);
+    }
+done:
+    git_buf_dispose(&buf);
+    return name;
+}
+
 static char *
 origin_from_remote(git_repository *repo, const char *remote_name)
 {
@@ -329,34 +374,10 @@ origin_from_remote(git_repository *repo, const char *remote_name)
 static char *
 resolve_origin(git_repository *repo, git_reference *head)
 {
-    git_buf  buf    = GIT_BUF_INIT;
-    char    *origin = NULL;
-
-    if (head && git_reference_is_branch(head)) {
-        if (git_branch_upstream_remote(&buf, repo, git_reference_name(head)) == 0) {
-            origin = origin_from_remote(repo, buf.ptr);
-        }
-    }
-    if (!origin) {
-        origin = origin_from_remote(repo, "origin");
-    }
-    if (!origin) {
-        git_strarray remotes = {0};
-        if (git_remote_list(&remotes, repo) == 0 && remotes.count > 0) {
-            for (size_t i = 0; i < remotes.count; i++) {
-                origin = origin_from_remote(repo, remotes.strings[i]);
-                if (origin) {
-                    break;
-                }
-            }
-        }
-        git_strarray_free(&remotes);
-    }
-    git_buf_dispose(&buf);
-    if (!origin) {
-        origin = strdup("local");
-    }
-    return origin;
+    char *name   = preferred_remote_name(repo, head);
+    char *origin = origin_from_remote(repo, name);
+    free(name);
+    return origin ? origin : strdup("local");
 }
 
 /* =========================================================================
@@ -557,8 +578,134 @@ consider_tag(best_tag_t *best, const char *name, int64_t ts_ms,
     best->annotated    = annotated;
 }
 
-static void select_latest_tag(best_tag_t *best, chalk_git_result_t *out,
-                               git_repository *repo, const git_oid *head_oid);
+/* =========================================================================
+ * Tag walking helper.
+ * ========================================================================= */
+
+typedef void (*head_tag_visitor_fn)(
+    const char *tag_name,
+    git_object *target_obj, /* GIT_OBJECT_TAG or GIT_OBJECT_COMMIT */
+    void       *user_data
+);
+
+/* Iterate every tag that peels to head_oid.
+ * For each matching tag, looks up the raw target object and calls visitor.
+ * Returns true if git_tag_list succeeded (visitor may still see zero calls). */
+static bool
+for_each_head_tag(
+    git_repository     *repo,
+    const git_oid      *head_oid,
+    head_tag_visitor_fn visitor,
+    void               *user_data
+)
+{
+    git_strarray tag_names = {0};
+    if (git_tag_list(&tag_names, repo) < 0) {
+        return false;
+    }
+
+    for (size_t i = 0; i < tag_names.count; i++) {
+        const char    *name    = tag_names.strings[i];
+        git_reference *ref     = NULL;
+        git_object    *peeled  = NULL;
+        git_object    *obj     = NULL;
+
+        if (!name) {
+            continue;
+        }
+
+        size_t ref_name_len = strlen("refs/tags/") + strlen(name) + 1;
+        char  *ref_name     = malloc(ref_name_len);
+        if (!ref_name) {
+            continue;
+        }
+        snprintf(ref_name, ref_name_len, "refs/tags/%s", name);
+        bool skip = (git_reference_lookup(&ref, repo, ref_name) < 0);
+        free(ref_name);
+        if (skip) {
+            continue;
+        }
+
+        if (git_reference_peel(&peeled, ref, GIT_OBJECT_COMMIT) < 0 ||
+            git_oid_cmp(git_object_id(peeled), head_oid) != 0)
+        {
+            git_object_free(peeled);
+            git_reference_free(ref);
+            continue;
+        }
+        git_object_free(peeled);
+
+        const git_oid *target_oid = git_reference_target(ref);
+        if (target_oid &&
+            git_object_lookup(&obj, repo, target_oid, GIT_OBJECT_ANY) == 0)
+        {
+            visitor(name, obj, user_data);
+            git_object_free(obj);
+        }
+        git_reference_free(ref);
+    }
+
+    git_strarray_free(&tag_names);
+    return true;
+}
+
+/* Visitor used by select_latest_tag. */
+typedef struct {
+    best_tag_t         *best;
+    chalk_git_result_t *out;
+    git_repository     *repo;
+} select_tag_ctx_t;
+
+static void
+select_tag_visitor(const char *name, git_object *obj, void *user_data)
+{
+    select_tag_ctx_t *ctx = user_data;
+
+    if (git_object_type(obj) == GIT_OBJECT_TAG) {
+        git_tag *tag = NULL;
+        if (git_tag_lookup(&tag, ctx->repo, git_object_id(obj)) == 0) {
+            const git_signature *sig         = git_tag_tagger(tag);
+            char               *tagger_str   = NULL;
+            char               *tag_date_str = NULL;
+            int64_t             ts_ms        = 0;
+
+            if (sig) {
+                tagger_str   = signature_person(sig);
+                tag_date_str = format_iso8601((time_t)sig->when.time,
+                                              (int)sig->when.offset);
+                ts_ms        = (int64_t)sig->when.time * 1000;
+            }
+
+            bool  is_signed = false;
+            char *msg_str   = trim_tag_message(git_tag_message(tag), &is_signed);
+
+            consider_tag(ctx->best, name, ts_ms, is_signed, true,
+                         tagger_str, msg_str, tag_date_str);
+
+            free(tagger_str);
+            free(tag_date_str);
+            free(msg_str);
+            git_tag_free(tag);
+        }
+    }
+    else if (git_object_type(obj) == GIT_OBJECT_COMMIT) {
+        consider_tag(ctx->best, name, 0, false, false, NULL, NULL, NULL);
+    }
+}
+
+/* Visitor used by refetch_lightweight_tags_on_head. */
+typedef struct {
+    str_list_t names;
+} refetch_ctx_t;
+
+static void
+refetch_tag_visitor(const char *name, git_object *obj, void *user_data)
+{
+    refetch_ctx_t *ctx = user_data;
+    if (git_object_type(obj) == GIT_OBJECT_COMMIT) {
+        str_list_append(&ctx->names, name);
+    }
+}
 
 /* =========================================================================
  * Lightweight-tag refetch.
@@ -622,105 +769,34 @@ write_ssh_command_wrapper(void)
 static git_remote *
 resolve_remote_for_fetch(git_repository *repo, git_reference *head)
 {
+    char       *name   = preferred_remote_name(repo, head);
     git_remote *remote = NULL;
-    git_buf     buf    = GIT_BUF_INIT;
-
-    if (head && git_reference_is_branch(head)) {
-        if (git_branch_upstream_remote(&buf, repo, git_reference_name(head)) == 0) {
-            if (git_remote_lookup(&remote, repo, buf.ptr) == 0) {
-                goto done;
-            }
-        }
+    if (name) {
+        git_remote_lookup(&remote, repo, name);
+        free(name);
     }
-    if (!remote && git_remote_lookup(&remote, repo, "origin") == 0) {
-        goto done;
-    }
-    if (!remote) {
-        git_strarray remotes = {0};
-        if (git_remote_list(&remotes, repo) == 0 && remotes.count > 0) {
-            for (size_t i = 0; i < remotes.count; i++) {
-                if (git_remote_lookup(&remote, repo, remotes.strings[i]) == 0) {
-                    break;
-                }
-            }
-        }
-        git_strarray_free(&remotes);
-    }
-done:
-    git_buf_dispose(&buf);
     return remote;
 }
 
-/* Refetch every lightweight tag that points to head_oid from the remote,
- * then re-run select_latest_tag so signed/annotated remote tags win over
- * the stub lightweight refs created by tools like the GitHub Actions
- * checkout action. */
+/* Refetch every lightweight tag on HEAD from the remote so that
+ * signed/annotated remote tags win over the stub lightweight refs created
+ * by tools like the GitHub Actions checkout action.  select_latest_tag is
+ * called by the parent after this returns so it sees the updated refs. */
 static void
 refetch_lightweight_tags_on_head(chalk_git_result_t *out,
                                   git_repository *repo, git_reference *head,
                                   const git_oid *head_oid,
                                   int connect_timeout_ms, int transfer_timeout_ms)
 {
-    git_strarray  tag_names = {0};
-    git_remote   *remote    = NULL;
-    char        **to_fetch  = NULL;
-    size_t        n_fetch   = 0;
+    refetch_ctx_t  ctx      = {0};
+    git_remote    *remote   = NULL;
 
-    if (git_tag_list(&tag_names, repo) < 0) {
-        return;
-    }
+    /* Collect lightweight (commit-target) tag names on HEAD. */
+    for_each_head_tag(repo, head_oid, refetch_tag_visitor, &ctx);
 
-    to_fetch = calloc(tag_names.count, sizeof(char *));
+    size_t  n_fetch  = ctx.names.count;
+    char  **to_fetch = str_list_finish(&ctx.names);
     if (!to_fetch) {
-        git_strarray_free(&tag_names);
-        return;
-    }
-
-    for (size_t i = 0; i < tag_names.count; i++) {
-        const char    *name    = tag_names.strings[i];
-        git_reference *ref     = NULL;
-        git_object    *obj     = NULL;
-        git_object    *peeled  = NULL;
-
-        if (!name) {
-            continue;
-        }
-
-        size_t ref_name_len = strlen("refs/tags/") + strlen(name) + 1;
-        char  *ref_name     = malloc(ref_name_len);
-        if (!ref_name) {
-            continue;
-        }
-        snprintf(ref_name, ref_name_len, "refs/tags/%s", name);
-
-        if (git_reference_lookup(&ref, repo, ref_name) < 0) {
-            free(ref_name);
-            continue;
-        }
-        free(ref_name);
-
-        if (git_reference_peel(&peeled, ref, GIT_OBJECT_COMMIT) < 0 ||
-            git_oid_cmp(git_object_id(peeled), head_oid) != 0) {
-            git_object_free(peeled);
-            git_reference_free(ref);
-            continue;
-        }
-        git_object_free(peeled);
-
-        const git_oid *target_oid = git_reference_target(ref);
-        if (target_oid &&
-            git_object_lookup(&obj, repo, target_oid, GIT_OBJECT_ANY) == 0) {
-            if (git_object_type(obj) == GIT_OBJECT_COMMIT) {
-                to_fetch[n_fetch++] = strdup(name);
-            }
-            git_object_free(obj);
-        }
-        git_reference_free(ref);
-    }
-    git_strarray_free(&tag_names);
-
-    if (n_fetch == 0) {
-        free(to_fetch);
         return;
     }
 
@@ -796,96 +872,10 @@ static void
 select_latest_tag(best_tag_t *best, chalk_git_result_t *out,
                   git_repository *repo, const git_oid *head_oid)
 {
-    git_strarray tag_names = {0};
-    if (git_tag_list(&tag_names, repo) < 0) {
+    select_tag_ctx_t ctx = {best, out, repo};
+    if (!for_each_head_tag(repo, head_oid, select_tag_visitor, &ctx)) {
         CAPTURE_GIT_ERROR(out, error_tag, "git_tag_list failed");
-        return;
     }
-
-    for (size_t i = 0; i < tag_names.count; i++) {
-        const char    *tag_name = tag_names.strings[i];
-        git_reference *ref      = NULL;
-        git_object    *obj      = NULL;
-        git_object    *peeled   = NULL;
-
-        if (!tag_name) {
-            continue;
-        }
-
-        size_t ref_len  = strlen("refs/tags/") + strlen(tag_name) + 1;
-        char  *ref_name = malloc(ref_len);
-        if (!ref_name) {
-            continue;
-        }
-        snprintf(ref_name, ref_len, "refs/tags/%s", tag_name);
-
-        if (git_reference_lookup(&ref, repo, ref_name) < 0) {
-            free(ref_name);
-            continue;
-        }
-        free(ref_name);
-
-        if (git_reference_peel(&peeled, ref, GIT_OBJECT_COMMIT) < 0) {
-            git_reference_free(ref);
-            continue;
-        }
-
-        const git_oid *target_oid = git_object_id(peeled);
-        if (!target_oid || git_oid_cmp(target_oid, head_oid) != 0) {
-            git_object_free(peeled);
-            git_reference_free(ref);
-            continue;
-        }
-
-        {
-            const git_oid *ref_target = git_reference_target(ref);
-            if (!ref_target ||
-                git_object_lookup(&obj, repo, ref_target, GIT_OBJECT_ANY) < 0)
-            {
-                git_object_free(peeled);
-                git_reference_free(ref);
-                continue;
-            }
-        }
-
-        if (git_object_type(obj) == GIT_OBJECT_TAG) {
-            git_tag *tag = NULL;
-            if (git_tag_lookup(&tag, repo, git_object_id(obj)) == 0) {
-                const git_signature *tagger_sig = git_tag_tagger(tag);
-                char   *tagger_str   = NULL;
-                char   *tag_date_str = NULL;
-                int64_t ts_ms        = 0;
-
-                if (tagger_sig) {
-                    tagger_str   = signature_person(tagger_sig);
-                    tag_date_str = format_iso8601((time_t)tagger_sig->when.time,
-                                                  (int)tagger_sig->when.offset);
-                    ts_ms        = (int64_t)tagger_sig->when.time * 1000;
-                }
-
-                bool  is_signed  = false;
-                char *msg_str    = trim_tag_message(git_tag_message(tag),
-                                                    &is_signed);
-
-                consider_tag(best, tag_name, ts_ms, is_signed, true,
-                             tagger_str, msg_str, tag_date_str);
-
-                free(tagger_str);
-                free(tag_date_str);
-                free(msg_str);
-                git_tag_free(tag);
-            }
-        }
-        else if (git_object_type(obj) == GIT_OBJECT_COMMIT) {
-            consider_tag(best, tag_name, 0, false, false, NULL, NULL, NULL);
-        }
-
-        git_object_free(obj);
-        git_object_free(peeled);
-        git_reference_free(ref);
-    }
-
-    git_strarray_free(&tag_names);
 }
 
 /* =========================================================================
