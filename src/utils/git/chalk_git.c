@@ -3,7 +3,7 @@
  *
  * This file is part of Chalk (see https://crashoverride.com/docs/chalk).
  *
- * Git metadata collection via libgit2.  Plain C23, no n00b runtime.
+ * Git metadata collection via libgit2.  C11 + POSIX.1-2008, no n00b runtime.
  * Logic ported from n00b/src/util/git.nc.
  */
 
