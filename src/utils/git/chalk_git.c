@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "chalk_git.h"
@@ -561,7 +562,62 @@ static void select_latest_tag(best_tag_t *best, chalk_git_result_t *out,
 
 /* =========================================================================
  * Lightweight-tag refetch.
+ * =========================================================================
+ *
+ * SSH transport path
+ * ------------------
+ * libgit2 is compiled with USE_SSH=exec, which means it spawns the real SSH
+ * binary rather than linking libssh2.  The exec transport reads $GIT_SSH (or
+ * core.sshCommand) to locate the SSH binary but does NOT read $GIT_SSH_COMMAND
+ * - the latter is the variable that `git` itself and most CI systems use to
+ * pass flags like `-o StrictHostKeyChecking=no` or to select a key file.
+ *
+ * To bridge the gap we write a tiny temporary wrapper script that re-exports
+ * $GIT_SSH_COMMAND and exec's it.  The wrapper is pointed to by $GIT_SSH so
+ * libgit2 runs it instead of ssh directly.  After the fetch the wrapper is
+ * unlinked and $GIT_SSH is cleared.  If $GIT_SSH is already set by the caller
+ * we leave it untouched (they know what they are doing).
+ *
+ * If neither $GIT_SSH_COMMAND nor $GIT_SSH is set the exec transport falls
+ * back to the system `ssh` binary and picks up $SSH_AUTH_SOCK automatically,
+ * so agent forwarding works without any extra configuration.
  * ========================================================================= */
+
+/* Create a temporary wrapper script that bridges $GIT_SSH_COMMAND into
+ * $GIT_SSH so libgit2's exec transport (which reads $GIT_SSH but not
+ * $GIT_SSH_COMMAND) honours the caller's SSH command.  Returns a malloc'd
+ * path to the executable script on success, NULL on failure.
+ * Caller must unlink() and free() the path when done. */
+static char *
+write_ssh_command_wrapper(void)
+{
+    const char *tmpdir = getenv("TMPDIR");
+    if (!tmpdir || !*tmpdir) {
+        tmpdir = "/tmp";
+    }
+    size_t  pathlen = strlen(tmpdir) + sizeof("/chalk_ssh_XXXXXX");
+    char   *path    = malloc(pathlen);
+    if (!path) {
+        return NULL;
+    }
+    snprintf(path, pathlen, "%s/chalk_ssh_XXXXXX", tmpdir);
+
+    int fd = mkstemp(path);
+    if (fd < 0) {
+        free(path);
+        return NULL;
+    }
+    static const char wrapper[] =
+        "#!/bin/sh\nexec sh -c \"$GIT_SSH_COMMAND\" -- \"$@\"\n";
+    ssize_t written = write(fd, wrapper, sizeof(wrapper) - 1);
+    close(fd);
+    if (written < 0 || chmod(path, 0700) < 0) {
+        unlink(path);
+        free(path);
+        return NULL;
+    }
+    return path;
+}
 
 static git_remote *
 resolve_remote_for_fetch(git_repository *repo, git_reference *head)
@@ -684,21 +740,37 @@ refetch_lightweight_tags_on_head(chalk_git_result_t *out,
         git_libgit2_opts(GIT_OPT_SET_SERVER_TIMEOUT, transfer_timeout_ms);
     }
 
+    /* Bridge $GIT_SSH_COMMAND -> $GIT_SSH for libgit2's exec transport.
+     *   - $GIT_SSH already set: caller controls the SSH binary; leave it.
+     *   - $GIT_SSH_COMMAND set (no $GIT_SSH): write a wrapper script that
+     *     execs $GIT_SSH_COMMAND and point $GIT_SSH at it.
+     *   - neither set: exec transport uses system `ssh`; agent forwarding
+     *     works via $SSH_AUTH_SOCK with no extra setup. */
+    char       *ssh_wrapper = NULL;
+    const char *git_ssh_cmd = getenv("GIT_SSH_COMMAND");
+    if (git_ssh_cmd && *git_ssh_cmd && !getenv("GIT_SSH")) {
+        ssh_wrapper = write_ssh_command_wrapper();
+        if (ssh_wrapper) {
+            setenv("GIT_SSH", ssh_wrapper, 1);
+        }
+    }
+
+    git_fetch_options base_opts = GIT_FETCH_OPTIONS_INIT;
+    base_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
+
     for (size_t i = 0; i < n_fetch; i++) {
-        const char *name       = to_fetch[i];
+        const char *name        = to_fetch[i];
         size_t      refspec_len = strlen(name) * 2 + strlen("+refs/tags/:refs/tags/") + 1;
-        char       *refspec    = malloc(refspec_len);
+        char       *refspec     = malloc(refspec_len);
         if (!refspec) {
             continue;
         }
         snprintf(refspec, refspec_len, "+refs/tags/%s:refs/tags/%s", name, name);
 
-        char            *specs[]  = {refspec};
-        git_strarray     refspecs = {specs, 1};
-        git_fetch_options opts    = GIT_FETCH_OPTIONS_INIT;
-        opts.download_tags        = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
-        if (git_remote_fetch(remote, &refspecs, &opts, NULL) < 0) {
-            CAPTURE_GIT_ERROR(out, error_tag, "git_remote_fetch failed");
+        char         *specs[]  = {refspec};
+        git_strarray  refspecs = {specs, 1};
+        if (git_remote_fetch(remote, &refspecs, &base_opts, NULL) < 0) {
+            CAPTURE_GIT_ERROR(out, error_refetch, "git_remote_fetch failed");
         }
         free(refspec);
     }
@@ -708,6 +780,12 @@ refetch_lightweight_tags_on_head(chalk_git_result_t *out,
         free(to_fetch[i]);
     }
     free(to_fetch);
+
+    if (ssh_wrapper) {
+        unsetenv("GIT_SSH");
+        unlink(ssh_wrapper);
+        free(ssh_wrapper);
+    }
 }
 
 /* =========================================================================
@@ -836,6 +914,7 @@ chalk_git_result_free(chalk_git_result_t *r)
     free(r->diff_patch);
     free(r->error_commit);
     free(r->error_tag);
+    free(r->error_refetch);
     free(r->error_status);
     free(r->error_diff);
 
@@ -922,12 +1001,21 @@ chalk_git_collect(char *repo_root, bool worktree_status,
         goto cleanup;
     }
 
-    if (git_repository_head(&head, repo) < 0) {
-        CAPTURE_GIT_ERROR(result, error_commit, "git_repository_head failed");
-        if (worktree_status) {
-            set_missing_files(result, repo);
+    {
+        int head_rc = git_repository_head(&head, repo);
+        if (head_rc == GIT_EUNBORNBRANCH || head_rc == GIT_ENOTFOUND) {
+            /* Empty repo (no commits yet) -- not an error. */
+            if (worktree_status) {
+                set_missing_files(result, repo);
+            }
+            goto cleanup;
+        } else if (head_rc < 0) {
+            CAPTURE_GIT_ERROR(result, error_commit, "git_repository_head failed");
+            if (worktree_status) {
+                set_missing_files(result, repo);
+            }
+            goto cleanup;
         }
-        goto cleanup;
     }
 
     /* BRANCH */

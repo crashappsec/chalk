@@ -33,10 +33,11 @@ typedef struct {
     /* NULL when not requested */
     char    *diff_patch;
     /* Non-NULL when a libgit2 call in the named phase failed. */
-    char    *error_commit;  /* repo open / head resolution / commit peel */
-    char    *error_tag;     /* tag enumeration */
-    char    *error_status;  /* worktree status (vcs_*_files) */
-    char    *error_diff;    /* diff stat / patch */
+    char    *error_commit;   /* repo open / head resolution / commit peel */
+    char    *error_tag;      /* local tag enumeration */
+    char    *error_refetch;  /* remote tag refetch (best-effort; not fatal) */
+    char    *error_status;   /* worktree status (vcs_*_files) */
+    char    *error_diff;     /* diff stat / patch */
 } chalk_git_result_t;
 
 /* Walk up from path to find the enclosing git repository and return its

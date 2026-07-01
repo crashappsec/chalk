@@ -2,6 +2,7 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import hashlib
 import os
 import shutil
 from pathlib import Path
@@ -13,6 +14,11 @@ from .chalk.runner import Chalk
 from .conf import LS_PATH
 from .utils.dict import ANY, MISSING, Iso8601
 from .utils.git import Git
+
+
+def _git_blob_hash(content: bytes) -> str:
+    header = f"blob {len(content)}\0".encode()
+    return hashlib.sha1(header + content).hexdigest()[:7]
 
 
 @pytest.mark.parametrize(
@@ -69,8 +75,10 @@ def test_repo(
         if not empty
         else ""
     )
-    dummy = tmp_data_dir / "dummy"
-    dummy.write_text("hello")
+    deleted = tmp_data_dir / "deleted"
+    deleted.write_text("hello")
+    committed = tmp_data_dir / "committed"
+    committed.write_text("original content")
     git = (
         Git(tmp_data_dir, sign=sign)
         .init(remote=remote, branch="foo/bar")
@@ -83,9 +91,34 @@ def test_repo(
         git.pack()
     if symbolic_ref:
         git.symbolic_ref(f"refs/tags/foo/{random_hex}-2")
-    dummy.unlink()
+    deleted.unlink()
+    committed.write_text("modified content")
+    untracked = tmp_data_dir / "untracked"
+    untracked.write_text("new file")
     artifact = copy_files[0]
     result = chalk_copy.insert(artifact)
+    orig_hash = _git_blob_hash(b"original content")
+    mod_hash = _git_blob_hash(b"modified content")
+    del_hash = _git_blob_hash(b"hello")
+    expected_patch = f"""\
+diff --git a/committed b/committed
+index {orig_hash}..{mod_hash} 100644
+--- a/committed
++++ b/committed
+@@ -1 +1 @@
+-original content
+\\ No newline at end of file
++modified content
+\\ No newline at end of file
+diff --git a/deleted b/deleted
+deleted file mode 100644
+index {del_hash}..0000000
+--- a/deleted
++++ /dev/null
+@@ -1 +0,0 @@
+-hello
+\\ No newline at end of file
+"""
     assert result.mark.has(
         BRANCH="foo/bar" if not symbolic_ref else MISSING,
         COMMIT_ID=ANY,
@@ -102,7 +135,13 @@ def test_repo(
         TAG_MESSAGE=(tag_message if (sign or annotate) and not empty else MISSING),
         ORIGIN_URI=expected_remote or remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
-        VCS_MISSING_FILES=[dummy.name],
+        VCS_MISSING_FILES=[deleted.name],
+        VCS_DELETED_FILES=[deleted.name],
+        VCS_MODIFIED_FILES=[committed.name],
+        VCS_UNTRACKED_FILES=[untracked.name],
+        VCS_DIFF_STAT={"files": 2, "insertions": 1, "deletions": 2},
+        VCS_DIFF_PATCH=expected_patch,
+        _OP_ARTIFACT_PATH_WITHIN_VCTL=artifact.name,
     )
     assert result.report.has(
         _ORIGIN_URI=expected_remote or remote or "local",
@@ -152,6 +191,7 @@ def test_worktree(
         DATE_COMMITTED=Iso8601(),
         VCS_DIR_WHEN_CHALKED=str(wt_dir),
         ORIGIN_URI="local",
+        _OP_ARTIFACT_PATH_WITHIN_VCTL=artifact.name,
     )
 
 

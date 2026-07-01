@@ -13,6 +13,13 @@ from .os import run, which
 
 logger = get_logger()
 
+GIT_NONINTERACTIVE_ENV = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "/bin/true",
+    "SSH_ASKPASS": "/bin/true",
+    "GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+}
+
 
 class Git:
     author = "author <author@test.com>"
@@ -21,7 +28,13 @@ class Git:
     def __init__(self, path: Path, sign: bool = False):
         self.path = path
         self.sign = sign
-        self.run = functools.partial(run, cwd=self.path)
+        # gpg is flaky in CI hence more attempts
+        self.run = functools.partial(
+            run,
+            cwd=self.path,
+            attempts=5,
+            env=GIT_NONINTERACTIVE_ENV,
+        )
 
     def init(
         self,

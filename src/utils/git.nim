@@ -73,6 +73,7 @@ type ChalkGitResult {.importc: "chalk_git_result_t",
   diff_patch:           cstring
   error_commit:         cstring
   error_tag:            cstring
+  error_refetch:        cstring
   error_status:         cstring
   error_diff:           cstring
 
@@ -156,6 +157,16 @@ proc gitCollect*(
       code        = "GIT_COLLECTION_FAILED",
       error       = msg,
       description = "libgit2 failed to collect tag metadata for " & repoRoot,
+    )
+
+  if r.error_refetch != nil:
+    let msg = $r.error_refetch
+    warn("git: tag refetch failed for " & repoRoot & ": " & msg)
+    addFailedKey(
+      "_TAG",
+      code        = "GIT_REFETCH_FAILED",
+      error       = msg,
+      description = "libgit2 failed to refetch lightweight tags from remote for " & repoRoot,
     )
 
   if r.error_status != nil:
