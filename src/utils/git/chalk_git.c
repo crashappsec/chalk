@@ -754,8 +754,13 @@ write_ssh_command_wrapper(void)
         free(path);
         return NULL;
     }
+    /* Splice a literal "$@" onto the -c script so the positional parameters
+     * that libgit2's exec transport appends (the <host> and 'git-upload-pack
+     * <path>') are forwarded to ssh; the backslash-escaped \$ keeps this outer
+     * shell from expanding it, leaving the inner `sh -c` to do so.  Without the
+     * "$@" ssh is invoked with no host and no remote command. */
     static const char wrapper[] =
-        "#!/bin/sh\nexec sh -c \"$GIT_SSH_COMMAND\" -- \"$@\"\n";
+        "#!/bin/sh\nexec sh -c \"$GIT_SSH_COMMAND \\\"\\$@\\\"\" -- \"$@\"\n";
     ssize_t written = write(fd, wrapper, sizeof(wrapper) - 1);
     close(fd);
     if (written < 0 || chmod(path, 0700) < 0) {
