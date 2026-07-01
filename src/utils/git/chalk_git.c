@@ -831,30 +831,38 @@ refetch_lightweight_tags_on_head(chalk_git_result_t *out,
         }
     }
 
-    git_fetch_options base_opts = GIT_FETCH_OPTIONS_INIT;
-    base_opts.download_tags = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
-
+    /* Build all refspecs upfront and issue a single batched fetch. */
+    char **refspec_strs = calloc(n_fetch, sizeof(char *));
+    if (!refspec_strs) {
+        git_remote_free(remote);
+        for (size_t i = 0; i < n_fetch; i++) { free(to_fetch[i]); }
+        free(to_fetch);
+        return;
+    }
     for (size_t i = 0; i < n_fetch; i++) {
         const char *name        = to_fetch[i];
         size_t      refspec_len = strlen(name) * 2 + strlen("+refs/tags/:refs/tags/") + 1;
-        char       *refspec     = malloc(refspec_len);
-        if (!refspec) {
-            continue;
+        refspec_strs[i]         = malloc(refspec_len);
+        if (refspec_strs[i]) {
+            snprintf(refspec_strs[i], refspec_len,
+                     "+refs/tags/%s:refs/tags/%s", name, name);
         }
-        snprintf(refspec, refspec_len, "+refs/tags/%s:refs/tags/%s", name, name);
+    }
 
-        char         *specs[]  = {refspec};
-        git_strarray  refspecs = {specs, 1};
-        if (git_remote_fetch(remote, &refspecs, &base_opts, NULL) < 0) {
-            CAPTURE_GIT_ERROR(out, error_refetch, "git_remote_fetch failed");
-        }
-        free(refspec);
+    git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
+    opts.download_tags     = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
+
+    git_strarray refspecs = {refspec_strs, n_fetch};
+    if (git_remote_fetch(remote, &refspecs, &opts, NULL) < 0) {
+        CAPTURE_GIT_ERROR(out, error_refetch, "git_remote_fetch failed");
     }
 
     git_remote_free(remote);
     for (size_t i = 0; i < n_fetch; i++) {
+        free(refspec_strs[i]);
         free(to_fetch[i]);
     }
+    free(refspec_strs);
     free(to_fetch);
 
     if (ssh_wrapper) {
