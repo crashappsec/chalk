@@ -114,10 +114,19 @@ str_list_append(str_list_t *list, const char *s)
 {
     /* keep cap > count so items[count] is always writable for NULL term */
     if (list->count + 1 >= list->cap) {
-        list->cap   = list->cap ? list->cap * 2 : 8;
-        list->items = realloc(list->items, list->cap * sizeof(char *));
+        size_t  new_cap   = list->cap ? list->cap * 2 : 8;
+        char  **new_items = realloc(list->items, new_cap * sizeof(char *));
+        if (!new_items) {
+            return;
+        }
+        list->items = new_items;
+        list->cap   = new_cap;
     }
-    list->items[list->count++] = strdup(s);
+    char *copy = strdup(s);
+    if (!copy) {
+        return;
+    }
+    list->items[list->count++] = copy;
 }
 
 /* Finalise: write NULL terminator and return ownership to caller.
