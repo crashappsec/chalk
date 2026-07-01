@@ -8,6 +8,9 @@
 ## The plugin responsible for pulling metadata from the git repository
 ## via libgit2 (compiled in via src/utils/git/chalk_git.c).
 
+import std/[
+  sets,
+]
 import ".."/[
   plugin_api,
   run_management,
@@ -17,9 +20,9 @@ import ".."/[
 ]
 
 type GitInfo = ref object of RootRef
-  repos:     OrderedTable[string, string]       # artifact path -> repo worktree root
-  worktrees: OrderedTable[string, bool]         # worktree root -> discovered
-  collected: OrderedTable[string, GitRepoInfo]  # worktree -> cached result
+  repos:     OrderedTable[string, string]      # artifact path -> repo worktree root
+  worktrees: OrderedSet[string]                # discovered worktree roots
+  collected: OrderedTable[string, GitRepoInfo] # worktree -> cached result
 
 proc clearCallback(self: Plugin) {.cdecl.} =
   self.internalState = RootRef(GitInfo())
@@ -35,7 +38,7 @@ proc findAndLoad(plugin: GitInfo, path: string) =
   if worktree == "" or worktree in plugin.worktrees:
     return
   trace("Found git worktree: " & worktree)
-  plugin.worktrees[worktree] = true
+  plugin.worktrees.incl(worktree)
   plugin.repos[path]         = worktree
 
 proc gitInit(self: Plugin) =
@@ -58,7 +61,7 @@ proc getRepoFor*(self: Plugin, path: string): string =
 proc gitFirstDir*(self: Plugin): Option[string] =
   self.gitInit()
   let cache = GitInfo(self.internalState)
-  for worktree, _ in cache.worktrees:
+  for worktree in cache.worktrees:
     return some(worktree)
   return none(string)
 
@@ -213,12 +216,12 @@ proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
     return
 
   if obj.fsRef == "":
-    for worktree, _ in cache.worktrees:
-      cache.setVcsKeys(result, worktree)
-      break
+    let first = self.gitFirstDir()
+    if first.isSome():
+      cache.setVcsKeys(result, first.get())
     return
 
-  for worktree, _ in cache.worktrees:
+  for worktree in cache.worktrees:
     if obj.isInRepo(worktree):
       cache.setVcsKeys(result, worktree)
       break
@@ -232,7 +235,7 @@ proc gitGetRunTimeArtifactInfo*(self:  Plugin,
   if chalk.fsRef == "":
     return
   let cache = GitInfo(self.internalState)
-  for worktree, _ in cache.worktrees:
+  for worktree in cache.worktrees:
     result.setIfNeeded(
       "_OP_ARTIFACT_PATH_WITHIN_VCTL",
       getRelativePathBetween(worktree, chalk.fsRef),
@@ -243,9 +246,9 @@ proc gitGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]):
   self.gitInit()
   result    = ChalkDict()
   let cache = GitInfo(self.internalState)
-  for worktree, _ in cache.worktrees:
-    cache.setVcsKeys(result, worktree, prefix = "_")
-    break
+  let first = self.gitFirstDir()
+  if first.isSome():
+    cache.setVcsKeys(result, first.get(), prefix = "_")
 
 proc loadVctlGit*() =
   newPlugin(
