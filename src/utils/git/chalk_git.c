@@ -233,9 +233,16 @@ sanitize_origin(const char *url)
         return strdup(url);
     }
     const char *auth  = scheme_end + 3;
-    const char *at    = strchr(auth, '@');
     const char *slash = strchr(auth, '/');
-    if (!at || (slash && at > slash)) {
+    /* Search for the LAST '@' in the authority (before the first '/').
+     * Using the first '@' leaks credential bytes when a password/token
+     * contains a literal '@' character. */
+    const char *auth_end = slash ? slash : auth + strlen(auth);
+    const char *at       = NULL;
+    for (const char *p = auth_end - 1; p >= auth; p--) {
+        if (*p == '@') { at = p; break; }
+    }
+    if (!at) {
         return strdup(url);
     }
     size_t      prefix_len = (size_t)(scheme_end - url) + 3;
