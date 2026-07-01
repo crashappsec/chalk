@@ -19,6 +19,16 @@
 
 #include "chalk_git.h"
 
+/* Capture the current libgit2 error into out->field (first error wins). */
+#define CAPTURE_GIT_ERROR(out, field, fallback)                         \
+    do {                                                                \
+        if (!(out)->field) {                                            \
+            const git_error *_ge = git_error_last();                    \
+            (out)->field = strdup((_ge && _ge->message)                 \
+                                  ? _ge->message : (fallback));         \
+        }                                                               \
+    } while (0)
+
 static const char gpg_sig_start[] = "-----BEGIN PGP SIGNATURE-----";
 static const char gpg_sig_end[]   = "-----END PGP SIGNATURE-----";
 
@@ -356,6 +366,7 @@ set_missing_files(chalk_git_result_t *out, git_repository *repo)
     opts.flags  |= GIT_STATUS_OPT_RENAMES_INDEX_TO_WORKDIR;
 
     if (git_status_list_new(&status, repo, &opts) < 0) {
+        CAPTURE_GIT_ERROR(out, error_status, "git_status_list_new failed");
         return;
     }
 
@@ -443,14 +454,17 @@ set_diff_stat(chalk_git_result_t *out, git_repository *repo,
         return;
     }
     if (git_commit_tree(&tree, commit) < 0) {
+        CAPTURE_GIT_ERROR(out, error_diff, "git_commit_tree failed");
         goto cleanup;
     }
 
     git_diff_options diff_opts = GIT_DIFF_OPTIONS_INIT;
     if (git_diff_tree_to_workdir_with_index(&diff, repo, tree, &diff_opts) < 0) {
+        CAPTURE_GIT_ERROR(out, error_diff, "git_diff_tree_to_workdir_with_index failed");
         goto cleanup;
     }
     if (git_diff_get_stats(&stats, diff) < 0) {
+        CAPTURE_GIT_ERROR(out, error_diff, "git_diff_get_stats failed");
         goto cleanup;
     }
 
@@ -529,8 +543,8 @@ consider_tag(best_tag_t *best, const char *name, int64_t ts_ms,
     best->annotated    = annotated;
 }
 
-static void select_latest_tag(best_tag_t *best, git_repository *repo,
-                               const git_oid *head_oid);
+static void select_latest_tag(best_tag_t *best, chalk_git_result_t *out,
+                               git_repository *repo, const git_oid *head_oid);
 
 /* =========================================================================
  * Lightweight-tag refetch.
@@ -677,10 +691,12 @@ refetch_lightweight_tags_on_head(git_repository *repo, git_reference *head,
  * ========================================================================= */
 
 static void
-select_latest_tag(best_tag_t *best, git_repository *repo, const git_oid *head_oid)
+select_latest_tag(best_tag_t *best, chalk_git_result_t *out,
+                  git_repository *repo, const git_oid *head_oid)
 {
     git_strarray tag_names = {0};
     if (git_tag_list(&tag_names, repo) < 0) {
+        CAPTURE_GIT_ERROR(out, error_tag, "git_tag_list failed");
         return;
     }
 
@@ -794,6 +810,10 @@ chalk_git_result_free(chalk_git_result_t *r)
     free(r->tag_message);
     free(r->date_tagged);
     free(r->diff_patch);
+    free(r->error_commit);
+    free(r->error_tag);
+    free(r->error_status);
+    free(r->error_diff);
 
     if (r->vcs_missing_files) {
         for (size_t i = 0; r->vcs_missing_files[i]; i++) {
@@ -870,10 +890,12 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     setup_ssl_certs(chalk_cert_path);
 
     if (git_repository_open(&repo, repo_root) < 0) {
+        CAPTURE_GIT_ERROR(result, error_commit, "git_repository_open failed");
         goto cleanup;
     }
 
     if (git_repository_head(&head, repo) < 0) {
+        CAPTURE_GIT_ERROR(result, error_commit, "git_repository_head failed");
         if (worktree_status) {
             set_missing_files(result, repo);
         }
@@ -892,6 +914,7 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     result->origin_uri = resolve_origin(repo, head);
 
     if (git_reference_peel(&head_obj, head, GIT_OBJECT_COMMIT) < 0) {
+        CAPTURE_GIT_ERROR(result, error_commit, "git_reference_peel failed");
         if (worktree_status) {
             set_missing_files(result, repo);
         }
@@ -974,7 +997,7 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     if (refetch_tags) {
         refetch_lightweight_tags_on_head(repo, head, git_commit_id(commit));
     }
-    select_latest_tag(&best_tag, repo, git_commit_id(commit));
+    select_latest_tag(&best_tag, result, repo, git_commit_id(commit));
 
     if (best_tag.has_value) {
         /* Transfer ownership to result — do not free best_tag fields. */

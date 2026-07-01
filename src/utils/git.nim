@@ -9,6 +9,7 @@ import std/[
   os,
 ]
 import ".."/[
+  run_management,
   types,
 ]
 import "."/[
@@ -70,6 +71,10 @@ type ChalkGitResult {.importc: "chalk_git_result_t",
   diff_stat_insertions: int64
   diff_stat_deletions:  int64
   diff_patch:           cstring
+  error_commit:         cstring
+  error_tag:            cstring
+  error_status:         cstring
+  error_diff:           cstring
 
 proc c_free(p: pointer) {.importc: "free", header: "<stdlib.h>".}
 
@@ -123,6 +128,55 @@ proc gitCollect*(
   if r == nil:
     return
   defer: chalk_git_result_free(r)
+
+  if r.error_commit != nil:
+    let msg = $r.error_commit
+    error("git: commit collection failed for " & repoRoot & ": " & msg)
+    addFailedKey(
+      "_COMMIT_ID",
+      code        = "GIT_COLLECTION_FAILED",
+      error       = msg,
+      description = "libgit2 failed to collect commit metadata for " & repoRoot,
+    )
+
+  if r.error_tag != nil:
+    let msg = $r.error_tag
+    error("git: tag collection failed for " & repoRoot & ": " & msg)
+    addFailedKey(
+      "_TAG",
+      code        = "GIT_COLLECTION_FAILED",
+      error       = msg,
+      description = "libgit2 failed to collect tag metadata for " & repoRoot,
+    )
+
+  if r.error_status != nil:
+    let msg = $r.error_status
+    error("git: worktree status failed for " & repoRoot & ": " & msg)
+    for key in ["_VCS_MISSING_FILES", "_VCS_DELETED_FILES",
+                "_VCS_MODIFIED_FILES", "_VCS_UNTRACKED_FILES"]:
+      addFailedKey(
+        key,
+        code        = "GIT_COLLECTION_FAILED",
+        error       = msg,
+        description = "libgit2 failed to collect worktree status for " & repoRoot,
+      )
+
+  if r.error_diff != nil:
+    let msg = $r.error_diff
+    error("git: diff collection failed for " & repoRoot & ": " & msg)
+    addFailedKey(
+      "_VCS_DIFF_STAT",
+      code        = "GIT_COLLECTION_FAILED",
+      error       = msg,
+      description = "libgit2 failed to collect diff stats for " & repoRoot,
+    )
+    if diffPatch:
+      addFailedKey(
+        "_VCS_DIFF_PATCH",
+        code        = "GIT_COLLECTION_FAILED",
+        error       = msg,
+        description = "libgit2 failed to collect diff patch for " & repoRoot,
+      )
 
   if r.commit_id           != nil: result["COMMIT_ID"]            = pack($r.commit_id)
   if r.author              != nil: result["AUTHOR"]               = pack($r.author)
