@@ -205,16 +205,19 @@ proc gitCollect*(
   if r.branch              != nil: result["BRANCH"]               = pack($r.branch)
   if r.origin_uri          != nil: result["ORIGIN_URI"]           = pack($r.origin_uri)
   if r.vcs_dir             != nil: result["VCS_DIR_WHEN_CHALKED"] = pack($r.vcs_dir)
-  if r.date_authored       != nil: result["DATE_AUTHORED"]        = pack($r.date_authored)
-  if r.date_committed      != nil: result["DATE_COMMITTED"]       = pack($r.date_committed)
-  if r.timestamp_authored  != 0:   result["TIMESTAMP_AUTHORED"]   = pack(r.timestamp_authored)
-  if r.timestamp_committed != 0:   result["TIMESTAMP_COMMITTED"]  = pack(r.timestamp_committed)
+  if r.date_authored  != nil:
+    result["DATE_AUTHORED"]      = pack($r.date_authored)
+    result["TIMESTAMP_AUTHORED"] = pack(r.timestamp_authored)
+  if r.date_committed != nil:
+    result["DATE_COMMITTED"]      = pack($r.date_committed)
+    result["TIMESTAMP_COMMITTED"] = pack(r.timestamp_committed)
   if r.commit_id           != nil: result["COMMIT_SIGNED"]        = pack(r.commit_signed)
   if r.tag                 != nil: result["TAG"]                  = pack($r.tag)
   if r.tagger              != nil: result["TAGGER"]               = pack($r.tagger)
   if r.tag_message         != nil: result["TAG_MESSAGE"]          = pack($r.tag_message)
-  if r.date_tagged         != nil: result["DATE_TAGGED"]          = pack($r.date_tagged)
-  if r.timestamp_tagged    != 0:   result["TIMESTAMP_TAGGED"]     = pack(r.timestamp_tagged)
+  if r.date_tagged != nil:
+    result["DATE_TAGGED"]      = pack($r.date_tagged)
+    result["TIMESTAMP_TAGGED"] = pack(r.timestamp_tagged)
   if r.tag                 != nil: result["TAG_SIGNED"]           = pack(r.tag_signed)
 
   let
