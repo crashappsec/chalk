@@ -143,29 +143,29 @@ proc gitCollect*(
   if r.error_status  != nil: result.errorStatus  = $r.error_status
   if r.error_diff    != nil: result.errorDiff    = $r.error_diff
 
-  if r.commit_id      != nil: result.commitId      = $r.commit_id
-  if r.author         != nil: result.author        = $r.author
-  if r.committer      != nil: result.committer     = $r.committer
-  if r.commit_message != nil: result.commitMessage = $r.commit_message
-  if r.branch         != nil: result.branch        = $r.branch
-  if r.origin_uri     != nil: result.originUri     = $r.origin_uri
-  if r.vcs_dir        != nil: result.vcsDir        = $r.vcs_dir
-  if r.date_authored  != nil:
-    result.dateAuthored       = $r.date_authored
-    result.timestampAuthored  = r.timestamp_authored
-  if r.date_committed != nil:
-    result.dateCommitted      = $r.date_committed
-    result.timestampCommitted = r.timestamp_committed
-  if r.commit_id != nil:
+  if r.branch     != nil: result.branch    = $r.branch
+  if r.origin_uri != nil: result.originUri = $r.origin_uri
+  if r.commit_id  != nil:
+    result.commitId     = $r.commit_id
     result.commitSigned = r.commit_signed
-  if r.tag         != nil: result.tag        = $r.tag
-  if r.tagger      != nil: result.tagger     = $r.tagger
-  if r.tag_message != nil: result.tagMessage = $r.tag_message
-  if r.date_tagged != nil:
-    result.dateTagged      = $r.date_tagged
-    result.timestampTagged = r.timestamp_tagged
+    if r.vcs_dir        != nil: result.vcsDir        = $r.vcs_dir
+    if r.author         != nil: result.author        = $r.author
+    if r.committer      != nil: result.committer     = $r.committer
+    if r.commit_message != nil: result.commitMessage = $r.commit_message
+    if r.date_authored  != nil:
+      result.dateAuthored      = $r.date_authored
+      result.timestampAuthored = r.timestamp_authored
+    if r.date_committed != nil:
+      result.dateCommitted      = $r.date_committed
+      result.timestampCommitted = r.timestamp_committed
   if r.tag != nil:
+    result.tag      = $r.tag
     result.tagSigned = r.tag_signed
+    if r.tagger      != nil: result.tagger     = $r.tagger
+    if r.tag_message != nil: result.tagMessage = $r.tag_message
+    if r.date_tagged != nil:
+      result.dateTagged      = $r.date_tagged
+      result.timestampTagged = r.timestamp_tagged
 
   result.missingFiles   = cstringArrayToSeq(r.vcs_missing_files)
   result.deletedFiles   = cstringArrayToSeq(r.vcs_deleted_files)
