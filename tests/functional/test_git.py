@@ -26,7 +26,7 @@ def _git_blob_hash(content: bytes) -> str:
     [
         ("git@github.com:crashappsec/chalk.git", None, False, False, True, False),
         (
-            "https://octocat:password@github.com/octocat/example.git",
+            "https://octocat:p@ssword@github.com/octocat/example.git",
             "https://github.com/octocat/example.git",
             False,
             False,
