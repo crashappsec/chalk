@@ -16,10 +16,16 @@ var
   default  = getEnv("HOME").joinPath(".local/c0")
   localDir = getEnv("LOCAL_INSTALL_DIR", default)
   libDir   = localdir.joinPath("libs")
-  libs     = ["pcre", "ssl", "crypto", "gumbo", "hatrack", "sodium", "z"]
+  libs     = ["pcre", "ssl", "crypto", "gumbo", "hatrack", "sodium", "z", "git2"]
 
 applyCommonLinkOptions()
 staticLinkLibraries(libs, libDir, muslBase = localDir)
+
+when defined(macosx):
+  # libgit2 is compiled with GSSAPI (Negotiate auth) and iconv support on
+  # macOS, which require these extra link flags.
+  switch("passL", "-framework GSS")
+  switch("passL", "-liconv")
 
 # https://nim-lang.org/docs/nimc.html
 # > --styleCheck:usages

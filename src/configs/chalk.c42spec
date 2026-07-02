@@ -2537,6 +2537,26 @@ singleton git {
 Options how chalk interacts with git.
 """
 
+  field fetch_connect_timeout {
+    type:     Duration
+    default:  << 30 sec >>
+    shortdoc: "Network connection timeout for tag refetch"
+    doc:      """
+Maximum time to wait when opening a connection to the remote during
+lightweight-tag refetch.  Set to << 0 sec >> to disable the timeout.
+"""
+  }
+
+  field fetch_transfer_timeout {
+    type:     Duration
+    default:  << 60 sec >>
+    shortdoc: "Network transfer timeout for tag refetch"
+    doc:      """
+Maximum time allowed for the full data transfer during lightweight-tag
+refetch.  Set to << 0 sec >> to disable the timeout.
+"""
+  }
+
   field refetch_lightweight_tags {
     type:     bool
     default:  true
@@ -2557,6 +2577,13 @@ such as date tagged, tagger, etc.
 
 When this config is true, chalk will refetch lightweight tags (not annotated)
 from the origin to ensure its local definition is up to date.
+
+**SSH remotes:** chalk uses libgit2's exec transport for SSH, which respects
+the same `GIT_SSH_COMMAND` environment variable that `git` itself uses (e.g.
+`GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no"`).
+SSH agent forwarding also works as long as `SSH_AUTH_SOCK` is set.  If neither
+`GIT_SSH_COMMAND` nor `GIT_SSH` is configured, the system `ssh` binary and
+agent are used directly, exactly as when running `git fetch` manually.
 """
   }
 }

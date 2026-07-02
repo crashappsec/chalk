@@ -140,6 +140,39 @@ type
     commentStart*:             string
     resourceTypes*:            set[ResourceType]
 
+  GitRepoInfo* = ref object
+    commitId*:           string
+    author*:             string
+    committer*:          string
+    commitMessage*:      string
+    branch*:             string
+    originUri*:          string
+    vcsDir*:             string
+    dateAuthored*:       string
+    dateCommitted*:      string
+    timestampAuthored*:  int64
+    timestampCommitted*: int64
+    commitSigned*:       bool
+    tag*:                string
+    tagger*:             string
+    tagMessage*:         string
+    dateTagged*:         string
+    timestampTagged*:    int64
+    tagSigned*:          bool
+    missingFiles*:       seq[string]
+    modifiedFiles*:      seq[string]
+    untrackedFiles*:     seq[string]
+    hasDiffStat*:        bool
+    diffStatFiles*:      int64
+    diffStatInsertions*: int64
+    diffStatDeletions*:  int64
+    diffPatch*:          string
+    errorCommit*:        string
+    errorTag*:           string
+    errorRefetch*:       string
+    errorStatus*:        string
+    errorDiff*:          string
+
   AttestationKey* = ref object
     password*:   string
     publicKey*:  string

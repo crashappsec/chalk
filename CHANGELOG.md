@@ -1,5 +1,38 @@
 # Chalk Release Notes
 
+## 1.1.3
+
+### New Features
+
+- New git working tree keys via embedded libgit2 library.
+  - `VCS_MODIFIED_FILES` — files tracked by git that have been modified in the
+    working tree or index relative to HEAD.
+  - `VCS_UNTRACKED_FILES` — files present in the working tree that are not
+    tracked by git.
+  - `VCS_DIFF_STAT` — dict with `files`, `insertions`, and `deletions` keys
+    summarising the diff between HEAD and the working tree.
+  - `VCS_DIFF_PATCH` — full unified diff between HEAD and the working tree in
+    standard patch format.
+
+  ([#683](https://github.com/crashappsec/chalk/pull/683))
+
+- New `git` configuration fields for controlling network timeouts
+  during lightweight-tag refetch:
+  - `git.fetch_connect_timeout` — maximum time to wait when opening a
+    connection to the remote.
+  - `git.fetch_transfer_timeout` — maximum time allowed for the full
+    data transfer.
+
+  ([#683](https://github.com/crashappsec/chalk/pull/683))
+
+### Bug Fixes
+
+- Git metadata collection now uses an embedded libgit2 library instead of
+  hand-parsing git's on-disk format in Nim. The previous implementation did not
+  support all git object types, causing chalk to silently report incomplete git
+  metadata in some repositories.
+  ([#683](https://github.com/crashappsec/chalk/pull/683))
+
 ## 1.1.2
 
 **June 25, 2026**
@@ -1003,8 +1036,8 @@
 - `DOCKERFILE_PATH` was always reported as `:stdin:` when using docker git
   context, regardless if `Dockerfile` was actually read from `stdin`.
   It will only report `:stdin:` now when reading `Dockerfile` from `stdin`.
-  Otherwise it is omitted and instead ``DOCKERFILE_PATH_WITHIN_VCTL` is
-  reports relative `Dockerfile` path to the remote git context repository.
+  Otherwise it is omitted and instead `DOCKERFILE_PATH_WITHIN_VCTL` is
+  used to report the relative `Dockerfile` path to the remote git context repository.
   ([#523](https://github.com/crashappsec/chalk/pull/523))
 - When any key in confspec fails, error is ignored which allows
   all other confspec keys to be collected. Any single error used to

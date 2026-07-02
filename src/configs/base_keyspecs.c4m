@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2025, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "1.1.2"
+chalk_version :=   "1.1.3-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -1305,6 +1305,130 @@ keyspec VCS_MISSING_FILES {
 Reports names of files which are in VCS but are missing on disk during chalk operation.
 If there are missing files, this might indicate CI process is mutating the repo
 before chalking an artifact.
+"""
+}
+
+keyspec VCS_MODIFIED_FILES {
+    kind:     ChalkTimeArtifact
+    type:     list[string]
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Files modified in the working tree since HEAD"
+    doc:      """
+Files tracked by git that have been modified in the working tree or index at
+chalk time relative to HEAD.
+"""
+}
+
+keyspec VCS_UNTRACKED_FILES {
+    kind:     ChalkTimeArtifact
+    type:     list[string]
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Untracked files present in the working tree"
+    doc:      """
+Files present in the working tree that are not tracked by git at chalk time.
+"""
+}
+
+keyspec VCS_DIFF_STAT {
+    kind:     ChalkTimeArtifact
+    type:     dict[string, int]
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Summary diff statistics against HEAD"
+    doc:      """
+A dict with keys "files", "insertions", and "deletions" summarising the diff
+between HEAD and the working tree at chalk time.  Only populated when
+subscribed; collecting it requires a full diff pass.
+
+```json
+{
+  "files":      3,
+  "insertions": 42,
+  "deletions":  7
+}
+```
+"""
+}
+
+keyspec VCS_DIFF_PATCH {
+    kind:     ChalkTimeArtifact
+    type:     string
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Unified diff patch against HEAD"
+    doc:      """
+The full unified diff between HEAD and the working tree at chalk time, in
+standard patch format.  Only populated when subscribed; this can be large.
+"""
+}
+
+keyspec _VCS_MISSING_FILES {
+    kind:     RunTimeHost
+    type:     list[string]
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Which files are in VCS but are missing on disk (runtime)"
+    doc:      """
+Runtime equivalent of VCS_MISSING_FILES, collected at the time of a chalk
+operation such as exec or extract.
+"""
+}
+
+keyspec _VCS_MODIFIED_FILES {
+    kind:     RunTimeHost
+    type:     list[string]
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Files modified in the working tree since HEAD (runtime)"
+    doc:      """
+Runtime equivalent of VCS_MODIFIED_FILES, collected at the time of a chalk
+operation such as exec or extract.
+"""
+}
+
+keyspec _VCS_UNTRACKED_FILES {
+    kind:     RunTimeHost
+    type:     list[string]
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Untracked files present in the working tree (runtime)"
+    doc:      """
+Runtime equivalent of VCS_UNTRACKED_FILES, collected at the time of a chalk
+operation such as exec or extract.
+"""
+}
+
+keyspec _VCS_DIFF_STAT {
+    kind:     RunTimeHost
+    type:     dict[string, int]
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Summary diff statistics against HEAD (runtime)"
+    doc:      """
+Runtime equivalent of VCS_DIFF_STAT, collected at the time of a chalk
+operation such as exec or extract.
+
+```json
+{
+  "files":      3,
+  "insertions": 42,
+  "deletions":  7
+}
+```
+"""
+}
+
+keyspec _VCS_DIFF_PATCH {
+    kind:     RunTimeHost
+    type:     string
+    standard: true
+    since:    "1.1.3"
+    shortdoc: "Unified diff patch against HEAD (runtime)"
+    doc:      """
+Runtime equivalent of VCS_DIFF_PATCH, collected at the time of a chalk
+operation such as exec or extract.  Only populated when subscribed.
 """
 }
 

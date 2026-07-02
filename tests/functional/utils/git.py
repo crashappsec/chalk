@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2026, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -13,6 +13,13 @@ from .os import run, which
 
 logger = get_logger()
 
+GIT_NONINTERACTIVE_ENV = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "/bin/true",
+    "SSH_ASKPASS": "/bin/true",
+    "GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+}
+
 
 class Git:
     author = "author <author@test.com>"
@@ -21,7 +28,13 @@ class Git:
     def __init__(self, path: Path, sign: bool = False):
         self.path = path
         self.sign = sign
-        self.run = functools.partial(run, cwd=self.path)
+        # gpg is flaky in CI hence more attempts
+        self.run = functools.partial(
+            run,
+            cwd=self.path,
+            attempts=5,
+            env=GIT_NONINTERACTIVE_ENV,
+        )
 
     def init(
         self,
@@ -100,6 +113,10 @@ class Git:
     def pack(self):
         self.run(["git", "gc"])
         return self
+
+    def worktree(self, path: Path, branch: str) -> "Git":
+        self.run(["git", "worktree", "add", "-b", branch, str(path)])
+        return Git(path)
 
     @property
     def latest_commit(self) -> str:

@@ -24,6 +24,8 @@ object_store_config server {
 report_template insertion_default {
   key._OP_EXIT_CODE.use     = true
   key._CHALK_RUN_TIME.use   = true
+  key.VCS_DIFF_PATCH.use    = true
+  key._VCS_DIFF_PATCH.use   = true
   # key._IMAGE_SBOM.use       = false
   # key._IMAGE_PROVENANCE.use = false
 }

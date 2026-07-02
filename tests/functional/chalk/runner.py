@@ -17,6 +17,7 @@ from ..utils.cosign import Cosign
 from ..utils.dict import ANY, MISSING, Contains, ContainsDict, ContainsList, IfExists
 from ..utils.docker import Docker, DockerDigests
 from ..utils.log import get_logger
+from ..utils.git import GIT_NONINTERACTIVE_ENV
 from ..utils.os import CalledProcessError, Program, run
 from ..utils.text import valid_json
 
@@ -452,7 +453,7 @@ class Chalk:
                 cmd,
                 expected_exit_code=int(not expected_success),
                 cwd=cwd,
-                env={**self.env, **(env or {})},
+                env={**self.env, **GIT_NONINTERACTIVE_ENV, **(env or {})},
                 stdin=stdin,
                 tty=tty,
             )
