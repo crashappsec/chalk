@@ -47,11 +47,14 @@ char *chalk_git_discover_worktree(char *path);
 /*
  * Collect git metadata for the repository whose worktree root is repo_root.
  *
- * worktree_status  - populate vcs_{missing,deleted,modified,untracked}_files
- * diff_stat        - populate diff_stat_{files,insertions,deletions}
- * diff_patch       - populate diff_patch (implies diff_stat)
- * refetch_tags     - fetch lightweight tags from remote before selecting latest
- * chalk_cert_path  - chalk's bundled Mozilla CA store path (may be NULL)
+ * worktree_status      - populate vcs_{missing,deleted,modified,untracked}_files
+ * diff_stat            - populate diff_stat_{files,insertions,deletions}
+ * diff_patch           - populate diff_patch (implies diff_stat)
+ * collect_tags         - select the latest tag on HEAD and populate its metadata
+ * refetch_tags         - fetch lightweight tags from remote before selecting latest
+ * connect_timeout_ms   - remote connect timeout for tag refetch (ms; 0 = libgit2 default)
+ * transfer_timeout_ms  - remote transfer timeout for tag refetch (ms; 0 = libgit2 default)
+ * chalk_cert_path      - chalk's bundled Mozilla CA store path (may be NULL)
  *
  * Returns a heap-allocated struct on success (even if the path is not a repo;
  * fields will simply be NULL/zero).  Returns NULL only on allocation failure.
