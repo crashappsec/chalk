@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import hashlib
 import os
 import shutil
 from pathlib import Path
@@ -12,13 +11,8 @@ import pytest
 
 from .chalk.runner import Chalk
 from .conf import LS_PATH
-from .utils.dict import ANY, MISSING, Iso8601
+from .utils.dict import ANY, MISSING, Contains, Iso8601
 from .utils.git import Git
-
-
-def _git_blob_hash(content: bytes) -> str:
-    header = f"blob {len(content)}\0".encode()
-    return hashlib.sha1(header + content).hexdigest()[:7]
 
 
 @pytest.mark.parametrize(
@@ -121,94 +115,49 @@ def test_repo(
     untracked2.write_text("another new file")
     artifact = copy_files[0]
     result = chalk_copy.insert(artifact)
-    orig_hash = _git_blob_hash(b"original content")
-    mod_hash = _git_blob_hash(b"modified content")
-    del_hash = _git_blob_hash(b"hello")
-    rename_hash = _git_blob_hash(b"relocated by a bare move")
-    staged_orig_hash = _git_blob_hash(b"staged original")
-    staged_mod_hash = _git_blob_hash(b"staged modified")
-    typechange_hash = _git_blob_hash(b"regular file becoming a symlink")
-    # a symlink blob stores its target path as the file content
-    symlink_hash = _git_blob_hash(wt_mod1.name.encode())
-    wt1_orig_hash = _git_blob_hash(b"wt one original")
-    wt1_mod_hash = _git_blob_hash(b"wt one changed")
-    wt2_orig_hash = _git_blob_hash(b"wt two original")
-    wt2_mod_hash = _git_blob_hash(b"wt two changed")
     # The diff is HEAD-tree vs index+workdir with neither rename detection nor
     # untracked files, so: the bare-mv rename shows only as a deletion of the
     # source (rename_dst is untracked -> absent), and the typechange shows as a
     # deletion of the old regular file plus an addition of the new symlink.
-    # Entries are ordered by path.
-    expected_patch = f"""\
-diff --git a/committed b/committed
-index {orig_hash}..{mod_hash} 100644
---- a/committed
-+++ b/committed
-@@ -1 +1 @@
--original content
-\\ No newline at end of file
-+modified content
-\\ No newline at end of file
-diff --git a/deleted b/deleted
-deleted file mode 100644
-index {del_hash}..0000000
---- a/deleted
-+++ /dev/null
-@@ -1 +0,0 @@
--hello
-\\ No newline at end of file
-diff --git a/rename_src b/rename_src
-deleted file mode 100644
-index {rename_hash}..0000000
---- a/rename_src
-+++ /dev/null
-@@ -1 +0,0 @@
--relocated by a bare move
-\\ No newline at end of file
-diff --git a/staged_mod b/staged_mod
-index {staged_orig_hash}..{staged_mod_hash} 100644
---- a/staged_mod
-+++ b/staged_mod
-@@ -1 +1 @@
--staged original
-\\ No newline at end of file
-+staged modified
-\\ No newline at end of file
-diff --git a/typechange b/typechange
-deleted file mode 100644
-index {typechange_hash}..0000000
---- a/typechange
-+++ /dev/null
-@@ -1 +0,0 @@
--regular file becoming a symlink
-\\ No newline at end of file
-diff --git a/typechange b/typechange
-new file mode 120000
-index 0000000..{symlink_hash}
---- /dev/null
-+++ b/typechange
-@@ -0,0 +1 @@
-+wt_mod1
-\\ No newline at end of file
-diff --git a/wt_mod1 b/wt_mod1
-index {wt1_orig_hash}..{wt1_mod_hash} 100644
---- a/wt_mod1
-+++ b/wt_mod1
-@@ -1 +1 @@
--wt one original
-\\ No newline at end of file
-+wt one changed
-\\ No newline at end of file
-diff --git a/wt_mod2 b/wt_mod2
-index {wt2_orig_hash}..{wt2_mod_hash} 100644
---- a/wt_mod2
-+++ b/wt_mod2
-@@ -1 +1 @@
--wt two original
-\\ No newline at end of file
-+wt two changed
-\\ No newline at end of file
-"""
+    #
+    # VCS_DIFF_PATCH is asserted structurally -- the per-file `diff --git`
+    # headers, the meaningful file-mode / status lines, and the changed +/-
+    # content lines. It intentionally does NOT couple to libgit2/git incidental
+    # formatting (abbreviated blob-hash width, "No newline at end of file"
+    # markers, hunk-header line counts, or delta ordering), which chalk does not
+    # control. VCS_DIFF_STAT below still pins the exact file/insertion/deletion
+    # counts.
+    expected_patch_content = Contains(
+        [
+            # committed: content modified in place
+            "diff --git a/committed b/committed",
+            "-original content",
+            "+modified content",
+            # deleted: removed from the working tree
+            "diff --git a/deleted b/deleted",
+            "deleted file mode 100644",
+            "-hello",
+            # rename_src: bare mv shows only as a deletion of the source
+            "diff --git a/rename_src b/rename_src",
+            "-relocated by a bare move",
+            # staged_mod: staged (index) modification
+            "diff --git a/staged_mod b/staged_mod",
+            "-staged original",
+            "+staged modified",
+            # typechange: old regular file deleted, new symlink added
+            "diff --git a/typechange b/typechange",
+            "-regular file becoming a symlink",
+            "new file mode 120000",
+            "+wt_mod1",
+            # wt_mod1 / wt_mod2: working-tree modifications
+            "diff --git a/wt_mod1 b/wt_mod1",
+            "-wt one original",
+            "+wt one changed",
+            "diff --git a/wt_mod2 b/wt_mod2",
+            "-wt two original",
+            "+wt two changed",
+        ]
+    )
     assert result.mark.has(
         BRANCH="foo/bar" if not symbolic_ref else MISSING,
         COMMIT_ID=ANY,
@@ -236,7 +185,7 @@ index {wt2_orig_hash}..{wt2_mod_hash} 100644
         },
         VCS_UNTRACKED_FILES={untracked.name, untracked2.name},
         VCS_DIFF_STAT={"files": 8, "insertions": 5, "deletions": 7},
-        VCS_DIFF_PATCH=expected_patch,
+        VCS_DIFF_PATCH=expected_patch_content,
         _OP_ARTIFACT_PATH_WITHIN_VCTL=artifact.name,
     )
     assert result.report.has(
