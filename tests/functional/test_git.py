@@ -79,6 +79,17 @@ def test_repo(
     deleted.write_text("hello")
     committed = tmp_data_dir / "committed"
     committed.write_text("original content")
+    staged_mod = tmp_data_dir / "staged_mod"
+    staged_mod.write_text("staged original")
+    wt_mod1 = tmp_data_dir / "wt_mod1"
+    wt_mod1.write_text("wt one original")
+    wt_mod2 = tmp_data_dir / "wt_mod2"
+    wt_mod2.write_text("wt two original")
+    rename_src = tmp_data_dir / "rename_src"
+    rename_src.write_text("relocated by a bare move")
+    rename_dst = tmp_data_dir / "rename_dst"
+    typechange = tmp_data_dir / "typechange"
+    typechange.write_text("regular file becoming a symlink")
     git = (
         Git(tmp_data_dir, sign=sign)
         .init(remote=remote, branch="foo/bar")
@@ -93,13 +104,41 @@ def test_repo(
         git.symbolic_ref(f"refs/tags/foo/{random_hex}-2")
     deleted.unlink()
     committed.write_text("modified content")
+    # staged-only modification -> INDEX_MODIFIED
+    staged_mod.write_text("staged modified")
+    git.run(["git", "add", staged_mod.name])
+    # multiple working-tree modifications -> WT_MODIFIED
+    wt_mod1.write_text("wt one changed")
+    wt_mod2.write_text("wt two changed")
+    # working-tree rename via bare mv -> WT_RENAMED (NOT git mv/INDEX_RENAMED)
+    rename_src.rename(rename_dst)
+    # typechange: tracked regular file replaced by a symlink -> WT_TYPECHANGE
+    typechange.unlink()
+    typechange.symlink_to(wt_mod1.name)
     untracked = tmp_data_dir / "untracked"
     untracked.write_text("new file")
+    untracked2 = tmp_data_dir / "untracked2"
+    untracked2.write_text("another new file")
     artifact = copy_files[0]
     result = chalk_copy.insert(artifact)
     orig_hash = _git_blob_hash(b"original content")
     mod_hash = _git_blob_hash(b"modified content")
     del_hash = _git_blob_hash(b"hello")
+    rename_hash = _git_blob_hash(b"relocated by a bare move")
+    staged_orig_hash = _git_blob_hash(b"staged original")
+    staged_mod_hash = _git_blob_hash(b"staged modified")
+    typechange_hash = _git_blob_hash(b"regular file becoming a symlink")
+    # a symlink blob stores its target path as the file content
+    symlink_hash = _git_blob_hash(wt_mod1.name.encode())
+    wt1_orig_hash = _git_blob_hash(b"wt one original")
+    wt1_mod_hash = _git_blob_hash(b"wt one changed")
+    wt2_orig_hash = _git_blob_hash(b"wt two original")
+    wt2_mod_hash = _git_blob_hash(b"wt two changed")
+    # The diff is HEAD-tree vs index+workdir with neither rename detection nor
+    # untracked files, so: the bare-mv rename shows only as a deletion of the
+    # source (rename_dst is untracked -> absent), and the typechange shows as a
+    # deletion of the old regular file plus an addition of the new symlink.
+    # Entries are ordered by path.
     expected_patch = f"""\
 diff --git a/committed b/committed
 index {orig_hash}..{mod_hash} 100644
@@ -118,6 +157,57 @@ index {del_hash}..0000000
 @@ -1 +0,0 @@
 -hello
 \\ No newline at end of file
+diff --git a/rename_src b/rename_src
+deleted file mode 100644
+index {rename_hash}..0000000
+--- a/rename_src
++++ /dev/null
+@@ -1 +0,0 @@
+-relocated by a bare move
+\\ No newline at end of file
+diff --git a/staged_mod b/staged_mod
+index {staged_orig_hash}..{staged_mod_hash} 100644
+--- a/staged_mod
++++ b/staged_mod
+@@ -1 +1 @@
+-staged original
+\\ No newline at end of file
++staged modified
+\\ No newline at end of file
+diff --git a/typechange b/typechange
+deleted file mode 100644
+index {typechange_hash}..0000000
+--- a/typechange
++++ /dev/null
+@@ -1 +0,0 @@
+-regular file becoming a symlink
+\\ No newline at end of file
+diff --git a/typechange b/typechange
+new file mode 120000
+index 0000000..{symlink_hash}
+--- /dev/null
++++ b/typechange
+@@ -0,0 +1 @@
++wt_mod1
+\\ No newline at end of file
+diff --git a/wt_mod1 b/wt_mod1
+index {wt1_orig_hash}..{wt1_mod_hash} 100644
+--- a/wt_mod1
++++ b/wt_mod1
+@@ -1 +1 @@
+-wt one original
+\\ No newline at end of file
++wt one changed
+\\ No newline at end of file
+diff --git a/wt_mod2 b/wt_mod2
+index {wt2_orig_hash}..{wt2_mod_hash} 100644
+--- a/wt_mod2
++++ b/wt_mod2
+@@ -1 +1 @@
+-wt two original
+\\ No newline at end of file
++wt two changed
+\\ No newline at end of file
 """
     assert result.mark.has(
         BRANCH="foo/bar" if not symbolic_ref else MISSING,
@@ -135,10 +225,17 @@ index {del_hash}..0000000
         TAG_MESSAGE=(tag_message if (sign or annotate) and not empty else MISSING),
         ORIGIN_URI=expected_remote or remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
-        VCS_MISSING_FILES=[deleted.name],
-        VCS_MODIFIED_FILES=[committed.name],
-        VCS_UNTRACKED_FILES=[untracked.name],
-        VCS_DIFF_STAT={"files": 2, "insertions": 1, "deletions": 2},
+        VCS_MISSING_FILES={deleted.name},
+        VCS_MODIFIED_FILES={
+            committed.name,
+            staged_mod.name,
+            wt_mod1.name,
+            wt_mod2.name,
+            rename_dst.name,
+            typechange.name,
+        },
+        VCS_UNTRACKED_FILES={untracked.name, untracked2.name},
+        VCS_DIFF_STAT={"files": 8, "insertions": 5, "deletions": 7},
         VCS_DIFF_PATCH=expected_patch,
         _OP_ARTIFACT_PATH_WITHIN_VCTL=artifact.name,
     )
