@@ -88,10 +88,14 @@ setup_ssl_certs(chalk_git_result_t *out, const char *chalk_cert_path)
         }
     }
 
-    /* Load system certs (file + dir are both additive, either may be NULL). */
+    /* Load system certs (file + dir are both additive, either may be NULL).
+     * setup_ssl_certs only runs on the refetch path, and a cert-load failure
+     * only degrades the best-effort remote refetch, so route it to
+     * error_refetch (a non-fatal warning) rather than error_tag, which is
+     * reserved for local tag enumeration (select_latest_tag). */
     if (system_file || system_dir) {
         if (git_libgit2_opts(GIT_OPT_SET_SSL_CERT_LOCATIONS, system_file, system_dir) < 0) {
-            CAPTURE_GIT_ERROR(out, error_tag, "failed to load system SSL certs");
+            CAPTURE_GIT_ERROR(out, error_refetch, "failed to load system SSL certs");
         }
     }
 
@@ -99,7 +103,7 @@ setup_ssl_certs(chalk_git_result_t *out, const char *chalk_cert_path)
      * Additive: does not replace what was loaded above. */
     if (chalk_cert_path && *chalk_cert_path && access(chalk_cert_path, R_OK) == 0) {
         if (git_libgit2_opts(GIT_OPT_SET_SSL_CERT_LOCATIONS, chalk_cert_path, NULL) < 0) {
-            CAPTURE_GIT_ERROR(out, error_tag, "failed to load chalk bundled SSL certs");
+            CAPTURE_GIT_ERROR(out, error_refetch, "failed to load chalk bundled SSL certs");
         }
     }
 }

@@ -216,3 +216,37 @@ def test_refetch_tag(
         TAG="1-signed",
         TAG_SIGNED=True,
     )
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_tag_refetch_ssl_cert_failure(
+    tmp_data_dir: Path,
+    chalk_copy: Chalk,
+    copy_files: list[Path],
+):
+    # SSL cert setup only runs on the lightweight-tag refetch path, and a
+    # cert-load failure only degrades that best-effort refetch. It must be
+    # attributed to the refetch phase (a non-fatal _TAG GIT_REFETCH_FAILED
+    # warning), NOT surfaced as a hard _TAG GIT_COLLECTION_FAILED, while TAG is
+    # still collected from local tags. Regression guard for SSL cert-setup
+    # failures being misfiled into the tag error channel.
+    bad_cert = tmp_data_dir / "malformed.pem"
+    bad_cert.write_text(
+        "-----BEGIN CERTIFICATE-----\nnot a certificate\n-----END CERTIFICATE-----\n"
+    )
+    # No remote: the tag refetch bails out before fetching, so the SSL
+    # cert-load failure is the only thing that can populate the refetch error
+    # channel -- isolating the misclassification under test.
+    Git(tmp_data_dir).init(branch="main").add().commit().tag("v1.0.0")
+    artifact = copy_files[0]
+    result = chalk_copy.insert(artifact, env={"SSL_CERT_FILE": str(bad_cert)})
+    assert result.mark.has(
+        TAG="v1.0.0",
+        FAILED_KEYS={
+            "_TAG": [
+                {
+                    "code": "GIT_REFETCH_FAILED",
+                },
+            ],
+        },
+    )
