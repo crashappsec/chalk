@@ -21,6 +21,12 @@ var
 applyCommonLinkOptions()
 staticLinkLibraries(libs, libDir, muslBase = localDir)
 
+when defined(macosx):
+  # libgit2 is compiled with GSSAPI (Negotiate auth) and iconv support on
+  # macOS, which require these extra link flags.
+  switch("passL", "-framework GSS")
+  switch("passL", "-liconv")
+
 # https://nim-lang.org/docs/nimc.html
 # > --styleCheck:usages
 # > only enforce consistent spellings of identifiers, do not enforce the style on declarations
