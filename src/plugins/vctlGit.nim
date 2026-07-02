@@ -27,11 +27,6 @@ type GitInfo = ref object of RootRef
 proc clearCallback(self: Plugin) {.cdecl.} =
   self.internalState = RootRef(GitInfo())
 
-proc isInRepo(obj: ChalkObj, repo: string): bool =
-  if obj.fsRef == "":
-    return false
-  return obj.fsRef.resolvePath().startsWith(repo)
-
 proc findAndLoad(plugin: GitInfo, path: string) =
   trace("Looking for git worktree, from: " & path)
   let worktree = gitDiscoverWorkTree(path)
@@ -218,8 +213,9 @@ proc gitGetChalkTimeArtifactInfo(self: Plugin, obj: ChalkObj):
       cache.setVcsKeys(result, first.get())
     return
 
+  let resolved = obj.fsRef.resolvePath()
   for worktree in cache.worktrees:
-    if obj.isInRepo(worktree):
+    if resolved.startsWith(worktree):
       cache.setVcsKeys(result, worktree)
       break
 
@@ -231,12 +227,16 @@ proc gitGetRunTimeArtifactInfo*(self:  Plugin,
   result = ChalkDict()
   if chalk.fsRef == "":
     return
-  let cache = GitInfo(self.internalState)
+  let
+    cache    = GitInfo(self.internalState)
+    resolved = chalk.fsRef.resolvePath()
   for worktree in cache.worktrees:
-    result.setIfNeeded(
-      "_OP_ARTIFACT_PATH_WITHIN_VCTL",
-      getRelativePathBetween(worktree, chalk.fsRef),
-    )
+    if resolved.startsWith(worktree):
+      result.setIfNeeded(
+        "_OP_ARTIFACT_PATH_WITHIN_VCTL",
+        getRelativePathBetween(worktree, chalk.fsRef),
+      )
+      break
 
 proc gitGetRunTimeHostInfo(self: Plugin, chalks: seq[ChalkObj]):
                            ChalkDict {.cdecl.} =
