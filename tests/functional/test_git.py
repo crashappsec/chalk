@@ -136,7 +136,6 @@ index {del_hash}..0000000
         ORIGIN_URI=expected_remote or remote or "local",
         VCS_DIR_WHEN_CHALKED=str(tmp_data_dir),
         VCS_MISSING_FILES=[deleted.name],
-        VCS_DELETED_FILES=[deleted.name],
         VCS_MODIFIED_FILES=[committed.name],
         VCS_UNTRACKED_FILES=[untracked.name],
         VCS_DIFF_STAT={"files": 2, "insertions": 1, "deletions": 2},

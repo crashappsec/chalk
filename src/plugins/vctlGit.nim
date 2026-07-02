@@ -72,7 +72,6 @@ proc collectVcsData(cache: GitInfo, worktree: string): GitRepoInfo =
     # Check both chalk-time and runtime prefixes so collection is not
     # order-dependent (whichever callback fires first gets the full data).
     needWorktree  = (isSubscribedKey("VCS_MISSING_FILES")   or isSubscribedKey("_VCS_MISSING_FILES")   or
-                     isSubscribedKey("VCS_DELETED_FILES")   or isSubscribedKey("_VCS_DELETED_FILES")   or
                      isSubscribedKey("VCS_MODIFIED_FILES")  or isSubscribedKey("_VCS_MODIFIED_FILES")  or
                      isSubscribedKey("VCS_UNTRACKED_FILES") or isSubscribedKey("_VCS_UNTRACKED_FILES"))
     needDiffStat  = (isSubscribedKey("VCS_DIFF_STAT")       or isSubscribedKey("_VCS_DIFF_STAT"))
@@ -129,7 +128,6 @@ proc collectVcsData(cache: GitInfo, worktree: string): GitRepoInfo =
     error("git: worktree status failed for " & worktree & ": " & msg)
     for key in [
       "_VCS_MISSING_FILES",
-      "_VCS_DELETED_FILES",
       "_VCS_MODIFIED_FILES",
       "_VCS_UNTRACKED_FILES",
     ]:
@@ -184,7 +182,6 @@ proc packGitInfo(info: GitRepoInfo, prefix: string): ChalkDict =
   if info.tag != "":
     result.setIfNeeded(prefix & "TAG_SIGNED",          info.tagSigned)
   result.setIfNeeded(prefix & "VCS_MISSING_FILES",   info.missingFiles)
-  result.setIfNeeded(prefix & "VCS_DELETED_FILES",   info.deletedFiles)
   result.setIfNeeded(prefix & "VCS_MODIFIED_FILES",  info.modifiedFiles)
   result.setIfNeeded(prefix & "VCS_UNTRACKED_FILES", info.untrackedFiles)
   if info.hasDiffStat:

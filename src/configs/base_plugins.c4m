@@ -126,7 +126,7 @@ plugin vctl_git {
                       "COMMITTER", "DATE_COMMITTED", "TIMESTAMP_COMMITTED", "COMMIT_MESSAGE",
                       "TAG", "TAG_SIGNED", "TAGGER", "DATE_TAGGED", "TIMESTAMP_TAGGED",
                       "TAG_MESSAGE", "VCS_DIR_WHEN_CHALKED", "VCS_MISSING_FILES",
-                      "VCS_DELETED_FILES", "VCS_MODIFIED_FILES", "VCS_UNTRACKED_FILES",
+                      "VCS_MODIFIED_FILES", "VCS_UNTRACKED_FILES",
                       "VCS_DIFF_STAT", "VCS_DIFF_PATCH"]
     post_chalk_keys: ["_OP_ARTIFACT_PATH_WITHIN_VCTL"]
     post_run_keys:   ["_COMMIT_ID", "_COMMIT_SIGNED",
@@ -135,7 +135,7 @@ plugin vctl_git {
                       "_COMMITTER", "_DATE_COMMITTED", "_TIMESTAMP_COMMITTED", "_COMMIT_MESSAGE",
                       "_TAG", "_TAG_SIGNED", "_TAGGER", "_DATE_TAGGED", "_TIMESTAMP_TAGGED",
                       "_TAG_MESSAGE",
-                      "_VCS_MISSING_FILES", "_VCS_DELETED_FILES", "_VCS_MODIFIED_FILES",
+                      "_VCS_MISSING_FILES", "_VCS_MODIFIED_FILES",
                       "_VCS_UNTRACKED_FILES", "_VCS_DIFF_STAT", "_VCS_DIFF_PATCH"]
     doc: """
 This plugin collects version control information from .git directories

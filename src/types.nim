@@ -160,7 +160,6 @@ type
     timestampTagged*:    int64
     tagSigned*:          bool
     missingFiles*:       seq[string]
-    deletedFiles*:       seq[string]
     modifiedFiles*:      seq[string]
     untrackedFiles*:     seq[string]
     hasDiffStat*:        bool

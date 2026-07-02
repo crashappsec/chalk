@@ -410,7 +410,6 @@ set_status_files(chalk_git_result_t *out, git_repository *repo)
     }
 
     str_list_t missing   = {0};
-    str_list_t deleted   = {0};
     str_list_t untracked = {0};
     str_list_t modified  = {0};
     size_t     count     = git_status_list_entrycount(status);
@@ -438,7 +437,6 @@ set_status_files(chalk_git_result_t *out, git_repository *repo)
             }
             if (path && *path) {
                 str_list_append(&missing, path);
-                str_list_append(&deleted, path);
             }
         }
 
@@ -472,7 +470,6 @@ set_status_files(chalk_git_result_t *out, git_repository *repo)
     git_status_list_free(status);
 
     out->vcs_missing_files   = str_list_finish(&missing);
-    out->vcs_deleted_files   = str_list_finish(&deleted);
     out->vcs_untracked_files = str_list_finish(&untracked);
     out->vcs_modified_files  = str_list_finish(&modified);
 }
@@ -975,12 +972,6 @@ chalk_git_result_free(chalk_git_result_t *r)
             free(r->vcs_missing_files[i]);
         }
         free(r->vcs_missing_files);
-    }
-    if (r->vcs_deleted_files) {
-        for (size_t i = 0; r->vcs_deleted_files[i]; i++) {
-            free(r->vcs_deleted_files[i]);
-        }
-        free(r->vcs_deleted_files);
     }
     if (r->vcs_modified_files) {
         for (size_t i = 0; r->vcs_modified_files[i]; i++) {

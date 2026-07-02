@@ -1308,18 +1308,6 @@ before chalking an artifact.
 """
 }
 
-keyspec VCS_DELETED_FILES {
-    kind:     ChalkTimeArtifact
-    type:     list[string]
-    standard: true
-    since:    "1.1.3"
-    shortdoc: "Files deleted from the working tree since HEAD"
-    doc:      """
-Files present in HEAD that have been deleted in the working tree at chalk time.
-A non-empty list may indicate the CI environment has modified the checkout.
-"""
-}
-
 keyspec VCS_MODIFIED_FILES {
     kind:     ChalkTimeArtifact
     type:     list[string]
@@ -1384,18 +1372,6 @@ keyspec _VCS_MISSING_FILES {
     shortdoc: "Which files are in VCS but are missing on disk (runtime)"
     doc:      """
 Runtime equivalent of VCS_MISSING_FILES, collected at the time of a chalk
-operation such as exec or extract.
-"""
-}
-
-keyspec _VCS_DELETED_FILES {
-    kind:     RunTimeHost
-    type:     list[string]
-    standard: true
-    since:    "1.1.3"
-    shortdoc: "Files deleted from the working tree since HEAD (runtime)"
-    doc:      """
-Runtime equivalent of VCS_DELETED_FILES, collected at the time of a chalk
 operation such as exec or extract.
 """
 }

@@ -62,7 +62,6 @@ type ChalkGitResult {.importc: "chalk_git_result_t",
   timestamp_tagged:     int64
   tag_signed:           bool
   vcs_missing_files:    cstringArray
-  vcs_deleted_files:    cstringArray
   vcs_modified_files:   cstringArray
   vcs_untracked_files:  cstringArray
   diff_stat_files:      int64
@@ -168,7 +167,6 @@ proc gitCollect*(
       result.timestampTagged = r.timestamp_tagged
 
   result.missingFiles   = cstringArrayToSeq(r.vcs_missing_files)
-  result.deletedFiles   = cstringArrayToSeq(r.vcs_deleted_files)
   result.modifiedFiles  = cstringArrayToSeq(r.vcs_modified_files)
   result.untrackedFiles = cstringArrayToSeq(r.vcs_untracked_files)
 

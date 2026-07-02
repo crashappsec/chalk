@@ -23,7 +23,6 @@ typedef struct {
     bool     tag_signed;
     /* NULL-terminated string arrays; NULL when not requested or empty */
     char   **vcs_missing_files;
-    char   **vcs_deleted_files;
     char   **vcs_modified_files;
     char   **vcs_untracked_files;
     /* zero when not requested */

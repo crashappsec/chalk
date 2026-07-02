@@ -5,8 +5,6 @@
 ### New Features
 
 - New git working tree keys via embedded libgit2 library.
-  - `VCS_DELETED_FILES` — files present in HEAD that have been deleted in the
-    working tree at chalk time.
   - `VCS_MODIFIED_FILES` — files tracked by git that have been modified in the
     working tree or index relative to HEAD.
   - `VCS_UNTRACKED_FILES` — files present in the working tree that are not
