@@ -582,6 +582,17 @@ consider_tag(best_tag_t *best, const char *name, int64_t ts_ms,
     best->annotated    = annotated;
 }
 
+/* Free the owned strings in best and zero it back to the initial state. */
+static void
+best_tag_reset(best_tag_t *best)
+{
+    free(best->name);
+    free(best->tagger);
+    free(best->message);
+    free(best->date);
+    *best = (best_tag_t){0};
+}
+
 /* =========================================================================
  * Tag walking helper.
  * ========================================================================= */
@@ -697,18 +708,23 @@ select_tag_visitor(const char *name, git_object *obj, void *user_data)
     }
 }
 
-/* Visitor used by refetch_lightweight_tags_on_head. */
+/* Visitor for the fused refetch+selection walk: performs latest-tag selection
+ * (via select_tag_visitor) AND collects the lightweight (commit-target) tag
+ * names on HEAD, so a single walk over the tag set serves both the refetch
+ * name-collection and the initial selection. */
 typedef struct {
-    str_list_t names;
-} refetch_ctx_t;
+    select_tag_ctx_t select;
+    str_list_t       names;
+} refetch_select_ctx_t;
 
 static void
-refetch_tag_visitor(const char *name, git_object *obj, void *user_data)
+refetch_select_visitor(const char *name, git_object *obj, void *user_data)
 {
-    refetch_ctx_t *ctx = user_data;
+    refetch_select_ctx_t *ctx = user_data;
     if (git_object_type(obj) == GIT_OBJECT_COMMIT) {
         str_list_append(&ctx->names, name);
     }
+    select_tag_visitor(name, obj, &ctx->select);
 }
 
 /* =========================================================================
@@ -787,34 +803,20 @@ resolve_remote_for_fetch(git_repository *repo, git_reference *head)
     return remote;
 }
 
-/* Refetch every lightweight tag on HEAD from the remote so that
+/* Refetch the named lightweight tags on HEAD from the remote so that
  * signed/annotated remote tags win over the stub lightweight refs created
- * by tools like the GitHub Actions checkout action.  select_latest_tag is
- * called by the parent after this returns so it sees the updated refs. */
+ * by tools like the GitHub Actions checkout action.  The caller collects the
+ * tag names (fused with the initial tag-selection walk) and retains ownership
+ * of to_fetch; this issues a single batched fetch.  The caller re-runs
+ * select_latest_tag afterwards so it sees the updated refs. */
 static void
-refetch_lightweight_tags_on_head(chalk_git_result_t *out,
-                                  git_repository *repo, git_reference *head,
-                                  const git_oid *head_oid,
-                                  int connect_timeout_ms, int transfer_timeout_ms)
+refetch_tags_by_name(chalk_git_result_t *out,
+                     git_repository *repo, git_reference *head,
+                     char **to_fetch, size_t n_fetch,
+                     int connect_timeout_ms, int transfer_timeout_ms)
 {
-    refetch_ctx_t  ctx      = {0};
-    git_remote    *remote   = NULL;
-
-    /* Collect lightweight (commit-target) tag names on HEAD. */
-    for_each_head_tag(repo, head_oid, refetch_tag_visitor, &ctx);
-
-    size_t  n_fetch  = ctx.names.count;
-    char  **to_fetch = str_list_finish(&ctx.names);
-    if (!to_fetch) {
-        return;
-    }
-
-    remote = resolve_remote_for_fetch(repo, head);
+    git_remote *remote = resolve_remote_for_fetch(repo, head);
     if (!remote) {
-        for (size_t i = 0; i < n_fetch; i++) {
-            free(to_fetch[i]);
-        }
-        free(to_fetch);
         return;
     }
 
@@ -842,37 +844,32 @@ refetch_lightweight_tags_on_head(chalk_git_result_t *out,
 
     /* Build all refspecs upfront and issue a single batched fetch. */
     char **refspec_strs = calloc(n_fetch, sizeof(char *));
-    if (!refspec_strs) {
-        git_remote_free(remote);
-        for (size_t i = 0; i < n_fetch; i++) { free(to_fetch[i]); }
-        free(to_fetch);
-        return;
-    }
-    for (size_t i = 0; i < n_fetch; i++) {
-        const char *name        = to_fetch[i];
-        size_t      refspec_len = strlen(name) * 2 + strlen("+refs/tags/:refs/tags/") + 1;
-        refspec_strs[i]         = malloc(refspec_len);
-        if (refspec_strs[i]) {
-            snprintf(refspec_strs[i], refspec_len,
-                     "+refs/tags/%s:refs/tags/%s", name, name);
+    if (refspec_strs) {
+        for (size_t i = 0; i < n_fetch; i++) {
+            const char *name        = to_fetch[i];
+            size_t      refspec_len = strlen(name) * 2 + strlen("+refs/tags/:refs/tags/") + 1;
+            refspec_strs[i]         = malloc(refspec_len);
+            if (refspec_strs[i]) {
+                snprintf(refspec_strs[i], refspec_len,
+                         "+refs/tags/%s:refs/tags/%s", name, name);
+            }
         }
-    }
 
-    git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
-    opts.download_tags     = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
+        git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
+        opts.download_tags     = GIT_REMOTE_DOWNLOAD_TAGS_NONE;
 
-    git_strarray refspecs = {refspec_strs, n_fetch};
-    if (git_remote_fetch(remote, &refspecs, &opts, NULL) < 0) {
-        CAPTURE_GIT_ERROR(out, error_refetch, "git_remote_fetch failed");
+        git_strarray refspecs = {refspec_strs, n_fetch};
+        if (git_remote_fetch(remote, &refspecs, &opts, NULL) < 0) {
+            CAPTURE_GIT_ERROR(out, error_refetch, "git_remote_fetch failed");
+        }
+
+        for (size_t i = 0; i < n_fetch; i++) {
+            free(refspec_strs[i]);
+        }
+        free(refspec_strs);
     }
 
     git_remote_free(remote);
-    for (size_t i = 0; i < n_fetch; i++) {
-        free(refspec_strs[i]);
-        free(to_fetch[i]);
-    }
-    free(refspec_strs);
-    free(to_fetch);
 
     if (ssh_wrapper) {
         unsetenv("GIT_SSH");
@@ -893,6 +890,54 @@ select_latest_tag(best_tag_t *best, chalk_git_result_t *out,
     if (!for_each_head_tag(repo, head_oid, select_tag_visitor, &ctx)) {
         CAPTURE_GIT_ERROR(out, error_tag, "git_tag_list failed");
     }
+}
+
+/* Collect the latest tag on HEAD, optionally refetching lightweight tags from
+ * the remote first.
+ *
+ * When refetch is enabled a single fused walk collects the lightweight-on-HEAD
+ * tag names (needed for the refetch) AND performs the initial tag selection.
+ * The tag set is re-walked only when a refetch actually runs -- i.e. HEAD
+ * carries lightweight tags whose refs the fetch may replace with annotated
+ * remote tags.  When HEAD has no lightweight tags (the common case) no fetch
+ * follows, the refs cannot change, and the fused-walk selection is final, so
+ * the tag set is enumerated exactly once instead of twice. */
+static void
+collect_tags_phase(best_tag_t *best, chalk_git_result_t *out,
+                   git_repository *repo, git_reference *head,
+                   const git_oid *head_oid, bool refetch_tags,
+                   int connect_timeout_ms, int transfer_timeout_ms)
+{
+    if (!refetch_tags) {
+        select_latest_tag(best, out, repo, head_oid);
+        return;
+    }
+
+    refetch_select_ctx_t ctx = { .select = {best, out, repo} };
+    if (!for_each_head_tag(repo, head_oid, refetch_select_visitor, &ctx)) {
+        CAPTURE_GIT_ERROR(out, error_tag, "git_tag_list failed");
+    }
+
+    size_t  n_fetch  = ctx.names.count;
+    char  **to_fetch = str_list_finish(&ctx.names);
+    if (!to_fetch) {
+        /* No lightweight tags on HEAD: no remote fetch will follow, so the
+         * refs cannot change and the fused-walk selection is already final. */
+        return;
+    }
+
+    refetch_tags_by_name(out, repo, head, to_fetch, n_fetch,
+                         connect_timeout_ms, transfer_timeout_ms);
+    for (size_t i = 0; i < n_fetch; i++) {
+        free(to_fetch[i]);
+    }
+    free(to_fetch);
+
+    /* The refetch may have replaced lightweight stubs with annotated remote
+     * tags; discard the provisional selection and re-select on the refreshed
+     * refs so select_latest_tag's semantics are preserved exactly. */
+    best_tag_reset(best);
+    select_latest_tag(best, out, repo, head_oid);
 }
 
 /* =========================================================================
@@ -1119,12 +1164,9 @@ chalk_git_collect(char *repo_root, bool worktree_status,
 
     /* Tags */
     if (collect_tags) {
-        if (refetch_tags) {
-            refetch_lightweight_tags_on_head(
-              result, repo, head, git_commit_id(commit),
-              connect_timeout_ms, transfer_timeout_ms);
-        }
-        select_latest_tag(&best_tag, result, repo, git_commit_id(commit));
+        collect_tags_phase(
+          &best_tag, result, repo, head, git_commit_id(commit),
+          refetch_tags, connect_timeout_ms, transfer_timeout_ms);
     }
 
     if (best_tag.has_value) {
@@ -1139,10 +1181,7 @@ chalk_git_collect(char *repo_root, bool worktree_status,
     }
 
 cleanup:
-    free(best_tag.name);
-    free(best_tag.tagger);
-    free(best_tag.message);
-    free(best_tag.date);
+    best_tag_reset(&best_tag);
 
     if (head_obj) { git_object_free(head_obj); }
     if (head)     { git_reference_free(head); }
