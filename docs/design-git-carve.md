@@ -1,5 +1,10 @@
 # Plan: Carving n00b's Git Logic into Chalk (main branch)
 
+> **Historical design note.** This is a point-in-time record of the plan that
+> carved n00b's git logic into chalk. It describes the design as it was shipped;
+> if it ever drifts from the code, the source is authoritative:
+> `src/utils/git.nim`, `src/plugins/vctlGit.nim`, `src/utils/git/chalk_git.c`.
+
 ## Status: COMPLETE
 
 All 15 git functional tests pass. The branch is `libn00b`.
@@ -102,7 +107,7 @@ type usage with struct fields and standard C. Key functions:
 | `maybe_refetch_lightweight_tag` | gated by `refetch_tags` bool (no env var)       |
 | `signature_person`              | `snprintf` into `malloc`'d buffer               |
 | `format_iso8601`                | `strftime` + manual offset formatting           |
-| `set_missing_files`             | populates `char **` arrays via `realloc`        |
+| `set_status_files`              | populates `char **` arrays via `realloc`        |
 | `set_diff_stat`                 | populates `diff_stat_*` fields and `diff_patch` |
 | `resolve_origin`                | populates `origin_uri` field                    |
 | `sanitize_origin`               | strips credentials from http(s) URLs            |
@@ -156,7 +161,7 @@ proc gitCollect*(
     diffStat:       bool = false,
     diffPatch:      bool = false,
     refetchTags:    bool = false,
-): ChalkDict
+): GitRepoInfo
 ```
 
 `gitCollect` maps every non-nil / non-zero struct field to a chalk key.
@@ -180,7 +185,7 @@ config parser, `RepoInfo`, `GitTag`, `findGitDir`, etc.).
 ```nim
 type GitInfo = ref object of RootRef
   repos:     OrderedTable[string, string]  # artifact path -> worktree root
-  worktrees: OrderedTable[string, bool]    # worktree root -> discovered
+  worktrees: OrderedSet[string]            # discovered worktree roots
 ```
 
 **Discovery** uses `gitDiscoverWorkTree(path)` (libgit2 walk) instead of the
