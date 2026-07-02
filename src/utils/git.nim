@@ -166,9 +166,9 @@ proc gitCollect*(
       result.dateTagged      = $r.date_tagged
       result.timestampTagged = r.timestamp_tagged
 
-  result.missingFiles   = cstringArrayToSeq(r.vcs_missing_files)
-  result.modifiedFiles  = cstringArrayToSeq(r.vcs_modified_files)
-  result.untrackedFiles = cstringArrayToSeq(r.vcs_untracked_files)
+  if r.vcs_missing_files   != nil: result.missingFiles   = cstringArrayToSeq(r.vcs_missing_files)
+  if r.vcs_modified_files  != nil: result.modifiedFiles  = cstringArrayToSeq(r.vcs_modified_files)
+  if r.vcs_untracked_files != nil: result.untrackedFiles = cstringArrayToSeq(r.vcs_untracked_files)
 
   if r.commit_id != nil and (diffStat or diffPatch):
     result.hasDiffStat        = true
