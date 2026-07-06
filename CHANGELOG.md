@@ -2,6 +2,8 @@
 
 ## 1.1.3
 
+**July 6, 2026**
+
 ### New Features
 
 - New git working tree keys via embedded libgit2 library.
