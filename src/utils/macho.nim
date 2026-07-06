@@ -176,6 +176,9 @@ proc chalk_macho_signature_kind(bin: MachoBinary): cint
 proc chalk_macho_strip_signature(bin: MachoBinary): cint
   {.importc, cdecl, header: "chalk_macho.h".}
 
+proc chalk_macho_lc_slack(bin: MachoBinary): csize_t
+  {.importc, cdecl, header: "chalk_macho.h".}
+
 proc c_free(p: pointer) {.importc: "free", header: "<stdlib.h>".}
 
 # ---------------------------------------------------------------------------
@@ -341,6 +344,19 @@ proc getChalkPayload*(self: ParsedMacho): string =
   if size > 0:
     copyMem(addr result[0], p, size.int)
   c_free(p)
+
+proc lcSlack*(self: ParsedMacho): int =
+  ## Bytes of load-command slack between lc_end and the first file-backed
+  ## section.  0 if there is none.  Returns high(int) when no sections
+  ## constrain the LC region (the C side signals this with SIZE_MAX).
+  if self == nil or self.bin == nil:
+    return 0
+  let raw = chalk_macho_lc_slack(self.bin)
+  # The C side uses SIZE_MAX as a sentinel for "no section constraint."
+  # Any value that would overflow a signed int is treated as unlimited.
+  if raw > csize_t(high(int)):
+    return high(int)
+  return int(raw)
 
 iterator notes*(self: ParsedMacho): tuple[owner: string,
                                            payload: string] =

@@ -240,6 +240,19 @@ extern chalk_macho_status_t chalk_macho_unchalked_hash(macho_binary_t *bin,
                                                        char out_hex[65]);
 
 /**
+ * @brief Return the load-command slack (bytes between lc_end and the
+ *        first file-backed section).
+ *
+ * chalk uses this at scan time to decide whether a fresh 40-byte
+ * LC_NOTE can be inserted without clashing with section data.
+ *
+ * @return Slack in bytes.  0 if there is no slack or bin is NULL.
+ *         SIZE_MAX if no file-backed sections constrain the LC region
+ *         (treat as "unconstrained / unlimited").
+ */
+extern size_t chalk_macho_lc_slack(macho_binary_t *bin);
+
+/**
  * @brief Retrieve the (possibly mutated) raw bytes of a binary.
  *
  * After chalk_macho_add_note / remove_note, callers use this to
