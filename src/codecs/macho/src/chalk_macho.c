@@ -903,6 +903,34 @@ chalk_macho_strip_signature(macho_binary_t *bin)
     return CHALK_MACHO_OK;
 }
 
+// ============================================================================
+// chalk_macho_lc_slack
+// ============================================================================
+
+size_t
+chalk_macho_lc_slack(macho_binary_t *bin)
+{
+    if (!bin) {
+        return 0;
+    }
+
+    macho_layout_t layout;
+
+    compute_layout(bin, &layout);
+
+    if (layout.first_section == SIZE_MAX) {
+        // No file-backed sections; no section-derived constraint on the
+        // LC region.  Return SIZE_MAX as a sentinel meaning "unlimited."
+        return SIZE_MAX;
+    }
+
+    if (layout.first_section <= layout.lc_end) {
+        return 0;
+    }
+
+    return layout.first_section - layout.lc_end;
+}
+
 chalk_macho_status_t
 chalk_macho_add_note(macho_binary_t *bin,
                      const uint8_t *payload, size_t payload_size)

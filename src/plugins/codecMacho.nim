@@ -174,6 +174,26 @@ proc machoScan*(self: Plugin, path: string): Option[ChalkObj] {.cdecl.} =
     warn(path & ": did not find either codesign or rcodesign to adhoc sign - deferring to wrapper")
     return none(ChalkObj)
 
+  # For any fresh chalking, verify there is enough pre-strip LC header
+  # padding.  The minimum is 40 bytes regardless of signature kind:
+  #   csNone:  no strip, no resign → addChalkNote costs 40 B.
+  #   csAdhoc: strip_signature frees 16 B, addChalkNote costs 40 B,
+  #            codesign re-inserts LC_CODE_SIGNATURE for 16 B → net 40 B.
+  # (csRealCert/csMalformed are rejected above and never reach here.)
+  # Without this guard, binaries compiled without -headerpad,0x1000 may
+  # have only 24-39 B of slack (csAdhoc: passes the post-strip C-side
+  # check but leaves codesign no room, producing a silently broken
+  # binary; csNone: the C-side check correctly fails but machoScan has
+  # already claimed the artifact, so the wrapper never gets to try).
+  if isChalkingOp() and not hasChalkNote:
+    let slack = parsed.lcSlack()
+    if slack < 40:
+      trace(
+        path & ": LC header padding too small (" &
+        $slack & " B available, 40 B required); deferring to wrapper codec",
+      )
+      return none(ChalkObj)
+
   # Build a ChalkObj.  If a chalk note is already present, extract
   # its payload as the existing chalk mark.
   let cache = MachoCache(
@@ -286,9 +306,7 @@ proc machoHandleWrite*(self: Plugin, chalk: ChalkObj,
   if st != cmOk:
     case st
     of cmNoLcSlack:
-      warn(chalk.name & ": insufficient load-command slack for " &
-           "in-place LC_NOTE insert; deferring to wrapper would " &
-           "require re-running chalk after this codec is disabled")
+      warn(chalk.name & ": insufficient load-command slack for in-place LC_NOTE insert")
     of cmFat:
       warn(chalk.name & ": fat Mach-O not supported by native codec")
     else:

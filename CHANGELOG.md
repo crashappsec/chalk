@@ -27,6 +27,14 @@
 
 ### Bug Fixes
 
+- Mach-O codec now correctly falls back to the script-wrapper codec for
+  binaries compiled without `-headerpad,0x1000`. Previously, binaries with
+  24–39 bytes of LC header padding were silently corrupted: the codec appeared
+  to mark them successfully, but `codesign` had no room to re-insert
+  `LC_CODE_SIGNATURE` after the 40-byte `LC_NOTE` was added, producing a binary
+  that failed to run on macOS.
+  ([#684](https://github.com/crashappsec/chalk/pull/684))
+
 - Git metadata collection now uses an embedded libgit2 library instead of
   hand-parsing git's on-disk format in Nim. The previous implementation did not
   support all git object types, causing chalk to silently report incomplete git
