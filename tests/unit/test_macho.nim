@@ -6,18 +6,26 @@
 ##   - stripSignature → addChalkNote → reparse → recover payload.
 ##   - unchalkedHash invariance across mark / unmark.
 ##   - removeChalkNote round-trip.
+##   - lcSlack() reports < 40 for a binary with tight LC header padding
+##     (macho_arm64_no_lc_slack.bin), confirming it would be deferred to
+##     the script wrapper codec instead of being marked natively.
 ##
-## Fixture: tests/unit/fixtures/macho_arm64_adhoc.bin — a tiny
-## clang-compiled "hello" binary, ad-hoc-signed by the linker, with
-## headerpad room for LC_NOTE insertion.  Committed so Linux CI
-## runners have something to test against.
+## Fixtures (tests/unit/fixtures/):
+##   macho_arm64_adhoc.bin       — tiny clang hello, ad-hoc-signed, with
+##                                  headerpad room for LC_NOTE insertion.
+##   macho_arm64_no_lc_slack.bin — same binary with sizeofcmds bumped so
+##                                  LC header slack == 32 B (< 40 threshold);
+##                                  the native codec must defer to the wrapper.
+##
+## Both committed so Linux CI runners have something to test against.
 
 import ../../src/utils/macho
 
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
 
-const fixtureBytes = staticRead("fixtures/macho_arm64_adhoc.bin")
+const fixtureBytes        = staticRead("fixtures/macho_arm64_adhoc.bin")
+const noSlackFixtureBytes = staticRead("fixtures/macho_arm64_no_lc_slack.bin")
 
 proc isMagic(s: string): bool =
   var arr: array[4, char]
@@ -75,5 +83,16 @@ proc main() =
   let rereparsed = parseMacho(stripped)
   doAssert rereparsed != nil
   assertEq(rereparsed.getChalkPayload(), "")
+
+  # ---- no-lc-slack fixture: parse + slack check ----
+  # macho_arm64_no_lc_slack.bin has sizeofcmds patched up by 64 bytes so
+  # that only 32 bytes of LC header slack remain.  The native codec guard
+  # (codecMacho.nim) checks lcSlack() < 40 and defers to the script wrapper
+  # rather than attempting (and silently corrupting) a native mark.
+  let noSlackParsed = parseMacho(noSlackFixtureBytes)
+  doAssert noSlackParsed != nil, "parseMacho failed on no-lc-slack fixture"
+  let slack = noSlackParsed.lcSlack()
+  doAssert slack < 40, "expected lcSlack < 40, got " & $slack
+  doAssert noSlackParsed.signatureKind() == csAdhoc, "expected csAdhoc"
 
 main()
