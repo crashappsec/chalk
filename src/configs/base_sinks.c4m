@@ -190,6 +190,11 @@ content-type field will be `application/json`. Changing this value
 doesn't change what is posted; it is only there in case a particular
 endpoint requires a different value.
 
+Chalk always includes the following headers in every POST request:
+
+* `X-Chalk-Version` - version of chalk sending the report
+* `X-Chalk-Action-Id` - action ID of this chalk run (same as `_ACTION_ID`)
+
 If HTTPS is used, the connection will fail if the server doesn't have
 a valid certificate. Unless you provide a specific certificate via the
 `pinned_cert_file` field, self-signed certificates will not be
@@ -237,18 +242,34 @@ sink presign {
   ~auth:                 false
   shortdoc:              "HTTP/HTTPS Presign PUT"
   doc:                   """
-Sink which allows to upload reports to pre-signed URL.
+Sink which allows to upload reports to a pre-signed URL.
 
-All parameters are identical as `post` sink.
+All parameters are identical to the `post` sink.
 
-Pre-sign flow is as follows:
+Pre-sign flow:
 
-1. Send PUT to URI (without report)
-2. Receive 302/307 redirect with pre-signed URI in Location header
-3. Send full report to that URI by using HTTP PUT
+1. Send PUT to URI (without report body) with these headers:
+   * `X-Chalk-Version` - version of chalk sending the report
+   * `X-Chalk-Action-Id` - action ID of this chalk run (same as `_ACTION_ID`)
+2. Receive 302/307 redirect with pre-signed URI in `Location` header.
+3. Copy any headers listed in `x-forward-headers` response header into the upload request.
+4. Send full report body to pre-signed URI via PUT.
 
-This allows chalk to send reports to otherwise forbidden endpoints
-such as AWS S3 without any hard-coded credentials baked into chalk.
+The presign API can return these headers in the redirect response:
+
+* `x-forward-headers` - comma-delimited list of header names from the redirect response
+  that chalk should copy into the upload PUT request. This is useful for injecting
+  metadata that cannot be encoded in the presigned URL itself. For example:
+
+  ```
+  x-forward-headers: x-amz-meta-env
+  x-amz-meta-env: production
+  ```
+
+  causes chalk to include `x-amz-meta-env: production` in the upload request.
+
+This allows chalk to send reports to otherwise restricted endpoints
+such as AWS S3 without credentials baked into chalk.
 """
 }
 

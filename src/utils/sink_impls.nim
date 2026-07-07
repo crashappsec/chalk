@@ -37,6 +37,9 @@ import pkg/nimutils/[
   file,
   net,
 ]
+import "."/[
+  http,
+]
 
 const defaultLogSearchPath = @["/var/log/", "~/.log/", "."]
 
@@ -369,10 +372,11 @@ proc httpParams(cfg: SinkConfig): tuple[
 proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
     params   = cfg.httpParams()
+    headers  = getChalkCoreHeaders().update(params.headers)
     response = safeRequest(
       url                = params.uri,
       timeout            = params.timeout,
-      headers            = params.headers,
+      headers            = headers,
       disallowHttp       = params.disallowHttp,
       pinnedCert         = params.pinnedCert,
       preferBundledCerts = params.preferBundledCerts,
@@ -388,10 +392,11 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
 proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
     params      = cfg.httpParams()
+    signHeaders = getChalkCoreHeaders().update(params.headers)
     signResponse = safeRequest(
       url                = params.uri,
       timeout            = params.timeout,
-      headers            = params.headers,
+      headers            = signHeaders,
       disallowHttp       = params.disallowHttp,
       pinnedCert         = params.pinnedCert,
       preferBundledCerts = params.preferBundledCerts,
@@ -414,8 +419,10 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     raise newException(ValueError, "Presign redirect Location header needs to be absolute URL")
 
   let
-    response = safeRequest(
+    uploadHeaders = newHttpHeaders().applyForwardedHeaders(signResponse)
+    response      = safeRequest(
       url                = uri,
+      headers            = uploadHeaders,
       timeout            = params.timeout,
       disallowHttp       = params.disallowHttp,
       pinnedCert         = params.pinnedCert,

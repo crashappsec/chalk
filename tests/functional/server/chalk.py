@@ -71,9 +71,33 @@ async def presign_report_url(
     request: Request,
     response: Response,
 ):
-    return RedirectResponse(
-        request.url_for("accept_report"),
+    if not request.headers.get("x-chalk-version"):
+        raise HTTPException(status_code=400, detail="missing X-Chalk-Version header")
+    if not request.headers.get("x-chalk-action-id"):
+        raise HTTPException(status_code=400, detail="missing X-Chalk-Action-Id header")
+    redirect = RedirectResponse(
+        request.url_for("accept_presign_report"),
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    )
+    redirect.headers["x-forward-headers"] = "x-presign-test"
+    redirect.headers["x-presign-test"] = "forwarded-value"
+    return redirect
+
+
+@app.put("/report/presign/accept", status_code=200)
+async def accept_presign_report(
+    reports: list[dict],
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    if request.headers.get("x-presign-test") != "forwarded-value":
+        raise HTTPException(
+            status_code=400,
+            detail="x-presign-test forwarded header missing or has wrong value",
+        )
+    return await accept_report(
+        reports=reports, request=request, response=response, db=db
     )
 
 
@@ -86,9 +110,19 @@ async def error_500():
 @app.put("/report", status_code=200)
 async def accept_report(
     reports: list[dict],
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
 ):
+    if request.method == "POST":
+        if not request.headers.get("x-chalk-version"):
+            raise HTTPException(
+                status_code=400, detail="missing X-Chalk-Version header"
+            )
+        if not request.headers.get("x-chalk-action-id"):
+            raise HTTPException(
+                status_code=400, detail="missing X-Chalk-Action-Id header"
+            )
     try:
         for report in reports:
             operation = report.get("_OPERATION")
