@@ -3,14 +3,25 @@ BINARY=chalk
 CHALK_BUILD?=release
 CHALK_ARGS=
 
-ifeq "$(shell [ -t 0 ] && echo interactive)" "interactive"
-CRASHAPPSEC = git@github.com:crashappsec
+INTERACTIVE := $(shell [ -t 0 ] && echo interactive)
+
+# auto-clone sibling repos if not present; SSH in interactive sessions, HTTPS in CI
+# $(1) = repo name, $(2) = destination path, $(3) = branch/commit
+ifeq "$(INTERACTIVE)" "interactive"
 CON4M_VERSION ?= dev
 NIMUTILS_VERSION ?= dev
+define clone-sibling
+git clone git@github.com:crashappsec/$(1).git $(2)
+git --git-dir=$(2)/.git --work-tree=$(2) checkout $(3)
+endef
 else
-CRASHAPPSEC = https://github.com/crashappsec
 CON4M_VERSION ?= $(shell grep '# con4m:' chalk.nimble | grep -oE '[a-f0-9]{40}')
 NIMUTILS_VERSION ?= $(shell grep '# nimutils:' chalk.nimble | grep -oE '[a-f0-9]{40}')
+define clone-sibling
+git init $(2)
+git -C $(2) fetch --depth=1 https://github.com/crashappsec/$(1).git $(3)
+git -C $(2) checkout FETCH_HEAD
+endef
 endif
 
 ifeq "$(CHALK_BUILD)" "debug"
@@ -108,15 +119,11 @@ WATCH_DONE ?= /tmp/chalk-watch-done
 watch: $(SOURCES)
 	echo $^ | tr ' ' '\n' | entr $(MAKE) 2>&1 | tee $(WATCH_LOG)
 
-# auto-clone sibling repos if not present; SSH in interactive sessions, HTTPS in CI
-
 ../nimutils/README.md:
-	git clone $(CRASHAPPSEC)/nimutils.git $(@D)
-	git --git-dir=$(@D)/.git --work-tree=$(@D) checkout $(NIMUTILS_VERSION)
+	$(call clone-sibling,nimutils,$(@D),$(NIMUTILS_VERSION))
 
 ../con4m/README.md:
-	git clone $(CRASHAPPSEC)/con4m.git $(@D)
-	git --git-dir=$(@D)/.git --work-tree=$(@D) checkout $(CON4M_VERSION)
+	$(call clone-sibling,con4m,$(@D),$(CON4M_VERSION))
 
 nimble.paths: ../nimutils/README.md ../con4m/README.md
 	echo --noNimblePath > $@

@@ -81,6 +81,9 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKER_HUB_PUBLIC_READONLY_TOKEN }}
 
+      - name: Checkout sibling repos
+        run: make nimble.paths
+
       - name: Bake images
         run: |
           docker buildx bake chalk --load
