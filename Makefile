@@ -3,6 +3,27 @@ BINARY=chalk
 CHALK_BUILD?=release
 CHALK_ARGS=
 
+INTERACTIVE := $(shell [ -t 0 ] && echo interactive)
+
+# auto-clone sibling repos if not present; SSH in interactive sessions, HTTPS in CI
+# $(1) = repo name, $(2) = destination path, $(3) = branch/commit
+ifeq "$(INTERACTIVE)" "interactive"
+CON4M_VERSION ?= dev
+NIMUTILS_VERSION ?= dev
+define clone-sibling
+git clone git@github.com:crashappsec/$(1).git $(2)
+git --git-dir=$(2)/.git --work-tree=$(2) checkout $(3)
+endef
+else
+CON4M_VERSION ?= $(shell grep '# con4m:' chalk.nimble | grep -oE '[a-f0-9]{40}')
+NIMUTILS_VERSION ?= $(shell grep '# nimutils:' chalk.nimble | grep -oE '[a-f0-9]{40}')
+define clone-sibling
+git init $(2)
+git -C $(2) fetch --depth=1 https://github.com/crashappsec/$(1).git $(3)
+git -C $(2) checkout FETCH_HEAD
+endef
+endif
+
 ifeq "$(CHALK_BUILD)" "debug"
 export DEBUG=true
 CHALK_ARGS=--log-level=trace
@@ -16,6 +37,7 @@ endif
 
 SOURCES=$(wildcard *.nims)
 SOURCES+=$(wildcard *.nimble)
+SOURCES+=nimble.paths
 SOURCES+=$(shell find src/ -name '*.nim')
 SOURCES+=$(shell find src/ -name '*.c4m')
 SOURCES+=$(shell find src/ -name '*.c42spec')
@@ -77,7 +99,7 @@ version:
 
 .PHONY: clean
 clean:
-	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck dist nimutils con4m nimble.develop nimble.paths
+	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck dist nimble.develop nimble.paths
 
 # WATCH_LOG  - build output is tee'd here on every rebuild cycle.
 #              Truncated once when "make watch" starts (tee opens for write);
@@ -97,21 +119,15 @@ WATCH_DONE ?= /tmp/chalk-watch-done
 watch: $(SOURCES)
 	echo $^ | tr ' ' '\n' | entr $(MAKE) 2>&1 | tee $(WATCH_LOG)
 
-# devmode for local deps
-# this allows to dev againt local versions of nimutils/con4m
-# this works for both docker/host builds
+../nimutils/README.md:
+	$(call clone-sibling,nimutils,$(@D),$(NIMUTILS_VERSION))
 
-../%/.git:
-	git clone git@github.com:crashappsec/$*.git
+../con4m/README.md:
+	$(call clone-sibling,con4m,$(@D),$(CON4M_VERSION))
 
-nimble.paths:
-	echo --noNimblePath > $@
-
-nimutils con4m: nimble.paths
-	$(MAKE) -s ../$@/.git
-	echo '--path:"$(abspath ../$@)"' >> $^
-	$(DOCKER) ln -s ../$@ $@
-	$(DOCKER) touch $@
+nimble.paths: ../nimutils/README.md ../con4m/README.md
+	echo '--path:"$(abspath $(dir $(shell find ../nimutils -name nimutils.nim)))"' > $@
+	echo '--path:"$(abspath $(dir $(shell find ../con4m -name con4m.nim)))"' >> $@
 
 # ----------------------------------------------------------------------------
 # TESTS

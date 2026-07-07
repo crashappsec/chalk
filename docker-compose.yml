@@ -15,8 +15,8 @@ services:
     build:
       context: .
       target: deps
-      # additional_contexts:
-      #   nimutils: ../nimutils
+      additional_contexts:
+        nimutils: ../nimutils
       args:
         BASE: ${BASE:-alpine}
     # platform: linux/arm64

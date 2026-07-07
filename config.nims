@@ -1,5 +1,13 @@
 import std/os
-import pkg/[nimutils/nimscript]
+
+# begin Nimble config (version 2)
+# Must come before `import nimutils/nimscript` so the --path: directives in
+# nimble.paths are active when nimscript is resolved.
+when withDir(thisDir(), system.fileExists("nimble.paths")):
+  include "nimble.paths"
+# end Nimble config
+
+import nimutils/nimscript
 
 # This will end up yielding lto warnings. Uncomment if you want to load in gdb
 # switch("debugger", "native")
@@ -34,8 +42,3 @@ when defined(macosx):
 # To be enabled, this has to be combined either with --styleCheck:error or --styleCheck:hint.
 switch("styleCheck", "usages")
 switch("styleCheck", "error")
-
-# begin Nimble config (version 2)
-when withDir(thisDir(), system.fileExists("nimble.paths")):
-  include "nimble.paths"
-# end Nimble config

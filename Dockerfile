@@ -49,15 +49,17 @@ RUN if which git; then git config --global --add safe.directory "*"; fi
 
 WORKDIR /chalk
 
-# Build any static deps not bundled in nimutils' pre-built package directory.
-# Uses the local nimutils tree (mounted as a build context) so that changes to
-# buildlibs.sh (e.g. ensure_zlib) take effect without a nimutils release.
-# COPY --from=nimutils bin/buildlibs.sh /tmp/nimutils-local/bin/
-# COPY --from=nimutils files/deps/ /tmp/nimutils-local/deps/
-# RUN bash /tmp/nimutils-local/bin/buildlibs.sh /tmp/nimutils-local/deps
-# COPY --from=nimutils bin/header_install.sh /tmp/nimutils-local/bin/
-# COPY --from=nimutils nimutils/c/ /tmp/nimutils-local/nimutils/c/
-# RUN ls -la /tmp/nimutils-local/nimutils/c/ && NIMUTILS_DIR=/tmp/nimutils-local bash /tmp/nimutils-local/bin/header_install.sh
+# Install static libs and C headers from the nimutils sibling repo.
+# buildlibs.sh copies platform-specific pre-built .a files from
+# files/deps/lib/{os}-{arch}/; header_install.sh copies nimutils/c/ headers.
+# Both land in ~/.local/c0/ so chalk's config.nims can link against them.
+COPY --from=nimutils bin/buildlibs.sh /tmp/nimutils/bin/
+COPY --from=nimutils files/deps/ /tmp/nimutils/deps/
+RUN bash /tmp/nimutils/bin/buildlibs.sh /tmp/nimutils/deps
+
+COPY --from=nimutils bin/header_install.sh /tmp/nimutils/bin/
+COPY --from=nimutils nimutils/c/ /tmp/nimutils/nimutils/c/
+RUN NIMUTILS_DIR=/tmp/nimutils bash /tmp/nimutils/bin/header_install.sh
 
 COPY *.nimble /chalk/
 
