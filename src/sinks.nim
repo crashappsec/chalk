@@ -22,6 +22,7 @@ import "."/[
   types,
   utils/files,
   utils/json,
+  utils/sink_impls,
   utils/times,
 ]
 
@@ -95,16 +96,47 @@ proc getFilterName*(filter: MsgFilter): Option[string] =
   for name, f in availableFilters:
     if f == filter: return some(name)
 
-defaultLogHook.filters = @[MsgFilter(logLevelFilter),
-                           MsgFilter(logPrefixFilter),
-                           MsgFilter(chalkLogWrap),
-                           MsgFilter(chalkJsonLogs)]
+addDefaultSinks()
 
-var availableSinkConfigs = { "log_hook"     : defaultLogHook,
-                             "con4m_hook"   : defaultCon4mHook,
-                     }.toTable()
+let
+  `logHook?`     = configSink(
+    getSinkImplementation("stderr").get(),
+    "default-log-config",
+    filters = @[
+      MsgFilter(logLevelFilter),
+      MsgFilter(logPrefixFilter),
+      MsgFilter(chalkLogWrap),
+      MsgFilter(chalkJsonLogs),
+    ],
+  )
+  defaultLogHook = `logHook?`.get()
+
+subscribe(logTopic, defaultLogHook)
+
+let
+  `con4mHook?`      = configSink(
+    getSinkImplementation("stderr").get(),
+    "con4m-default",
+    filters = @[
+      MsgFilter(logLevelFilter),
+      MsgFilter(logPrefixFilter),
+    ],
+  )
+  defaultCon4mHook* = `con4mHook?`.get()
+
+var availableSinkConfigs = {
+  "log_hook"   : defaultLogHook,
+  "con4m_hook" : defaultCon4mHook,
+}.toTable()
 
 when not defined(release):
+  discard registerTopic("debug")
+  let
+    `debugHook?`      = configSink(
+      getSinkImplementation("stderr").get(),
+      "default-debug-config",
+    )
+    defaultDebugHook* = `debugHook?`.get()
   availableSinkConfigs["debug_hook"] = defaultDebugHook
 
 # These are used by reportcache.nim
@@ -457,5 +489,4 @@ proc ioSetup*(bgColor = "darkslategray") =
   once:
     setDefaultUserAgent("chalk/" & getChalkExeVersion() & " " & getDefaultUserAgent())
     useCrashTheme()
-    addDefaultSinks()
     addDefaultAuths()
