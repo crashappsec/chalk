@@ -126,8 +126,7 @@ watch: $(SOURCES)
 	$(call clone-sibling,con4m,$(@D),$(CON4M_VERSION))
 
 nimble.paths: ../nimutils/README.md ../con4m/README.md
-	echo --noNimblePath > $@
-	echo '--path:"$(abspath $(dir $(shell find ../nimutils -name nimutils.nim)))"' >> $@
+	echo '--path:"$(abspath $(dir $(shell find ../nimutils -name nimutils.nim)))"' > $@
 	echo '--path:"$(abspath $(dir $(shell find ../con4m -name con4m.nim)))"' >> $@
 
 # ----------------------------------------------------------------------------
