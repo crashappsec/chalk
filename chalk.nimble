@@ -15,7 +15,14 @@ bin           = @["chalk"]
 
 # Dependencies
 requires "nim >= 2.0.8"
-requires "https://github.com/crashappsec/con4m#c9ee7a3bf672d10311fd23d7cf5f206d1df2ea39"
+# con4m and nimutils are not nimble deps; they are loaded from sibling
+# directories (../con4m, ../nimutils) via nimble.paths.  The commits below
+# are the pinned versions used in CI; `make nimble.paths` clones and checks
+# out these commits when the repos are absent.  In interactive shells the
+# Makefile defaults to the `dev` branch instead.
+# con4m:   c9ee7a3bf672d10311fd23d7cf5f206d1df2ea39
+# nimutils: 29f40c70e702f7d46dbef2293e856bbe81570a36
+requires "unicodedb == 0.12.0"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 requires "https://github.com/NimParsers/parsetoml == 0.7.1" # MIT
 
