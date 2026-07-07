@@ -86,7 +86,7 @@ jobs:
 
       - name: Bake images
         run: |
-          docker buildx bake chalk --load
+          docker buildx bake --allow=fs.read=../nimutils chalk --load
 
       - name: Run unit tests
         run: |

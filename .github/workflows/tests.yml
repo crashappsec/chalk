@@ -100,7 +100,7 @@ jobs:
 
       - name: Bake Images
         run: |
-          docker buildx bake chalk server tests --load
+          docker buildx bake --allow=fs.read=../nimutils chalk server tests --load
 
       - name: Test pingttl
         if: inputs.chalk_url == ''
