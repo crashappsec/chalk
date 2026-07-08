@@ -36,22 +36,15 @@ proc mustGetInt*(headers: HttpHeaders, header: string, msg: string): int =
   except:
     raise newException(ValueError, msg & ": invalid integer: " & value)
 
-proc getChalkCoreHeaders*(): HttpHeaders =
-  result = newHttpHeaders(@[
-    ("X-Chalk-Version", getChalkExeVersion()),
-  ])
-  # _ACTION_ID is only present in hostInfo when an active report template
-  # subscribes it, so guard the read and omit the header when it is absent
-  # rather than raising and dropping the report.
+proc withChalkCoreHeaders*(headers: HttpHeaders): HttpHeaders =
+  ## Merges chalk core headers into `headers`, applying them last so they
+  ## take precedence over any same-named user-configured header.
+  ## _ACTION_ID is guarded: absent when no report template subscribes it.
+  headers["X-Chalk-Version"] = getChalkExeVersion()
   let actionId = lookupCollectedKey("_ACTION_ID")
   if actionId.isSome():
-    result["X-Chalk-Action-Id"] = unpack[string](actionId.get())
-
-proc withChalkCoreHeaders*(headers: HttpHeaders): HttpHeaders =
-  ## Merges the guaranteed chalk core headers into `headers`, applying them
-  ## last so they take precedence over any same-named user-configured header.
-  ## This upholds the "always includes" guarantee documented in base_sinks.c4m.
-  return headers.update(getChalkCoreHeaders())
+    headers["X-Chalk-Action-Id"] = unpack[string](actionId.get())
+  return headers
 
 proc applyForwardedHeaders*(headers: HttpHeaders, response: Response): HttpHeaders =
   ## Copies headers listed in the response's x-forward-headers into headers.

@@ -84,7 +84,7 @@ proc request(self:           ObjectStorePresign,
   var signHeaders = newHttpHeaders(@[
     ("X-Content-Length",     $len(body)),
     ("X-Chalk-Digest-Sha256", keyRef.digest),
-  ]).update(getChalkCoreHeaders()).update(contentTypeHeaders).update(self.headers)
+  ]).update(contentTypeHeaders).update(self.headers).withChalkCoreHeaders()
   if auth != nil:
     signHeaders = auth.implementation.injectHeaders(auth, signHeaders)
 
