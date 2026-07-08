@@ -12,6 +12,7 @@ import std/[
 ]
 import ".."/[
   config,
+  run_management,
   types,
 ]
 
@@ -36,10 +37,15 @@ proc mustGetInt*(headers: HttpHeaders, header: string, msg: string): int =
     raise newException(ValueError, msg & ": invalid integer: " & value)
 
 proc getChalkCoreHeaders*(): HttpHeaders =
-  return newHttpHeaders(@[
-    ("X-Chalk-Version",   getChalkExeVersion()),
-    ("X-Chalk-Action-Id", unpack[string](hostInfo["_ACTION_ID"])),
+  result = newHttpHeaders(@[
+    ("X-Chalk-Version", getChalkExeVersion()),
   ])
+  # _ACTION_ID is only present in hostInfo when an active report template
+  # subscribes it, so guard the read and omit the header when it is absent
+  # rather than raising and dropping the report.
+  let actionId = lookupCollectedKey("_ACTION_ID")
+  if actionId.isSome():
+    result["X-Chalk-Action-Id"] = unpack[string](actionId.get())
 
 proc applyForwardedHeaders*(headers: HttpHeaders, response: Response): HttpHeaders =
   ## Copies headers listed in the response's x-forward-headers into headers.
