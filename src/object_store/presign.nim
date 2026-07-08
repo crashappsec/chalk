@@ -81,13 +81,10 @@ proc request(self:           ObjectStorePresign,
       newHttpHeaders(@[
         ("Content-Type", contentType),
       ])
-  var signHeaders = newHttpHeaders(@[
-    ("X-Content-Length", $len(body)),
-    ("X-Chalk-Digest-Sha256", keyRef.digest),
-    ("X-Chalk-Version", getChalkExeVersion()),
-    # TODO expose better API for action id interaction
-    ("X-Chalk-Action-Id", unpack[string](hostInfo["_ACTION_ID"])),
-  ]).update(contentTypeHeaders).update(self.headers)
+  var signHeaders = newHttpHeaders().update(contentTypeHeaders).update(self.headers).addChalkCoreHeaders(
+    body   = body,
+    digest = keyRef.digest,
+  )
   if auth != nil:
     signHeaders = auth.implementation.injectHeaders(auth, signHeaders)
 
@@ -118,26 +115,17 @@ proc request(self:           ObjectStorePresign,
     raise newException(ValueError, "Presign requires 302/307 redirect but received: " & signResponse.status)
 
   if not signResponse.headers.hasKey("location"):
-    raise newException(ValueError, "Presign edirect Location header missing")
+    raise newException(ValueError, "Presign redirect Location header missing")
 
   let uri = parseUri(signResponse.headers["location"])
   if uri.scheme == "":
     trace("object store: " & $uri)
-    raise newException(ValueError, "Presign edirect Location header needs to be absolute URL")
+    raise newException(ValueError, "Presign redirect Location header needs to be absolute URL")
 
-  var
-    names   = newSeq[string]()
-    headers = newHttpHeaders(@[
-      ("Content-Length", $len(body)),
-    ]).update(contentTypeHeaders)
-  if signResponse.headers.hasKey("x-forward-headers"):
-    names = signResponse.headers["x-forward-headers"].strip().split(',')
-    for i in names:
-      let name = i.strip()
-      if signResponse.headers.hasKey(name):
-        headers[name] = signResponse.headers[name]
-
-  trace("object store: " & $httpMethod & " @" & uri.hostname & " (" & $len(body) & "bytes) forwarding: " & $names)
+  let headers = newHttpHeaders(@[
+    ("Content-Length", $len(body)),
+  ]).update(contentTypeHeaders).addForwardedHeaders(signResponse)
+  trace("object store: " & $httpMethod & " @" & uri.hostname & " (" & $len(body) & " bytes)")
   let response = safeRequest(url               = uri,
                              headers           = headers,
                              timeout           = self.timeout,
@@ -148,7 +136,7 @@ proc request(self:           ObjectStorePresign,
                              retries           = 2,
                              firstRetryDelayMs = 100,
                              rejectStatusCodes = [500..599])
-  trace("object store: " & $httpMethod & " @" & $uri.hostname & " (" & $len(body) & "bytes) -> " & $response.code)
+  trace("object store: " & $httpMethod & " @" & $uri.hostname & " (" & $len(body) & " bytes) -> " & $response.code)
 
   let updatedRef = deepCopy(keyRef)
   updatedRef.query = signResponse.headers.getOrDefault("x-chalk-object-query")

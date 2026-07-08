@@ -10,6 +10,14 @@ import std/[
   httpcore,
   strutils,
 ]
+import pkg/nimutils/[
+  sha,
+]
+import ".."/[
+  config,
+  run_management,
+  types,
+]
 
 export httpclient
 export httpcore
@@ -30,3 +38,33 @@ proc mustGetInt*(headers: HttpHeaders, header: string, msg: string): int =
     return parseInt(value)
   except:
     raise newException(ValueError, msg & ": invalid integer: " & value)
+
+proc addChalkCoreHeaders*(
+    headers: HttpHeaders,
+    body:    string,
+    digest  = "",
+): HttpHeaders =
+  ## Merges chalk core headers into `headers`, applying them last so they
+  ## take precedence over any same-named user-configured header.
+  ## _ACTION_ID is guarded: absent when no report template subscribes it.
+  ## digest defaults to sha256(body) when not provided.
+  headers["X-Chalk-Version"]       = getChalkExeVersion()
+  headers["X-Chalk-Operation"]     = getBaseCommandName()
+  headers["X-Content-Length"]      = $len(body)
+  headers["X-Chalk-Digest-Sha256"] = if digest != "": digest else: body.sha256Hex()
+  let actionId = lookupCollectedKey("_ACTION_ID")
+  if actionId.isSome():
+    headers["X-Chalk-Action-Id"] = unpack[string](actionId.get())
+  return headers
+
+proc addForwardedHeaders*(headers: HttpHeaders, response: Response): HttpHeaders =
+  ## Copies headers listed in the response's x-forward-headers into headers.
+  ## Allows the sign server to request that specific response headers be
+  ## forwarded to the actual upload request (e.g. extra metadata headers).
+  if not response.headers.hasKey("x-forward-headers"):
+    return headers
+  for item in response.headers["x-forward-headers"].strip().split(','):
+    let name = item.strip()
+    if response.headers.hasKey(name):
+      headers[name] = response.headers[name]
+  return headers

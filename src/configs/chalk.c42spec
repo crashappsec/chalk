@@ -1113,6 +1113,7 @@ In all cases chalk includes these headers to presign endpoints:
 * `X-Content-Length` - similar to `Content-Length` but is sent to presigning API
 * `X-Chalk-Digest-Sha256` - raw digest of the uploaded content to check for transmission errors
 * `X-Chalk-Version`
+* `X-Chalk-Operation` - same as `_OPERATION` (e.g. `insert`, `build`)
 * `X-Chalk-Action-Id` - same as `_ACTION_ID` which can be used to associate object to original
   report which created it.
 

@@ -324,6 +324,10 @@ proc lookupCollectedKey*(obj: ChalkObj, k: string): Option[Box] =
   if k in obj.collectedData: return some(obj.collectedData[k])
   return none(Box)
 
+proc lookupCollectedKey*(k: string): Option[Box] =
+  if k in hostInfo: return some(hostInfo[k])
+  return none(Box)
+
 proc setArgs*(a: seq[string]) =
   collectionCtx.args = a
 proc getArgs*(): seq[string] = collectionCtx.args

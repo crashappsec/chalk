@@ -3,6 +3,7 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import asyncio
+import hashlib
 import json
 import os
 import pathlib
@@ -66,14 +67,58 @@ async def ping(stats: list[schemas.Stat], db: Session = Depends(get_db)):
         return {"ping": "pong"}
 
 
+async def _check_chalk_core_headers(
+    request: Request, verify_body: bool = False
+) -> None:
+    for header in [
+        "x-chalk-version",
+        "x-chalk-operation",
+        "x-chalk-action-id",
+        "x-content-length",
+        "x-chalk-digest-sha256",
+    ]:
+        if not request.headers.get(header):
+            raise HTTPException(status_code=400, detail=f"missing {header} header")
+    if verify_body:
+        body = await request.body()
+        if int(request.headers["x-content-length"]) != len(body):
+            raise HTTPException(status_code=400, detail="x-content-length mismatch")
+        expected = hashlib.sha256(body).hexdigest()
+        if request.headers["x-chalk-digest-sha256"] != expected:
+            raise HTTPException(
+                status_code=400, detail="x-chalk-digest-sha256 mismatch"
+            )
+
+
 @app.put("/report/presign", status_code=200)
 async def presign_report_url(
     request: Request,
     response: Response,
 ):
-    return RedirectResponse(
-        request.url_for("accept_report"),
+    await _check_chalk_core_headers(request)
+    redirect = RedirectResponse(
+        request.url_for("accept_presign_report"),
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+    )
+    redirect.headers["x-forward-headers"] = "x-presign-test"
+    redirect.headers["x-presign-test"] = "forwarded-value"
+    return redirect
+
+
+@app.put("/report/presign/accept", status_code=200)
+async def accept_presign_report(
+    reports: list[dict],
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    if request.headers.get("x-presign-test") != "forwarded-value":
+        raise HTTPException(
+            status_code=400,
+            detail="x-presign-test forwarded header missing or has wrong value",
+        )
+    return await accept_report(
+        reports=reports, request=request, response=response, db=db
     )
 
 
@@ -86,9 +131,12 @@ async def error_500():
 @app.put("/report", status_code=200)
 async def accept_report(
     reports: list[dict],
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
 ):
+    if request.method == "POST":
+        await _check_chalk_core_headers(request, verify_body=True)
     try:
         for report in reports:
             operation = report.get("_OPERATION")
