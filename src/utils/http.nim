@@ -47,6 +47,12 @@ proc getChalkCoreHeaders*(): HttpHeaders =
   if actionId.isSome():
     result["X-Chalk-Action-Id"] = unpack[string](actionId.get())
 
+proc withChalkCoreHeaders*(headers: HttpHeaders): HttpHeaders =
+  ## Merges the guaranteed chalk core headers into `headers`, applying them
+  ## last so they take precedence over any same-named user-configured header.
+  ## This upholds the "always includes" guarantee documented in base_sinks.c4m.
+  return headers.update(getChalkCoreHeaders())
+
 proc applyForwardedHeaders*(headers: HttpHeaders, response: Response): HttpHeaders =
   ## Copies headers listed in the response's x-forward-headers into headers.
   ## Allows the sign server to request that specific response headers be

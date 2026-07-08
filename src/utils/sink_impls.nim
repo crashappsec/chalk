@@ -372,7 +372,7 @@ proc httpParams(cfg: SinkConfig): tuple[
 proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
     params   = cfg.httpParams()
-    headers  = getChalkCoreHeaders().update(params.headers)
+    headers  = params.headers.withChalkCoreHeaders()
     response = safeRequest(
       url                = params.uri,
       timeout            = params.timeout,
@@ -392,7 +392,7 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
 proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
     params      = cfg.httpParams()
-    signHeaders = getChalkCoreHeaders().update(params.headers)
+    signHeaders = params.headers.withChalkCoreHeaders()
     signResponse = safeRequest(
       url                = params.uri,
       timeout            = params.timeout,
