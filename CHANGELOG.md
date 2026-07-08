@@ -4,9 +4,14 @@
 
 ### New Features
 
-- `post` and `presign` sinks now send `X-Chalk-Version` and `X-Chalk-Action-Id`
-  headers with every request, enabling server-side routing and auditing without
-  parsing the body.
+- `post` and `presign` sinks now send chalk metadata headers with every
+  request, enabling server-side routing and auditing without parsing the body:
+  - `X-Chalk-Version`
+  - `X-Chalk-Operation` (same as `_OPERATION`)
+  - `X-Chalk-Action-Id` (same as `_ACTION_ID`)
+  - `X-Content-Length`
+  - `X-Chalk-Digest-Sha256`
+
   ([#688](https://github.com/crashappsec/chalk/pull/688))
 
 - `presign` sink now supports `x-forward-headers`: header names listed in that

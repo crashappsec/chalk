@@ -372,7 +372,7 @@ proc httpParams(cfg: SinkConfig): tuple[
 proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
     params   = cfg.httpParams()
-    headers  = params.headers.withChalkCoreHeaders()
+    headers  = params.headers.addChalkCoreHeaders(body = msg)
     response = safeRequest(
       url                = params.uri,
       timeout            = params.timeout,
@@ -392,7 +392,7 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
 proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
     params      = cfg.httpParams()
-    signHeaders = params.headers.withChalkCoreHeaders()
+    signHeaders = params.headers.addChalkCoreHeaders(body = msg)
     signResponse = safeRequest(
       url                = params.uri,
       timeout            = params.timeout,
@@ -419,7 +419,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     raise newException(ValueError, "Presign redirect Location header needs to be absolute URL")
 
   let
-    uploadHeaders = newHttpHeaders().applyForwardedHeaders(signResponse)
+    uploadHeaders = newHttpHeaders().addForwardedHeaders(signResponse)
     response      = safeRequest(
       url                = uri,
       headers            = uploadHeaders,

@@ -81,10 +81,10 @@ proc request(self:           ObjectStorePresign,
       newHttpHeaders(@[
         ("Content-Type", contentType),
       ])
-  var signHeaders = newHttpHeaders(@[
-    ("X-Content-Length",     $len(body)),
-    ("X-Chalk-Digest-Sha256", keyRef.digest),
-  ]).update(contentTypeHeaders).update(self.headers).withChalkCoreHeaders()
+  var signHeaders = newHttpHeaders().update(contentTypeHeaders).update(self.headers).addChalkCoreHeaders(
+    body   = body,
+    digest = keyRef.digest,
+  )
   if auth != nil:
     signHeaders = auth.implementation.injectHeaders(auth, signHeaders)
 
@@ -124,7 +124,7 @@ proc request(self:           ObjectStorePresign,
 
   let headers = newHttpHeaders(@[
     ("Content-Length", $len(body)),
-  ]).update(contentTypeHeaders).applyForwardedHeaders(signResponse)
+  ]).update(contentTypeHeaders).addForwardedHeaders(signResponse)
   trace("object store: " & $httpMethod & " @" & uri.hostname & " (" & $len(body) & " bytes)")
   let response = safeRequest(url               = uri,
                              headers           = headers,

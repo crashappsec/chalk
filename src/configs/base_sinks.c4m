@@ -195,7 +195,10 @@ core headers take precedence over any same-named header supplied via the
 `headers` field, so a user-configured header cannot override them:
 
 * `X-Chalk-Version` - version of chalk sending the report
+* `X-Chalk-Operation` - chalk operation (same as `_OPERATION`, e.g. `insert`, `build`)
 * `X-Chalk-Action-Id` - action ID of this chalk run (same as `_ACTION_ID`)
+* `X-Content-Length` - byte length of the request body
+* `X-Chalk-Digest-Sha256` - SHA-256 hex digest of the request body
 
 If HTTPS is used, the connection will fail if the server doesn't have
 a valid certificate. Unless you provide a specific certificate via the
@@ -252,7 +255,10 @@ Pre-sign flow:
 
 1. Send PUT to URI (without report body) with these headers:
    * `X-Chalk-Version` - version of chalk sending the report
+   * `X-Chalk-Operation` - chalk operation (same as `_OPERATION`, e.g. `insert`, `build`)
    * `X-Chalk-Action-Id` - action ID of this chalk run (same as `_ACTION_ID`)
+   * `X-Content-Length` - byte length of the report body to be uploaded
+   * `X-Chalk-Digest-Sha256` - SHA-256 hex digest of the report body to be uploaded
 2. Receive 302/307 redirect with pre-signed URI in `Location` header.
 3. Copy any headers listed in `x-forward-headers` response header into the upload request.
 4. Send full report body to pre-signed URI via PUT.
