@@ -84,16 +84,17 @@ need 2x the value of `max` available in terms of disk space.
 }
 
 sink s3 {
-  ~uid:           true
-  ~secret:        true
-  ~token:         false
-  ~uri:           true
-  ~region:        true
-  ~extra:         false
-  ~endpoint:      false
-  ~on_write_msg:  false
-  shortdoc:       "S3 object storage"
-  doc:       """
+  ~uid:                  true
+  ~secret:               true
+  ~token:                false
+  ~uri:                  true
+  ~region:               true
+  ~extra:                false
+  ~endpoint:             false
+  ~on_write_msg:         false
+  ~disable_after_errors: false
+  shortdoc:              "S3 object storage"
+  doc:                   """
 
 | Parameter  | Type     | Required | Description                                                                                                                                                                   |
 |------------|----------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -103,7 +104,8 @@ sink s3 {
 | `uri`      | `string` | true     | The URI for the bucket in `s3:` format; see below                                                                                                                             |
 | `region`   | `string` | true     | The AWS region (or any non-empty string for S3-compatible stores)                                                                                                             |
 | `extra`    | `string` | false    | A prefix added to the object path within the bucket                                                                                                                           |
-| `endpoint` | `string` | false    | Custom S3-compatible endpoint URL (e.g. `http://localhost:9000` for MinIO or `http://localhost:8080` for `rclone serve s3`). When omitted, the standard AWS endpoint is used. |
+| `endpoint`              | `string` | false    | Custom S3-compatible endpoint URL (e.g. `http://localhost:9000` for MinIO or `http://localhost:8080` for `rclone serve s3`). When omitted, the standard AWS endpoint is used. |
+| `disable_after_errors`  | `int`    | false    | Number of consecutive errors before the sink is disabled (default: 3)                                                                                                         |
 
 To ensure uniqueness, each run of chalk constructs a unique object
 name. Here are the components:
@@ -171,6 +173,7 @@ sink post {
   ~prefer_bundled_certs: false
   ~on_write_msg:         false
   ~auth:                 false
+  ~disable_after_errors: false
   shortdoc:              "HTTP/HTTPS POST"
   doc:       """
 
@@ -184,6 +187,7 @@ sink post {
 | `pinned_cert_file`     | `string`               | false    | TLS certificate file                                           |
 | `prefer_bundled_certs` | `bool`                 | false    | Whether to prefer chalk bundled root CA certs                  |
 | `auth`                 | `string`               | false    | Auth configuration for the API                                 |
+| `disable_after_errors` | `int`                  | false    | Number of consecutive errors before the sink is disabled (default: 3) |
 
 The post will always be a single JSON object, and the default
 content-type field will be `application/json`. Changing this value
@@ -245,6 +249,7 @@ sink presign {
   ~prefer_bundled_certs: false
   ~on_write_msg:         false
   ~auth:                 false
+  ~disable_after_errors: false
   shortdoc:              "HTTP/HTTPS Presign PUT"
   doc:                   """
 Sink which allows to upload reports to a pre-signed URL.

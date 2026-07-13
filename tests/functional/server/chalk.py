@@ -122,6 +122,11 @@ async def accept_presign_report(
     )
 
 
+@app.post("/400")
+async def error_400():
+    raise HTTPException(400)
+
+
 @app.post("/500")
 async def error_500():
     raise HTTPException(500)

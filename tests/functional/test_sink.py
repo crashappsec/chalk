@@ -236,6 +236,26 @@ def test_500_http_fastapi(
 
 
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_post_400_disables_sink(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_http: str,
+):
+    """
+    A 400 response is a hard error; the sink must be disabled immediately and
+    chalk must log an error naming the sink.
+    """
+    result = chalk.insert(
+        copy_files[0],
+        config=SINK_CONFIGS / "post_400_disable.c4m",
+        use_embedded=False,
+        env={"CHALK_POST_URL": f"{SERVER_HTTP}/400"},
+        ignore_errors=True,
+    )
+    assert "sink 'my_http_config' disabled" in result.logs
+
+
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_presign_http_fastapi(
     copy_files: list[Path],
     chalk: Chalk,

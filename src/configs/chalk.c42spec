@@ -4951,7 +4951,7 @@ func sink_config_check(path) {
           return conffield + ": Field must be a dict[string, string]"
       }
     }
-    elif contains(["priority"], conffield) {
+    elif contains(["priority", "disable_after_errors"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, int) {
           return conffield + ": This field must be int"

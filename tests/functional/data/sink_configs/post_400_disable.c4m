@@ -1,0 +1,14 @@
+log_level = "trace"
+
+sink_config my_http_config {
+  enabled:              true
+  sink:                 "post"
+  uri:                  env("CHALK_POST_URL")
+  disable_after_errors: 1
+}
+
+if env_exists("CHALK_POST_URL") {
+  subscribe("report", "my_http_config")
+}
+
+subscribe("report", "json_console_out")

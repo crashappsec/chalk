@@ -37,6 +37,9 @@ import pkg/nimutils/[
   file,
   net,
 ]
+import ".."/[
+  types,
+]
 import "."/[
   http,
 ]
@@ -246,6 +249,32 @@ proc rotoLogSinkOut(msg: string, cfg: SinkConfig, t: Topic, tbl: StringTable) =
     logState.stream    = nil
     cfg.iolog(t, "Truncate")
 
+var sinkConsecFailures: Table[string, int]
+
+proc sinkErrorThreshold(cfg: SinkConfig): int =
+  result = 3
+  if "disable_after_errors" in cfg.params:
+    discard parseInt(cfg.params["disable_after_errors"], result)
+
+template onHttpSinkError(cfg: SinkConfig, reason: string, hard: bool) =
+  if hard:
+    cfg.enabled = false
+    error("sink '" & cfg.name & "' disabled: " & reason)
+  else:
+    let count = sinkConsecFailures.getOrDefault(cfg.name, 0) + 1
+    sinkConsecFailures[cfg.name] = count
+    if count >= cfg.sinkErrorThreshold():
+      cfg.enabled = false
+      error(
+        "sink '" & cfg.name & "' disabled after " & $count &
+        " consecutive failures: " & reason,
+      )
+    else:
+      raise
+
+proc resetSinkFailures(cfg: SinkConfig) =
+  sinkConsecFailures.del(cfg.name)
+
 type S3SinkState* = ref object of RootRef
   region*:   string
   uri*:      Uri
@@ -305,12 +334,19 @@ proc s3SinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   objParts.add(state.nameBase)
 
   let
-      newTail  = objParts.join("-")
-      rawPath  = joinPath(state.objPath, newTail)
-      newPath  = if rawPath.startsWith("/"): rawPath else: "/" & rawPath
-      response = client.put_object(state.bucket, newPath, msg)
-
-  cfg.iolog(t, "Post to: " & newPath & "; response = " & response.status)
+    newTail = objParts.join("-")
+    rawPath = joinPath(state.objPath, newTail)
+    newPath = if rawPath.startsWith("/"): rawPath else: "/" & rawPath
+  try:
+    let response = client.put_object(state.bucket, newPath, msg)
+    resetSinkFailures(cfg)
+    cfg.iolog(t, "Post to: " & newPath & "; response = " & response.status)
+  except HttpStatusError as e:
+    dumpExOnDebug()
+    onHttpSinkError(cfg, e.msg, hard = e.code in 400..499 and e.code != 429)
+  except:
+    dumpExOnDebug()
+    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
 
 proc httpHeaders(cfg: SinkConfig): HttpHeaders =
   var
@@ -371,9 +407,10 @@ proc httpParams(cfg: SinkConfig): tuple[
 
 proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
-    params   = cfg.httpParams()
-    headers  = params.headers.addChalkCoreHeaders(body = msg)
-    response = safeRequest(
+    params  = cfg.httpParams()
+    headers = params.headers.addChalkCoreHeaders(body = msg)
+  try:
+    let response = safeRequest(
       url                = params.uri,
       timeout            = params.timeout,
       headers            = headers,
@@ -386,13 +423,21 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
       firstRetryDelayMs  = 100,
       acceptStatusCodes  = [200..299],
     )
-
-  cfg.iolog(t, "Post " & response.status)
+    resetSinkFailures(cfg)
+    cfg.iolog(t, "Post " & response.status)
+  except HttpStatusError as e:
+    dumpExOnDebug()
+    onHttpSinkError(cfg, e.msg, hard = e.code in 400..499 and e.code != 429)
+  except:
+    dumpExOnDebug()
+    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
 
 proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
     params      = cfg.httpParams()
     signHeaders = params.headers.addChalkCoreHeaders(body = msg)
+  var signResponse: Response
+  try:
     signResponse = safeRequest(
       url                = params.uri,
       timeout            = params.timeout,
@@ -404,11 +449,16 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
       retries            = 2,
       firstRetryDelayMs  = 100,
       maxRedirects       = 0,
-      rejectStatusCodes  = [500..599],
+      acceptStatusCodes  = [302..302, 307..307],
     )
-
-  if signResponse.code notin [Http302, Http307]:
-    raise newException(ValueError, "Presign requires 302/307 redirect but received: " & signResponse.status)
+  except HttpStatusError as e:
+    dumpExOnDebug()
+    onHttpSinkError(cfg, e.msg, hard = e.code in 400..499 and e.code != 429)
+    return
+  except:
+    dumpExOnDebug()
+    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
+    return
 
   if not signResponse.headers.hasKey("location"):
     raise newException(ValueError, "Presign redirect Location header missing")
@@ -418,9 +468,9 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
   if uri.scheme == "":
     raise newException(ValueError, "Presign redirect Location header needs to be absolute URL")
 
-  let
-    uploadHeaders = newHttpHeaders().addForwardedHeaders(signResponse)
-    response      = safeRequest(
+  let uploadHeaders = newHttpHeaders().addForwardedHeaders(signResponse)
+  try:
+    let response = safeRequest(
       url                = uri,
       headers            = uploadHeaders,
       timeout            = params.timeout,
@@ -433,8 +483,12 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
       firstRetryDelayMs  = 100,
       acceptStatusCodes  = [200..299],
     )
-
-  cfg.iolog(t, "Presign " & response.status)
+    resetSinkFailures(cfg)
+    cfg.iolog(t, "Presign " & response.status)
+  except:
+    dumpExOnDebug()
+    # Upload errors are always soft: the presigned URL itself may be transient.
+    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
 
 proc addFileSink*() =
   var
@@ -473,13 +527,14 @@ proc addS3Sink*() =
   var
     record = SinkImplementation()
     keys   = {
-      "uid"      : true,
-      "secret"   : true,
-      "token"    : false,
-      "uri"      : true,
-      "region"   : false,
-      "extra"    : false,
-      "endpoint" : false,
+      "uid"                  : true,
+      "secret"               : true,
+      "token"                : false,
+      "uri"                  : true,
+      "region"               : false,
+      "extra"                : false,
+      "endpoint"             : false,
+      "disable_after_errors" : false,
     }.toTable()
 
   record.initFunction   = some(InitCallback(s3SinkInit))
@@ -500,6 +555,7 @@ proc addPostSink*() =
       "pinned_cert_file"     : false,
       "prefer_bundled_certs" : false,
       "auth"                 : false,
+      "disable_after_errors" : false,
     }.toTable()
 
   record.outputFunction = postSinkOut
@@ -519,6 +575,7 @@ proc addPresignSink*() =
       "pinned_cert_file"     : false,
       "prefer_bundled_certs" : false,
       "auth"                 : false,
+      "disable_after_errors" : false,
     }.toTable()
 
   record.outputFunction = presignSinkOut
