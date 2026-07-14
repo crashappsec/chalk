@@ -21,7 +21,7 @@ requires "nim >= 2.0.8"
 # out these commits when the repos are absent.  In interactive shells the
 # Makefile defaults to the `dev` branch instead.
 # con4m:    f2364ee578f22aa0a4ad94e68173c24fe0d5038e
-# nimutils: 893ce42b2004a1a5443233d333906c8cf1388fa5
+# nimutils: f58ed57c49f5b12785da1a1d9b9868bd9774f8a6
 requires "unicodedb == 0.12.0"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
 requires "https://github.com/NimParsers/parsetoml == 0.7.1" # MIT

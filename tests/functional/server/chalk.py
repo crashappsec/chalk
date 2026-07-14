@@ -122,8 +122,28 @@ async def accept_presign_report(
     )
 
 
+@app.post("/400")
+async def error_400():
+    raise HTTPException(400)
+
+
 @app.post("/500")
 async def error_500():
+    raise HTTPException(500)
+
+
+# S3-style error-injecting routes. The s3 sink issues
+# `PUT /<bucket>/<object>`, so a distinct literal bucket prefix lets these
+# return a deterministic status without colliding with the real routes. The
+# object segment is captured (and ignored) because the sink rewrites it to a
+# timestamped/random name.
+@app.put("/chalk-s3-error-400/{key:path}")
+async def s3_error_400(key: str):
+    raise HTTPException(400)
+
+
+@app.put("/chalk-s3-error-500/{key:path}")
+async def s3_error_500(key: str):
     raise HTTPException(500)
 
 

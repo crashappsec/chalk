@@ -236,6 +236,46 @@ def test_500_http_fastapi(
 
 
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_400_disables_sink(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_http: str,
+):
+    """
+    The post and s3 sinks share the same auto-disable machinery. A 400 response
+    is a hard error, disabling the sink immediately; a 500 response is a soft
+    error, disabling the sink once disable_after_errors (1) is reached. Both
+    classifications are exercised for the post and s3 sinks in one chalk run.
+    The s3 sinks point at a fake S3-style endpoint, so the s3 hard/soft/disable
+    path runs without real AWS credentials. In each case chalk must log an error
+    naming the sink, and the report that triggered the disable must still be
+    accounted as a publish failure and buffered in the report cache -- disabling
+    stops future publishes but must not drop the report that tripped it.
+    """
+    result = chalk.insert(
+        copy_files[0],
+        config=SINK_CONFIGS / "errors.c4m",
+        use_embedded=False,
+        env={
+            "CHALK_POST_URL": f"{SERVER_HTTP}/400",
+            "CHALK_POST_500_URL": f"{SERVER_HTTP}/500",
+            "CHALK_S3_ENDPOINT": server_http,
+            "CHALK_S3_URL": "s3://chalk-s3-error-400/sink-test.json",
+            "CHALK_S3_500_URL": "s3://chalk-s3-error-500/sink-test.json",
+        },
+        ignore_errors=True,
+    )
+    # hard 400 disables immediately; soft 500 disables once the threshold hits
+    assert "sink 'my_http_config' disabled: " in result.logs
+    assert "sink 'my_http_500_config' disabled after " in result.logs
+    assert "sink 'my_s3_config' disabled: " in result.logs
+    assert "sink 'my_s3_500_config' disabled after " in result.logs
+    # the disabling deliveries are still surfaced as failures and cached
+    assert "publish failures will be cached" in result.logs
+    assert result.logged_report.contains(result.report)
+
+
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_presign_http_fastapi(
     copy_files: list[Path],
     chalk: Chalk,
