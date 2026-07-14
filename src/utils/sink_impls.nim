@@ -261,6 +261,11 @@ proc sinkErrorThreshold(cfg: SinkConfig): int =
   if result < 1:
     result = 1
 
+proc isHardHttpError(e: ref HttpStatusError): bool =
+  ## A 4xx (client) status is a hard error the sink config cannot fix by
+  ## retrying, except 429 (rate limited) which is transient and stays soft.
+  e.code in 400..499 and e.code != 429
+
 template onHttpSinkError(cfg: SinkConfig, err: ref Exception, hard: bool) =
   ## Records an HTTP sink delivery failure and always re-raises `err`.
   ##
@@ -358,7 +363,7 @@ proc s3SinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     cfg.iolog(t, "Post to: " & newPath & "; response = " & response.status)
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = e.code in 400..499 and e.code != 429)
+    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
     onHttpSinkError(cfg, getCurrentException(), hard = false)
@@ -442,7 +447,7 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     cfg.iolog(t, "Post " & response.status)
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = e.code in 400..499 and e.code != 429)
+    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
     onHttpSinkError(cfg, getCurrentException(), hard = false)
@@ -468,7 +473,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     )
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = e.code in 400..499 and e.code != 429)
+    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
     onHttpSinkError(cfg, getCurrentException(), hard = false)
