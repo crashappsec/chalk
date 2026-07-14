@@ -96,16 +96,16 @@ sink s3 {
   shortdoc:              "S3 object storage"
   doc:                   """
 
-| Parameter  | Type     | Required | Description                                                                                                                                                                   |
-|------------|----------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `uid`      | `string` | true     | A valid AWS access key ID                                                                                                                                                     |
-| `secret`   | `string` | true     | A valid AWS secret access key                                                                                                                                                 |
-| `token`    | `string` | false    | AWS session token                                                                                                                                                             |
-| `uri`      | `string` | true     | The URI for the bucket in `s3:` format; see below                                                                                                                             |
-| `region`   | `string` | true     | The AWS region (or any non-empty string for S3-compatible stores)                                                                                                             |
-| `extra`    | `string` | false    | A prefix added to the object path within the bucket                                                                                                                           |
-| `endpoint`              | `string` | false    | Custom S3-compatible endpoint URL (e.g. `http://localhost:9000` for MinIO or `http://localhost:8080` for `rclone serve s3`). When omitted, the standard AWS endpoint is used. |
-| `disable_after_errors`  | `int`    | false    | Number of consecutive errors before the sink is disabled (default: 3)                                                                                                         |
+| Parameter              | Type     | Required | Description                                                                                                                                                                   |
+|------------------------|----------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `uid`                  | `string` | true     | A valid AWS access key ID                                                                                                                                                     |
+| `secret`               | `string` | true     | A valid AWS secret access key                                                                                                                                                 |
+| `token`                | `string` | false    | AWS session token                                                                                                                                                             |
+| `uri`                  | `string` | true     | The URI for the bucket in `s3:` format; see below                                                                                                                             |
+| `region`               | `string` | true     | The AWS region (or any non-empty string for S3-compatible stores)                                                                                                             |
+| `extra`                | `string` | false    | A prefix added to the object path within the bucket                                                                                                                           |
+| `endpoint`             | `string` | false    | Custom S3-compatible endpoint URL (e.g. `http://localhost:9000` for MinIO or `http://localhost:8080` for `rclone serve s3`). When omitted, the standard AWS endpoint is used. |
+| `disable_after_errors` | `int`    | false    | Number of consecutive errors before the sink is disabled (default: 3)                                                                                                         |
 
 To ensure uniqueness, each run of chalk constructs a unique object
 name. Here are the components:
@@ -177,16 +177,16 @@ sink post {
   shortdoc:              "HTTP/HTTPS POST"
   doc:       """
 
-| Parameter              |                        | Required | Description                                                    |
-|------------------------|------------------------|----------|----------------------------------------------------------------|
-| `uri`                  | `string`               | true     | The full URI to the endpoint to which the POST should be made. |
-| `content_type`         | `string`               | false    | The value to pass for the "content-type" header                |
-| `headers`              | `dict[string, string]` | false    | A dictionary of additional mime headers                        |
-| `disallow_http`        | `bool`                 | false    | Do not allow HTTP connections, only HTTPS                      |
-| `timeout`              | `Duration`             | false    | Connection timeout in ms                                       |
-| `pinned_cert_file`     | `string`               | false    | TLS certificate file                                           |
-| `prefer_bundled_certs` | `bool`                 | false    | Whether to prefer chalk bundled root CA certs                  |
-| `auth`                 | `string`               | false    | Auth configuration for the API                                 |
+| Parameter              |                        | Required | Description                                                           |
+|------------------------|------------------------|----------|-----------------------------------------------------------------------|
+| `uri`                  | `string`               | true     | The full URI to the endpoint to which the POST should be made.        |
+| `content_type`         | `string`               | false    | The value to pass for the "content-type" header                       |
+| `headers`              | `dict[string, string]` | false    | A dictionary of additional mime headers                               |
+| `disallow_http`        | `bool`                 | false    | Do not allow HTTP connections, only HTTPS                             |
+| `timeout`              | `Duration`             | false    | Connection timeout in ms                                              |
+| `pinned_cert_file`     | `string`               | false    | TLS certificate file                                                  |
+| `prefer_bundled_certs` | `bool`                 | false    | Whether to prefer chalk bundled root CA certs                         |
+| `auth`                 | `string`               | false    | Auth configuration for the API                                        |
 | `disable_after_errors` | `int`                  | false    | Number of consecutive errors before the sink is disabled (default: 3) |
 
 The post will always be a single JSON object, and the default
