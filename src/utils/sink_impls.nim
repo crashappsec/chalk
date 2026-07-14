@@ -255,6 +255,11 @@ proc sinkErrorThreshold(cfg: SinkConfig): int =
   result = 3
   if "disable_after_errors" in cfg.params:
     discard parseInt(cfg.params["disable_after_errors"], result)
+  # Defensive floor: a non-positive threshold would disable the sink on the
+  # first soft error. Config load already rejects non-positive values, but
+  # clamp here so the disable machinery can never be tripped immediately.
+  if result < 1:
+    result = 1
 
 template onHttpSinkError(cfg: SinkConfig, reason: string, hard: bool) =
   if hard:

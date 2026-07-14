@@ -354,9 +354,10 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     of "disable_after_errors":
       let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
-        if boxOpt.get().kind != MkInt:
+        if boxOpt.get().kind != MkInt or unpack[int](boxOpt.get()) <= 0:
           error(k & " (sink config key) must be a positive integer")
         else:
+          # Nimutils wants this param as a string.
           opts[k] = $(unpack[int](boxOpt.get()))
     of "max":
       try:
