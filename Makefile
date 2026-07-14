@@ -15,8 +15,8 @@ git clone git@github.com:crashappsec/$(1).git $(2)
 git --git-dir=$(2)/.git --work-tree=$(2) checkout $(3)
 endef
 else
-CON4M_VERSION ?= $(shell grep '# con4m:' chalk.nimble | grep -oE '[a-f0-9]{40}')
-NIMUTILS_VERSION ?= $(shell grep '# nimutils:' chalk.nimble | grep -oE '[a-f0-9]{40}')
+CON4M_VERSION ?= $(shell awk '/con4m:/{print $$NF}' chalk.nimble)
+NIMUTILS_VERSION ?= $(shell awk '/nimutils:/{print $$NF}' chalk.nimble)
 define clone-sibling
 git init $(2)
 git -C $(2) fetch --depth=1 https://github.com/crashappsec/$(1).git $(3)
