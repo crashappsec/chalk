@@ -28,6 +28,9 @@
   - The threshold defaults to 3 and is configurable per sink via
     `disable_after_errors: <int>`.
   - The counter resets to zero on any successful delivery.
+  - Disabling a sink stops future publishes only; the delivery that tripped
+    the disable is still accounted as a failure and buffered in the report
+    cache rather than being silently dropped.
 
   ([#689](https://github.com/crashappsec/chalk/pull/689))
 

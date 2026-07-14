@@ -269,8 +269,11 @@ template onHttpSinkError(cfg: SinkConfig, reason: string, hard: bool) =
         "sink '" & cfg.name & "' disabled after " & $count &
         " consecutive failures: " & reason,
       )
-    else:
-      raise
+  # Re-raise on every path, including when the sink was just disabled.
+  # Disabling only stops future publishes; the delivery that triggered it
+  # must still propagate to publish()'s onFail so this report is accounted
+  # as a failure and buffered in the report cache rather than dropped.
+  raise
 
 proc resetSinkFailures(cfg: SinkConfig) =
   sinkConsecFailures.del(cfg.name)
@@ -454,11 +457,9 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
   except HttpStatusError as e:
     dumpExOnDebug()
     onHttpSinkError(cfg, e.msg, hard = e.code in 400..499 and e.code != 429)
-    return
   except:
     dumpExOnDebug()
     onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
-    return
 
   if not signResponse.headers.hasKey("location"):
     raise newException(ValueError, "Presign redirect Location header missing")

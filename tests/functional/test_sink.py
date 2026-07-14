@@ -242,17 +242,30 @@ def test_post_400_disables_sink(
     server_http: str,
 ):
     """
-    A 400 response is a hard error; the sink must be disabled immediately and
-    chalk must log an error naming the sink.
+    A 400 response is a hard error, disabling the sink immediately; a 500
+    response is a soft error, disabling the sink once disable_after_errors (1)
+    is reached. Both are exercised in one chalk run. In each case chalk must
+    log an error naming the sink, and the report that triggered the disable
+    must still be accounted as a publish failure and buffered in the report
+    cache -- disabling stops future publishes but must not drop the report that
+    tripped it.
     """
     result = chalk.insert(
         copy_files[0],
-        config=SINK_CONFIGS / "post_400_disable.c4m",
+        config=SINK_CONFIGS / "post_errors.c4m",
         use_embedded=False,
-        env={"CHALK_POST_URL": f"{SERVER_HTTP}/400"},
+        env={
+            "CHALK_POST_URL": f"{SERVER_HTTP}/400",
+            "CHALK_POST_500_URL": f"{SERVER_HTTP}/500",
+        },
         ignore_errors=True,
     )
-    assert "sink 'my_http_config' disabled" in result.logs
+    # hard 400 disables immediately; soft 500 disables once the threshold hits
+    assert "sink 'my_http_config' disabled: " in result.logs
+    assert "sink 'my_http_500_config' disabled after " in result.logs
+    # both disabling deliveries are still surfaced as failures and cached
+    assert "publish failures will be cached" in result.logs
+    assert result.logged_report.contains(result.report)
 
 
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
