@@ -125,6 +125,20 @@ watch: $(SOURCES)
 ../con4m/README.md:
 	$(call clone-sibling,con4m,$(@D),$(CON4M_VERSION))
 
+# On macOS the build runs on the host (no Docker). Populate ~/.local/c0 with
+# the pre-built static libs from nimutils/files/deps/ and the bundled C
+# headers from nimutils/nimutils/c/ - exactly what the Dockerfile does for
+# Linux. Uses libgit2.a as a stamp: skip if already present.
+ifeq "$(shell uname -s 2>/dev/null)" "Darwin"
+MACOS_DEPS_STAMP := $(HOME)/.local/c0/libs/libgit2.a
+
+$(MACOS_DEPS_STAMP): ../nimutils/README.md
+	bash ../nimutils/bin/buildlibs.sh ../nimutils/files/deps
+	NIMUTILS_DIR=../nimutils bash ../nimutils/bin/header_install.sh
+
+nimble.paths: $(MACOS_DEPS_STAMP)
+endif
+
 nimble.paths: ../nimutils/README.md ../con4m/README.md
 	echo '--path:"$(abspath $(dir $(shell find ../nimutils -name nimutils.nim)))"' > $@
 	echo '--path:"$(abspath $(dir $(shell find ../con4m -name con4m.nim)))"' >> $@
