@@ -23,6 +23,8 @@
 - `post`, `presign`, and `s3` sinks now automatically disable themselves on
   repeated errors to avoid flooding an unavailable endpoint:
   - 4xx responses (except 429) disable the sink immediately (hard error).
+  - For `presign`, a malformed redirect sign response is also treated as a
+    hard error.
   - 5xx responses, 429, and network errors increment a consecutive-failure
     counter; the sink is disabled once the counter reaches the threshold.
   - The threshold defaults to 3 and is configurable per sink via

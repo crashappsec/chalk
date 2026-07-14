@@ -466,13 +466,19 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     dumpExOnDebug()
     onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
 
-  if not signResponse.headers.hasKey("location"):
-    raise newException(ValueError, "Presign redirect Location header missing")
-
-  let uri = parseUri(signResponse.headers["location"])
-
-  if uri.scheme == "":
-    raise newException(ValueError, "Presign redirect Location header needs to be absolute URL")
+  var uri: Uri
+  try:
+    if not signResponse.headers.hasKey("location"):
+      raise newException(ValueError, "Presign redirect Location header missing")
+    uri = parseUri(signResponse.headers["location"])
+    if uri.scheme == "":
+      raise newException(ValueError, "Presign redirect Location header needs to be absolute URL")
+  except:
+    dumpExOnDebug()
+    # A malformed redirect (missing or relative Location) can never yield a
+    # working upload URL, so treat it as a hard error and route it through the
+    # disable machinery like a 4xx sign response instead of raising past it.
+    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = true)
 
   let uploadHeaders = newHttpHeaders().addForwardedHeaders(signResponse)
   try:
