@@ -261,10 +261,21 @@ proc sinkErrorThreshold(cfg: SinkConfig): int =
   if result < 1:
     result = 1
 
-template onHttpSinkError(cfg: SinkConfig, reason: string, hard: bool) =
+template onHttpSinkError(cfg: SinkConfig, err: ref Exception, hard: bool) =
+  ## Records an HTTP sink delivery failure and always re-raises `err`.
+  ##
+  ## `hard` failures (4xx except 429, malformed presign redirects) disable the
+  ## sink immediately; soft failures disable it once disable_after_errors
+  ## consecutive failures are reached. On every path `err` is re-raised so the
+  ## delivery that triggered the failure still propagates to publish()'s onFail,
+  ## is accounted as a failure, and is buffered in the report cache rather than
+  ## dropped. Disabling only stops future publishes; it must not drop the report
+  ## that tripped it. Passing the exception explicitly (rather than a bare
+  ## `raise`) keeps the re-raise self-documenting and correct even outside an
+  ## except block.
   if hard:
     cfg.enabled = false
-    error("sink '" & cfg.name & "' disabled: " & reason)
+    error("sink '" & cfg.name & "' disabled: " & err.msg)
   else:
     let count = sinkConsecFailures.getOrDefault(cfg.name, 0) + 1
     sinkConsecFailures[cfg.name] = count
@@ -272,13 +283,9 @@ template onHttpSinkError(cfg: SinkConfig, reason: string, hard: bool) =
       cfg.enabled = false
       error(
         "sink '" & cfg.name & "' disabled after " & $count &
-        " consecutive failures: " & reason,
+        " consecutive failures: " & err.msg,
       )
-  # Re-raise on every path, including when the sink was just disabled.
-  # Disabling only stops future publishes; the delivery that triggered it
-  # must still propagate to publish()'s onFail so this report is accounted
-  # as a failure and buffered in the report cache rather than dropped.
-  raise
+  raise err
 
 proc resetSinkFailures(cfg: SinkConfig) =
   sinkConsecFailures.del(cfg.name)
@@ -351,10 +358,10 @@ proc s3SinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     cfg.iolog(t, "Post to: " & newPath & "; response = " & response.status)
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e.msg, hard = e.code in 400..499 and e.code != 429)
+    onHttpSinkError(cfg, e, hard = e.code in 400..499 and e.code != 429)
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
+    onHttpSinkError(cfg, getCurrentException(), hard = false)
 
 proc httpHeaders(cfg: SinkConfig): HttpHeaders =
   var
@@ -435,10 +442,10 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     cfg.iolog(t, "Post " & response.status)
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e.msg, hard = e.code in 400..499 and e.code != 429)
+    onHttpSinkError(cfg, e, hard = e.code in 400..499 and e.code != 429)
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
+    onHttpSinkError(cfg, getCurrentException(), hard = false)
 
 proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
@@ -461,10 +468,10 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     )
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e.msg, hard = e.code in 400..499 and e.code != 429)
+    onHttpSinkError(cfg, e, hard = e.code in 400..499 and e.code != 429)
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
+    onHttpSinkError(cfg, getCurrentException(), hard = false)
 
   var uri: Uri
   try:
@@ -478,7 +485,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     # A malformed redirect (missing or relative Location) can never yield a
     # working upload URL, so treat it as a hard error and route it through the
     # disable machinery like a 4xx sign response instead of raising past it.
-    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = true)
+    onHttpSinkError(cfg, getCurrentException(), hard = true)
 
   let uploadHeaders = newHttpHeaders().addForwardedHeaders(signResponse)
   try:
@@ -500,7 +507,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
   except:
     dumpExOnDebug()
     # Upload errors are always soft: the presigned URL itself may be transient.
-    onHttpSinkError(cfg, getCurrentExceptionMsg(), hard = false)
+    onHttpSinkError(cfg, getCurrentException(), hard = false)
 
 proc addFileSink*() =
   var
