@@ -1,0 +1,55 @@
+log_level = "trace"
+
+sink_config my_http_config {
+  enabled:              true
+  sink:                 "post"
+  uri:                  env("CHALK_POST_URL")
+  disable_after_errors: 1
+}
+
+sink_config my_http_500_config {
+  enabled:              true
+  sink:                 "post"
+  uri:                  env("CHALK_POST_500_URL")
+  disable_after_errors: 1
+}
+
+sink_config my_s3_config {
+  enabled:              true
+  sink:                 "s3"
+  uri:                  env("CHALK_S3_URL")
+  endpoint:             env("CHALK_S3_ENDPOINT")
+  uid:                  "test"
+  secret:               "test"
+  region:               "us-east-1"
+  disable_after_errors: 1
+}
+
+sink_config my_s3_500_config {
+  enabled:              true
+  sink:                 "s3"
+  uri:                  env("CHALK_S3_500_URL")
+  endpoint:             env("CHALK_S3_ENDPOINT")
+  uid:                  "test"
+  secret:               "test"
+  region:               "us-east-1"
+  disable_after_errors: 1
+}
+
+if env_exists("CHALK_POST_URL") {
+  subscribe("report", "my_http_config")
+}
+
+if env_exists("CHALK_POST_500_URL") {
+  subscribe("report", "my_http_500_config")
+}
+
+if env_exists("CHALK_S3_URL") {
+  subscribe("report", "my_s3_config")
+}
+
+if env_exists("CHALK_S3_500_URL") {
+  subscribe("report", "my_s3_500_config")
+}
+
+subscribe("report", "json_console_out")
