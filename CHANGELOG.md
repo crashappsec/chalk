@@ -4,6 +4,21 @@
 
 ### New Features
 
+- Two new runtime artifact keys capture errors and failures that occur
+  **after** the chalk mark has already been embedded into the image (e.g.
+  registry queries, provenance, SBOM collection, and build-context upload).
+  Because the chalk mark is already written at that point, these cannot
+  appear in the chalk-time originals:
+  - `_ERR_INFO` — superset of `ERR_INFO`; contains the full error log
+    accumulated through the end of the operation.
+  - `_FAILED_KEYS` — superset of `FAILED_KEYS`; includes failures from
+    post-build steps.
+
+  All report templates except `report_all` now subscribe to the new keys
+  instead of the chalk-time originals. `report_all` subscribes to both.
+
+  ([#692](https://github.com/crashappsec/chalk/pull/692))
+
 - `post` and `presign` sinks now send chalk metadata headers with every
   request, enabling server-side routing and auditing without parsing the body:
   - `X-Chalk-Version`

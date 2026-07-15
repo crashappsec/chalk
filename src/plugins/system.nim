@@ -305,6 +305,8 @@ proc attestationGetChalkTimeArtifactInfo*(self: Plugin, obj: ChalkObj):
 proc attestationGetRunTimeArtifactInfo(self: Plugin, obj: ChalkObj, insert: bool):
                                        ChalkDict {.cdecl.} =
   result = ChalkDict()
+  result.setIfNeeded("_ERR_INFO", obj.err)
+  result.setIfNeeded("_FAILED_KEYS", obj.failedKeys)
   if insert and obj.willSignBySigStore():
     try:
       result.update(obj.signBySigStore())

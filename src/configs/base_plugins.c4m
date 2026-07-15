@@ -70,7 +70,7 @@ plugin attestation {
     ~enabled: true
     pre_chalk_keys:  ["METADATA_HASH", "ERR_INFO", "FAILED_KEYS", "METADATA_ID",
                       "SIGNING", "SIGNATURE", "INJECTOR_PUBLIC_KEY"]
-    post_chalk_keys: ["_SIGNATURES"]
+    post_chalk_keys: ["_SIGNATURES", "_ERR_INFO", "_FAILED_KEYS"]
     ~priority:       high() - 1
     doc: """
 Like the `system` module, this module is non-overridable keys added by
