@@ -287,7 +287,7 @@ def test_tag_refetch_ssl_cert_failure(
     result = chalk_copy.insert(artifact, env={"SSL_CERT_FILE": str(bad_cert)})
     assert result.mark.has(
         TAG="v1.0.0",
-        FAILED_KEYS={
+        _FAILED_KEYS={
             "_TAG": [
                 {
                     "code": "GIT_REFETCH_FAILED",
