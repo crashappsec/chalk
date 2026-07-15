@@ -149,6 +149,7 @@ report and subtract from it.
   key.SBOM.use                                = true
   key.SAST.use                                = true
   key.ERR_INFO.use                            = true
+  key._ERR_INFO.use                           = true
   key.SIGNING.use                             = true
   key.METADATA_HASH.use                       = true
   key.METADATA_ID.use                         = true
@@ -433,6 +434,7 @@ report and subtract from it.
   key._OP_CLOUD_METADATA.use                  = true
   key._OP_FAILED_KEYS.use                     = true
   key.FAILED_KEYS.use                         = true
+  key._FAILED_KEYS.use                        = true
   key._NETWORK_PARTIAL_TRACEROUTE_IPS.use     = true
   key._OP_ERRORS.use                          = true
   key._OP_HOST_REPORT_KEYS.use                = true
@@ -620,7 +622,8 @@ doc: """
   key._OP_HOST_MACHINE.use                    = true
   key._OP_CLOUD_METADATA.use                  = true
   key._OP_FAILED_KEYS.use                     = true
-  key.FAILED_KEYS.use                         = true
+  key.FAILED_KEYS.use                         = false
+  key._FAILED_KEYS.use                        = true
   key._NETWORK_PARTIAL_TRACEROUTE_IPS.use     = true
   key._OP_ERRORS.use                          = true
   key._OP_HOST_REPORT_KEYS.use                = true
@@ -841,7 +844,8 @@ doc: """
   key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
-  key.ERR_INFO.use                            = true
+  key.ERR_INFO.use                            = false
+  key._ERR_INFO.use                           = true
   key.SIGNING.use                             = false
   key.METADATA_HASH.use                       = true
   key.METADATA_ID.use                         = true
@@ -1206,7 +1210,8 @@ container.
   key._OP_HOST_MACHINE.use                    = true
   key._OP_CLOUD_METADATA.use                  = true
   key._OP_FAILED_KEYS.use                     = true
-  key.FAILED_KEYS.use                         = true
+  key.FAILED_KEYS.use                         = false
+  key._FAILED_KEYS.use                        = true
   key._NETWORK_PARTIAL_TRACEROUTE_IPS.use     = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_ERRORS.use                          = true
@@ -1403,7 +1408,8 @@ container.
   key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
-  key.ERR_INFO.use                            = true
+  key.ERR_INFO.use                            = false
+  key._ERR_INFO.use                           = true
   key.SIGNING.use                             = false
   key.METADATA_HASH.use                       = true
   key.METADATA_ID.use                         = true
@@ -1753,7 +1759,8 @@ and keep the run-time key.
   key._OP_HOST_MACHINE.use                    = true
   key._OP_CLOUD_METADATA.use                  = true
   key._OP_FAILED_KEYS.use                     = true
-  key.FAILED_KEYS.use                         = true
+  key.FAILED_KEYS.use                         = false
+  key._FAILED_KEYS.use                        = true
   key._NETWORK_PARTIAL_TRACEROUTE_IPS.use     = true
   key._CHALK_EXTERNAL_ACTION_AUDIT.use        = true
   key._OP_ERRORS.use                          = true
@@ -1950,7 +1957,8 @@ and keep the run-time key.
   key.SECRET_SCANNER.use                      = true
   key.SBOM.use                                = true
   key.SAST.use                                = true
-  key.ERR_INFO.use                            = true
+  key.ERR_INFO.use                            = false
+  key._ERR_INFO.use                           = true
   key.SIGNING.use                             = false
   key.METADATA_HASH.use                       = true
   key.METADATA_ID.use                         = true
@@ -2347,7 +2355,8 @@ running insert commands.
   key._TIMESTAMP_TAGGED.use                   = true
   key._TAG_MESSAGE.use                        = true
   key.EMBEDDED_CHALK.use                      = true
-  key.ERR_INFO.use                            = true
+  key.ERR_INFO.use                            = false
+  key._ERR_INFO.use                           = true
   key._DOCKER_CLIENT_VERSION.use              = false
   key._DOCKER_SERVER_VERSION.use              = false
   key._DOCKER_BUILDX_VERSION.use              = false
@@ -2456,7 +2465,8 @@ running commands that do NOT insert chalk marks.
   key._TIMESTAMP_TAGGED.use                   = true
   key._TAG_MESSAGE.use                        = true
   key.EMBEDDED_CHALK.use                      = true
-  key.ERR_INFO.use                            = true
+  key.ERR_INFO.use                            = false
+  key._ERR_INFO.use                           = true
   key._DOCKER_CLIENT_VERSION.use              = false
   key._DOCKER_SERVER_VERSION.use              = false
   key._DOCKER_BUILDX_VERSION.use              = false

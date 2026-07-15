@@ -79,7 +79,8 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OP_HOST_MACHINE.use                           = true
   ~key._OP_CLOUD_METADATA.use                         = true
   ~key._OP_FAILED_KEYS.use                            = true
-  ~key.FAILED_KEYS.use                                = true
+  ~key.FAILED_KEYS.use                                = false
+  ~key._FAILED_KEYS.use                               = true
   ~key._NETWORK_PARTIAL_TRACEROUTE_IPS.use            = true
   ~key._CHALK_EXTERNAL_ACTION_AUDIT.use               = true
   ~key._OP_ERRORS.use                                 = true
@@ -272,7 +273,8 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key.SECRET_SCANNER.use                      = true
   ~key.SBOM.use                                = true
   ~key.SAST.use                                = true
-  ~key.ERR_INFO.use                            = true
+  ~key.ERR_INFO.use                            = false
+  ~key._ERR_INFO.use                           = true
   ~key.SIGNING.use                             = false
   ~key.METADATA_HASH.use                       = true
   ~key.METADATA_ID.use                         = true

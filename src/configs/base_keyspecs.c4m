@@ -2163,6 +2163,27 @@ variable that controls console logging output.
 """
 }
 
+keyspec _ERR_INFO {
+    kind:             RunTimeArtifact
+    type:             list[string]
+    standard:         true
+    system:           true
+    since:            "1.1.4"
+    normalized_order: high() - 500
+    shortdoc:         "Errors collected during chalk time and post-build operations"
+    doc:              """
+This captures all errors and logging information reported during chalk
+insertion and any subsequent operations (such as registry queries,
+provenance, and SBOM collection) that occur after the chalk mark is
+embedded. This is a superset of ERR_INFO, which is snapshotted at
+chalk time before the build runs.
+
+Only messages of a log level at least as severe as that found in the
+configuration variable `chalk_log_level` are captured. By default,
+this value is set to "error".
+"""
+}
+
 keyspec FAILED_KEYS {
   kind:     ChalkTimeArtifact
   type:     dict[string, list[`x]]
@@ -2176,6 +2197,39 @@ AWS EC2 instance metadata if IMDSv2 is disabled for that instance.
 This key reports all known errors and reasons why that key could
 not be collected so that further action can be taken to be able
 to collect that metadata in the future.
+
+Each entry maps a key name to a list of error objects. Using a list
+allows multiple distinct failures for the same key to be recorded
+without later errors overwriting earlier ones. Each error object has:
+
+- `code` - a machine-readable error code string
+- `error` - a human-readable error message
+- `description` - a longer explanation and remediation hint
+"""
+}
+
+keyspec _FAILED_KEYS {
+  kind:     RunTimeArtifact
+  type:     dict[string, list[`x]]
+  standard: true
+  since:    "1.1.4"
+  shortdoc: "Keys and errors why chalk could not collect them (including post-build)"
+  doc:      """
+This key reports all known errors and reasons why chalk could not
+collect some metadata, including operations that occur after the
+chalk mark has already been embedded into the artifact.
+
+This is a superset of FAILED_KEYS, which is snapshotted at chalk
+time before the build runs. _FAILED_KEYS includes failures from
+post-build operations such as registry queries, provenance, and
+SBOM collection.
+
+For example, if a build context upload fails after the chalk mark
+has already been embedded into the image, the failure is recorded
+under the `_REPO_BUILD_CONTEXTS` key with a code of
+`CONTEXT_UPLOAD_FAILED` or `CONTEXT_TOO_LARGE`. These failures
+cannot appear in FAILED_KEYS because the chalk mark was already
+written before the upload was attempted.
 
 Each entry maps a key name to a list of error objects. Using a list
 allows multiple distinct failures for the same key to be recorded
