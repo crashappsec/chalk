@@ -76,6 +76,7 @@ async def _check_chalk_core_headers(
         "x-chalk-action-id",
         "x-content-length",
         "x-chalk-digest-sha256",
+        "x-chalk-attempt",
     ]:
         if not request.headers.get(header):
             raise HTTPException(status_code=400, detail=f"missing {header} header")
@@ -116,6 +117,11 @@ async def accept_presign_report(
         raise HTTPException(
             status_code=400,
             detail="x-presign-test forwarded header missing or has wrong value",
+        )
+    if not request.headers.get("x-chalk-attempt"):
+        raise HTTPException(
+            status_code=400,
+            detail="missing x-chalk-attempt header",
         )
     return await accept_report(
         reports=reports, request=request, response=response, db=db
@@ -300,6 +306,11 @@ async def object_get_presign(key: str, request: Request):
 
 @app.put("/presign/objects/{key}")
 async def object_create_presign(key: str, request: Request):
+    if not request.headers.get("x-chalk-attempt"):
+        raise HTTPException(
+            status_code=400,
+            detail="missing x-chalk-attempt header",
+        )
     redirect = request.url_for("object_create", key=key)
     return RedirectResponse(
         f"{redirect}?signature=foobar",
@@ -326,6 +337,11 @@ async def object_get(key: str):
 
 @app.put("/objects/{key}")
 async def object_create(key: str, request: Request):
+    if not request.headers.get("x-chalk-attempt"):
+        raise HTTPException(
+            status_code=400,
+            detail="missing x-chalk-attempt header",
+        )
     if key in objects:
         raise HTTPException(status_code=status.HTTP_412_PRECONDITION_FAILED)
     content_type = request.headers.get("content-type", "")
