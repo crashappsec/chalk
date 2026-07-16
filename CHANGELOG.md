@@ -26,8 +26,10 @@
   - `X-Chalk-Action-Id` (same as `_ACTION_ID`)
   - `X-Content-Length`
   - `X-Chalk-Digest-Sha256`
+  - `X-Chalk-Attempt` — 1-based attempt counter, incremented on each retry
 
-  ([#688](https://github.com/crashappsec/chalk/pull/688))
+  ([#688](https://github.com/crashappsec/chalk/pull/688),
+  [#693](https://github.com/crashappsec/chalk/pull/693))
 
 - `presign` sink now supports `x-forward-headers`: header names listed in that
   response header are copied from the redirect response into the upload PUT,

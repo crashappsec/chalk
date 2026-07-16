@@ -538,6 +538,7 @@ const
   emptyMark*          = "{ \"MAGIC\" : \"" & magicUTF8 & "\" }"
   implName*           = "chalk-reference"
   chalkSpecName*      = "configs/chalk.c42spec"
+  chalkAttemptHeader* = "X-Chalk-Attempt"
   getoptConfName*     = "configs/getopts.c4m"
   baseConfName*       = "configs/base_*.c4m"
   sbomConfName*       = "configs/sbomconfig.c4m"

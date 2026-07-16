@@ -442,6 +442,7 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
       retries            = 2,
       firstRetryDelayMs  = 100,
       acceptStatusCodes  = [200..299],
+      attemptHeader      = chalkAttemptHeader,
     )
     resetSinkFailures(cfg)
     cfg.iolog(t, "Post " & response.status)
@@ -470,6 +471,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
       firstRetryDelayMs  = 100,
       maxRedirects       = 0,
       acceptStatusCodes  = [302..302, 307..307],
+      attemptHeader      = chalkAttemptHeader,
     )
   except HttpStatusError as e:
     dumpExOnDebug()
@@ -506,6 +508,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
       retries            = 2,
       firstRetryDelayMs  = 100,
       acceptStatusCodes  = [200..299],
+      attemptHeader      = chalkAttemptHeader,
     )
     resetSinkFailures(cfg)
     cfg.iolog(t, "Presign " & response.status)
