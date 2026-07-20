@@ -1542,6 +1542,17 @@ integrity check passes, even if this makes marks forgable.
 """
   }
 
+  field per_chalk_reports {
+    type:    bool
+    default: false
+    doc:     """
+When set to `true`, instead of emitting one report with all chalk marks
+bundled in `_CHALKS`, chalk emits one report per chalk mark with
+`_CHALKS` containing only that single mark. Host-level keys are repeated
+verbatim in each report.
+"""
+  }
+
   field doc {
     type:     string
     require:  false
@@ -1689,6 +1700,17 @@ That is, if the current chalk command is not in this list, then the
 report will NOT run.
 
 If not specified, reports apply to any command that reports.
+"""
+  }
+
+  field per_chalk {
+    type:    bool
+    default: false
+    doc:     """
+When set to `true`, instead of emitting one report with all chalk marks
+bundled in `_CHALKS`, chalk emits one report per chalk mark with
+`_CHALKS` containing only that single mark. Host-level keys are repeated
+verbatim in each report.
 """
   }
 

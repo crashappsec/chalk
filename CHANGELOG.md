@@ -4,6 +4,13 @@
 
 ### New Features
 
+- `outconf` sections now support `per_chalk_reports: true`, and `custom_report`
+  sections now support `per_chalk: true`. When enabled, chalk emits one report
+  per chalk mark (with `_CHALKS` containing exactly that mark) instead of
+  bundling all marks into a single report. Host-level keys are repeated verbatim
+  in each report.
+  ([#694](https://github.com/crashappsec/chalk/pull/694))
+
 - Two new runtime artifact keys capture errors and failures that occur
   **after** the chalk mark has already been embedded into the image (e.g.
   registry queries, provenance, SBOM collection, and build-context upload).

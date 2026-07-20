@@ -85,29 +85,46 @@ def test_insert_extract_directory(
     assert chalk.extract(artifact=tmp_data_dir)
 
 
+@pytest.mark.parametrize(
+    "copy_files", [[LS_PATH, DATE_PATH, HELLO_GO_PATH]], indirect=True
+)
+def test_per_chalk_custom_report(
+    tmp_data_dir: Path, copy_files: list[Path], chalk: Chalk
+):
+    insert = chalk.run(
+        command="insert",
+        target=tmp_data_dir,
+        config=CONFIGS / "per_chalk_custom_report.c4m",
+    )
+    assert len(insert.reports) == len(copy_files)
+    for report in insert.reports:
+        assert report.mark
+
+
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
 def test_insert_extract_delete(copy_files: list[Path], chalk: Chalk):
+    env = {"PER_CHALK_REPORTS": "1"}
     artifact = copy_files[0]
 
     # insert
-    insert = chalk.insert(artifact=artifact, virtual=False)
+    insert = chalk.insert(artifact=artifact, virtual=False, env=env)
     assert insert.marks_by_path.contains({str(artifact): {}})
     insert_1_hash = insert.report["_CHALKS"][0]["HASH"]
 
     # extract
-    extract = chalk.extract(artifact=artifact)
+    extract = chalk.extract(artifact=artifact, env=env)
 
     # delete
-    delete = chalk.run(command="delete", target=artifact)
+    delete = chalk.run(command="delete", target=artifact, env=env)
 
     for key in ["HASH", "_OP_ARTIFACT_PATH", "_OP_ARTIFACT_TYPE"]:
         assert extract.mark[key] == delete.mark[key]
 
     # extract again and we shouldn't get anything this time
-    assert chalk.extract(artifact=artifact, expecting_chalkmarks=False)
+    assert chalk.extract(artifact=artifact, expecting_chalkmarks=False, env=env)
 
     # insert again and check that hash is the same as first insert
-    insert2 = chalk.insert(artifact=artifact, virtual=False)
+    insert2 = chalk.insert(artifact=artifact, virtual=False, env=env)
     insert_2_hash = insert2.report["_CHALKS"][0]["HASH"]
     assert insert_1_hash == insert_2_hash
 

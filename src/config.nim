@@ -110,6 +110,9 @@ proc getReportTemplate*(spec = ""): string =
   result = "report_template." & tmplName
   result.copyReportTemplateKeys()
 
+proc getPerChalkReports*(): bool =
+  attrGetOpt[bool](getOutputConfig() & ".per_chalk_reports").get(false)
+
 proc forceKeys(keynames: openArray[string], templateRef: string) =
   let section     = templateRef & ".key"
 

@@ -1,0 +1,8 @@
+skip_command_report: true
+
+custom_report per_chalk_test {
+  report_template: "insertion_default"
+  sink_configs:    ["json_console_out"]
+  per_chalk:       true
+  use_when:        ["insert"]
+}
