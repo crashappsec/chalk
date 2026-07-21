@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `FAILED_KEYS` is no longer included in most default report templates; they now
+  subscribe to `_FAILED_KEYS` (the runtime artifact key, populated after all
+  post-build operations complete) instead of the chalk-time snapshot.
+  ([#692](https://github.com/crashappsec/chalk/pull/692))
+  - `report_default` — `FAILED_KEYS` removed, `_FAILED_KEYS` added
+  - `report_large` — `FAILED_KEYS` removed, `_FAILED_KEYS` added
+  - `insertion_default` — `FAILED_KEYS` removed, `_FAILED_KEYS` added
+  - `report_all` — unchanged; subscribes to both `FAILED_KEYS` and `_FAILED_KEYS`
+  - All other templates (`null`, `unknown_docker`, `audit`, `usage`, `heartbeat`,
+    `terminal_insert`, `terminal_rest`) — unaffected; did not subscribe to either
+  - `FAILED_KEYS` remains available in the chalk mark itself
+  - Consumers reading `FAILED_KEYS` from reports should switch to `_FAILED_KEYS`
+
 ### New Features
 
 - Four new runtime host keys for timing and heartbeat tracking:
