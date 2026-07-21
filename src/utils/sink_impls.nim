@@ -617,55 +617,40 @@ proc addPresignSink*() =
 
   registerSink("presign", record)
 
-proc dnsSinkScalar(node: JsonNode, placeholder: string): string =
-  case node.kind
-  of JString: return node.getStr()
-  of JInt:    return $node.getInt()
-  of JFloat:  return $node.getFloat()
-  of JBool:   return $node.getBool()
-  else:       return placeholder
-
 proc applyDnsNormalizer(
-  node:        JsonNode,
+  box:         Box,
   placeholder: string,
   key:         string,
   cfgName:     string,
 ): string =
+  if box.kind notin {MkStr, MkInt, MkFloat, MkBool}:
+    warn("dns sink '" & cfgName & "': key '" & key & "' is non-scalar (" & $box.kind & "); using placeholder '" & placeholder & "'")
+    return placeholder
   let cbPath = "sink_config." & cfgName & ".normalize." & key & ".callback"
   let cbOpt  = attrGetOpt[CallbackObj](cbPath)
   if cbOpt.isNone():
-    return dnsSinkScalar(node, placeholder)
-  let box = nimJsonToBox(node)
-  if box.kind notin {MkStr, MkInt, MkFloat, MkBool}:
-    return placeholder
+    return $box
   try:
     let r = runCallback(cbOpt.get(), @[box])
     if r.isSome():
       return $(r.get())
   except:
     dumpExOnDebug()
-    warn("dns sink '" & cfgName & "': normalize callback for '" & key & "' failed")
-  return dnsSinkScalar(node, placeholder)
+    warn("dns sink '" & cfgName & "': normalize callback for '" & key & "' failed: " & getCurrentExceptionMsg())
+  return $box
 
 proc dnsSinkLookup(
   key:         string,
-  report:      JsonNode,
+  report:      ChalkDict,
+  chalk:       ChalkDict,
   placeholder: string,
   cfgName:     string,
 ): string =
-  if report.hasKey(key):
+  if key in report:
     return applyDnsNormalizer(report[key], placeholder, key, cfgName)
-  elif report.hasKey("_CHALKS"):
-    try:
-      let chalk = report["_CHALKS"].assertIs(JArray).assertHasLen()[0].assertIs(JObject)
-      if chalk.hasKey(key):
-        return applyDnsNormalizer(chalk[key], placeholder, key, cfgName)
-      else:
-        warn("dns sink '" & cfgName & "': key '" & key & "' not found; using placeholder '" & placeholder & "'")
-    except:
-      dumpExOnDebug()
-  else:
-    warn("dns sink '" & cfgName & "': key '" & key & "' not found; using placeholder '" & placeholder & "'")
+  if key in chalk:
+    return applyDnsNormalizer(chalk[key], placeholder, key, cfgName)
+  warn("dns sink '" & cfgName & "': key '" & key & "' not found; using placeholder '" & placeholder & "'")
   return placeholder
 
 proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
@@ -680,33 +665,53 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
                   of "ANY":  DnsQtype.ANY
                   else:      DnsQtype.A
 
-  var report: JsonNode
+  var
+    report: ChalkDict
+    chalks: seq[ChalkDict] = @[]
   try:
-    report = parseJson(msg).assertIs(JArray).assertHasLen()[0].assertIs(JObject)
+    let reportJson = parseJson(msg).assertIs(JArray).assertHasLen()[0].assertIs(JObject)
+    report = unpack[ChalkDict](nimJsonToBox(reportJson))
+    if "_CHALKS" in reportJson:
+      let chalksJson = reportJson["_CHALKS"].assertIs(JArray)
+      for i, chalkJson in chalksJson.pairs():
+        try:
+          chalks.add(unpack[ChalkDict](nimJsonToBox(chalkJson.assertIs(JObject))))
+        except:
+          dumpExOnDebug()
+          warn(
+            "dns sink '" & cfg.name & "': failed to extract _CHALKS[" & $i & "]: " &
+            getCurrentExceptionMsg(),
+          )
   except:
     dumpExOnDebug()
     onHttpSinkError(cfg, getCurrentException(), hard = true)
-    return
 
-  try:
-    let domain = tmpl.applySubstitutions(
-      proc(key: string): string =
-        dnsSinkLookup(key, report, placeholder, cfg.name),
-    )
-    dnsLookup(
-      domain    = domain,
-      server    = dnsServer,
-      qtype     = qtype,
-      timeoutMs = timeoutMs,
-    )
-    resetSinkFailures(cfg)
-    cfg.iolog(t, "DNS: " & domain)
-  except ValueError:
-    dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = true)
-  except:
-    dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+  # Emit one DNS lookup per chalk mark; fall back to a single lookup with
+  # report-level keys only when no chalk marks are present.
+  if chalks.len == 0:
+    chalks.add(ChalkDict())
+
+  for chalkEntry in chalks:
+    let chalk = chalkEntry
+    try:
+      let domain = tmpl.applySubstitutions(
+        proc(key: string): string =
+          dnsSinkLookup(key, report, chalk, placeholder, cfg.name),
+      )
+      dnsLookup(
+        domain    = domain,
+        server    = dnsServer,
+        qtype     = qtype,
+        timeoutMs = timeoutMs,
+      )
+      resetSinkFailures(cfg)
+      cfg.iolog(t, "DNS: " & domain)
+    except ValueError:
+      dumpExOnDebug()
+      onHttpSinkError(cfg, getCurrentException(), hard = true)
+    except:
+      dumpExOnDebug()
+      onHttpSinkError(cfg, getCurrentException(), hard = false)
 
 proc addDnsSink*() =
   var
