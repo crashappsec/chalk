@@ -240,11 +240,12 @@ proc connectUdpSocket(host: string, port: Port): Socket =
       hints.ai_socktype = cint(SockType.SOCK_DGRAM)
       let gaiRet = getaddrinfo(host.cstring, nil, addr hints, res)
       if gaiRet != 0 or res == nil:
+        let reason = if gaiRet != 0: ": " & $gai_strerror(gaiRet) else: ""
         if res != nil:
           freeAddrInfo(res)
         raise newException(
           IOError,
-          "DNS: cannot resolve server '" & host & "'",
+          "DNS: cannot resolve server '" & host & "'" & reason,
         )
       let f =
         if res.ai_family == posix.AF_INET6:
@@ -272,7 +273,10 @@ proc dnsLookupSystem(domain: string, qtype: DnsQtype) =
   if res != nil:
     freeAddrInfo(res)
   if ret != 0:
-    raise newException(IOError, "DNS lookup failed for '" & domain & "'")
+    raise newException(
+      IOError,
+      "DNS lookup failed for '" & domain & "': " & $gai_strerror(ret),
+    )
 
 proc dnsLookup*(
     domain:    string,
