@@ -83,7 +83,10 @@ class ChalkReport(ContainsDict):
                 for k, v in self.items()
                 if k
                 not in {
+                    "_MONOTIME",
                     "_TIMESTAMP",
+                    "_SINCE_TIMESTAMP",
+                    "_SINCE_MONOTIME",
                     "_DATETIME",
                     "_ACTION_ID",
                     "_ARGV",
