@@ -21,7 +21,10 @@
   is restricted. Key values are substituted into a `domain_template` using
   `{KEY}` placeholders. Per-key `normalize` callbacks transform values before
   substitution, which is useful for keys whose string representation may exceed
-  the 63-character DNS label limit:
+  the 63-character DNS label limit. The sink emits one lookup per chalk mark in
+  `_CHALKS`, falling back to a single lookup with report-level keys only when no
+  chalk marks are present. Set `require_chalk_mark: true` to suppress the
+  fallback and skip emission entirely when no marks are present:
 
   ```con4m
   func trunc16(v: string) {
@@ -29,12 +32,11 @@
   }
 
   sink_config my_dns_beacon {
-    sink:            "dns"
-    domain_template: "{_COMMIT_ID}.{METADATA_ID}.beacons.example.com"
-    dns_server:      "10.0.0.1:5353"
-    normalize _COMMIT_ID {
-      callback: func trunc16
-    }
+    sink:               "dns"
+    domain_template:    "{_COMMIT_ID}.{METADATA_ID}.beacons.example.com"
+    dns_server:         "10.0.0.1:5353"
+    require_chalk_mark: true
+    normalize._COMMIT_ID.callback: func trunc16
   }
   subscribe("report", "my_dns_beacon")
   ```

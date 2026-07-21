@@ -293,6 +293,7 @@ sink dns {
   ~dns_server:              false
   ~dns_timeout:             false
   ~disable_after_errors:    false
+  ~require_chalk_mark:      false
   shortdoc: "DNS lookup with a templated hostname"
   doc:      """
 

@@ -32,6 +32,7 @@ sink_config my_dns_beacon {
   domain_template:         "{METADATA_ID}.{_EXEC_ID}.chalk.example.com"
   record_type:             "A"
   missing_key_placeholder: "x"
+  require_chalk_mark:      true
   disable_after_errors:    3
 }
 
@@ -40,14 +41,15 @@ subscribe("report", "my_dns_beacon")
 
 **Fields:**
 
-| Field                     | Type     | Required | Default | Description                                                                                                      |
-| ------------------------- | -------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| `domain_template`         | `string` | true     | -       | Hostname template. `{KEY}` placeholders are replaced with values from the report.                                |
-| `record_type`             | `string` | false    | `"A"`   | DNS record type to query. Accepted values: `"A"`, `"AAAA"`, `"any"` (see below).                                 |
-| `missing_key_placeholder` | `string` | false    | `"x"`   | Value substituted when a `{KEY}` placeholder cannot be resolved (see below).                                     |
-| `dns_server`              | `string` | false    | `""`    | Custom resolver address: `"8.8.8.8"`, `"8.8.8.8:5353"`, `"[::1]:5353"`. When empty, the system resolver is used. |
-| `dns_timeout`             | `int`    | false    | `5000`  | Timeout in milliseconds for custom resolver queries. Has no effect when `dns_server` is empty.                   |
-| `disable_after_errors`    | `int`    | false    | `3`     | Number of consecutive lookup failures before the sink is permanently disabled.                                   |
+| Field                     | Type     | Required | Default | Description                                                                                                                                         |
+| ------------------------- | -------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain_template`         | `string` | true     | -       | Hostname template. `{KEY}` placeholders are replaced with values from the report.                                                                   |
+| `record_type`             | `string` | false    | `"A"`   | DNS record type to query. Accepted values: `"A"`, `"AAAA"`, `"any"` (see below).                                                                    |
+| `missing_key_placeholder` | `string` | false    | `"x"`   | Value substituted when a `{KEY}` placeholder cannot be resolved (see below).                                                                        |
+| `dns_server`              | `string` | false    | `""`    | Custom resolver address: `"8.8.8.8"`, `"8.8.8.8:5353"`, `"[::1]:5353"`. When empty, the system resolver is used.                                    |
+| `dns_timeout`             | `int`    | false    | `5000`  | Timeout in milliseconds for custom resolver queries. Has no effect when `dns_server` is empty.                                                      |
+| `require_chalk_mark`      | `bool`   | false    | `false` | When `true`, skip emission entirely if the report contains no chalk marks. When `false`, fall back to a single lookup using report-level keys only. |
+| `disable_after_errors`    | `int`    | false    | `3`     | Number of consecutive lookup failures before the sink is permanently disabled.                                                                      |
 
 ## Template Substitution
 
@@ -60,12 +62,18 @@ to the same key.
 
 ### Lookup order
 
-When a placeholder is encountered, the sink searches for the key in this order:
+The sink emits one DNS lookup per chalk mark in `_CHALKS`. For each mark,
+key lookup proceeds in this order:
 
 1. Top-level report fields (host-level keys, e.g. `_OPERATION`, `_EXEC_ID`,
    `_TIMESTAMP`).
-2. The first chalk mark in `_CHALKS[0]` (chalk-time keys, e.g. `METADATA_ID`,
+2. The current chalk mark's fields (chalk-time keys, e.g. `METADATA_ID`,
    `CHALK_ID`, `HASH`).
+
+When `_CHALKS` is absent or empty the sink falls back to a single lookup
+using only report-level keys (chalk-time keys will resolve to the placeholder).
+Set `require_chalk_mark: true` to suppress this fallback and skip emission
+entirely when no marks are present.
 
 Both sources are extracted by parsing the JSON report string passed to the
 sink output function. The report string is a JSON array `[ { ... } ]`
@@ -344,19 +352,16 @@ with the other network sinks.
 
 ## Interaction with Per-Chalk Reporting
 
+The DNS sink iterates `_CHALKS` internally and emits one lookup per mark,
+so it handles multi-mark reports naturally regardless of whether per-chalk
+mode is enabled.
+
 When `per_chalk_reports: true` is set on the `outconf` section (or
 `per_chalk: true` on a `custom_report` section), the reporting pipeline emits
-one report per chalk mark rather than one bundled report. Because the DNS
-sink's template substitution reads `_CHALKS[0]` from the incoming JSON report,
-per-chalk mode is the most natural fit: each emitted report contains exactly
-one chalk mark, so `_CHALKS[0]` always refers to the mark for the artifact
-currently being reported.
-
-Without per-chalk mode, `_CHALKS[0]` refers to the first chalk mark in a
-potentially multi-mark bundle. Keys from other marks in the same report are
-not accessible, so templates that reference chalk-time keys such as
-`METADATA_ID` will reflect only the first artifact's values regardless of how
-many were chalked.
+one report per chalk mark. Combined with the sink's internal iteration, this
+means one lookup is emitted per mark — the same result as without per-chalk
+mode — but each report is smaller and the sink processes exactly one mark at
+a time rather than iterating a bundle.
 
 ## Source Locations
 

@@ -5027,7 +5027,8 @@ func sink_config_check(path) {
           return conffield + ": This field must be a positive integer"
       }
     }
-    elif contains(["enabled", "use_search_path", "disallow_http", "prefer_bundled_certs"], conffield) {
+    elif contains(["enabled", "use_search_path", "disallow_http", "prefer_bundled_certs",
+                   "require_chalk_mark"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, bool) {
           return conffield + ": Field must be `true` or `false`"

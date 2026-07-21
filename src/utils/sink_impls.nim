@@ -656,15 +656,16 @@ proc dnsSinkLookup(
 
 proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
-    tmpl        = cfg.params.getOrDefault("domain_template", "")
-    placeholder = cfg.params.getOrDefault("missing_key_placeholder", "x")
-    recordType  = cfg.params.getOrDefault("record_type", "A")
-    dnsServer   = cfg.params.getOrDefault("dns_server", "")
-    timeoutMs   = parseInt(cfg.params.getOrDefault("dns_timeout", "5000"))
-    qtype       = case recordType.toUpperAscii()
-                  of "AAAA": DnsQtype.AAAA
-                  of "ANY":  DnsQtype.ANY
-                  else:      DnsQtype.A
+    tmpl             = cfg.params.getOrDefault("domain_template", "")
+    placeholder      = cfg.params.getOrDefault("missing_key_placeholder", "x")
+    recordType       = cfg.params.getOrDefault("record_type", "A")
+    dnsServer        = cfg.params.getOrDefault("dns_server", "")
+    timeoutMs        = parseInt(cfg.params.getOrDefault("dns_timeout", "5000"))
+    requireChalkMark = cfg.params.getOrDefault("require_chalk_mark", "false") == "true"
+    qtype            = case recordType.toUpperAscii()
+                       of "AAAA": DnsQtype.AAAA
+                       of "ANY":  DnsQtype.ANY
+                       else:      DnsQtype.A
 
   var
     report: ChalkDict
@@ -687,9 +688,10 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     dumpExOnDebug()
     onHttpSinkError(cfg, getCurrentException(), hard = true)
 
-  # Emit one DNS lookup per chalk mark; fall back to a single lookup with
-  # report-level keys only when no chalk marks are present.
   if chalks.len == 0:
+    if requireChalkMark:
+      return
+    # Fall back to a single lookup with report-level keys only.
     chalks.add(ChalkDict())
 
   for chalkEntry in chalks:
@@ -724,6 +726,7 @@ proc addDnsSink*() =
       "dns_server":              false,
       "dns_timeout":             false,
       "disable_after_errors":    false,
+      "require_chalk_mark":      false,
     }.toTable()
   record.outputFunction = dnsSinkOut
   record.keys           = keys

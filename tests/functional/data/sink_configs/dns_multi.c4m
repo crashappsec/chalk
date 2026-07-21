@@ -1,9 +1,10 @@
 sink_config test_dns_id {
-  enabled:         true
-  sink:            "dns"
-  domain_template: "{METADATA_ID}.chalk.test"
-  dns_server:      env("DNS_SERVER")
-  dns_timeout:     2000
+  enabled:            true
+  sink:               "dns"
+  domain_template:    "{METADATA_ID}.chalk.test"
+  dns_server:         env("DNS_SERVER")
+  dns_timeout:        2000
+  require_chalk_mark: true
 }
 
 sink_config test_dns_multi_keys {
