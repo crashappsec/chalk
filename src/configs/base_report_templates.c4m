@@ -32,7 +32,6 @@ report and subtract from it.
   key.TIME_CHALKED.use                        = true
   key.TZ_OFFSET_WHEN_CHALKED.use              = true
   key.DATETIME_WHEN_CHALKED.use               = true
-  key.EARLIEST_VERSION.use                    = true
   key.HOST_SYSNAME_WHEN_CHALKED.use           = true
   key.HOST_NODENAME_WHEN_CHALKED.use          = true
   key.HOST_RELEASE_WHEN_CHALKED.use           = true
@@ -570,7 +569,6 @@ doc: """
   key.TIME_CHALKED.use                        = true
   key.TZ_OFFSET_WHEN_CHALKED.use              = true
   key.DATETIME_WHEN_CHALKED.use               = true
-  key.EARLIEST_VERSION.use                    = true
   key.HOST_SYSNAME_WHEN_CHALKED.use           = true
   key.HOST_NODENAME_WHEN_CHALKED.use          = true
   key.HOST_RELEASE_WHEN_CHALKED.use           = true
@@ -731,7 +729,6 @@ doc: """
   key.TIME_CHALKED.use                        = true
   key.TZ_OFFSET_WHEN_CHALKED.use              = true
   key.DATETIME_WHEN_CHALKED.use               = true
-  key.EARLIEST_VERSION.use                    = true
   key.HOST_SYSNAME_WHEN_CHALKED.use           = true
   key.HOST_NODENAME_WHEN_CHALKED.use          = true
   key.HOST_RELEASE_WHEN_CHALKED.use           = true
@@ -1158,7 +1155,6 @@ container.
   key.TIME_CHALKED.use                        = true
   key.TZ_OFFSET_WHEN_CHALKED.use              = true
   key.DATETIME_WHEN_CHALKED.use               = true
-  key.EARLIEST_VERSION.use                    = true
   key.HOST_SYSNAME_WHEN_CHALKED.use           = true
   key.HOST_NODENAME_WHEN_CHALKED.use          = true
   key.HOST_RELEASE_WHEN_CHALKED.use           = true
@@ -1712,7 +1708,6 @@ and keep the run-time key.
   key.TIME_CHALKED.use                        = false
   key.TZ_OFFSET_WHEN_CHALKED.use              = false
   key.DATETIME_WHEN_CHALKED.use               = false
-  key.EARLIEST_VERSION.use                    = false
   key.HOST_SYSNAME_WHEN_CHALKED.use           = false
   key.HOST_NODENAME_WHEN_CHALKED.use          = false
   key.HOST_RELEASE_WHEN_CHALKED.use           = false

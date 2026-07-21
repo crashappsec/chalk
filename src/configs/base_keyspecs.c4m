@@ -210,19 +210,6 @@ value of `_TIMESTAMP` would give for the operation.
 """
 }
 
-keyspec EARLIEST_VERSION {
-    kind:           ChalkTimeHost
-    type:           string
-    standard:       true
-    system:         true
-    conf_as_system: true
-    ~value:         chalk_version
-    since:          "0.1.0"
-    shortdoc:       "Reserved for future use"
-    doc:            """
-This key is reserved for future use; it is not currently used in any capacity.
-"""
-}
 
 keyspec HOST_SYSNAME_WHEN_CHALKED {
     kind:     ChalkTimeHost
