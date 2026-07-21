@@ -223,6 +223,13 @@ def server_dns():
     yield SERVER_DNS
 
 
+@pytest.fixture(scope="session", autouse=True)
+def dns_queries_cleanup():
+    yield
+    if is_server_up(f"{SERVER_DNS}/health"):
+        requests.delete(f"{SERVER_DNS}/queries")
+
+
 @pytest.fixture()
 def server_chalkdust():
     return SERVER_CHALKDUST

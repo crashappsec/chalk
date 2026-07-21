@@ -337,15 +337,21 @@ mechanism as the HTTP sinks. When consecutive failures reach the
 `disable_after_errors` threshold, the sink sets `cfg.enabled = false` and
 logs an error.
 
-**Design decision:** All DNS errors are soft (threshold-based) rather than
-distinguishing hard vs. soft as the HTTP sinks do. HTTP sinks classify 4xx
-responses as hard errors (immediate disable) because they indicate a
-configuration problem. DNS has no equivalent — a lookup failure could be
-transient (SERVFAIL, NXDOMAIN for a typo, network blip) or permanent (bad
-template rendering a malformed name), and there is no status code to
-distinguish them. The threshold approach ensures transient failures do not
-permanently disable the sink while repeated failures still trigger the
-disable.
+**Design decision:** DNS errors are split into two categories, mirroring the
+HTTP sink convention:
+
+- **Hard errors (immediate disable):** A `ValueError` raised by `toAsciiDomain`
+  before any socket is opened — e.g., a rendered label exceeds 63 characters or
+  the full hostname exceeds 253 characters. These indicate a structural
+  configuration bug (a template that will always produce an invalid hostname
+  regardless of retries), so the sink is disabled immediately without waiting
+  for the `disable_after_errors` threshold.
+
+- **Soft errors (threshold-based):** All other failures — timeouts, SERVFAIL,
+  NXDOMAIN, socket errors, and RCODE != 0 responses. These count toward the
+  `disable_after_errors` counter. Transient failures (network blips, intermittent
+  SERVFAIL) will recover on the next successful lookup, which resets the counter
+  via `resetSinkFailures(cfg)`.
 
 Successful lookups reset the counter via `resetSinkFailures(cfg)`, consistent
 with the other network sinks.

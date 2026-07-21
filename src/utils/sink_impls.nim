@@ -274,11 +274,11 @@ proc isHardHttpError(e: ref HttpStatusError): bool =
   ## retrying, except 429 (rate limited) which is transient and stays soft.
   e.code in 400..499 and e.code != 429
 
-template onHttpSinkError(cfg: SinkConfig, err: ref Exception, hard: bool) =
-  ## Records an HTTP sink delivery failure and always re-raises `err`.
+template onSinkError(cfg: SinkConfig, err: ref Exception, hard: bool) =
+  ## Records a sink delivery failure and always re-raises `err`.
   ##
-  ## `hard` failures (4xx except 429, malformed presign redirects) disable the
-  ## sink immediately; soft failures disable it once disable_after_errors
+  ## `hard` failures disable the sink immediately; soft failures disable it
+  ## once disable_after_errors
   ## consecutive failures are reached. On every path `err` is re-raised so the
   ## delivery that triggered the failure still propagates to publish()'s onFail,
   ## is accounted as a failure, and is buffered in the report cache rather than
@@ -371,10 +371,10 @@ proc s3SinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     cfg.iolog(t, "Post to: " & newPath & "; response = " & response.status)
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
+    onSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+    onSinkError(cfg, getCurrentException(), hard = false)
 
 proc httpHeaders(cfg: SinkConfig): HttpHeaders =
   var
@@ -456,10 +456,10 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     cfg.iolog(t, "Post " & response.status)
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
+    onSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+    onSinkError(cfg, getCurrentException(), hard = false)
 
 proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
@@ -483,10 +483,10 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     )
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
+    onSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+    onSinkError(cfg, getCurrentException(), hard = false)
 
   var uri: Uri
   try:
@@ -500,7 +500,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     # A malformed redirect (missing or relative Location) can never yield a
     # working upload URL, so treat it as a hard error and route it through the
     # disable machinery like a 4xx sign response instead of raising past it.
-    onHttpSinkError(cfg, getCurrentException(), hard = true)
+    onSinkError(cfg, getCurrentException(), hard = true)
 
   let uploadHeaders = newHttpHeaders().addForwardedHeaders(signResponse)
   try:
@@ -523,7 +523,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
   except:
     dumpExOnDebug()
     # Upload errors are always soft: the presigned URL itself may be transient.
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+    onSinkError(cfg, getCurrentException(), hard = false)
 
 proc addFileSink*() =
   var
@@ -686,7 +686,7 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
           )
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = true)
+    onSinkError(cfg, getCurrentException(), hard = true)
 
   if chalks.len == 0:
     if requireChalkMark:
@@ -711,10 +711,10 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
       cfg.iolog(t, "DNS: " & domain)
     except ValueError:
       dumpExOnDebug()
-      onHttpSinkError(cfg, getCurrentException(), hard = true)
+      onSinkError(cfg, getCurrentException(), hard = true)
     except:
       dumpExOnDebug()
-      onHttpSinkError(cfg, getCurrentException(), hard = false)
+      onSinkError(cfg, getCurrentException(), hard = false)
 
 proc addDnsSink*() =
   var

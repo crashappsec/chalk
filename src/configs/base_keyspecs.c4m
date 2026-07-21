@@ -2168,7 +2168,7 @@ keyspec _ERR_INFO {
     type:             list[string]
     standard:         true
     system:           true
-    since:            "1.1.4"
+    since:            "1.2.0"
     normalized_order: high() - 500
     shortdoc:         "Errors collected during chalk time and post-build operations"
     doc:              """
@@ -2212,7 +2212,7 @@ keyspec _FAILED_KEYS {
   kind:     RunTimeArtifact
   type:     dict[string, list[`x]]
   standard: true
-  since:    "1.1.4"
+  since:    "1.2.0"
   shortdoc: "Keys and errors why chalk could not collect them (including post-build)"
   doc:      """
 This key reports all known errors and reasons why chalk could not

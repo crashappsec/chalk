@@ -303,7 +303,7 @@ sink dns {
 | `record_type`             | `string` | false    | `"A"`    | DNS record type: `"A"` (IPv4), `"AAAA"` (IPv6), or `"any"`. Validated at config load. |
 | `missing_key_placeholder` | `string` | false    | `"x"`    | Value used when a `{KEY}` placeholder cannot be resolved.                               |
 | `dns_server`              | `string` | false    | `""`     | Custom DNS resolver, e.g. `"8.8.8.8"`, `"8.8.8.8:5353"`, or `"[::1]:5353"`. When empty, the system resolver is used. |
-| `dns_timeout`             | `int`    | false    | `5000`   | Timeout for custom resolver queries in milliseconds. Requires `dns_server`.                            |
+| `dns_timeout`             | `int`    | false    | `5000`   | Timeout in milliseconds for custom resolver queries. Has no effect when `dns_server` is empty: the system resolver (`getaddrinfo`) does not support per-call timeouts. |
 | `disable_after_errors`    | `int`    | false    | `3`      | Consecutive lookup failures before the sink is disabled.                                |
 
 Emits one DNS lookup per report. The response is discarded; only the DNS

@@ -312,7 +312,8 @@ proc dnsLookup*(
     cint(0),
   )
 
-  # Loop discarding datagrams that do not match our transaction ID.
+  # Loop discarding datagrams that do not match our transaction ID or are not
+  # responses (QR=1, RFC 1035 §4.1.1).
   let deadline = getMonoTime() + initDuration(milliseconds = timeoutMs)
   while true:
     let remaining = int(inMilliseconds(deadline - getMonoTime()))
@@ -333,6 +334,8 @@ proc dnsLookup*(
       continue
     if uint8(response[0]) != uint8(id shr 8) or
        uint8(response[1]) != uint8(id and 0xff):
+      continue
+    if (uint8(response[2]) and 0x80) == 0:
       continue
     let rcode = uint8(response[3]) and 0x0f
     if rcode != 0:
