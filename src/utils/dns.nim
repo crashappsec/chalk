@@ -171,16 +171,18 @@ proc tryPort(s: string): int =
     -1
 
 proc parseServerPort*(server: string): (string, Port) =
-  ## Parses "host[:port]". Accepts IPv4 ("1.2.3.4:5353"), plain IPv4 ("1.2.3.4"),
-  ## bracketed IPv6 ("[::1]:5353" or "[::1]"), and bare IPv6 ("::1").
-  ## Returns (host, port); default port is 53.
+  ## Parses "host[:port]", returning (host, port). Default port is 53.
+  ## Accepted formats: "1.2.3.4", "1.2.3.4:5353", "[::1]", "[::1]:5353", "::1".
   const defaultPort = Port(53)
   let parsed = parseUri("dns://" & server)
   if not server.startsWith('['):
-    # parseUri misparses bare IPv6 by splitting on the last ':':
-    #   "::1"         -> hostname="",     port="1"    (empty hostname)
-    #   "2001:db8::1" -> hostname="2001", port="db81" (reconstructs to "2001:db81" != server)
-    # Detect by round-tripping: if hostname[:port] doesn't reconstruct server, it's a misparse.
+    # Bracketed IPv6 is valid URI syntax, so parseUri handles it correctly.
+    # Bare IPv6 is not: parseUri splits on the last ':', yielding a truncated
+    # hostname and a non-numeric port fragment:
+    #   "::1"         -> hostname="",     port="1"
+    #   "2001:db8::1" -> hostname="2001", port="db81"
+    # Detect the mismatch by round-tripping: reconstruct what parseUri saw and
+    # compare to the original input; inequality means it was a bare IPv6.
     let roundtrip = if parsed.port == "": parsed.hostname
                     else: parsed.hostname & ":" & parsed.port
     if parsed.hostname == "" or roundtrip != server:
