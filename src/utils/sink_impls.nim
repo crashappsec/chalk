@@ -17,6 +17,7 @@
 ## ever called.
 
 import std/[
+  enumerate,
   json,
   streams,
   tables,
@@ -673,7 +674,7 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     report = unpack[ChalkDict](nimJsonToBox(reportJson))
     if "_CHALKS" in reportJson:
       let chalksJson = reportJson["_CHALKS"].assertIs(JArray)
-      for i, chalkJson in chalksJson.pairs():
+      for i, chalkJson in enumerate(chalksJson.items()):
         try:
           chalks.add(unpack[ChalkDict](nimJsonToBox(chalkJson.assertIs(JObject))))
         except:
