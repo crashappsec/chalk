@@ -309,6 +309,25 @@ Emits one DNS lookup per report. The response is discarded; only the DNS
 query itself carries the payload. Keys from `_CHALKS[0]` and top-level
 report fields are available for substitution in `domain_template`.
 
+Use `normalize.KEYNAME.callback` subsections to transform key values before
+substitution. This is useful for keys whose string representation may exceed
+the 63-character DNS label limit:
+
+```con4m
+func trunc16(v: string) {
+  return slice(v, 0, 16)
+}
+
+sink_config my_dns {
+  sink:            "dns"
+  domain_template: "{_COMMIT_ID}.{METADATA_ID}.chalk.test"
+  dns_server:      "10.0.0.1"
+  normalize _COMMIT_ID {
+    callback: func trunc16
+  }
+}
+```
+
 See `docs/design-dns-sink.md` for full design rationale.
 """
 }

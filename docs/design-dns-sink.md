@@ -94,16 +94,65 @@ Users are expected to craft templates that only reference keys that will be
 collected for the operations they subscribe to; the placeholder is a safety
 valve, not an invitation to use arbitrary key names.
 
+### Key normalization
+
+Each `sink_config` can include `normalize.KEYNAME.callback` subsections to
+transform a key's string value before it is substituted into the template.
+This is the primary mechanism for handling values that may exceed the 63-character
+DNS label limit (e.g. SHA-256 commit IDs):
+
+```con4m
+func trunc16(v: string) {
+  return slice(v, 0, 16)
+}
+
+sink_config my_dns {
+  sink:            "dns"
+  domain_template: "{_COMMIT_ID}.{METADATA_ID}.chalk.example.com"
+  dns_server:      "10.0.0.1"
+  normalize _COMMIT_ID {
+    callback: func trunc16
+  }
+}
+```
+
+The `callback` field type is `func(`x) -> `y` — a generic function that
+receives the raw Box value of the key (a string, int, float, or bool as
+stored in the report) and returns a Box of any type. The returned Box is
+stringified with `$box` for DNS label substitution, which for scalar types
+gives the natural string representation: no quoting for strings, plain
+integer decimal for ints, `true`/`false` for bools, and a float with
+a decimal point for floats. Float values will always contain a `.` in the
+DNS label; add a normalize callback to strip it if needed.
+
+If the callback raises or returns no value, the key's original string
+representation is used and a `warn` is emitted.
+
+Normalization is applied after key lookup but before the placeholder fallback:
+if the key is not found, the placeholder is substituted directly without
+calling the normalizer. Non-scalar key values (arrays, objects) that cannot
+be converted to a Box are also substituted with the placeholder.
+
+The callback for each key is fetched on demand from the con4m attribute store
+(`sink_config.<name>.normalize.<key>.callback`) via `attrGetOpt[CallbackObj]`
+at the point of substitution — only for keys that actually appear in the
+template, avoiding unnecessary config traversal.
+
+**Design decision:** Normalization lives in `sink_config`, not in the keyspec
+or report template, because it is a property of how a specific sink renders
+values — not a property of the key itself. Different DNS sinks targeting
+different backends may need different truncation strategies for the same key.
+
 ### Hostname sanitization
 
-The sink does not perform additional sanitization beyond the `"x"` fallback.
-If a key value contains characters that are invalid in a DNS label (e.g.
-underscores in some strict resolver configurations), the resulting lookup
-will simply fail and count toward the error threshold. Users are responsible
-for selecting keys whose rendered values produce DNS-safe labels. Keys
-that are likely to contain only alphanumeric characters and hyphens (such
-as `METADATA_ID`, `CHALK_ID`, hash values, and ID-format strings) are the
-most reliable choices.
+The sink does not perform additional sanitization beyond the `"x"` fallback
+and any user-supplied `normalize` callbacks. If a key value (after normalization)
+contains characters that are invalid in a DNS label (e.g. underscores in
+some strict resolver configurations), the resulting lookup will simply fail
+and count toward the error threshold. Users are responsible for selecting
+keys whose rendered values produce DNS-safe labels. Keys that are likely to
+contain only alphanumeric characters and hyphens (such as `METADATA_ID`,
+`CHALK_ID`, hash values, and ID-format strings) are the most reliable choices.
 
 ## Template Substitution Engine
 
@@ -132,11 +181,19 @@ The DNS sink supplies its own callback that reads from parsed JSON instead of
 from a `ChalkObj`:
 
 ```nim
-proc dnsSinkLookup(key: string, report: JsonNode, placeholder: string, cfgName: string): string
+proc dnsSinkLookup(
+  key:         string,
+  report:      JsonNode,
+  placeholder: string,
+  cfgName:     string,
+): string
 ```
 
 The `cfgName` parameter is the sink config name used in warning messages when
-a key is not found.
+a key is not found and for dynamic callback lookup: `applyDnsNormalizer` fetches
+the con4m callback for each key on demand via `attrGetOpt[CallbackObj]` at the
+path `sink_config.<cfgName>.normalize.<key>.callback`, so only keys that actually
+appear in the template are looked up.
 
 **Design decision:** Making the callback the extension point (rather than, say,
 a method on an interface type) keeps the engine simple and avoids any object
@@ -295,13 +352,13 @@ many were chalked.
 
 ## Source Locations
 
-| Path                          | Role                                                                         |
-| ----------------------------- | ---------------------------------------------------------------------------- |
-| `src/utils/dns.nim`           | `dnsLookup`, Punycode encoder, IDNA validation, server address parsing       |
-| `src/utils/substitutions.nim` | Generic `{KEY}` template engine; callback-based lookup                       |
-| `src/docker/util.nim`         | Thin `applySubstitutions(s, ChalkObj)` wrapper over the generic engine       |
-| `src/utils/sink_impls.nim`    | `dnsSinkOut`, `addDnsSink` — DNS sink output function and registration       |
-| `src/configs/base_sinks.c4m`  | `sink dns { ... }` — con4m schema for DNS sink parameters                    |
-| `src/configs/chalk.c42spec`   | `sink_config_check` — validation for `record_type` and `dns_timeout`         |
-| `src/sinks.nim`               | `getSinkConfigByName` — int param handling for `dns_timeout`                 |
-| `tests/unit/test_dns.nim`     | Unit tests: Punycode (RFC 3492 vectors), IDNA, server parsing, lookup errors |
+| Path                          | Role                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------- |
+| `src/utils/dns.nim`           | `dnsLookup`, Punycode encoder, IDNA validation, server address parsing             |
+| `src/utils/substitutions.nim` | Generic `{KEY}` template engine; callback-based lookup                             |
+| `src/docker/util.nim`         | Thin `applySubstitutions(s, ChalkObj)` wrapper over the generic engine             |
+| `src/utils/sink_impls.nim`    | `dnsSinkOut`, `dnsSinkLookup`, `applyDnsNormalizer`, `addDnsSink`                  |
+| `src/configs/base_sinks.c4m`  | `sink dns { ... }` — con4m schema for DNS sink parameters                          |
+| `src/configs/chalk.c42spec`   | `object normalize` — per-key callback spec; `sink_config_check` — field validation |
+| `src/sinks.nim`               | `getSinkConfigByName` — int param handling for `dns_timeout`                       |
+| `tests/unit/test_dns.nim`     | Unit tests: Punycode (RFC 3492 vectors), IDNA, server parsing, lookup errors       |

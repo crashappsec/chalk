@@ -18,13 +18,23 @@
 
 - New `dns` sink type that encodes chalk key values into a DNS lookup hostname,
   providing a telemetry channel that works in environments where HTTPS egress
-  is restricted. Example:
+  is restricted. Key values are substituted into a `domain_template` using
+  `{KEY}` placeholders. Per-key `normalize` callbacks transform values before
+  substitution, which is useful for keys whose string representation may exceed
+  the 63-character DNS label limit:
 
   ```con4m
+  func trunc16(v: string) {
+    return slice(v, 0, 16)
+  }
+
   sink_config my_dns_beacon {
     sink:            "dns"
-    domain_template: "{METADATA_ID}.beacons.example.com"
+    domain_template: "{_COMMIT_ID}.{METADATA_ID}.beacons.example.com"
     dns_server:      "10.0.0.1:5353"
+    normalize _COMMIT_ID {
+      callback: func trunc16
+    }
   }
   subscribe("report", "my_dns_beacon")
   ```

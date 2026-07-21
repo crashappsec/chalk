@@ -373,3 +373,4 @@ def test_dns_sink(
     assert f"{metadata_id}.insert.chalk.test" in queries
     assert "x.chalk.test" in queries
     assert "key 'NONEXISTENT_KEY' not found" in result.logs
+    assert f"{metadata_id[:8]}.chalk.test" in queries

@@ -39,6 +39,9 @@ import pkg/nimutils/[
   net,
 ]
 import ".."/[
+  chalkjson,
+  config,
+  con4mwrap,
   types,
 ]
 import "."/[
@@ -622,17 +625,47 @@ proc dnsSinkScalar(node: JsonNode, placeholder: string): string =
   of JBool:   return $node.getBool()
   else:       return placeholder
 
-proc dnsSinkLookup(key: string, report: JsonNode, placeholder: string, cfgName: string): string =
+proc applyDnsNormalizer(
+  node:        JsonNode,
+  placeholder: string,
+  key:         string,
+  cfgName:     string,
+): string =
+  let cbPath = "sink_config." & cfgName & ".normalize." & key & ".callback"
+  let cbOpt  = attrGetOpt[CallbackObj](cbPath)
+  if cbOpt.isNone():
+    return dnsSinkScalar(node, placeholder)
+  let box = nimJsonToBox(node)
+  if box.kind notin {MkStr, MkInt, MkFloat, MkBool}:
+    return placeholder
+  try:
+    let r = runCallback(cbOpt.get(), @[box])
+    if r.isSome():
+      return $(r.get())
+  except:
+    dumpExOnDebug()
+    warn("dns sink '" & cfgName & "': normalize callback for '" & key & "' failed")
+  return dnsSinkScalar(node, placeholder)
+
+proc dnsSinkLookup(
+  key:         string,
+  report:      JsonNode,
+  placeholder: string,
+  cfgName:     string,
+): string =
   if report.hasKey(key):
-    return dnsSinkScalar(report[key], placeholder)
-  if report.hasKey("_CHALKS"):
+    return applyDnsNormalizer(report[key], placeholder, key, cfgName)
+  elif report.hasKey("_CHALKS"):
     try:
       let chalk = report["_CHALKS"].assertIs(JArray).assertHasLen()[0].assertIs(JObject)
       if chalk.hasKey(key):
-        return dnsSinkScalar(chalk[key], placeholder)
+        return applyDnsNormalizer(chalk[key], placeholder, key, cfgName)
+      else:
+        warn("dns sink '" & cfgName & "': key '" & key & "' not found; using placeholder '" & placeholder & "'")
     except:
       dumpExOnDebug()
-  warn("dns sink '" & cfgName & "': key '" & key & "' not found; using placeholder '" & placeholder & "'")
+  else:
+    warn("dns sink '" & cfgName & "': key '" & key & "' not found; using placeholder '" & placeholder & "'")
   return placeholder
 
 proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
@@ -653,7 +686,8 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
 
   let
     domain = tmpl.applySubstitutions(
-      proc(key: string): string = dnsSinkLookup(key, report, placeholder, cfg.name),
+      proc(key: string): string =
+        dnsSinkLookup(key, report, placeholder, cfg.name),
     )
     qtype  = case recordType.toUpperAscii()
              of "AAAA": DnsQtype.AAAA

@@ -320,7 +320,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       discard setOverride(getChalkScope(), section & ".pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
       deleteList.add(k)
-    of "on_write_msg":
+    of "on_write_msg", "normalize":
       discard
     of "log_search_path":
       let boxOpt = attrGetOpt[Box](section & "." & k)

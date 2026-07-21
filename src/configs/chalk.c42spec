@@ -155,6 +155,43 @@ for multiple reports allows to de-duplicate SBOM data between builds.
   }
 }
 
+object normalize {
+  user_def_ok: true
+  doc: """
+Per-key normalization callbacks for sink output. Each subsection name is a
+chalk key name. The `callback` field receives the raw Box value of the key
+and its return value is converted to a string for substitution into sink
+templates such as a DNS `domain_template`.
+
+Example:
+
+```
+func trunc16(v: string) {
+  return slice(v, 0, 16)
+}
+
+sink_config my_dns {
+  sink:            "dns"
+  domain_template: "{_COMMIT_ID}.{METADATA_ID}.chalk.test"
+  normalize _COMMIT_ID {
+    callback: func trunc16
+  }
+}
+```
+"""
+
+  field callback {
+    type:    func (`x) -> `y
+    require: false
+    doc: """
+A function that receives the raw Box value of the key and returns a Box.
+The return value is stringified (via `$box`) for substitution into a sink
+template. Floats will include a decimal point; add a normalize callback to
+strip it if needed.
+"""
+  }
+}
+
 object mark_template {
   user_def_ok:   false
   doc: """
@@ -1032,6 +1069,8 @@ in this section are defined by the `sink` configuration named in this
 field.
 """
   }
+
+  allow normalize {}
 }
 
 object_store_types := ["", "presign"]
