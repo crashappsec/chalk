@@ -675,26 +675,24 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     recordType  = cfg.params.getOrDefault("record_type", "A")
     dnsServer   = cfg.params.getOrDefault("dns_server", "")
     timeoutMs   = parseInt(cfg.params.getOrDefault("dns_timeout", "5000"))
+    qtype       = case recordType.toUpperAscii()
+                  of "AAAA": DnsQtype.AAAA
+                  of "ANY":  DnsQtype.ANY
+                  else:      DnsQtype.A
 
   var report: JsonNode
   try:
     report = parseJson(msg).assertIs(JArray).assertHasLen()[0].assertIs(JObject)
   except:
     dumpExOnDebug()
-    error("dns sink '" & cfg.name & "': failed to decode report JSON")
+    onHttpSinkError(cfg, getCurrentException(), hard = true)
     return
 
-  let
-    domain = tmpl.applySubstitutions(
+  try:
+    let domain = tmpl.applySubstitutions(
       proc(key: string): string =
         dnsSinkLookup(key, report, placeholder, cfg.name),
     )
-    qtype  = case recordType.toUpperAscii()
-             of "AAAA": DnsQtype.AAAA
-             of "ANY":  DnsQtype.ANY
-             else:      DnsQtype.A
-
-  try:
     dnsLookup(
       domain    = domain,
       server    = dnsServer,
@@ -703,9 +701,12 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     )
     resetSinkFailures(cfg)
     cfg.iolog(t, "DNS: " & domain)
+  except ValueError:
+    dumpExOnDebug()
+    onHttpSinkError(cfg, getCurrentException(), hard = true)
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), false)
+    onHttpSinkError(cfg, getCurrentException(), hard = false)
 
 proc addDnsSink*() =
   var

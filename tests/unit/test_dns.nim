@@ -120,8 +120,9 @@ proc testToAsciiDomain() =
   # Already-encoded xn-- labels are ASCII, pass through unchanged
   check toAsciiDomain("xn--mnchen-3ya.de") == "xn--mnchen-3ya.de"
 
-  # Empty labels (trailing/leading dots) are preserved
-  check toAsciiDomain("foo..bar") == "foo..bar"
+  # Empty labels (adjacent dots) are rejected
+  checkRaises(ValueError):
+    discard toAsciiDomain("foo..bar")
 
   # Label exactly 63 chars is valid
   check toAsciiDomain("a".repeat(63) & ".com") == "a".repeat(63) & ".com"

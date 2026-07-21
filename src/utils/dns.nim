@@ -135,8 +135,10 @@ proc toAsciiDomain*(domain: string): string =
   var labels: seq[string]
   for label in domain.split('.'):
     if label.len == 0:
-      labels.add("")
-      continue
+      raise newException(
+        ValueError,
+        "DNS hostname contains an empty label (check for adjacent or trailing dots)",
+      )
     var ascii = true
     for c in label:
       if ord(c) > 127:
