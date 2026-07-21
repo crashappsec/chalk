@@ -1,4 +1,7 @@
 import std/[
+  nativesockets,
+  net,
+  posix,
   strutils,
 ]
 import "../../src/utils/dns"
@@ -252,6 +255,72 @@ proc testDnsLookupTimeout() =
       timedOut = true
   check timedOut
 
+var gStubFd   {.global.}: cint = -1
+var gStubDone {.global.}: bool = false
+
+proc runStub(ignored: int) {.thread.} =
+  # Receive one query datagram, then send two replies:
+  # 1) wrong transaction ID (XOR 0xFF on both ID bytes) -- must be discarded
+  # 2) correct transaction ID, RCODE=0                  -- must be accepted
+  var
+    query:   array[512, byte]
+    fromSa:  array[128, byte]
+    fromLen = SockLen(128)
+  let n = posix.recvfrom(
+    SocketHandle(gStubFd),
+    cast[pointer](addr query[0]),
+    512,
+    cint(0),
+    cast[ptr SockAddr](addr fromSa[0]),
+    addr fromLen,
+  )
+  if n < 2:
+    gStubDone = true
+    return
+  var bad:  array[12, byte]
+  var good: array[12, byte]
+  bad[0]  = query[0] xor byte(0xFF)
+  bad[1]  = query[1] xor byte(0xFF)
+  bad[2]  = byte(0x80)
+  good[0] = query[0]
+  good[1] = query[1]
+  good[2] = byte(0x80)
+  discard posix.sendto(
+    SocketHandle(gStubFd), cast[pointer](addr bad[0]), 12, cint(0),
+    cast[ptr SockAddr](addr fromSa[0]), fromLen,
+  )
+  discard posix.sendto(
+    SocketHandle(gStubFd), cast[pointer](addr good[0]), 12, cint(0),
+    cast[ptr SockAddr](addr fromSa[0]), fromLen,
+  )
+  gStubDone = true
+
+proc testDnsTransactionIdValidation() =
+  # Bind a stub UDP server on a random loopback port.  The stub sends a
+  # bad-ID response first, then a good-ID response.  dnsLookup must discard
+  # the first and succeed on the second.
+  let srv = newSocket(
+    domain   = Domain.AF_INET,
+    sockType = SockType.SOCK_DGRAM,
+    protocol = Protocol.IPPROTO_UDP,
+    buffered = false,
+  )
+  defer: srv.close()
+  srv.bindAddr(Port(0), "127.0.0.1")
+  let (_, srvPort) = srv.getLocalAddr()
+  gStubFd   = srv.getFd().cint
+  gStubDone = false
+
+  var t: Thread[int]
+  createThread(t, runStub, 0)
+  dnsLookup(
+    domain    = "example.com",
+    server    = "127.0.0.1:" & $srvPort,
+    timeoutMs = 2000,
+  )
+  joinThread(t)
+  check gStubDone
+
 # ---------------------------------------------------------------------------
 
 testPunycode()
@@ -259,4 +328,5 @@ testToAsciiDomain()
 testParseServerPort()
 testDnsLookupValidation()
 testDnsLookupTimeout()
+testDnsTransactionIdValidation()
 echo "All DNS tests passed."

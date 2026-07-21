@@ -246,13 +246,21 @@ entirely. This allows targeting a specific recursive resolver not listed in
 authoritative server.
 
 The query is a standard A/AAAA/ANY question with the Recursion Desired bit
-set. The response is read back and inspected only for the RCODE field
-(bits 0-3 of byte 3 of the header); a non-zero RCODE raises `IOError`. The
-response payload is otherwise discarded.
+set. Each query uses a cryptographically random 16-bit transaction ID
+(`secureRand[uint16]()`). The response is inspected for the transaction ID
+(bytes 0-1) and the RCODE field (bits 0-3 of byte 3); a non-zero RCODE raises
+`IOError`. The response payload is otherwise discarded.
 
-A `select`-based timeout is applied before the `recvFrom` call. If no
-response arrives within `timeoutMs` milliseconds, `IOError` is raised with a
-`"timed out"` message, which the sink counts as a soft error toward the
+Source filtering is delegated to the kernel: `connect()` is called on the UDP
+socket before sending, which causes the kernel to discard datagrams not
+originating from the configured resolver address and port. This works
+correctly whether `dns_server` is an IP address or a hostname. For literal IP
+addresses `parseIpAddress` determines the socket family without a resolver
+call; for hostnames `getaddrinfo` is used.
+
+A `select`-based timeout is applied before each `recv` call. If no response
+arrives within `timeoutMs` milliseconds, `IOError` is raised with a `"timed
+out"` message, which the sink counts as a soft error toward the
 `disable_after_errors` threshold.
 
 ### Server address parsing

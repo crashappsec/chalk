@@ -9,11 +9,16 @@
 ## Supports a configurable resolver address, which getaddrinfo does not.
 
 import std/[
+  monotimes,
   net,
   nativesockets,
   posix,
   strutils,
+  times,
   uri,
+]
+import pkg/nimutils/[
+  random,
 ]
 
 type DnsQtype* = enum
@@ -185,8 +190,6 @@ proc parseServerPort*(server: string): (string, Port) =
 # DNS wire format
 # ---------------------------------------------------------------------------
 
-var dnsQueryId {.global.}: uint16 = 0
-
 proc addUint16(s: var string, v: uint16) =
   s.add(char(v shr 8))
   s.add(char(v and 0xff))
@@ -214,6 +217,44 @@ proc buildDnsQuery(domain: string, qtype: DnsQtype, id: uint16): string =
 # ---------------------------------------------------------------------------
 # Resolver
 # ---------------------------------------------------------------------------
+
+proc connectUdpSocket(host: string, port: Port): Socket =
+  # Determine socket family without a resolver call when host is a literal IP.
+  # For hostnames, call getaddrinfo for family detection only, then free the
+  # result before creating the socket to avoid any lifetime issues.
+  let family =
+    try:
+      if parseIpAddress(host).family == IpAddressFamily.IPv6:
+        Domain.AF_INET6
+      else:
+        Domain.AF_INET
+    except ValueError:
+      var
+        hints: AddrInfo
+        res:   ptr AddrInfo
+      hints.ai_socktype = cint(SockType.SOCK_DGRAM)
+      let gaiRet = getaddrinfo(host.cstring, nil, addr hints, res)
+      if gaiRet != 0 or res == nil:
+        if res != nil:
+          freeAddrInfo(res)
+        raise newException(
+          IOError,
+          "DNS: cannot resolve server '" & host & "'",
+        )
+      let f =
+        if res.ai_family == posix.AF_INET6:
+          Domain.AF_INET6
+        else:
+          Domain.AF_INET
+      freeAddrInfo(res)
+      f
+  result = newSocket(
+    domain   = family,
+    sockType = SockType.SOCK_DGRAM,
+    protocol = Protocol.IPPROTO_UDP,
+    buffered = false,
+  )
+  result.connect(host, port)
 
 proc dnsLookupSystem(domain: string, qtype: DnsQtype) =
   var hints: AddrInfo
@@ -244,40 +285,48 @@ proc dnsLookup*(
     return
 
   let
+    id           = secureRand[uint16]()
     (host, port) = parseServerPort(server)
-    packet       = buildDnsQuery(ascii, qtype, dnsQueryId)
-    sock         = newSocket(
-      domain   = Domain.AF_INET,
-      sockType = SockType.SOCK_DGRAM,
-      protocol = Protocol.IPPROTO_UDP,
-      buffered = false,
-    )
-  inc dnsQueryId
+    packet       = buildDnsQuery(ascii, qtype, id)
+
+  # connect() on a UDP socket installs a kernel-level filter: only datagrams
+  # from this address/port are delivered.
+  let sock = connectUdpSocket(host, port)
   defer: sock.close()
 
-  sock.sendTo(host, port, packet)
+  discard posix.send(
+    sock.getFd(),
+    cast[pointer](unsafeAddr packet[0]),
+    packet.len,
+    cint(0),
+  )
 
-  var fds = @[sock.getFd()]
-  if selectRead(fds, timeoutMs) == 0:
-    raise newException(
-      IOError,
-      "DNS query timed out for '" & ascii & "'",
-    )
-
-  var
-    response = newString(512)
-    fromAddr: string
-    fromPort: Port
-  let n = sock.recvFrom(response, 512, fromAddr, fromPort)
-  if n < 4:
-    raise newException(
-      IOError,
-      "DNS response truncated for '" & ascii & "'",
-    )
-
-  let rcode = uint8(response[3]) and 0x0f
-  if rcode != 0:
-    raise newException(
-      IOError,
-      "DNS lookup failed for '" & ascii & "' (rcode=" & $rcode & ")",
-    )
+  # Loop discarding datagrams that do not match our transaction ID.
+  let deadline = getMonoTime() + initDuration(milliseconds = timeoutMs)
+  while true:
+    let remaining = int(inMilliseconds(deadline - getMonoTime()))
+    if remaining <= 0:
+      raise newException(
+        IOError,
+        "DNS query timed out for '" & ascii & "'",
+      )
+    var fds = @[sock.getFd()]
+    if selectRead(fds, remaining) == 0:
+      raise newException(
+        IOError,
+        "DNS query timed out for '" & ascii & "'",
+      )
+    var response = newString(512)
+    let n = sock.recv(response, 512)
+    if n < 4:
+      continue
+    if uint8(response[0]) != uint8(id shr 8) or
+       uint8(response[1]) != uint8(id and 0xff):
+      continue
+    let rcode = uint8(response[3]) and 0x0f
+    if rcode != 0:
+      raise newException(
+        IOError,
+        "DNS lookup failed for '" & ascii & "' (rcode=" & $rcode & ")",
+      )
+    break
