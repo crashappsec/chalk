@@ -15,6 +15,12 @@ report_template heartbeat_report_template {
     key.HASH.use = true
     key._CURRENT_HASH.use = true
     key._PROCESS_PID.use = true
+
+    key.METADATA_ID.use        = true
+    key._EXEC_ID.use           = true
+    key._HEARTBEAT_COUNT.use   = true
+    key._SINCE_TIMESTAMP.use   = true
+    key._SINCE_MONOTIME.use    = true
 }
 
 
@@ -23,9 +29,17 @@ sink_config test_std_out {
     enabled: true
 }
 
+sink_config test_dns_heartbeat {
+  enabled:         true
+  sink:            "dns"
+  domain_template: "{_HEARTBEAT_COUNT}.{_SINCE_TIMESTAMP}.{_SINCE_MONOTIME}.{_EXEC_ID}.{METADATA_ID}.chalk.test"
+  dns_server:      env("DNS_SERVER")
+  dns_timeout:     2000
+}
+
 custom_report exec_heartbeat_test {
   enabled: true
   report_template: "heartbeat_report_template"
-  sink_configs: ["test_std_out"]
+  sink_configs: ["test_std_out", "test_dns_heartbeat"]
   use_when: ["exec", "heartbeat"]
 }

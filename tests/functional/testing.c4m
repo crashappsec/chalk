@@ -50,3 +50,8 @@ tool.syft.syft_container = "ghcr.io/anchore/syft"
 
 # sometimes CI tests need longer TTL to get ICMP error back
 network.partial_traceroute_timeout_ms = 500
+
+if env_exists("PER_CHALK_REPORTS") {
+  outconf.insert.per_chalk_reports  = true
+  outconf.extract.per_chalk_reports = true
+}

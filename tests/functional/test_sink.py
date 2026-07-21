@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Crash Override, Inc.
+# Copyright (c) 2023-2026, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -14,6 +14,7 @@ import requests
 from .chalk.runner import Chalk
 from .conf import (
     CAT_PATH,
+    DNS_SINK_SERVER,
     SERVER_CERT,
     SERVER_HTTP,
     SERVER_HTTPS,
@@ -346,3 +347,30 @@ def _test_server(
     assert fetched_chalk["METADATA_ID"] == metadata_id
 
     return proc
+
+
+# ---------------------------------------------------------------------------
+# DNS sink
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_dns_sink(
+    tmp_data_dir: Path,
+    chalk: Chalk,
+    copy_files: list[Path],
+    server_dns: str,
+):
+    artifact = copy_files[0]
+    result = chalk.insert(
+        artifact,
+        config=SINK_CONFIGS / "dns_multi.c4m",
+        env={"DNS_SERVER": DNS_SINK_SERVER},
+    )
+    metadata_id = result.mark["METADATA_ID"]
+    queries = requests.get(f"{server_dns}/queries").json()
+    assert f"{metadata_id}.chalk.test" in queries
+    assert f"{metadata_id}.insert.chalk.test" in queries
+    assert "x.chalk.test" in queries
+    assert "key 'NONEXISTENT_KEY' not found" in result.logs
+    assert f"{metadata_id[:8]}.chalk.test" in queries

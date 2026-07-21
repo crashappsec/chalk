@@ -221,6 +221,9 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
       chalks += 1
   result.setIfNeeded("_OPERATION",            getBaseCommandName())
   result.setIfNeeded("_EXEC_ID",              execId)
+  let hbCount = getHeartbeatCount()
+  if hbCount > 0:
+    result.setIfNeeded("_HEARTBEAT_COUNT",    hbCount)
   result.setIfNeeded("_OP_CHALKER_VERSION",   getChalkExeVersion())
   result.setIfNeeded("_OP_PLATFORM",          getChalkPlatform())
   result.setIfNeeded("_OP_CHALKER_COMMIT_ID", getChalkCommitId())
@@ -231,11 +234,14 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
   result.setIfNeeded("_OP_HOSTNAME",          getHostname())
   result.setIfNeeded("_OP_PUBLIC_IPV4_ADDR",  getMyIpV4Addr())
   result.setIfNeeded("_OP_UNMARKED_COUNT",    len(getUnmarked()))
-  result.setIfNeeded("_TIMESTAMP",            startTime.toUnixInMs())
-  result.setIfNeeded("_DATE",                 startTime.forReport().format(timesDateFormat))
-  result.setIfNeeded("_TIME",                 startTime.forReport().format(timesTimeFormat))
-  result.setIfNeeded("_TZ_OFFSET",            startTime.forReport().format(timesTzFormat))
-  result.setIfNeeded("_DATETIME",             startTime.forReport().format(timesIso8601Format))
+  result.setIfNeeded("_TIMESTAMP",            opTime.toUnixInMs())
+  result.setIfNeeded("_DATE",                 opTime.forReport().format(timesDateFormat))
+  result.setIfNeeded("_TIME",                 opTime.forReport().format(timesTimeFormat))
+  result.setIfNeeded("_TZ_OFFSET",            opTime.forReport().format(timesTzFormat))
+  result.setIfNeeded("_DATETIME",             opTime.forReport().format(timesIso8601Format))
+  result.setIfNeeded("_MONOTIME",             opMonoTime.toMs())
+  result.setIfNeeded("_SINCE_MONOTIME",       (opMonoTime - processMonoTime).inMilliseconds())
+  result.setIfNeeded("_SINCE_TIMESTAMP",      opTime.toUnixInMs() - processStartTime.toUnixInMs())
 
   if isSubscribedKey("_ENV"):
     result["_ENV"] = getEnvDict()
@@ -245,11 +251,11 @@ proc sysGetRunTimeHostInfo*(self: Plugin, objs: seq[ChalkObj]):
     result.setIfNeeded("_OP_HOST_REPORT_KEYS", reportKeys)
 
   when defined(posix):
-    result.setIfNeeded("_OP_HOST_SYSNAME", uinfo.sysname)
-    result.setIfNeeded("_OP_HOST_RELEASE", uinfo.release)
-    result.setIfNeeded("_OP_HOST_VERSION", uinfo.version)
-    result.setIfNeeded("_OP_HOST_NODENAME", uinfo.nodename)
-    result.setIfNeeded("_OP_HOST_MACHINE", uinfo.machine)
+    result.setIfNeeded("_OP_HOST_SYSNAME",    uinfo.sysname)
+    result.setIfNeeded("_OP_HOST_RELEASE",    uinfo.release)
+    result.setIfNeeded("_OP_HOST_VERSION",    uinfo.version)
+    result.setIfNeeded("_OP_HOST_NODENAME",   uinfo.nodename)
+    result.setIfNeeded("_OP_HOST_MACHINE",    uinfo.machine)
 
 proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   result           = ChalkDict()
@@ -258,23 +264,23 @@ proc sysGetChalkTimeHostInfo*(self: Plugin): ChalkDict {.cdecl.} =
   let pubKeyOpt = selfChalkGetKey("$CHALK_PUBLIC_KEY")
   if pubKeyOpt.isSome():
     result["INJECTOR_PUBLIC_KEY"] = pubKeyOpt.get()
-  result.setIfNeeded("INJECTOR_VERSION", getChalkExeVersion())
-  result.setIfNeeded("INJECTOR_COMMIT_ID", getChalkCommitId())
-  result.setIfNeeded("INJECTOR_ENV", getEnvDict())
-  result.setIfNeeded("DATE_CHALKED", startTime.forReport().format(timesDateFormat))
-  result.setIfNeeded("TIME_CHALKED", startTime.forReport().format(timesTimeFormat))
-  result.setIfNeeded("TZ_OFFSET_WHEN_CHALKED", startTime.forReport().format(timesTzFormat))
-  result.setIfNeeded("DATETIME_WHEN_CHALKED", startTime.forReport().format(timesIso8601Format))
-  result.setIfNeeded("TIMESTAMP_WHEN_CHALKED", startTime.toUnixInMs())
-  result.setIfNeeded("PLATFORM_WHEN_CHALKED", getChalkPlatform())
+  result.setIfNeeded("INJECTOR_VERSION",              getChalkExeVersion())
+  result.setIfNeeded("INJECTOR_COMMIT_ID",            getChalkCommitId())
+  result.setIfNeeded("INJECTOR_ENV",                  getEnvDict())
+  result.setIfNeeded("DATE_CHALKED",                  opTime.forReport().format(timesDateFormat))
+  result.setIfNeeded("TIME_CHALKED",                  opTime.forReport().format(timesTimeFormat))
+  result.setIfNeeded("TZ_OFFSET_WHEN_CHALKED",        opTime.forReport().format(timesTzFormat))
+  result.setIfNeeded("DATETIME_WHEN_CHALKED",         opTime.forReport().format(timesIso8601Format))
+  result.setIfNeeded("TIMESTAMP_WHEN_CHALKED",        opTime.toUnixInMs())
+  result.setIfNeeded("PLATFORM_WHEN_CHALKED",         getChalkPlatform())
   result.setIfNeeded("PUBLIC_IPV4_ADDR_WHEN_CHALKED", getMyIpV4Addr())
 
   when defined(posix):
-    result.setIfNeeded("HOST_SYSNAME_WHEN_CHALKED", uinfo.sysname)
-    result.setIfNeeded("HOST_RELEASE_WHEN_CHALKED", uinfo.release)
-    result.setIfNeeded("HOST_VERSION_WHEN_CHALKED", uinfo.version)
-    result.setIfNeeded("HOST_NODENAME_WHEN_CHALKED", uinfo.nodename)
-    result.setIfNeeded("HOST_MACHINE_WHEN_CHALKED", uinfo.machine)
+    result.setIfNeeded("HOST_SYSNAME_WHEN_CHALKED",   uinfo.sysname)
+    result.setIfNeeded("HOST_RELEASE_WHEN_CHALKED",   uinfo.release)
+    result.setIfNeeded("HOST_VERSION_WHEN_CHALKED",   uinfo.version)
+    result.setIfNeeded("HOST_NODENAME_WHEN_CHALKED",  uinfo.nodename)
+    result.setIfNeeded("HOST_MACHINE_WHEN_CHALKED",   uinfo.machine)
 
   if isSubscribedKey("INJECTOR_CHALK_ID") and selfChalk != nil:
     result.setIfNeeded("INJECTOR_CHALK_ID", selfChalk.callGetChalkId())
@@ -325,7 +331,7 @@ proc metsysGetRunTimeHostInfo(self: Plugin, objs: seq[ChalkObj]):
   if isSubscribedKey("_CHALK_RUN_TIME"):
     let
       monoEndTime = getMonoTime()
-      diff        = monoEndTime - monoStartTime
+      diff        = monoEndTime - opMonoTime
       inMs        = diff.inMilliseconds()
     result["_CHALK_RUN_TIME"] = pack(inMs)
 

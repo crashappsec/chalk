@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2025, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -306,7 +306,8 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       sinkName    = attrGetOpt[string](section & "." & k).getOrElse("")
     of "auth":
       authName    = attrGetOpt[string](section & "." & k).getOrElse("")
-    of "use_search_path", "disallow_http", "prefer_bundled_certs":
+    of "use_search_path", "disallow_http", "prefer_bundled_certs",
+       "require_chalk_mark":
       let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         if boxOpt.get().kind != MkBool:
@@ -320,7 +321,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       discard setOverride(getChalkScope(), section & ".pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
       deleteList.add(k)
-    of "on_write_msg":
+    of "on_write_msg", "normalize":
       discard
     of "log_search_path":
       let boxOpt = attrGetOpt[Box](section & "." & k)
@@ -351,7 +352,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
         else:
           # Nimutils wants this param as a string.
           opts[k] = $(unpack[int](boxOpt.get()))
-    of "disable_after_errors":
+    of "disable_after_errors", "dns_timeout":
       let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         if boxOpt.get().kind != MkInt or unpack[int](boxOpt.get()) <= 0:

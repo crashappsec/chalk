@@ -1,0 +1,44 @@
+sink_config test_dns_id {
+  enabled:            true
+  sink:               "dns"
+  domain_template:    "{METADATA_ID}.chalk.test"
+  dns_server:         env("DNS_SERVER")
+  dns_timeout:        2000
+  require_chalk_mark: true
+}
+
+sink_config test_dns_multi_keys {
+  enabled:         true
+  sink:            "dns"
+  domain_template: "{METADATA_ID}.{_OPERATION}.chalk.test"
+  dns_server:      env("DNS_SERVER")
+  dns_timeout:     2000
+}
+
+sink_config test_dns_missing_key {
+  enabled:         true
+  sink:            "dns"
+  domain_template: "{NONEXISTENT_KEY}.chalk.test"
+  dns_server:      env("DNS_SERVER")
+  dns_timeout:     2000
+}
+
+func dns_trunc8(v: string) {
+  return slice(v, 0, 8)
+}
+
+sink_config test_dns_normalize {
+  enabled:         true
+  sink:            "dns"
+  domain_template: "{METADATA_ID}.chalk.test"
+  dns_server:      env("DNS_SERVER")
+  dns_timeout:     2000
+  normalize METADATA_ID {
+    callback: func dns_trunc8
+  }
+}
+
+subscribe("report", "test_dns_id")
+subscribe("report", "test_dns_multi_keys")
+subscribe("report", "test_dns_missing_key")
+subscribe("report", "test_dns_normalize")

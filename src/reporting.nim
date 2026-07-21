@@ -76,43 +76,50 @@ proc setPerChalkReports(tmpl: string, key: string, chalks: seq[ChalkObj]) =
   elif key in hostInfo:
     hostInfo.del(key)
 
-proc setPerChalkReports(tmpl: string) =
-  ## Adds the `_CHALKS` key in the `hostinfo` global to the current
-  ## collection context with whatever items were requested in the
-  ## reporting template passed.
+proc buildHostReport*(tmpl: string): string =
   setPerChalkReports(tmpl, "_CHALKS",              getAllChalks())
   setPerChalkReports(tmpl, "_COLLECTED_ARTIFACTS", getAllArtifacts())
-
-proc buildHostReport*(tmpl: string): string =
-  setPerChalkReports(tmpl)
   return objectifyByTemplate(
     hostInfo.filterByTemplate(tmpl),
     objectsData,
     tmpl,
   ).toJson(tmpl)
 
-proc doCommandReport(): string =
+proc buildHostReportForChalk(chalk: ChalkObj, tmpl: string): string =
+  setPerChalkReports(tmpl, "_CHALKS",              @[chalk])
+  setPerChalkReports(tmpl, "_COLLECTED_ARTIFACTS", getAllArtifacts())
+  return objectifyByTemplate(
+    hostInfo.filterByTemplate(tmpl),
+    objectsData,
+    tmpl,
+  ).toJson(tmpl)
+
+proc doCommandReport(topic: string) =
   let
     unmarked       = getUnmarked()
     reportTemplate = getReportTemplate()
-    # The above goes from the string name to the object.
 
-  if attrGet[bool]("skip_command_report"):
-    info("Skipping the command report as per the `skip_command_report` directive")
-    result = ""
+  trace(reportTemplate & ": Generating command report.")
+  if len(unmarked) != 0:
+    hostInfo["_UNMARKED"] = pack(unmarked)
+
+  if getPerChalkReports():
+    for chalk in getAllChalks():
+      let report = buildHostReportForChalk(chalk, reportTemplate)
+      if report != "":
+        safePublish(topic, report)
   else:
-    trace(reportTemplate & ": Generating command report.")
-    if len(unmarked) != 0:
-      hostInfo["_UNMARKED"] = pack(unmarked)
-
-    result = buildHostReport(reportTemplate)
+    let report = buildHostReport(reportTemplate)
+    if report != "":
+      safePublish(topic, report)
 
 proc doEmbeddedReport(): Box =
   let
     unmarked       = getUnmarked()
     reportTemplate = getReportTemplate()
 
-  setPerChalkReports(reportTemplate)
+  setPerChalkReports(reportTemplate, "_CHALKS",              getAllChalks())
+  setPerChalkReports(reportTemplate, "_COLLECTED_ARTIFACTS", getAllArtifacts())
 
   if len(unmarked) != 0:
     hostInfo["_UNMARKED"] = pack(unmarked)
@@ -155,7 +162,16 @@ proc doCustomReporting() =
         warn("Report '" & topic & "' sink config is invalid. Skipping.")
 
     trace(topic & ": generating custom report")
-    safePublish(topic, buildHostReport(templateToUse))
+    let perChalk = attrGetOpt[bool](spec & ".per_chalk").get(false)
+    if perChalk:
+      for chalk in getAllChalks():
+        let report = buildHostReportForChalk(chalk, templateToUse)
+        if report != "":
+          safePublish(topic, report)
+    else:
+      let report = buildHostReport(templateToUse)
+      if report != "":
+        safePublish(topic, report)
 
 proc doReporting*(topic="report", clearState = false) {.exportc, cdecl.} =
   if inSubscan():
@@ -168,9 +184,10 @@ proc doReporting*(topic="report", clearState = false) {.exportc, cdecl.} =
     if skipCommand and skipCustom:
       return
     collectRunTimeHostInfo()
-    let report = doCommandReport()
-    if report != "":
-      safePublish(topic, report)
+    if skipCommand:
+      info("Skipping the command report as per the `skip_command_report` directive")
+    else:
+      doCommandReport(topic)
     if not skipCustom:
       doCustomReporting()
     writeReportCache()

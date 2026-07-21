@@ -405,6 +405,7 @@ report and subtract from it.
   key._OPERATION.use                          = true
   key._OP_EXIT_CODE.use                       = true
   key._TIMESTAMP.use                          = true
+  key._MONOTIME.use                           = true
   key._DATE.use                               = true
   key._TIME.use                               = true
   key._TZ_OFFSET.use                          = true
@@ -594,6 +595,7 @@ doc: """
   key._OPERATION.use                          = true
   key._OP_EXIT_CODE.use                       = true
   key._TIMESTAMP.use                          = true
+  key._MONOTIME.use                           = true
   key._DATE.use                               = true
   key._TIME.use                               = true
   key._TZ_OFFSET.use                          = true
@@ -1182,6 +1184,7 @@ container.
   key._ENV.use                                = true
   key._OPERATION.use                          = true
   key._TIMESTAMP.use                          = true
+  key._MONOTIME.use                           = true
   key._DATE.use                               = false # Go with _DATETIME
   key._TIME.use                               = false
   key._TZ_OFFSET.use                          = false
@@ -1731,6 +1734,7 @@ and keep the run-time key.
   key._ENV.use                                = true
   key._OPERATION.use                          = true
   key._TIMESTAMP.use                          = true
+  key._MONOTIME.use                           = true
   key._DATE.use                               = false # Go with _DATETIME
   key._TIME.use                               = false
   key._TZ_OFFSET.use                          = false
@@ -2306,6 +2310,8 @@ running insert commands.
 """
   key._OPERATION.use                          = true
   key._DATETIME.use                           = true
+  key._TIMESTAMP.use                          = true
+  key._MONOTIME.use                           = true
   key._CHALKS.use                             = true
   key._COLLECTED_ARTIFACTS.use                = true
   key._OP_ARGV.use                            = true

@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2025, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -17,6 +17,8 @@
 ## ever called.
 
 import std/[
+  enumerate,
+  json,
   streams,
   tables,
   options,
@@ -38,10 +40,16 @@ import pkg/nimutils/[
   net,
 ]
 import ".."/[
+  chalkjson,
+  config,
+  con4mwrap,
   types,
 ]
 import "."/[
+  dns,
   http,
+  json,
+  substitutions,
 ]
 
 const defaultLogSearchPath = @["/var/log/", "~/.log/", "."]
@@ -266,11 +274,11 @@ proc isHardHttpError(e: ref HttpStatusError): bool =
   ## retrying, except 429 (rate limited) which is transient and stays soft.
   e.code in 400..499 and e.code != 429
 
-template onHttpSinkError(cfg: SinkConfig, err: ref Exception, hard: bool) =
-  ## Records an HTTP sink delivery failure and always re-raises `err`.
+template onSinkError(cfg: SinkConfig, err: ref Exception, hard: bool) =
+  ## Records a sink delivery failure and always re-raises `err`.
   ##
-  ## `hard` failures (4xx except 429, malformed presign redirects) disable the
-  ## sink immediately; soft failures disable it once disable_after_errors
+  ## `hard` failures disable the sink immediately; soft failures disable it
+  ## once disable_after_errors
   ## consecutive failures are reached. On every path `err` is re-raised so the
   ## delivery that triggered the failure still propagates to publish()'s onFail,
   ## is accounted as a failure, and is buffered in the report cache rather than
@@ -363,10 +371,10 @@ proc s3SinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     cfg.iolog(t, "Post to: " & newPath & "; response = " & response.status)
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
+    onSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+    onSinkError(cfg, getCurrentException(), hard = false)
 
 proc httpHeaders(cfg: SinkConfig): HttpHeaders =
   var
@@ -448,10 +456,10 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     cfg.iolog(t, "Post " & response.status)
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
+    onSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+    onSinkError(cfg, getCurrentException(), hard = false)
 
 proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
@@ -475,10 +483,10 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     )
   except HttpStatusError as e:
     dumpExOnDebug()
-    onHttpSinkError(cfg, e, hard = isHardHttpError(e))
+    onSinkError(cfg, e, hard = isHardHttpError(e))
   except:
     dumpExOnDebug()
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+    onSinkError(cfg, getCurrentException(), hard = false)
 
   var uri: Uri
   try:
@@ -492,7 +500,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     # A malformed redirect (missing or relative Location) can never yield a
     # working upload URL, so treat it as a hard error and route it through the
     # disable machinery like a 4xx sign response instead of raising past it.
-    onHttpSinkError(cfg, getCurrentException(), hard = true)
+    onSinkError(cfg, getCurrentException(), hard = true)
 
   let uploadHeaders = newHttpHeaders().addForwardedHeaders(signResponse)
   try:
@@ -515,7 +523,7 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
   except:
     dumpExOnDebug()
     # Upload errors are always soft: the presigned URL itself may be transient.
-    onHttpSinkError(cfg, getCurrentException(), hard = false)
+    onSinkError(cfg, getCurrentException(), hard = false)
 
 proc addFileSink*() =
   var
@@ -610,6 +618,120 @@ proc addPresignSink*() =
 
   registerSink("presign", record)
 
+proc applyDnsNormalizer(
+  box:         Box,
+  placeholder: string,
+  key:         string,
+  cfgName:     string,
+): string =
+  if box.kind notin {MkStr, MkInt, MkFloat, MkBool}:
+    warn("dns sink '" & cfgName & "': key '" & key & "' is non-scalar (" & $box.kind & "); using placeholder '" & placeholder & "'")
+    return placeholder
+  let cbPath = "sink_config." & cfgName & ".normalize." & key & ".callback"
+  let cbOpt  = attrGetOpt[CallbackObj](cbPath)
+  if cbOpt.isNone():
+    return $box
+  try:
+    let r = runCallback(cbOpt.get(), @[box])
+    if r.isSome():
+      return $(r.get())
+  except:
+    dumpExOnDebug()
+    warn("dns sink '" & cfgName & "': normalize callback for '" & key & "' failed: " & getCurrentExceptionMsg())
+  return $box
+
+proc dnsSinkLookup(
+  key:         string,
+  report:      ChalkDict,
+  chalk:       ChalkDict,
+  placeholder: string,
+  cfgName:     string,
+): string =
+  if key in report:
+    return applyDnsNormalizer(report[key], placeholder, key, cfgName)
+  if key in chalk:
+    return applyDnsNormalizer(chalk[key], placeholder, key, cfgName)
+  warn("dns sink '" & cfgName & "': key '" & key & "' not found; using placeholder '" & placeholder & "'")
+  return placeholder
+
+proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
+  let
+    tmpl             = cfg.params.getOrDefault("domain_template", "")
+    placeholder      = cfg.params.getOrDefault("missing_key_placeholder", "x")
+    recordType       = cfg.params.getOrDefault("record_type", "A")
+    dnsServer        = cfg.params.getOrDefault("dns_server", "")
+    timeoutMs        = parseInt(cfg.params.getOrDefault("dns_timeout", "5000"))
+    requireChalkMark = cfg.params.getOrDefault("require_chalk_mark", "false") == "true"
+    qtype            = case recordType.toUpperAscii()
+                       of "AAAA": DnsQtype.AAAA
+                       of "ANY":  DnsQtype.ANY
+                       else:      DnsQtype.A
+
+  var
+    report: ChalkDict
+    chalks: seq[ChalkDict] = @[]
+  try:
+    let reportJson = parseJson(msg).assertIs(JArray).assertHasLen()[0].assertIs(JObject)
+    report = unpack[ChalkDict](nimJsonToBox(reportJson))
+    if "_CHALKS" in reportJson:
+      let chalksJson = reportJson["_CHALKS"].assertIs(JArray)
+      for i, chalkJson in enumerate(chalksJson.items()):
+        try:
+          chalks.add(unpack[ChalkDict](nimJsonToBox(chalkJson.assertIs(JObject))))
+        except:
+          dumpExOnDebug()
+          warn(
+            "dns sink '" & cfg.name & "': failed to extract _CHALKS[" & $i & "]: " &
+            getCurrentExceptionMsg(),
+          )
+  except:
+    dumpExOnDebug()
+    onSinkError(cfg, getCurrentException(), hard = true)
+
+  if chalks.len == 0:
+    if requireChalkMark:
+      return
+    # Fall back to a single lookup with report-level keys only.
+    chalks.add(ChalkDict())
+
+  for chalkEntry in chalks:
+    let chalk = chalkEntry
+    try:
+      let domain = tmpl.applySubstitutions(
+        proc(key: string): string =
+          dnsSinkLookup(key, report, chalk, placeholder, cfg.name),
+      )
+      dnsLookup(
+        domain    = domain,
+        server    = dnsServer,
+        qtype     = qtype,
+        timeoutMs = timeoutMs,
+      )
+      resetSinkFailures(cfg)
+      cfg.iolog(t, "DNS: " & domain)
+    except ValueError:
+      dumpExOnDebug()
+      onSinkError(cfg, getCurrentException(), hard = true)
+    except:
+      dumpExOnDebug()
+      onSinkError(cfg, getCurrentException(), hard = false)
+
+proc addDnsSink*() =
+  var
+    record = SinkImplementation()
+    keys = {
+      "domain_template":         true,
+      "record_type":             false,
+      "missing_key_placeholder": false,
+      "dns_server":              false,
+      "dns_timeout":             false,
+      "disable_after_errors":    false,
+      "require_chalk_mark":      false,
+    }.toTable()
+  record.outputFunction = dnsSinkOut
+  record.keys           = keys
+  registerSink("dns", record)
+
 proc addDefaultSinks*() =
   addStdoutSink()
   addStderrSink()
@@ -618,3 +740,4 @@ proc addDefaultSinks*() =
   addS3Sink()
   addPostSink()
   addPresignSink()
+  addDnsSink()

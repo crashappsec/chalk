@@ -215,6 +215,7 @@ type
     args*:                     seq[string]
     contextDirectories*:       seq[string]
     baseChalk*:                ChalkObj
+    heartbeatCount*:           int
 
   ArtifactIterationInfo* = ref object
     filePaths*:       seq[string]

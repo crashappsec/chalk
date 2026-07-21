@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "1.1.4-dev"
+chalk_version :=   "1.2.0-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -2168,7 +2168,7 @@ keyspec _ERR_INFO {
     type:             list[string]
     standard:         true
     system:           true
-    since:            "1.1.4"
+    since:            "1.2.0"
     normalized_order: high() - 500
     shortdoc:         "Errors collected during chalk time and post-build operations"
     doc:              """
@@ -2212,7 +2212,7 @@ keyspec _FAILED_KEYS {
   kind:     RunTimeArtifact
   type:     dict[string, list[`x]]
   standard: true
-  since:    "1.1.4"
+  since:    "1.2.0"
   shortdoc: "Keys and errors why chalk could not collect them (including post-build)"
   doc:      """
 This key reports all known errors and reasons why chalk could not
@@ -5495,6 +5495,67 @@ For example, unlike `_ACTION_ID` which is unique for each report,
 reports hence allowing to tie them together.
 
 The value is a 64-bit (secure) random value, encoded as hex.
+"""
+}
+
+keyspec _HEARTBEAT_COUNT {
+    kind:           RunTimeHost
+    type:           int
+    standard:       true
+    system:         true
+    conf_as_system: true
+    since:          "1.2.0"
+    shortdoc:       "Number of heartbeats emitted in this execution"
+    doc:            """
+Counter incremented by one on each periodic heartbeat report during a
+`chalk exec --heartbeat` run. The first heartbeat has `_HEARTBEAT_COUNT`
+of 1. Only present in heartbeat reports.
+"""
+}
+
+keyspec _MONOTIME {
+    kind:           RunTimeHost
+    type:           int
+    standard:       true
+    system:         true
+    conf_as_system: true
+    since:          "1.2.0"
+    shortdoc:       "Kernel monotonic clock at report time (ms since boot)"
+    doc:            """
+Milliseconds from the kernel monotonic clock at the time of this report.
+Unlike `_TIMESTAMP`, this clock never goes backwards and is unaffected
+by NTP or wall-clock adjustments. Use `_SINCE_MONOTIME` for elapsed time
+since process start; use this field to compare two reports from the same host.
+"""
+}
+
+keyspec _SINCE_TIMESTAMP {
+    kind:           RunTimeHost
+    type:           int
+    standard:       true
+    system:         true
+    conf_as_system: true
+    since:          "1.2.0"
+    shortdoc:       "Wall-clock milliseconds elapsed since process start"
+    doc:            """
+Milliseconds elapsed since the chalk process started, measured via the
+wall clock (`_TIMESTAMP` family). Resets to 0 at process launch; for
+heartbeat reports this grows monotonically across ticks.
+"""
+}
+
+keyspec _SINCE_MONOTIME {
+    kind:           RunTimeHost
+    type:           int
+    standard:       true
+    system:         true
+    conf_as_system: true
+    since:          "1.2.0"
+    shortdoc:       "Monotonic milliseconds elapsed since process start"
+    doc:            """
+Milliseconds elapsed since the chalk process started, measured via the
+kernel monotonic clock. Immune to NTP/wall-clock adjustments. Preferred
+over `_SINCE_TIMESTAMP` for measuring real elapsed time.
 """
 }
 

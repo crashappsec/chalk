@@ -4,6 +4,52 @@
 
 ### New Features
 
+- Four new runtime host keys for timing and heartbeat tracking:
+  - `_MONOTIME` — monotonic clock value at the start of the current operation,
+    in milliseconds (kernel monotonic time, suitable for elapsed-time math).
+  - `_SINCE_TIMESTAMP` — milliseconds elapsed since the chalk process started
+    (wall-clock delta between `_TIMESTAMP` and the process start time).
+  - `_SINCE_MONOTIME` — milliseconds elapsed since the chalk process started
+    (monotonic delta, unaffected by clock adjustments).
+  - `_HEARTBEAT_COUNT` — 1-based counter incremented on each heartbeat tick;
+    only present in heartbeat reports (absent in the initial `exec` report).
+
+  ([#695](https://github.com/crashappsec/chalk/pull/695))
+
+- New `dns` sink type that encodes chalk key values into a DNS lookup hostname,
+  providing a telemetry channel that works in environments where HTTPS egress
+  is restricted. Key values are substituted into a `domain_template` using
+  `{KEY}` placeholders. Per-key `normalize` callbacks transform values before
+  substitution, which is useful for keys whose string representation may exceed
+  the 63-character DNS label limit. The sink emits one lookup per chalk mark in
+  `_CHALKS`, falling back to a single lookup with report-level keys only when no
+  chalk marks are present. Set `require_chalk_mark: true` to suppress the
+  fallback and skip emission entirely when no marks are present:
+
+  ```con4m
+  func trunc16(v: string) {
+    return slice(v, 0, 16)
+  }
+
+  sink_config my_dns_beacon {
+    sink:               "dns"
+    domain_template:    "{_COMMIT_ID}.{METADATA_ID}.beacons.example.com"
+    dns_server:         "10.0.0.1:5353"
+    require_chalk_mark: true
+    normalize._COMMIT_ID.callback: func trunc16
+  }
+  subscribe("report", "my_dns_beacon")
+  ```
+
+  ([#694](https://github.com/crashappsec/chalk/pull/694))
+
+- `outconf` sections now support `per_chalk_reports: true`, and `custom_report`
+  sections now support `per_chalk: true`. When enabled, chalk emits one report
+  per chalk mark (with `_CHALKS` containing exactly that mark) instead of
+  bundling all marks into a single report. Host-level keys are repeated verbatim
+  in each report.
+  ([#694](https://github.com/crashappsec/chalk/pull/694))
+
 - Two new runtime artifact keys capture errors and failures that occur
   **after** the chalk mark has already been embedded into the image (e.g.
   registry queries, provenance, SBOM collection, and build-context upload).

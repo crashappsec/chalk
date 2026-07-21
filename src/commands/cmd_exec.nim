@@ -203,9 +203,10 @@ proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
 
   while true:
     sleep(sleepInterval)
-    # reset stats which includes the startTime
+    # reset stats which includes the opTime
     # so that each heartbeat has accurate timestamp
     clearReportingState()
+    incHeartbeatCount()
     chalkOpt.doHeartbeatReport()
     if fn(pid):
       break

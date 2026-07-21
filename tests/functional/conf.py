@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, Crash Override, Inc.
+# Copyright (c) 2023-2026, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -51,6 +51,8 @@ REGISTRY_AUTH = f"{IP}:5048"
 
 SERVER_CHALKDUST = "https://chalkdust.io"
 SERVER_IMDS = "http://169.254.169.254"
+SERVER_DNS = "http://dns.chalk.local:8054"
+DNS_SINK_SERVER = "dns.chalk.local:5354"
 SERVER_STATIC = "http://static:8000"
 SERVER_HTTP = "http://chalk.local:8585"
 SERVER_HTTPS = "https://tls.chalk.local:5858"

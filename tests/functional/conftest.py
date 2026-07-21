@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, Crash Override, Inc.
+# Copyright (c) 2023-2026, Crash Override, Inc.
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
@@ -22,6 +22,7 @@ from .conf import (
     SERVER_CERT,
     SERVER_CHALKDUST,
     SERVER_DB,
+    SERVER_DNS,
     SERVER_HTTP,
     SERVER_HTTPS,
     SERVER_IMDS,
@@ -213,6 +214,20 @@ def server_static():
     if not is_server_up(f"{SERVER_STATIC}/conftest.py"):
         pytest.skip(f"{SERVER_STATIC} is down. skipping test")
     return SERVER_STATIC
+
+
+@pytest.fixture()
+def server_dns():
+    if not is_server_up(f"{SERVER_DNS}/health"):
+        pytest.skip(f"DNS server ({SERVER_DNS}) is down. skipping test")
+    yield SERVER_DNS
+
+
+@pytest.fixture(scope="session", autouse=True)
+def dns_queries_cleanup():
+    yield
+    if is_server_up(f"{SERVER_DNS}/health"):
+        requests.delete(f"{SERVER_DNS}/queries")
 
 
 @pytest.fixture()

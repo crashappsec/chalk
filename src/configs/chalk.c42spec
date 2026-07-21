@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2025, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -151,6 +151,43 @@ Object store allows consistent metadata to be reference multiple times
 across multiple reports. For example many repositories do not change
 their SBOM on every build therefore allowing to reference same object
 for multiple reports allows to de-duplicate SBOM data between builds.
+"""
+  }
+}
+
+object normalize {
+  user_def_ok: true
+  doc: """
+Per-key normalization callbacks for sink output. Each subsection name is a
+chalk key name. The `callback` field receives the raw Box value of the key
+and its return value is converted to a string for substitution into sink
+templates such as a DNS `domain_template`.
+
+Example:
+
+```
+func trunc16(v: string) {
+  return slice(v, 0, 16)
+}
+
+sink_config my_dns {
+  sink:            "dns"
+  domain_template: "{_COMMIT_ID}.{METADATA_ID}.chalk.test"
+  normalize _COMMIT_ID {
+    callback: func trunc16
+  }
+}
+```
+"""
+
+  field callback {
+    type:    func (`x) -> `y
+    require: false
+    doc: """
+A function that receives the raw Box value of the key and returns a Box.
+The return value is stringified (via `$box`) for substitution into a sink
+template. Floats will include a decimal point; add a normalize callback to
+strip it if needed.
 """
   }
 }
@@ -1032,6 +1069,8 @@ in this section are defined by the `sink` configuration named in this
 field.
 """
   }
+
+  allow normalize {}
 }
 
 object_store_types := ["", "presign"]
@@ -1542,6 +1581,17 @@ integrity check passes, even if this makes marks forgable.
 """
   }
 
+  field per_chalk_reports {
+    type:    bool
+    default: false
+    doc:     """
+When set to `true`, instead of emitting one report with all chalk marks
+bundled in `_CHALKS`, chalk emits one report per chalk mark with
+`_CHALKS` containing only that single mark. Host-level keys are repeated
+verbatim in each report.
+"""
+  }
+
   field doc {
     type:     string
     require:  false
@@ -1689,6 +1739,17 @@ That is, if the current chalk command is not in this list, then the
 report will NOT run.
 
 If not specified, reports apply to any command that reports.
+"""
+  }
+
+  field per_chalk {
+    type:    bool
+    default: false
+    doc:     """
+When set to `true`, instead of emitting one report with all chalk marks
+bundled in `_CHALKS`, chalk emits one report per chalk mark with
+`_CHALKS` containing only that single mark. Host-level keys are repeated
+verbatim in each report.
 """
   }
 
@@ -4966,7 +5027,8 @@ func sink_config_check(path) {
           return conffield + ": This field must be a positive integer"
       }
     }
-    elif contains(["enabled", "use_search_path", "disallow_http", "prefer_bundled_certs"], conffield) {
+    elif contains(["enabled", "use_search_path", "disallow_http", "prefer_bundled_certs",
+                   "require_chalk_mark"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, bool) {
           return conffield + ": Field must be `true` or `false`"
@@ -4976,6 +5038,21 @@ func sink_config_check(path) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, list[string]) {
           return conffield + ": Field must be a list[string]"
+      }
+    }
+    elif conffield == "record_type" {
+      v := attr_get(path + "." + conffield, string)
+      if not contains(["A", "AAAA", "any"], v) {
+        return (conffield + ": must be one of \"A\", \"AAAA\", or \"any\" (got: \"" + v + "\")")
+      }
+    }
+    elif conffield == "dns_timeout" {
+      t := attr_type(path + "." + conffield)
+      if not typecmp(t, int) {
+        return conffield + ": This field must be a positive integer (milliseconds)"
+      }
+      if attr_get(path + "." + conffield, int) <= 0 {
+        return conffield + ": This field must be a positive integer (milliseconds)"
       }
     }
     elif not typecmp(attr_type(path + "." + conffield), string) {

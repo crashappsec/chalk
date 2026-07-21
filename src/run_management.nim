@@ -26,6 +26,12 @@ import "."/[
 
 var ctxStack = @[CollectionCtx()]
 
+proc incHeartbeatCount*() =
+  ctxStack[0].heartbeatCount += 1
+
+proc getHeartbeatCount*(): int =
+  ctxStack[0].heartbeatCount
+
 # This is for when we're doing a `conf load`.  We force silence, turning off
 # all logging of merit.
 proc startTestRun*() =
@@ -69,9 +75,11 @@ proc inSubscan*(): bool =
   return len(ctxStack) > 1
 
 proc clearReportingState*() =
-  startTime       = getTime().utc
-  monoStartTime   = getMonoTime()
+  opTime     = getTime().utc
+  opMonoTime = getMonoTime()
+  let savedHeartbeatCount = ctxStack[0].heartbeatCount
   ctxStack        = @[CollectionCtx()]
+  ctxStack[0].heartbeatCount = savedHeartbeatCount
   hostInfo        = ChalkDict()
   objectsData     = ObjectsDict()
   subscribedKeys  = Table[string, bool]()

@@ -44,7 +44,8 @@ plugin system {
                     "_OP_EXE_NAME", "_OP_EXE_PATH", "_OP_ARGV", "_OP_HOSTNAME",
                     "_OP_HOST_REPORT_KEYS", "_OP_UNMARKED_COUNT", "_TIMESTAMP",
                     "_DATE", "_TIME", "_TZ_OFFSET", "_DATETIME", "_ENV",
-                    "_EXEC_ID"]
+                    "_EXEC_ID", "_HEARTBEAT_COUNT",
+                    "_MONOTIME", "_SINCE_TIMESTAMP", "_SINCE_MONOTIME"]
 
   ~priority:       0
   doc: """

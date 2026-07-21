@@ -3,13 +3,16 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 from pathlib import Path
+import operator
 import sys
 
+import requests
 import pytest
 
 from .chalk.runner import Chalk
-from .conf import CONFIGS, SLEEP_PATH, UNAME_PATH
-from .utils.dict import Contains, ContainsDict
+from .conf import CONFIGS, DNS_SINK_SERVER, SLEEP_PATH, UNAME_PATH
+
+from .utils.dict import ANY, Contains, ContainsDict, IntCompare
 from .utils.bin import sha256
 from .utils.log import get_logger
 
@@ -59,6 +62,7 @@ def test_exec_chalked(
     copy_files: list[Path],
     chalk: Chalk,
     tmp_data_dir: Path,
+    server_dns: str,
 ):
     bin_path = copy_files[0]
     bin_hash = sha256(bin_path)
@@ -78,6 +82,7 @@ def test_exec_chalked(
         params=["3"],
         as_parent=as_parent,
         config=CONFIGS / "procfs.c4m",
+        env={"DNS_SERVER": DNS_SINK_SERVER},
     )
 
     assert exec_proc.report["_OPERATION"] == "exec"
@@ -123,7 +128,7 @@ def test_exec_chalked(
                 "pos": 0,
                 "mnt_id": int,
                 "ino": int,
-                "path": "/dev/null",
+                "path": str,
                 "flags": int,
             }
         },
@@ -155,6 +160,12 @@ def test_exec_chalked(
         # but we can check that some of the ancesor argv has python
         _OP_ANCESTOR_ARGVS=Contains([Contains([sys.executable])]),
     )
+    metadata_id = exec_proc.mark["METADATA_ID"]
+    exec_id = exec_proc.report["_EXEC_ID"]
+    monotime = exec_proc.report["_MONOTIME"]
+    timestamp = exec_proc.report["_TIMESTAMP"]
+    queries = requests.get(f"{server_dns}/queries").json()
+    assert f"{monotime}.{timestamp}.{exec_id}.{metadata_id}.chalk.test" in queries
 
 
 # exec wrapping with heartbeat
@@ -162,6 +173,7 @@ def test_exec_chalked(
 def test_exec_heartbeat(
     copy_files: list[Path],
     chalk: Chalk,
+    server_dns: str,
 ):
     bin_path = copy_files[0]
     bin_hash = sha256(bin_path)
@@ -178,17 +190,41 @@ def test_exec_heartbeat(
         heartbeat=True,
         config=CONFIGS / "heartbeat.c4m",
         params=["5"],
+        env={"DNS_SERVER": DNS_SINK_SERVER},
     )
 
     exec_report = result.reports[0]
-    assert exec_report["_OPERATION"] == "exec"
-    assert exec_report.mark["_OP_ARTIFACT_PATH"] == str(bin_path)
-    assert exec_report.mark["_CURRENT_HASH"] == chalk_hash
-    assert exec_report.mark["ARTIFACT_TYPE"] == "ELF"
-    assert exec_report.mark["_PROCESS_PID"] != ""
+    assert exec_report.has(
+        _OPERATION="exec",
+        _EXEC_ID=ANY,
+    )
+    assert exec_report.mark.has(
+        _OP_ARTIFACT_PATH=str(bin_path),
+        _CURRENT_HASH=chalk_hash,
+        ARTIFACT_TYPE="ELF",
+        METADATA_ID=ANY,
+        _PROCESS_PID=ANY,
+    )
 
     # there should be a few heartbeats
     assert len(result.reports) > 1
-    for heartbeat_report in result.reports[1:]:
-        assert heartbeat_report["_OPERATION"] == "heartbeat"
+    metadata_id = exec_report.mark["METADATA_ID"]
+    exec_id = exec_report["_EXEC_ID"]
+    queries = requests.get(f"{server_dns}/queries").json()
+    prev_since_monotime = 0
+    prev_since_timestamp = 0
+    for i, heartbeat_report in enumerate(result.reports[1:], start=1):
+        assert heartbeat_report.has(
+            _OPERATION="heartbeat",
+            _EXEC_ID=exec_id,
+            _HEARTBEAT_COUNT=i,
+            _SINCE_MONOTIME=IntCompare(prev_since_monotime, operator.gt),
+            _SINCE_TIMESTAMP=IntCompare(prev_since_timestamp, operator.gt),
+        )
+        prev_since_monotime = heartbeat_report["_SINCE_MONOTIME"]
+        prev_since_timestamp = heartbeat_report["_SINCE_TIMESTAMP"]
         assert heartbeat_report.mark == exec_report.mark
+        assert (
+            f"{i}.{prev_since_timestamp}.{prev_since_monotime}.{exec_id}.{metadata_id}.chalk.test"
+            in queries
+        )
