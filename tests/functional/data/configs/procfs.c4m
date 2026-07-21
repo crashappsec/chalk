@@ -31,12 +31,13 @@ report_template report_default {
   key._MONOTIME.use               = true
 }
 
-sink_config dns_exec {
-  enabled:         env_exists("DNS_SERVER")
-  sink:            "dns"
-  domain_template: "{_MONOTIME}.{_TIMESTAMP}.{_EXEC_ID}.{METADATA_ID}.chalk.test"
-  dns_server:      env("DNS_SERVER")
-  dns_timeout:     2000
+if env_exists("DNS_SERVER") {
+  sink_config dns_exec {
+    enabled:         true
+    sink:            "dns"
+    domain_template: "{_MONOTIME}.{_TIMESTAMP}.{_EXEC_ID}.{METADATA_ID}.chalk.test"
+    dns_server:      env("DNS_SERVER")
+    dns_timeout:     2000
+  }
+  subscribe("report", "dns_exec")
 }
-
-subscribe("report", "dns_exec")
