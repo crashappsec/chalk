@@ -18,6 +18,7 @@ import std/[
   uri,
 ]
 import pkg/nimutils/[
+  logging,
   random,
 ]
 
@@ -284,6 +285,8 @@ proc dnsLookup*(
   ## When `server` is empty the system resolver is used (via getaddrinfo).
   ## `server` may include a port: "8.8.8.8:5353" or "[::1]:5353".
   let ascii = toAsciiDomain(domain)
+  let srv   = if server == "": "system resolver" else: server
+  trace("dns: " & ascii & " via " & srv)
   if server == "":
     dnsLookupSystem(ascii, qtype)
     return
