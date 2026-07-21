@@ -575,6 +575,7 @@ class Chalk:
         heartbeat: bool = False,
         config: Optional[Path | str] = None,
         params: Optional[list[str]] = None,
+        env: Optional[dict[str, str]] = None,
     ) -> ChalkProgram:
         return self.run(
             command="exec",
@@ -584,6 +585,7 @@ class Chalk:
             heartbeat=heartbeat,
             config=config,
             params=params,
+            env=env,
         )
 
     def delete(self, artifact: Path) -> ChalkProgram:

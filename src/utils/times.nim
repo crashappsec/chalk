@@ -17,8 +17,13 @@ export times
 export monotimes
 
 var
-  startTime*     = getTime().utc # gives absolute wall time
-  monoStartTime* = getMonoTime() # used for computing diffs
+  processStartTime* = getTime().utc # set once at startup, never reset
+  processMonoTime*  = getMonoTime() # set once at startup, never reset
+  opTime*           = processStartTime # current operation wall time, reset each heartbeat
+  opMonoTime*       = processMonoTime  # current operation mono time, reset each heartbeat
+
+proc toMs*(t: MonoTime): int64 =
+  t.ticks div 1_000_000
 
 template withDuration*(c: untyped) =
   let start = getMonoTime()
@@ -41,4 +46,4 @@ proc forReport*(t: DateTime): DateTime =
 proc reportTotalTime*() =
   let monoEndTime = getMonoTime()
   if attrGet[bool]("report_total_time"):
-    echo("Total run time: " & $(monoEndTime - monoStartTime))
+    echo("Total run time: " & $(monoEndTime - processMonoTime))

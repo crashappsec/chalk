@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2025, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -17,6 +17,7 @@
 ## ever called.
 
 import std/[
+  json,
   streams,
   tables,
   options,
@@ -41,7 +42,10 @@ import ".."/[
   types,
 ]
 import "."/[
+  dns,
   http,
+  json,
+  substitutions,
 ]
 
 const defaultLogSearchPath = @["/var/log/", "~/.log/", "."]
@@ -610,6 +614,80 @@ proc addPresignSink*() =
 
   registerSink("presign", record)
 
+proc dnsSinkScalar(node: JsonNode, placeholder: string): string =
+  case node.kind
+  of JString: return node.getStr()
+  of JInt:    return $node.getInt()
+  of JFloat:  return $node.getFloat()
+  of JBool:   return $node.getBool()
+  else:       return placeholder
+
+proc dnsSinkLookup(key: string, report: JsonNode, placeholder: string, cfgName: string): string =
+  if report.hasKey(key):
+    return dnsSinkScalar(report[key], placeholder)
+  if report.hasKey("_CHALKS"):
+    try:
+      let chalk = report["_CHALKS"].assertIs(JArray).assertHasLen()[0].assertIs(JObject)
+      if chalk.hasKey(key):
+        return dnsSinkScalar(chalk[key], placeholder)
+    except:
+      dumpExOnDebug()
+  warn("dns sink '" & cfgName & "': key '" & key & "' not found; using placeholder '" & placeholder & "'")
+  return placeholder
+
+proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
+  let
+    tmpl        = cfg.params.getOrDefault("domain_template", "")
+    placeholder = cfg.params.getOrDefault("missing_key_placeholder", "x")
+    recordType  = cfg.params.getOrDefault("record_type", "A")
+    dnsServer   = cfg.params.getOrDefault("dns_server", "")
+    timeoutMs   = parseInt(cfg.params.getOrDefault("dns_timeout", "5000"))
+
+  var report: JsonNode
+  try:
+    report = parseJson(msg).assertIs(JArray).assertHasLen()[0].assertIs(JObject)
+  except:
+    dumpExOnDebug()
+    error("dns sink '" & cfg.name & "': failed to decode report JSON")
+    return
+
+  let
+    domain = tmpl.applySubstitutions(
+      proc(key: string): string = dnsSinkLookup(key, report, placeholder, cfg.name),
+    )
+    qtype  = case recordType.toUpperAscii()
+             of "AAAA": DnsQtype.AAAA
+             of "ANY":  DnsQtype.ANY
+             else:      DnsQtype.A
+
+  try:
+    dnsLookup(
+      domain    = domain,
+      server    = dnsServer,
+      qtype     = qtype,
+      timeoutMs = timeoutMs,
+    )
+    resetSinkFailures(cfg)
+    cfg.iolog(t, "DNS: " & domain)
+  except:
+    dumpExOnDebug()
+    onHttpSinkError(cfg, getCurrentException(), false)
+
+proc addDnsSink*() =
+  var
+    record = SinkImplementation()
+    keys = {
+      "domain_template":         true,
+      "record_type":             false,
+      "missing_key_placeholder": false,
+      "dns_server":              false,
+      "dns_timeout":             false,
+      "disable_after_errors":    false,
+    }.toTable()
+  record.outputFunction = dnsSinkOut
+  record.keys           = keys
+  registerSink("dns", record)
+
 proc addDefaultSinks*() =
   addStdoutSink()
   addStderrSink()
@@ -618,3 +696,4 @@ proc addDefaultSinks*() =
   addS3Sink()
   addPostSink()
   addPresignSink()
+  addDnsSink()

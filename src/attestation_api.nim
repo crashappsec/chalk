@@ -340,7 +340,7 @@ proc signBySigStore*(chalk: ChalkObj,
       annotations:  %*({
         "dev.sigstore.bundle.content":       "dsse-envelope",
         "dev.sigstore.bundle.predicateType": "https://sigstore.dev/cosign/sign/v1",
-        "org.opencontainers.image.created":  startTime.utc.format(timesIso8601Format),
+        "org.opencontainers.image.created":  opTime.utc.format(timesIso8601Format),
       }),
       config: DockerManifest(
         kind:         DockerManifestType.config,

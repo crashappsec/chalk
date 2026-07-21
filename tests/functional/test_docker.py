@@ -11,6 +11,8 @@ import platform
 import re
 import shutil
 import time
+
+import requests
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Iterator, Optional
@@ -22,6 +24,7 @@ from .chalk.runner import Chalk, ChalkMark, ChalkProgram
 from .conf import (
     AWS_ECR_REPO,
     CONFIGS,
+    DNS_SINK_SERVER,
     DOCKER_HUB_REPO,
     DOCKERFILES,
     DOCKER_SSH_REPO,
@@ -160,6 +163,7 @@ def test_build(
     buildx: bool,
     builder: Optional[str],
     random_hex: str,
+    server_dns: str,
 ):
     """
     Test various variants of docker build command
@@ -173,6 +177,7 @@ def test_build(
         buildx=buildx,
         builder=builder,
         config=CONFIGS / "docker_wrap.c4m",
+        env={"DNS_SERVER": DNS_SINK_SERVER},
     )
     assert digests
     assert build.mark.has(_IMAGE_ENTRYPOINT=["/chalk", "exec", "--"])
@@ -245,6 +250,11 @@ def test_build(
             else MISSING
         ),
     )
+    metadata_id = build.mark["METADATA_ID"]
+    monotime = build.report["_MONOTIME"]
+    timestamp = build.report["_TIMESTAMP"]
+    queries = requests.get(f"{server_dns}/queries").json()
+    assert f"{monotime}.{timestamp}.{metadata_id}.chalk.test" in queries
 
 
 def test_build_platform(

@@ -26,4 +26,17 @@ report_template report_default {
   key._PROCESS_DETAIL.use         = true
 
   key._OP_ANCESTOR_ARGVS.use      = true
+
+  key._EXEC_ID.use                = true
+  key._MONOTIME.use               = true
 }
+
+sink_config dns_exec {
+  enabled:         env_exists("DNS_SERVER")
+  sink:            "dns"
+  domain_template: "{_MONOTIME}.{_TIMESTAMP}.{_EXEC_ID}.{METADATA_ID}.chalk.test"
+  dns_server:      env("DNS_SERVER")
+  dns_timeout:     2000
+}
+
+subscribe("report", "dns_exec")

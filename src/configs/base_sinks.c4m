@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -283,6 +283,33 @@ The presign API can return these headers in the redirect response:
 
 This allows chalk to send reports to otherwise restricted endpoints
 such as AWS S3 without credentials baked into chalk.
+"""
+}
+
+sink dns {
+  ~domain_template:         true
+  ~record_type:             false
+  ~missing_key_placeholder: false
+  ~dns_server:              false
+  ~dns_timeout:             false
+  ~disable_after_errors:    false
+  shortdoc: "DNS lookup with a templated hostname"
+  doc:      """
+
+| Parameter                 | Type     | Required | Default  | Description                                                                             |
+|---------------------------|----------|----------|----------|-----------------------------------------------------------------------------------------|
+| `domain_template`         | `string` | true     | -        | Hostname template; `{KEY}` placeholders are replaced with values from the report.       |
+| `record_type`             | `string` | false    | `"A"`    | DNS record type: `"A"` (IPv4), `"AAAA"` (IPv6), or `"any"`. Validated at config load. |
+| `missing_key_placeholder` | `string` | false    | `"x"`    | Value used when a `{KEY}` placeholder cannot be resolved.                               |
+| `dns_server`              | `string` | false    | `""`     | Custom DNS resolver, e.g. `"8.8.8.8"`, `"8.8.8.8:5353"`, or `"[::1]:5353"`. When empty, the system resolver is used. |
+| `dns_timeout`             | `int`    | false    | `5000`   | Timeout for custom resolver queries in milliseconds. Requires `dns_server`.                            |
+| `disable_after_errors`    | `int`    | false    | `3`      | Consecutive lookup failures before the sink is disabled.                                |
+
+Emits one DNS lookup per report. The response is discarded; only the DNS
+query itself carries the payload. Keys from `_CHALKS[0]` and top-level
+report fields are available for substitution in `domain_template`.
+
+See `docs/design-dns-sink.md` for full design rationale.
 """
 }
 

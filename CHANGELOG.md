@@ -4,6 +4,33 @@
 
 ### New Features
 
+- Four new runtime host keys for timing and heartbeat tracking:
+  - `_MONOTIME` — monotonic clock value at the start of the current operation,
+    in milliseconds (kernel monotonic time, suitable for elapsed-time math).
+  - `_SINCE_TIMESTAMP` — milliseconds elapsed since the chalk process started
+    (wall-clock delta between `_TIMESTAMP` and the process start time).
+  - `_SINCE_MONOTIME` — milliseconds elapsed since the chalk process started
+    (monotonic delta, unaffected by clock adjustments).
+  - `_HEARTBEAT_COUNT` — 1-based counter incremented on each heartbeat tick;
+    only present in heartbeat reports (absent in the initial `exec` report).
+
+  ([#695](https://github.com/crashappsec/chalk/pull/695))
+
+- New `dns` sink type that encodes chalk key values into a DNS lookup hostname,
+  providing a telemetry channel that works in environments where HTTPS egress
+  is restricted. Example:
+
+  ```con4m
+  sink_config my_dns_beacon {
+    sink:            "dns"
+    domain_template: "{METADATA_ID}.beacons.example.com"
+    dns_server:      "10.0.0.1:5353"
+  }
+  subscribe("report", "my_dns_beacon")
+  ```
+
+  ([#694](https://github.com/crashappsec/chalk/pull/694))
+
 - `outconf` sections now support `per_chalk_reports: true`, and `custom_report`
   sections now support `per_chalk: true`. When enabled, chalk emits one report
   per chalk mark (with `_CHALKS` containing exactly that mark) instead of

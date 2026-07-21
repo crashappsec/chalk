@@ -4,6 +4,16 @@ docker.wrap_entrypoint = true
 docker.download_arch_binary_urls = [env("CHALK_SERVER") + "/dummy/chalk-{version}-{os}-{architecture}"]
 docker.arch_binary_locations_path = env("CHALK_TMP")
 
+sink_config dns_build {
+  enabled:         env_exists("DNS_SERVER")
+  sink:            "dns"
+  domain_template: "{_MONOTIME}.{_TIMESTAMP}.{METADATA_ID}.chalk.test"
+  dns_server:      env("DNS_SERVER")
+  dns_timeout:     2000
+}
+
+subscribe("report", "dns_build")
+
 docker {
   docker_registry local {
     enabled: env_exists("CHALK_SERVER")

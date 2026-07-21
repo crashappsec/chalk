@@ -1,5 +1,5 @@
 ##
-## Copyright (c) 2023-2024, Crash Override, Inc.
+## Copyright (c) 2023-2026, Crash Override, Inc.
 ##
 ## This file is part of Chalk
 ## (see https://crashoverride.com/docs/chalk)
@@ -14,6 +14,7 @@ import ".."/[
   types,
   utils/json,
   utils/strings,
+  utils/substitutions,
 ]
 
 proc isCI*(): bool =
@@ -158,28 +159,10 @@ proc getChalkKey*(chalk: ChalkObj, key: string): string =
 
   raise newException(KeyError, "key could not be collected")
 
-proc applySubstitutions*(s: string, chalk: ChalkObj): string =
-  var
-    key   = ""
-    inKey = false
-  for c in s:
-    if c == '{':
-      if inKey:
-        raise newException(ValueError, s & ": invalid format string. '{' is repeated without closing previous occurance")
-      inKey = true
-      key   = ""
-      continue
-    elif c == '}':
-      if not inKey:
-        raise newException(ValueError, s & ": invalid format string. '{' is occurring without matching '}'")
-      inKey = false
-      if key != "":
-        result &= chalk.getChalkKey(key.toUpperAscii())
-      continue
-    if inKey:
-      key.add(c)
-    else:
-      result.add(c)
+proc applySubstitutions(s: string, chalk: ChalkObj): string =
+  return s.applySubstitutions(
+    proc(key: string): string = chalk.getChalkKey(key),
+  )
 
 proc getValue*(secret: DockerSecret): string =
   if secret.src != "":
