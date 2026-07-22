@@ -580,6 +580,7 @@ proc request(self:              DockerImage,
             verifyMode        = config.verifyMode,
             timeout           = timeout,
             retries           = 2,
+            connectRetries    = 2,
             acceptStatusCodes = acceptStatusCodes,
           )
         config.wwwAuth[normalized.repo][isGet] = wwwAuth.update(authHeaders)
