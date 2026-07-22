@@ -240,17 +240,18 @@ template setIfNotEmptyBox(o: ChalkDict, k: string, v: Box) =
     o[k] = value
 
 template setIfNotEmpty*[T](o: ChalkDict, k: string, v: T) =
+  let captured = v
   when T is Box:
-    if not isNil(v):
-      setIfNotEmptyBox(o, k, v)
+    if not isNil(captured):
+      setIfNotEmptyBox(o, k, captured)
   elif T is JsonNode:
-    if not isNil(v):
-      setIfNotEmptyBox(o, k, v.nimJsonToBox())
+    if not isNil(captured):
+      setIfNotEmptyBox(o, k, captured.nimJsonToBox())
   elif T is Option:
-    if v.isSome():
-      setIfNotEmptyBox(o, k, pack(v.get()))
+    if captured.isSome():
+      setIfNotEmptyBox(o, k, pack(captured.get()))
   else:
-    setIfNotEmptyBox(o, k, pack(v))
+    setIfNotEmptyBox(o, k, pack(captured))
 
 template setFromEnvVar*(o: ChalkDict, k: string, default: string = "") =
   o.setIfNotEmpty(k, os.getEnv(k, default))
@@ -278,11 +279,19 @@ template setIfNeeded*[T](o: ChalkDict, k: string, v: T) =
 template setIfNeeded*[T](o: ChalkObj, k: string, v: T) =
   setIfNeeded(o.collectedData, k, v)
 
-template trySetIfNeeded*(o: ChalkDict, k: string, code: untyped) =
+template trySetIfNeeded*(o: ChalkDict, k: string, val: untyped) =
   try:
-    o.setIfNeeded(k, code)
+    o.setIfNeeded(k, val)
   except:
-    trace("Could not set chalk key " & k & " due to: " & getCurrentExceptionMsg())
+    let msg = getCurrentExceptionMsg()
+    trace("Could not set chalk key " & k & " due to: " & msg)
+    dumpExOnDebug()
+    addFailedKey(
+      k,
+      code        = "KEY_COLLECTION_ERROR",
+      error       = msg,
+      description = "Exception raised while collecting key " & k,
+    )
 
 proc idFormat*(rawHash: string): string =
   let s = base32vEncode(rawHash)
@@ -309,6 +318,10 @@ proc addFailedKey*(key: string, code: string, error: string, description: string
     addFailedEntry(failedKeys, key, failure)
   else:
     addFailedEntry(errObject.get().failedKeys, key, failure)
+
+proc addFailedKeys*(keys: openArray[string], code: string, error: string, description: string) =
+  for key in keys:
+    addFailedKey(key, code, error, description)
 
 proc lookupByPath*(obj: ChalkDict, path: string): Option[Box] =
   let

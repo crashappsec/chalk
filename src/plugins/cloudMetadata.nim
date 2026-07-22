@@ -18,6 +18,7 @@ import ".."/[
   utils/envvars,
   utils/http,
   utils/json,
+  utils/strings,
 ]
 
 const
@@ -33,41 +34,55 @@ const
   # special keys for special processing
   AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS = "_AWS_IDENTITY_CREDENTIALS_EC2_SECURITY_CREDENTIALS_EC2_INSTANCE"
 
+proc parseNonEmptyJson(url: string, data: string, default = newJObject()): JsonNode =
+  if data == "":
+    return default
+  try:
+    result = parseJson(data)
+  except:
+    trace("cloudmetadata: " & url & " returned invalid json - " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+    raise
+
 proc getUrl(path: string): string =
   let ip = attrGet[string]("cloud_provider.metadata_ip")
   return "http://" & ip & path
 
-proc hitProviderEndpoint(path: string, hdrs: HttpHeaders): Option[string] =
-  let url      = getUrl(path)
-  try:
-    let
-      response = safeRequest(url            = url,
-                             httpMethod     = HttpGet,
-                             timeout        = 1000, # 1 of a second
-                             connectRetries = 2,
-                             retries        = 2,
-                             headers        = hdrs)
-      body     = response.body().strip()
-
-    if not response.code.is2xx():
-      # 404 is expected response for some endpoints and logging full response body
-      # is very verbose. We only care about full body for other errors like 400,500,etc
-      if response.code == Http404:
-        trace("Could not retrieve metadata from: " & url & " - " & response.status)
+proc hitProviderEndpoint(path: string, hdrs: HttpHeaders, strict = false): string =
+  let
+    url         = getUrl(path)
+    acceptCodes =
+      if strict:
+        @[200..299]
       else:
-        trace("Could not retrieve metadata from: " & url & " - " & response.status & ": " & body)
-      return none(string)
-
+        @[200..299, 404..404]
+  try:
+    let response = safeRequest(
+      url               = url,
+      httpMethod        = HttpGet,
+      timeout           = 1000, # 1 of a second
+      connectRetries    = 2,
+      retries           = 2,
+      headers           = hdrs,
+      acceptStatusCodes = acceptCodes,
+    )
+    if response.code == Http404:
+      trace("Could not retrieve metadata from: " & url & " - HTTP 404")
+      return ""
+    let body = response.body().strip()
     if body == "":
-      # some paths are expected to be empty so this is not an error
       trace("Got empty metadata from: " & url)
-
     trace("Retrieved metadata from: " & url)
-    return some(body)
-  except:
-    trace("Could not retrieve metadata from: " & url & " due to: " & getCurrentExceptionMsg())
+    return body
+  except HttpStatusError as e:
+    trace(e.msg)
     dumpExOnDebug()
-    return none(string)
+    raise
+  except:
+    let msg = getCurrentExceptionMsg()
+    trace("Could not retrieve metadata from: " & url & " due to: " & msg)
+    dumpExOnDebug()
+    raise
 
 type
   HostKind = enum
@@ -86,19 +101,29 @@ proc getAzureMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_TAGS") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_ACCOUNT_INFO") or
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
-    let resultOpt = hitProviderEndpoint(
-      "/metadata/instance?api-version=2021-02-01",
-      newHttpHeaders([("Metadata", "true")]),
-    )
-    if not resultOpt.isSome():
-      trace("Did not get metadata back from Azure endpoint")
+    var azureBody = ""
+    try:
+      azureBody = hitProviderEndpoint(
+        "/metadata/instance?api-version=2021-02-01",
+        newHttpHeaders([("Metadata", "true")]),
+        strict = true,
+      )
+    except:
+      let msg = getCurrentExceptionMsg()
+      trace("Did not get metadata back from Azure endpoint: " & msg)
+      dumpExOnDebug()
+      addFailedKey(
+        "_OP_CLOUD_METADATA",
+        code        = "AZURE_IMDS_ERROR",
+        error       = msg,
+        description = "Azure metadata endpoint at /metadata/instance was unreachable or returned a non-2xx response",
+      )
       return
-    let value = resultOpt.get()
-    if not value.startsWith("{"):
+    if not azureBody.startsWith("{"):
       trace("Azure metadata didnt respond with json object. Ignoring it")
       return
     try:
-      let jsonValue = parseJson(value)
+      let jsonValue = parseJson(azureBody)
       result.setIfNeeded("_AZURE_INSTANCE_METADATA", jsonValue)
       try:
         for iface in jsonValue["network"]["interface"]:
@@ -114,6 +139,7 @@ proc getAzureMetadata(): ChalkDict =
             break
       except:
         trace("Could not set _OP_CLOUD_PROVIDER_IP for azure: " & getCurrentExceptionMsg())
+        dumpExOnDebug()
       result.trySetIfNeeded("_OP_CLOUD_PROVIDER_TAGS"):
         jsonValue["compute"]["tagsList"].nimJsonToBox()
       result.trySetIfNeeded("_OP_CLOUD_PROVIDER_ACCOUNT_INFO"):
@@ -123,7 +149,15 @@ proc getAzureMetadata(): ChalkDict =
       result.trySetIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
         jsonValue["compute"]["vmSize"].getStr()
     except:
-      trace("Azure metadata responded with invalid json: " & getCurrentExceptionMsg())
+      let msg = getCurrentExceptionMsg()
+      trace("Azure metadata responded with invalid json: " & msg)
+      dumpExOnDebug()
+      addFailedKey(
+        "_OP_CLOUD_METADATA",
+        code        = "AZURE_IMDS_PARSE_ERROR",
+        error       = msg,
+        description = "Azure IMDS endpoint returned data that could not be parsed as JSON",
+      )
 
 proc getGcpMetadata(): ChalkDict =
   result = ChalkDict()
@@ -141,34 +175,51 @@ proc getGcpMetadata(): ChalkDict =
       isSubscribedKey("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
     trace("Querying for GCP metadata")
     if isSubscribedKey("_GCP_PROJECT_METADATA"):
-      let projectOpt = hitProviderEndpoint(
-        "/computeMetadata/v1/project/?recursive=true",
-        newHttpHeaders([("Metadata-Flavor", "Google")]),
-      )
-      if projectOpt.isSome():
-        try:
-          let valueProj = projectOpt.get()
-          if valueProj.startsWith("{"):
-            let jsonProjValue = parseJson(valueProj)
-            result.setIfNeeded("_GCP_PROJECT_METADATA", jsonProjValue)
-          else:
-            trace("GCP project metadata didnt respond with json object. Ignoring it")
-        except:
-          trace("Could not set _GCP_PROJECT_METADATA: " & getCurrentExceptionMsg())
+      var projBody = ""
+      try:
+        projBody = hitProviderEndpoint(
+          "/computeMetadata/v1/project/?recursive=true",
+          newHttpHeaders([("Metadata-Flavor", "Google")]),
+          strict = true,
+        )
+      except:
+        let msg = getCurrentExceptionMsg()
+        dumpExOnDebug()
+        addFailedKey(
+          "_GCP_PROJECT_METADATA",
+          code        = "GCP_PROJECT_METADATA_ERROR",
+          error       = msg,
+          description = "GCP metadata endpoint at /computeMetadata/v1/project was unreachable or returned a non-2xx response",
+        )
+      if projBody.startsWith("{"):
+        result.trySetIfNeeded("_GCP_PROJECT_METADATA"):
+          parseJson(projBody).nimJsonToBox()
+      elif projBody != "":
+        trace("GCP project metadata didnt respond with json object. Ignoring it")
 
-    let resultOpt = hitProviderEndpoint(
-      "/computeMetadata/v1/instance/?recursive=true",
-      newHttpHeaders([("Metadata-Flavor", "Google")]),
-    )
-    if not resultOpt.isSome():
+    var gcpBody = ""
+    try:
+      gcpBody = hitProviderEndpoint(
+        "/computeMetadata/v1/instance/?recursive=true",
+        newHttpHeaders([("Metadata-Flavor", "Google")]),
+        strict = true,
+      )
+    except:
+      let msg = getCurrentExceptionMsg()
       trace("Did not get instance metadata back from GCP endpoint")
+      dumpExOnDebug()
+      addFailedKey(
+        "_OP_CLOUD_METADATA",
+        code        = "GCP_IMDS_ERROR",
+        error       = msg,
+        description = "GCP metadata endpoint at /computeMetadata/v1/instance was unreachable or returned a non-2xx response",
+      )
       return
-    let value = resultOpt.get()
-    if not value.startsWith("{"):
+    if not gcpBody.startsWith("{"):
       trace("GCP metadata didnt respond with json object. Ignoring it")
       return
     try:
-      let jsonValue = parseJson(value)
+      let jsonValue = parseJson(gcpBody)
       try:
         for iface in jsonValue["networkInterfaces"]:
           var found = false
@@ -183,6 +234,7 @@ proc getGcpMetadata(): ChalkDict =
             break
       except:
         trace("Could not insert _OP_CLOUD_PROVIDER_IP for gcp: " & getCurrentExceptionMsg())
+        dumpExOnDebug()
       result.trySetIfNeeded("_GCP_INSTANCE_METADATA"):
         jsonValue.nimJsonToBox()
       result.trySetIfNeeded("_OP_CLOUD_PROVIDER_TAGS"):
@@ -194,7 +246,15 @@ proc getGcpMetadata(): ChalkDict =
       result.trySetIfNeeded("_OP_CLOUD_PROVIDER_INSTANCE_TYPE"):
         jsonValue["machineType"].getStr().split("/")[^1]
     except:
-      trace("GCP metadata responded with invalid json: " & getCurrentExceptionMsg())
+      let msg = getCurrentExceptionMsg()
+      trace("GCP metadata responded with invalid json: " & msg)
+      dumpExOnDebug()
+      addFailedKey(
+        "_OP_CLOUD_METADATA",
+        code        = "GCP_IMDS_PARSE_ERROR",
+        error       = msg,
+        description = "GCP IMDS endpoint returned data that could not be parsed as JSON",
+      )
 
 proc getAwsToken(): Option[string] =
   let url      = getUrl(awsBaseUri & "api/token")
@@ -265,94 +325,61 @@ proc getAwsToken(): Option[string] =
     return none(string)
 
 proc oneItem(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
-  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
-  ## in `chalkDict` to the value of the response (if non-empty).
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    chalkDict.setIfNotEmpty(keyname, resultOpt)
+  chalkDict.trySetIfNeeded(keyname):
+    hitProviderEndpoint(
+      url,
+      newHttpHeaders([("X-aws-ec2-metadata-token", token)]),
+    )
 
 proc listKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
-  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
-  ## in `chalkDict` to the value of the response (as a `seq` of lines).
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      chalkDict.setIfNeeded(keyname, resultOpt.get().splitLines())
+  chalkDict.trySetIfNeeded(keyname):
+    hitProviderEndpoint(
+      url,
+      newHttpHeaders([("X-aws-ec2-metadata-token", token)]),
+    ).splitLinesAnd(keepEmpty = false)
 
 proc jsonKey(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
-  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
-  ## in `chalkDict` to the value of the response (as JSON).
-  ##
-  ## If `keyname` is the value of `AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS`,
-  ## sets `<<redacted>>` as the values of `SecretAccessKey` and `Token` in
-  ## `chalkDict`.
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      let value = resultOpt.get()
-      # imdsv2 does not respond with application/json content-type
-      # header and so we check first char before attempting json parse
-      if not value.startsWith("{"):
-        trace("IMDSv2 didnt respond with json object. Ignoring it. URL: " & url)
-      else:
-        try:
-          let jsonValue = parseJson(value)
-          # redact some keys as they contain sensitive api keys
-          case keyname
-          of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
-            jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
-            jsonValue["Token"] = newJString("<<redacted>>")
-          chalkDict.setIfNeeded(keyname, jsonValue)
-        except:
-          trace("IMDSv2 responded with invalid json from " & url & ": " & getCurrentExceptionMsg())
+  var jsonValue: JsonNode
+  chalkDict.trySetIfNeeded(keyname):
+    jsonValue = parseNonEmptyJson(url, hitProviderEndpoint(
+      url,
+      newHttpHeaders([("X-aws-ec2-metadata-token", token)]),
+    ))
+    case keyname
+    of AWS_IDENTITY_CREDENTIALS_SECURITY_CREDS:
+      if len(jsonValue) > 0:
+        jsonValue["SecretAccessKey"] = newJString("<<redacted>>")
+        jsonValue["Token"]           = newJString("<<redacted>>")
+    jsonValue.nimJsonToBox()
 
 proc extractJsonKey(chalkDict: ChalkDict, token: string, keyname: string,
                     url: string, subkey: string) =
-  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
-  ## in `chalkDict` to the value of `subkey` in the response.
-  if isSubscribedKey(keyname):
-    let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      let value = resultOpt.get()
-      # imdsv2 does not respond with application/json content-type
-      # header and so we check first char before attempting json parse
-      if not value.startsWith("{"):
-        trace("Provider Didn't respond with json object. Ignoring it. URL: " & url)
-      else:
-        chalkDict.trySetIfNeeded(keyname):
-          parseJson(value)[subkey].getStr()
+  chalkDict.trySetIfNeeded(keyname):
+    parseNonEmptyJson(url, hitProviderEndpoint(
+      url,
+      newHttpHeaders([("X-aws-ec2-metadata-token", token)]),
+    )){subkey}.getStr()
 
 proc getTags(chalkDict: ChalkDict, token: string, keyname: string, url: string) =
-  ## If `keyname` is subscribed, hits the given `url` and sets the `keyname` key
-  ## in `chalkDict` to a `ChalkDict` of tag/value pairs.
-  if isSubscribedKey(keyname):
+  let tags = ChalkDict()
+  chalkDict.trySetIfNeeded(keyname):
     let
-      hdrs      = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
-      resultOpt = hitProviderEndpoint(url, hdrs)
-    if resultOpt.isSome():
-      let
-        value = resultOpt.get()
-        tags  = ChalkDict()
-      # tag reponse is a newline-delimited list of tags
-      # which are set on the instance
-      # to each tag values an endpoint needs to be hit
-      # for each tag key to get its value
-      for line in value.split("\n"):
-        let name = line.strip()
-        if name == "":
-          continue
-        let tagOpt = hitProviderEndpoint(url & "/" & name, hdrs)
-        if tagOpt.isSome():
-          tags.setIfNotEmpty(name, tagOpt.get())
-        chalkDict.setIfNeeded(keyname, tags)
+      hdrs    = newHttpHeaders([("X-aws-ec2-metadata-token", token)])
+      tagList = hitProviderEndpoint(url, hdrs)
+    for name in tagList.splitLinesAnd(keepEmpty = false):
+      try:
+        tags.setIfNotEmpty(name, hitProviderEndpoint(url & "/" & name, hdrs))
+      except:
+        let msg = getCurrentExceptionMsg()
+        trace("Could not retrieve tag " & name & " from " & url & ": " & msg)
+        dumpExOnDebug()
+        addFailedKey(
+          keyname,
+          code        = "CLOUD_TAG_FETCH_ERROR",
+          error       = msg,
+          description = "Could not retrieve value for tag \"" & name & "\" from " & url,
+        )
+    tags
 
 proc getAwsMetadata(): ChalkDict =
   result = ChalkDict()
