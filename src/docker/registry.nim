@@ -520,7 +520,9 @@ proc request(self:              DockerImage,
   let cacheKey = (self, httpMethod, path, useCase)
   if cacheKey in jsonCache:
     return jsonCache[cacheKey]
-  var registryError = ""
+  var
+    registryError  = ""
+    ignoredErrors: seq[string] = @[]
   for config in self.getConfigs(useCase = useCase):
     let
       normalized = (
@@ -616,10 +618,15 @@ proc request(self:              DockerImage,
         registryError = getCurrentExceptionMsg()
         break
       else:
-        trace("docker: ignoring error: " & getCurrentExceptionMsg())
+        let msg = getCurrentExceptionMsg()
+        trace("docker: ignoring error: " & msg)
+        ignoredErrors.add(msg)
   if registryError != "":
     raise newException(RegistryResponseError, registryError)
-  raise newException(ValueError, "could not find working registry configuration for " & $self)
+  var errMsg = "could not find working registry configuration for " & $self
+  if ignoredErrors.len > 0:
+    errMsg &= ": " & ignoredErrors.join("; ")
+  raise newException(ValueError, errMsg)
 
 proc validateDigest(digest: string): string =
   if not digest.startsWith("sha256:") or digest.len != 71:
