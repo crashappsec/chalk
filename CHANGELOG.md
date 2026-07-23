@@ -19,6 +19,13 @@
 
 ### New Features
 
+- New GitLab CI collapsible log section sink. When chalk runs inside a GitLab
+  CI job (`GITLAB_CI` is set), the chalk report is automatically wrapped in
+  GitLab's `section_start`/`section_end` markers with `collapsed=true`, making
+  it collapsible in the GitLab job log UI — mirroring the existing GitHub
+  Actions `::group::` support.
+  ([#696](https://github.com/crashappsec/chalk/pull/696))
+
 - Four new runtime host keys for timing and heartbeat tracking:
   - `_MONOTIME` — monotonic clock value at the start of the current operation,
     in milliseconds (kernel monotonic time, suitable for elapsed-time math).

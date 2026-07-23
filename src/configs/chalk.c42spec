@@ -28,7 +28,7 @@ key_types            := ["Chalk-time Host", "Chalk-time Artifact",
                          "Run-time Artifact", "Run-time Host"]
 known_sink_filters   := ["log_level", "log_prefix", "pretty_json",
                          "fix_new_line", "add_topic", "wrap",
-                         "github_log_group"]
+                         "github_log_group", "gitlab_log_section"]
 
 # This is the enum for key types.   See 'key' object documentation below
 # for more details.

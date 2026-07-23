@@ -29,6 +29,13 @@ custom_report github_group_chalk_time {
   use_when:        ["insert", "extract", "build", "push", "pull"]
 }
 
+custom_report gitlab_group_chalk_time {
+  enabled:         false
+  report_template: "terminal_insert"
+  sink_configs:    ["gitlab_json_group"]
+  use_when:        ["insert", "extract", "build", "push", "pull"]
+}
+
 if not using_tty() {
   color: false
   custom_report.terminal_chalk_time.enabled: false
@@ -52,6 +59,10 @@ if skip_summary_report {
 
 if env_exists("CI") and env_exists("GITHUB_SHA") {
   custom_report.github_group_chalk_time.enabled: true
+}
+
+if env_exists("CI") and env_exists("GITLAB_CI") {
+  custom_report.gitlab_group_chalk_time.enabled: true
 }
 
 cmd := command_name()
