@@ -18,26 +18,44 @@ import ".."/[
   utils/json,
 ]
 
+type GithubApiError = ref object of CatchableError
+  apiCode*: string
+
+proc newGithubApiError(code, msg: string): GithubApiError =
+  result = GithubApiError(msg: msg, apiCode: code)
+
 proc getRepo(api: string, repo: string): JsonNode =
   # https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository
-  result = newJObject()
   let token = getEnv("GITHUB_TOKEN")
   if token == "":
-    warn("github: GITHUB_TOKEN is empty. " &
-         "If this is running inside GitHub action, make sure ${{ github.token }} is explicitly passed. " &
-         "See https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow")
-    return
+    let msg = (
+      "GITHUB_TOKEN is empty. " &
+      "If this is running inside GitHub action, make sure ${{ github.token }} is explicitly passed. " &
+      "See https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow"
+    )
+    warn("github: " & msg)
+    raise newGithubApiError("GITHUB_NO_TOKEN", msg)
   if not api.startsWith("http://") and not api.startsWith("https://"):
-    warn("github: invalid api url (" & api & "). Cannot query repo node id")
-    return
+    let msg = "invalid api url (" & api & "). Cannot query repo node id"
+    warn("github: " & msg)
+    raise newGithubApiError("GITHUB_INVALID_API_URL", msg)
   let
     url      = api.strip(chars = {'/'}, leading = false) & "/repos/" & repo.strip(chars = {'/'}, trailing = false)
     headers  = newHttpHeaders({"Authorization": "Bearer " & token})
-    response = safeRequest(url, httpMethod = HttpGet, headers = headers)
-  if not response.code().is2xx():
-    warn("github: could not fetch repo info from " & url & ". " &
-         "Received " & response.status)
-    return
+    response =
+      try:
+        safeRequest(
+          url               = url,
+          httpMethod        = HttpGet,
+          headers           = headers,
+          retries           = 2,
+          connectRetries    = 2,
+          acceptStatusCodes = @[200..299],
+        )
+      except HttpStatusError as e:
+        warn("github: " & e.msg)
+        dumpExOnDebug()
+        raise newGithubApiError("GITHUB_API_ERROR", e.msg)
   return parseJson(response.body())
 
 proc getGithubMetadata(self: Plugin, prefix=""): ChalkDict =
@@ -113,8 +131,23 @@ proc getGithubMetadata(self: Plugin, prefix=""): ChalkDict =
       let data = getRepo(GITHUB_API_URL, GITHUB_REPOSITORY)
       result.setIfNeeded(prefix & "BUILD_ORIGIN_KEY",       data{"node_id"}.getStr())
       result.setIfNeeded(prefix & "BUILD_ORIGIN_OWNER_KEY", data{"owner"}{"node_id"}.getStr())
+    except GithubApiError as e:
+      addFailedKeys(
+        [prefix & "BUILD_ORIGIN_KEY", prefix & "BUILD_ORIGIN_OWNER_KEY"],
+        code        = e.apiCode,
+        error       = e.msg,
+        description = "GitHub API call failed while fetching repository node IDs",
+      )
     except:
-      warn("github: could not fetch repo info: " & getCurrentExceptionMsg())
+      let msg = getCurrentExceptionMsg()
+      warn("github: could not fetch repo info: " & msg)
+      dumpExOnDebug()
+      addFailedKeys(
+        [prefix & "BUILD_ORIGIN_KEY", prefix & "BUILD_ORIGIN_OWNER_KEY"],
+        code        = "GITHUB_API_EXCEPTION",
+        error       = msg,
+        description = "GitHub API call failed while fetching repository node IDs",
+      )
 
   # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
   if GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":

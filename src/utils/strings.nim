@@ -100,7 +100,7 @@ proc splitLinesAnd*(items: string, keepEol = false, keepEmpty = true): seq[strin
   if keepEmpty:
     return lines
   for i in lines:
-    if i != "":
+    if i.strip() != "":
       result.add(i)
 
 proc elseWhenEmpty*(s: string, default: string): string =

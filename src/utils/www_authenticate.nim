@@ -68,13 +68,25 @@ proc initBearerChallenge(options: var OrderedTable[string, string]): AuthChallen
                        realm:   realm,
                        url:     $uri)
 
-proc elicitHeaders(self: AuthChallenge, headers = newHttpHeaders()): HttpHeaders =
+proc elicitHeaders(
+    self:           AuthChallenge,
+    headers:        HttpHeaders = newHttpHeaders(),
+    timeout:        int         = 1000,
+    retries:        int         = 0,
+    connectRetries: int         = 0,
+): HttpHeaders =
   case self.kind:
   of other:
     raise newException(ValueError, "unsupported auth challenge scheme: " & self.scheme)
   of bearer:
     trace("http: fetching bearer token from: " & self.url)
-    let tokenResponse = safeRequest(self.url, headers = headers)
+    let tokenResponse = safeRequest(
+      self.url,
+      headers        = headers,
+      timeout        = timeout,
+      retries        = retries,
+      connectRetries = connectRetries,
+    )
     if not tokenResponse.code().is2xx():
       raise newException(ValueError,
                          "Bearer auth realm URL did not return valid response: " &
@@ -89,11 +101,22 @@ proc elicitHeaders(self: AuthChallenge, headers = newHttpHeaders()): HttpHeaders
                          tokenBody)
     result = newHttpHeaders({"Authorization": "Bearer " & token})
 
-proc elicitHeaders*(challenges: seq[AuthChallenge], headers = newHttpHeaders()): HttpHeaders =
+proc elicitHeaders*(
+    challenges:     seq[AuthChallenge],
+    headers:        HttpHeaders = newHttpHeaders(),
+    timeout:        int         = 1000,
+    retries:        int         = 0,
+    connectRetries: int         = 0,
+): HttpHeaders =
   result = newHttpHeaders()
   for challenge in challenges:
     try:
-      return challenge.elicitHeaders(headers = headers)
+      return challenge.elicitHeaders(
+        headers        = headers,
+        timeout        = timeout,
+        retries        = retries,
+        connectRetries = connectRetries,
+      )
     except:
       continue
 
@@ -140,6 +163,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
                              headers: HttpHeaders = newHttpHeaders(),
                              multipart: MultipartData = nil,
                              retries: int = 0,
+                             connectRetries: int = 0,
                              firstRetryDelayMs: int = 0,
                              timeout: int = 1000,
                              pinnedCert: string = "",
@@ -159,6 +183,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       headers           = authHeaders,
       multipart         = multipart,
       retries           = retries,
+      connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
       timeout           = timeout,
       pinnedCert        = pinnedCert,
@@ -175,7 +200,12 @@ proc authHeadersSafeRequest*(url: Uri | string,
     let
       wwwAuthenticate = response.headers["www-authenticate"]
       challenges      = parseAuthChallenges(wwwAuthenticate)
-    newHeaders        = challenges.elicitHeaders(authHeaders)
+    newHeaders        = challenges.elicitHeaders(
+      headers        = authHeaders,
+      timeout        = timeout,
+      retries        = retries,
+      connectRetries = connectRetries,
+    )
     authHeaders       = authHeaders.update(newHeaders)
 
     # reattempt request
@@ -186,6 +216,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       headers           = authHeaders,
       multipart         = multipart,
       retries           = retries,
+      connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
       timeout           = timeout,
       pinnedCert        = pinnedCert,
@@ -213,6 +244,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       headers           = authHeaders,
       multipart         = multipart,
       retries           = retries,
+      connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
       timeout           = timeout,
       pinnedCert        = pinnedCert,
@@ -231,6 +263,7 @@ proc authSafeRequest*(url: Uri | string,
                       headers: HttpHeaders = newHttpHeaders(),
                       multipart: MultipartData = nil,
                       retries: int = 0,
+                      connectRetries: int = 0,
                       firstRetryDelayMs: int = 0,
                       timeout: int = 1000,
                       pinnedCert: string = "",
@@ -247,6 +280,7 @@ proc authSafeRequest*(url: Uri | string,
     headers           = headers,
     multipart         = multipart,
     retries           = retries,
+    connectRetries    = connectRetries,
     firstRetryDelayMs = firstRetryDelayMs,
     timeout           = timeout,
     pinnedCert        = pinnedCert,

@@ -121,17 +121,16 @@ proc collectVcsData(cache: GitInfo, worktree: string): GitRepoInfo =
   if result.errorStatus != "":
     let msg = result.errorStatus
     error("git: worktree status failed for " & worktree & ": " & msg)
-    for key in [
-      "_VCS_MISSING_FILES",
-      "_VCS_MODIFIED_FILES",
-      "_VCS_UNTRACKED_FILES",
-    ]:
-      addFailedKey(
-        key,
-        code        = "GIT_COLLECTION_FAILED",
-        error       = msg,
-        description = "libgit2 failed to collect worktree status for " & worktree,
-      )
+    addFailedKeys(
+      [
+        "_VCS_MISSING_FILES",
+        "_VCS_MODIFIED_FILES",
+        "_VCS_UNTRACKED_FILES",
+      ],
+      code        = "GIT_COLLECTION_FAILED",
+      error       = msg,
+      description = "libgit2 failed to collect worktree status for " & worktree,
+    )
   if result.errorDiff != "":
     let msg = result.errorDiff
     error("git: diff collection failed for " & worktree & ": " & msg)

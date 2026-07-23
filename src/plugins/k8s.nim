@@ -286,8 +286,20 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
     result.setIfNeeded("_K8S_CLUSTER_ENDPOINT",          clusterMetadata{"endpoint"}.getStr())
     result.trySetIfNeeded("_K8S_CLUSTER_CLOUD_METADATA", k8sMetadata{"cloud"}.default(newJObject()).assertIs(JObject).nimJsonToBox())
   except:
-    trace("k8s: could not parse cluster metadata: " & getCurrentExceptionMsg())
+    let msg = getCurrentExceptionMsg()
+    trace("k8s: could not parse cluster metadata: " & msg)
     dumpExOnDebug()
+    addFailedKeys(
+      [
+        "_K8S_CLUSTER_ID",
+        "_K8S_CLUSTER_NAME",
+        "_K8S_CLUSTER_ENDPOINT",
+        "_K8S_CLUSTER_CLOUD_METADATA",
+      ],
+      code        = "K8S_METADATA_PARSE_ERROR",
+      error       = msg,
+      description = "Could not parse Kubernetes cluster metadata from CHALK_K8S_METADATA env var",
+    )
     return
 
   let
@@ -297,6 +309,20 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
     return
   let token = tryToLoadFile(podMetadataTokenPath)
   if token == "":
+    addFailedKeys(
+      [
+        "_K8S_POD_MANIFEST",
+        "_K8S_POD_LABELS",
+        "_K8S_POD_ANNOTATIONS",
+        "_K8S_CONTAINER_ENV_VAR_HASHES",
+        "_K8S_CONTAINER_VOLUME_MOUNT_HASHES",
+        "_K8S_CONTAINER_PORTS",
+        "_EXEC_DEPLOYMENT_ID",
+      ],
+      code        = "K8S_TOKEN_ERROR",
+      error       = "Token at " & podMetadataTokenPath & " is empty or unreadable",
+      description = "Could not read the Chalk operator token needed to authenticate the pod manifest request",
+    )
     return
   trace("k8s: fetching pod manifest from " & podManifestUrl)
   var podManifest: JsonNode
@@ -316,8 +342,23 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
     result.trySetIfNeeded("_K8S_POD_LABELS",      metadata{"labels"}.default(newJObject()).assertIs(JObject).nimJsonToBox())
     result.trySetIfNeeded("_K8S_POD_ANNOTATIONS", metadata{"annotations"}.default(newJObject()).assertIs(JObject).nimJsonToBox())
   except:
-    trace("k8s: could not fetch pod manifest: " & getCurrentExceptionMsg())
+    let msg = getCurrentExceptionMsg()
+    trace("k8s: could not fetch pod manifest: " & msg)
     dumpExOnDebug()
+    addFailedKeys(
+      [
+        "_K8S_POD_MANIFEST",
+        "_K8S_POD_LABELS",
+        "_K8S_POD_ANNOTATIONS",
+        "_K8S_CONTAINER_ENV_VAR_HASHES",
+        "_K8S_CONTAINER_VOLUME_MOUNT_HASHES",
+        "_K8S_CONTAINER_PORTS",
+        "_EXEC_DEPLOYMENT_ID",
+      ],
+      code        = "K8S_POD_MANIFEST_ERROR",
+      error       = msg,
+      description = "Could not fetch pod manifest from Kubernetes API at " & podManifestUrl,
+    )
     return
 
   try:
@@ -328,8 +369,20 @@ proc k8sGetRunTimeHostInfo*(self: Plugin,
       containerName = containerName,
     ))
   except:
-    trace("k8s: could not collect container info: " & getCurrentExceptionMsg())
+    let msg = getCurrentExceptionMsg()
+    trace("k8s: could not collect container info: " & msg)
     dumpExOnDebug()
+    addFailedKeys(
+      [
+        "_K8S_CONTAINER_ENV_VAR_HASHES",
+        "_K8S_CONTAINER_VOLUME_MOUNT_HASHES",
+        "_K8S_CONTAINER_PORTS",
+        "_EXEC_DEPLOYMENT_ID",
+      ],
+      code        = "K8S_CONTAINER_INFO_ERROR",
+      error       = msg,
+      description = "Could not collect container info from the pod manifest",
+    )
     return
 
 proc loadK8s*() =
