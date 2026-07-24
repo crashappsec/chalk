@@ -2304,6 +2304,7 @@ The summary report that outputs to your terminal by default, when
 running insert commands.
 """
   key._OPERATION.use                          = true
+  key._ACTION_ID.use                          = true
   key._DATETIME.use                           = true
   key._TIMESTAMP.use                          = true
   key._MONOTIME.use                           = true

@@ -8,7 +8,8 @@ log_format = "plain"
 
 subscribe("report", "json_console_out")
 subscribe("fail",   "json_console_out")
-custom_report.github_group_chalk_time.enabled: false
+custom_report.github_group_chalk_time.enabled: env_exists("SHOW_GITHUB_GROUP")
+custom_report.gitlab_group_chalk_time.enabled: env_exists("SHOW_GITLAB_GROUP")
 custom_report.terminal_chalk_time.enabled: false
 custom_report.terminal_other_op.enabled: false
 custom_report.terminal_other_op.use_when: ["extract", "delete", "exec", "env", "heartbeat", "postexec"]

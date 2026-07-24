@@ -295,6 +295,13 @@ class ChalkProgram(Program):
         return self.report.marks
 
     @property
+    def all_marks(self):
+        marks = []
+        for r in self.reports:
+            marks += r.marks
+        return marks
+
+    @property
     def artifact(self):
         return self.report.artifact
 
@@ -514,7 +521,7 @@ class Chalk:
         )
         if expecting_report:
             if expecting_chalkmarks:
-                for chalk in result.marks:
+                for chalk in result.all_marks:
                     assert chalk.has(_VIRTUAL=IfExists(virtual))
                 if virtual:
                     assert result.virtual_path.exists()

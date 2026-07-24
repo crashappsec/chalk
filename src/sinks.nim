@@ -63,14 +63,28 @@ proc githubLogGroup(msg: string, extra: StringTable): (string, bool) =
   message.stripLineEnd() # in-place strip
   return (@[header, message, footer].join("\n"), true)
 
+proc gitlabLogSection(msg: string, extra: StringTable): (string, bool) =
+  # https://docs.gitlab.com/ee/ci/jobs/index.html#custom-collapsible-sections
+  # Timestamp must be an integer (Unix seconds); GitLab rejects floats.
+  let
+    ts      = $int(getTime().toUnixFloat())
+    esc     = "\e[0K"
+    header  = esc & "section_start:" & ts & ":chalk_report[collapsed=true]\r" & esc & "Chalk Report"
+    footer  = esc & "section_end:"   & ts & ":chalk_report\r" & esc
+  var
+    message = msg
+  message.stripLineEnd()
+  return (@[header, message, footer].join("\n"), true)
+
 const
-  availableFilters = { "log_level"       : MsgFilter(logLevelFilter),
-                       "log_prefix"      : MsgFilter(logPrefixFilter),
-                       "pretty_json"     : MsgFilter(prettyJson),
-                       "fix_new_line"    : MsgFilter(fixNewline),
-                       "show_topic"      : MsgFilter(showTopic),
-                       "wrap"            : MsgFilter(chalkLogWrap),
-                       "github_log_group": MsgFilter(githubLogGroup),
+  availableFilters = { "log_level"         : MsgFilter(logLevelFilter),
+                       "log_prefix"        : MsgFilter(logPrefixFilter),
+                       "pretty_json"       : MsgFilter(prettyJson),
+                       "fix_new_line"      : MsgFilter(fixNewline),
+                       "show_topic"        : MsgFilter(showTopic),
+                       "wrap"              : MsgFilter(chalkLogWrap),
+                       "github_log_group"  : MsgFilter(githubLogGroup),
+                       "gitlab_log_section": MsgFilter(gitlabLogSection),
                      }.toTable()
 
 proc chalkErrSink*(msg: string, cfg: SinkConfig, t: Topic, arg: StringTable) =

@@ -221,9 +221,13 @@ def test_github(
         "GITHUB_EVENT_NAME": "push",
         "GITHUB_REF_TYPE": "tag",
         "RUNNER_TEMP": str(tmp_data_dir),
+        # enable github report as its default by default in testing.c4m
+        "SHOW_GITHUB_GROUP": "true",
     }
     insert = chalk.insert(bin_path, env=env)
-    assert insert.report.contains(
+
+    # first report is normal one and second is the github one
+    assert insert.reports[0].contains(
         {
             "BUILD_ID": "51064362862",
             "BUILD_UNIQUE_ID": str,
@@ -245,10 +249,13 @@ def test_github(
         }
     )
     insert2 = chalk.insert(bin_path, env=env)
-    assert insert2.report.has(BUILD_UNIQUE_ID=insert.report["BUILD_UNIQUE_ID"])
+    assert insert2.reports[0].has(BUILD_UNIQUE_ID=insert.reports[0]["BUILD_UNIQUE_ID"])
+
+    assert "::group::Chalk Report" in insert.text
+    assert "::endgroup::" in insert.text
 
     env = chalk.run(command="env", env=env)
-    assert env.report.contains(
+    assert env.reports[0].contains(
         {
             "_BUILD_ID": "51064362862",
             "_BUILD_UNIQUE_ID": str,
@@ -291,9 +298,12 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "CI_PROJECT_NAMESPACE_ID": "456",
             "CI_CONFIG_PATH": "ci/.gitlab-ci.yml",
             "CI_PIPELINE_NAME": "build",
+            # enable gitlab group report as it is disabled by default in testing.c4m
+            "SHOW_GITLAB_GROUP": "true",
         },
     )
-    assert insert.report.contains(
+    # first report is normal one and second is the gitlab one
+    assert insert.reports[0].contains(
         {
             "BUILD_ID": "4999820578",
             "BUILD_COMMIT_ID": "ffac537e6cbbf934b08745a378932722df287a53",
@@ -309,6 +319,9 @@ def test_gitlab(copy_files: list[Path], chalk: Chalk):
             "BUILD_WORKFLOW_PATH": "ci/.gitlab-ci.yml",
         }
     )
+
+    assert "section_start:" in insert.text
+    assert "section_end:" in insert.text
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
