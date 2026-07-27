@@ -277,6 +277,44 @@ def test_400_disables_sink(
 
 
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_post_http_fallback(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_sql: Callable[[str], str | None],
+    server_http: str,
+):
+    """
+    Primary sink points to a failing endpoint; fallback delivers the report.
+    The report must arrive at the server via the fallback, and no report cache
+    entry must be created (the fallback delivery clears the primary from sinkErrors).
+    """
+    result = chalk.insert(
+        copy_files[0],
+        config=SINK_CONFIGS / "post_http_fallback.c4m",
+        use_embedded=False,
+        env={
+            "CHALK_PRIMARY_URL": f"{SERVER_HTTP}/500",
+            "CHALK_FALLBACK_URL": f"{SERVER_HTTP}/report",
+        },
+        ignore_errors=True,
+    )
+    metadata_id = result.mark["METADATA_ID"]
+    assert metadata_id
+
+    # primary must have logged a failure
+    assert "my_primary_config" in result.logs
+
+    # report must have been delivered via the fallback
+    db_id = server_sql(f"SELECT chalk_id FROM chalks WHERE metadata_id='{metadata_id}'")
+    assert db_id is not None, "report was not delivered to the server via fallback"
+
+    # fallback rescued the delivery - no report cache entry should be written
+    assert (
+        not result.logged_reports_path.exists()
+    ), "report was cached despite fallback success"
+
+
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_presign_http_fastapi(
     copy_files: list[Path],
     chalk: Chalk,

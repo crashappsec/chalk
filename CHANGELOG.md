@@ -121,6 +121,38 @@
 
   ([#689](https://github.com/crashappsec/chalk/pull/689))
 
+- Sink configs now support a `fallback_sink_config` field naming another
+  `sink_config` to use when the primary is unavailable. When the primary fails
+  or is disabled by errors, chalk walks the fallback chain until one succeeds.
+  Key behaviors:
+  - The fallback is attempted on every delivery failure, regardless of whether
+    the `disable_after_errors` threshold has been reached.
+  - Each sink in the chain has its own independent `disable_after_errors`
+    threshold.
+  - If the fallback delivers successfully, no report cache entry is created for
+    that delivery.
+  - Circular chains are rejected at configuration load time.
+  - The field is accepted on all sink types.
+
+  ```con4m
+  sink_config primary_api {
+    sink:                 "post"
+    uri:                  "https://api.us-east-1.example.com/report"
+    disable_after_errors: 3
+    fallback_sink_config: "backup_api"
+  }
+
+  sink_config backup_api {
+    sink:                 "post"
+    uri:                  "https://api.eu-west-1.example.com/report"
+    disable_after_errors: 3
+  }
+
+  subscribe("report", "primary_api")
+  ```
+
+  ([#698](https://github.com/crashappsec/chalk/pull/698))
+
 ## 1.1.3
 
 **July 6, 2026**

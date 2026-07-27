@@ -4259,7 +4259,9 @@ A few important notes:
 
 3. If, for any reason, writing to the report cache fails, there will be a forced write to stderr, whether you've subscribed to it or not, in an attempt to prevent data loss.
 
-4. There is currently not a way to specify a 'fallback' sink.
+4. To specify a fallback sink, set `fallback_sink_config` on a `sink_config` to
+   the name of another `sink_config`. When the primary sink fails or is
+   runtime-disabled, chalk will walk the chain until one succeeds.
 
 5. If this is off, there is no check for previously cached data.
 
@@ -5038,6 +5040,16 @@ func sink_config_check(path) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, list[string]) {
           return conffield + ": Field must be a list[string]"
+      }
+    }
+    elif conffield == "fallback_sink_config" {
+      t := attr_type(path + "." + conffield)
+      if not typecmp(t, string) {
+        return conffield + ": Field must be a string (name of another sink_config)"
+      }
+      fbname := attr_get(path + "." + conffield, string)
+      if fbname != "" and not sections("sink_config").contains(fbname) {
+        return ("fallback_sink_config: no sink_config named '" + fbname + "' exists")
       }
     }
     elif conffield == "record_type" {
