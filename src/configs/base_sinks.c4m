@@ -14,10 +14,11 @@
 ## callback outhook()
 
 sink file {
-  ~filename:        true
-  ~log_search_path: false
-  ~use_search_path: false
-  ~on_write_msg:    false
+  ~filename:             true
+  ~log_search_path:      false
+  ~use_search_path:      false
+  ~on_write_msg:         false
+  ~fallback_sink_config: false
   shortdoc:  "Log appending to a local file"
   doc:       """
 
@@ -49,11 +50,12 @@ then the sink configuration will error when used.
 }
 
 sink rotating_log {
-  ~filename:          true
-  ~max:               true
-  ~log_search_path:   false
-  ~truncation_amount: false
-  ~on_write_msg:      false
+  ~filename:             true
+  ~max:                  true
+  ~log_search_path:      false
+  ~truncation_amount:    false
+  ~on_write_msg:         false
+  ~fallback_sink_config: false
   shortdoc:       "A self-truncating log file"
   doc: """
 
@@ -93,6 +95,7 @@ sink s3 {
   ~endpoint:             false
   ~on_write_msg:         false
   ~disable_after_errors: false
+  ~fallback_sink_config: false
   shortdoc:              "S3 object storage"
   doc:                   """
 
@@ -174,6 +177,7 @@ sink post {
   ~on_write_msg:         false
   ~auth:                 false
   ~disable_after_errors: false
+  ~fallback_sink_config: false
   shortdoc:              "HTTP/HTTPS POST"
   doc:       """
 
@@ -250,6 +254,7 @@ sink presign {
   ~on_write_msg:         false
   ~auth:                 false
   ~disable_after_errors: false
+  ~fallback_sink_config: false
   shortdoc:              "HTTP/HTTPS Presign PUT"
   doc:                   """
 Sink which allows to upload reports to a pre-signed URL.
@@ -294,6 +299,7 @@ sink dns {
   ~dns_timeout:             false
   ~disable_after_errors:    false
   ~require_chalk_mark:      false
+  ~fallback_sink_config:    false
   shortdoc: "DNS lookup with a templated hostname"
   doc:      """
 
@@ -334,6 +340,7 @@ See `docs/design-dns-sink.md` for full design rationale.
 }
 
 sink stdout {
+  ~fallback_sink_config: false
   shortdoc:  "Write to stdout"
   doc:             """
 
@@ -342,6 +349,7 @@ When configuring, this sink take no configuration parameters.
 }
 
 sink stderr {
+  ~fallback_sink_config: false
   shortdoc:  "Write to stderr"
   doc:             """
 

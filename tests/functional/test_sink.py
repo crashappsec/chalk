@@ -277,6 +277,51 @@ def test_400_disables_sink(
 
 
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
+def test_post_http_fallback(
+    copy_files: list[Path],
+    chalk: Chalk,
+    server_sql: Callable[[str], str | None],
+    server_http: str,
+):
+    """
+    Two fallback chains run in a single chalk insert.
+
+    Chain 1 (my_primary_config -> my_hop1_config -> my_final_config): primary
+    and hop1 fail, final delivers. Verifies the chain walks past failing
+    intermediate sinks.
+
+    Chain 2 (my_fail_primary_config -> my_fail_hop_config): all sinks fail.
+    Verifies the report is cached for retry on the next chalk invocation.
+    """
+    result = chalk.insert(
+        copy_files[0],
+        config=SINK_CONFIGS / "post_http_fallback.c4m",
+        use_embedded=False,
+        env={
+            "CHALK_PRIMARY_URL": f"{server_http}/500",
+            "CHALK_HOP1_URL": f"{server_http}/500",
+            "CHALK_FINAL_URL": f"{server_http}/report",
+            "CHALK_FAIL_URL": f"{server_http}/500",
+        },
+        ignore_errors=True,
+    )
+    metadata_id = result.mark["METADATA_ID"]
+    assert metadata_id
+
+    # chain 1: primary and hop1 logged failures, final delivered the report
+    assert "my_primary_config" in result.logs
+    assert "my_hop1_config" in result.logs
+    db_id = server_sql(f"SELECT chalk_id FROM chalks WHERE metadata_id='{metadata_id}'")
+    assert db_id is not None, "report was not delivered via the fallback chain"
+
+    # chain 2: all sinks failed, report must be cached for retry
+    assert "my_fail_primary_config" in result.logs
+    assert (
+        result.logged_reports_path.exists()
+    ), "report was not cached when all sinks failed"
+
+
+@pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)
 def test_presign_http_fastapi(
     copy_files: list[Path],
     chalk: Chalk,

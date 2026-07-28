@@ -22,7 +22,11 @@
 ## 'current' sinks need to catch up.  If so, we UNSUBSCRIBE them from
 ## the current topic, and re-subscribe them to a topic just for them.
 
-import std/posix
+import std/[
+  posix,
+  sequtils,
+  sets,
+]
 import "."/[
   sinks,
   types,
@@ -335,6 +339,38 @@ proc panicPublish(contents, tmpfilename, targetname, err: string) =
 
   doPanicWrite(s)
 
+proc handleFallbacks(topic, msg: string) =
+  if topic notin allTopics:
+    return
+
+  var
+    candidateNames: HashSet[string]
+    candidates:     seq[SinkConfig]
+
+  for s in sinkErrors:
+    if getFallbackName(s.name) != "":
+      candidateNames.incl(s.name)
+      candidates.add(s)
+
+  for subscriber in allTopics[topic].getSubscribers():
+    if isRuntimeDisabled(subscriber.name) and
+       getFallbackName(subscriber.name) != "" and
+       subscriber.name notin candidateNames:
+      candidateNames.incl(subscriber.name)
+      candidates.add(subscriber)
+
+  if candidates.len == 0:
+    return
+
+  let wrappedMsg = "[ " & msg.strip() & " ]\n"
+
+  for primary in candidates:
+    if tryFallbackChain(primary, topic, wrappedMsg):
+      sinkErrors = sinkErrors.filterIt(it != primary)
+    else:
+      if primary notin sinkErrors:
+        sinkErrors.add(primary)
+
 proc safePublish*(topic, msg: string) =
   if not attrGet[bool]("use_report_cache"):
     tracePublish(topic, msg)
@@ -357,6 +393,8 @@ proc safePublish*(topic, msg: string) =
 
   # This publish is just for sinks that didn't get unsubscribed...
   tracePublish(topic, msg, successfulPublishes)
+
+  handleFallbacks(topic, msg)
 
   # If sinks were unsubscribed because they had some catch-up to do, but
   # the sink is still broken, then the sink config will still live in

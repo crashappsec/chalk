@@ -1,0 +1,43 @@
+log_level = "trace"
+
+# Chain 1: primary and hop1 fail, final delivers - exercises multi-hop walk
+sink_config my_primary_config {
+  enabled:              true
+  sink:                 "post"
+  uri:                  env("CHALK_PRIMARY_URL")
+  disable_after_errors: 1
+  fallback_sink_config: "my_hop1_config"
+}
+
+sink_config my_hop1_config {
+  enabled:              true
+  sink:                 "post"
+  uri:                  env("CHALK_HOP1_URL")
+  disable_after_errors: 1
+  fallback_sink_config: "my_final_config"
+}
+
+sink_config my_final_config {
+  enabled: true
+  sink:    "post"
+  uri:     env("CHALK_FINAL_URL")
+}
+
+# Chain 2: all sinks fail - exercises report caching when no link delivers
+sink_config my_fail_primary_config {
+  enabled:              true
+  sink:                 "post"
+  uri:                  env("CHALK_FAIL_URL")
+  disable_after_errors: 1
+  fallback_sink_config: "my_fail_hop_config"
+}
+
+sink_config my_fail_hop_config {
+  enabled: true
+  sink:    "post"
+  uri:     env("CHALK_FAIL_URL")
+}
+
+subscribe("report", "my_primary_config")
+subscribe("report", "my_fail_primary_config")
+subscribe("report", "json_console_out")

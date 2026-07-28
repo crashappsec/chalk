@@ -9,6 +9,9 @@
 
 import std/[
   os,
+  sequtils,
+  sets,
+  tables,
   uri,
   posix,
 ]
@@ -154,8 +157,28 @@ when not defined(release):
   availableSinkConfigs["debug_hook"] = defaultDebugHook
 
 # These are used by reportcache.nim
-var   sinkErrors*: seq[SinkConfig] = @[]
+var   sinkErrors*:          seq[SinkConfig]  = @[]
+var   runtimeDisabledSinks: HashSet[string]
+var   sinkFallbacks:        Table[string, string]
 const quietTopics* = ["chalk_usage_stats"]
+
+proc getFallbackName*(name: string): string =
+  sinkFallbacks.getOrDefault(name, "")
+
+proc isRuntimeDisabled*(name: string): bool =
+  name in runtimeDisabledSinks
+
+proc hasFallbackCycle(startName, proposed: string): bool =
+  var
+    current = proposed
+    visited: HashSet[string]
+  visited.incl(startName)
+  while current != "":
+    if current in visited:
+      return true
+    visited.incl(current)
+    current = sinkFallbacks.getOrDefault(current, "")
+  return false
 
 template formatIo(cfg: SinkConfig, t: Topic, err: string, msg: string): string =
   var line = ""
@@ -239,11 +262,20 @@ proc isSinkDestWritable(sinkPath: string): bool =
 proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
   if cfg.mySink.name in ["file", "rotating_log"]:
     cfg.enabled = false
+    runtimeDisabledSinks.incl(cfg.name)
     warn(
       "sink '" & cfg.name & "' disabled after write failure " &
       "(filesystem may be read-only or inaccessible): " & err
     )
     return
+
+  # cfg.enabled is false when disable_after_errors was just reached inside
+  # onSinkError. Record it as runtime-disabled so handleFallbacks can activate
+  # the fallback chain on future publishes that skip this sink silently.
+  # Intentionally no return: we still add to sinkErrors below so the report
+  # is cached for this delivery.
+  if not cfg.enabled:
+    runtimeDisabledSinks.incl(cfg.name)
 
   let quiet = t.name in quietTopics
   if not quiet:
@@ -335,6 +367,16 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       discard setOverride(getChalkScope(), section & ".pinned_cert_file", some(pack(path)))
       # Can't delete from a dict while we're iterating over it.
       deleteList.add(k)
+    of "fallback_sink_config":
+      let fbName = attrGetOpt[string](section & "." & k).getOrElse("")
+      if fbName != "":
+        if hasFallbackCycle(name, fbName):
+          error(
+            "sink_config '" & name & "': fallback_sink_config '" & fbName &
+            "' would create a circular chain - ignoring"
+          )
+        else:
+          sinkFallbacks[name] = fbName
     of "on_write_msg", "normalize":
       discard
     of "log_search_path":
@@ -390,12 +432,14 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
       except:
         warn(opts[k] & ": could not resolve sink filename. disabling sink")
         enabled = false
+        runtimeDisabledSinks.incl(name)
       if enabled and not isSinkDestWritable(opts[k]):
         warn(
           "sink '" & name & "': destination '" & opts[k] &
           "' is not writable (filesystem may be read-only), disabling sink"
         )
         enabled = false
+        runtimeDisabledSinks.incl(name)
     else:
       opts[k] = attrGetOpt[string](section & "." & k).getOrElse("")
 
@@ -476,6 +520,49 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     return none(SinkConfig)
 
 proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
+
+proc tryFallbackChain*(primary: SinkConfig, topicName: string, wrappedMsg: string): bool =
+  var current = primary
+  while true:
+    let nextName = getFallbackName(current.name)
+    if nextName == "":
+      return false
+    let nextOpt = getSinkConfigByName(nextName)
+    if nextOpt.isNone():
+      return false
+    let next = nextOpt.get()
+    if not next.enabled:
+      current = next
+      continue
+    if topicName in allTopics:
+      let alreadySubscribed = allTopics[topicName].getSubscribers().anyIt(it == next)
+      if alreadySubscribed and not isRuntimeDisabled(next.name):
+        # next is also a direct subscriber of this topic, so it already ran
+        # during the normal publish pass. If it succeeded (not in sinkErrors),
+        # the message was already delivered -- return true so the primary is
+        # cleared from sinkErrors. If it failed (in sinkErrors), skip it to
+        # avoid double-delivery but continue walking the chain so the primary's
+        # error is cached independently of next's own failure.
+        if not sinkErrors.anyIt(it == next):
+          return true
+        current = next
+        continue
+    let
+      tmpName  = "$fallback$" & topicName & "$" & current.name
+      tmpTopic = registerTopic(tmpName)
+    subscribe(tmpTopic, next)
+    var succeeded = false
+    let prevErrors = sinkErrors
+    sinkErrors     = @[]
+    try:
+      let n  = publish(tmpTopic, wrappedMsg)
+      succeeded = n >= 1 and sinkErrors.len == 0
+    finally:
+      sinkErrors = prevErrors
+      discard unsubscribe(tmpTopic, next)
+    if succeeded:
+      return true
+    current = next
 
 proc setupDefaultLogConfigs*() =
   let
