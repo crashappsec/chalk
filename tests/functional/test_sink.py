@@ -284,34 +284,41 @@ def test_post_http_fallback(
     server_http: str,
 ):
     """
-    Primary sink points to a failing endpoint; fallback delivers the report.
-    The report must arrive at the server via the fallback, and no report cache
-    entry must be created (the fallback delivery clears the primary from sinkErrors).
+    Two fallback chains run in a single chalk insert.
+
+    Chain 1 (my_primary_config -> my_hop1_config -> my_final_config): primary
+    and hop1 fail, final delivers. Verifies the chain walks past failing
+    intermediate sinks.
+
+    Chain 2 (my_fail_primary_config -> my_fail_hop_config): all sinks fail.
+    Verifies the report is cached for retry on the next chalk invocation.
     """
     result = chalk.insert(
         copy_files[0],
         config=SINK_CONFIGS / "post_http_fallback.c4m",
         use_embedded=False,
         env={
-            "CHALK_PRIMARY_URL": f"{SERVER_HTTP}/500",
-            "CHALK_FALLBACK_URL": f"{SERVER_HTTP}/report",
+            "CHALK_PRIMARY_URL": f"{server_http}/500",
+            "CHALK_HOP1_URL": f"{server_http}/500",
+            "CHALK_FINAL_URL": f"{server_http}/report",
+            "CHALK_FAIL_URL": f"{server_http}/500",
         },
         ignore_errors=True,
     )
     metadata_id = result.mark["METADATA_ID"]
     assert metadata_id
 
-    # primary must have logged a failure
+    # chain 1: primary and hop1 logged failures, final delivered the report
     assert "my_primary_config" in result.logs
-
-    # report must have been delivered via the fallback
+    assert "my_hop1_config" in result.logs
     db_id = server_sql(f"SELECT chalk_id FROM chalks WHERE metadata_id='{metadata_id}'")
-    assert db_id is not None, "report was not delivered to the server via fallback"
+    assert db_id is not None, "report was not delivered via the fallback chain"
 
-    # fallback rescued the delivery - no report cache entry should be written
+    # chain 2: all sinks failed, report must be cached for retry
+    assert "my_fail_primary_config" in result.logs
     assert (
-        not result.logged_reports_path.exists()
-    ), "report was cached despite fallback success"
+        result.logged_reports_path.exists()
+    ), "report was not cached when all sinks failed"
 
 
 @pytest.mark.parametrize("copy_files", [[CAT_PATH]], indirect=True)

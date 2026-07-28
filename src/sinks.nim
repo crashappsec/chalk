@@ -269,6 +269,11 @@ proc ioErrorHandler(cfg: SinkConfig, t: Topic, msg, err, tb: string) =
     )
     return
 
+  # cfg.enabled is false when disable_after_errors was just reached inside
+  # onSinkError. Record it as runtime-disabled so handleFallbacks can activate
+  # the fallback chain on future publishes that skip this sink silently.
+  # Intentionally no return: we still add to sinkErrors below so the report
+  # is cached for this delivery.
   if not cfg.enabled:
     runtimeDisabledSinks.incl(cfg.name)
 
@@ -532,7 +537,16 @@ proc tryFallbackChain*(primary: SinkConfig, topicName: string, wrappedMsg: strin
     if topicName in allTopics:
       let alreadySubscribed = allTopics[topicName].getSubscribers().anyIt(it == next)
       if alreadySubscribed and not isRuntimeDisabled(next.name):
-        return true
+        # next is also a direct subscriber of this topic, so it already ran
+        # during the normal publish pass. If it succeeded (not in sinkErrors),
+        # the message was already delivered -- return true so the primary is
+        # cleared from sinkErrors. If it failed (in sinkErrors), skip it to
+        # avoid double-delivery but continue walking the chain so the primary's
+        # error is cached independently of next's own failure.
+        if not sinkErrors.anyIt(it == next):
+          return true
+        current = next
+        continue
     let
       tmpName  = "$fallback$" & topicName & "$" & current.name
       tmpTopic = registerTopic(tmpName)

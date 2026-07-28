@@ -140,9 +140,10 @@ sink type declaration so the con4m validator accepts the field.
 
 **`src/configs/chalk.c42spec`** — add an `elif conffield == "fallback_sink_config"`
 branch in `sink_config_check` to validate that the referenced name exists as a
-`sink_config` section. Circular-chain detection is handled in Nim, not here,
-because the full graph may not be loaded when the validator runs for any
-individual section.
+`sink_config` section. `sections("sink_config")` returns all declared sections
+regardless of order, so forward references are safe. Circular-chain detection
+is handled in Nim rather than here because the graph traversal is simpler to
+express in Nim.
 
 ### Nim changes
 
@@ -180,8 +181,13 @@ the result.
 
 - Skips disabled sinks (enabled = false) and continues to the next link.
 - If the candidate is already a live (non-runtime-disabled) subscriber of the
-  same topic, it already received the message via the normal publish path —
-  returns `true` immediately to avoid double delivery.
+  same topic and is **not** in `sinkErrors` (it succeeded during normal
+  publish), returns `true` immediately — the message was already delivered,
+  no action needed.
+- If the candidate is a live subscriber but **is** in `sinkErrors` (it also
+  failed during normal publish), skips it to avoid double-delivery and
+  continues to the next link. The primary's error is cached independently of
+  the candidate's own failure tracking.
 - Otherwise, creates a `$fallback$<topic>$<currentName>` temp topic, subscribes
   the candidate, and publishes the pre-wrapped message. `sinkErrors` is
   saved and restored around the publish so fallback failures do not contaminate
