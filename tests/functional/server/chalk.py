@@ -107,7 +107,6 @@ async def presign_report_url(
 
 @app.put("/report/presign/accept", status_code=200)
 async def accept_presign_report(
-    reports: list[dict],
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
@@ -122,6 +121,8 @@ async def accept_presign_report(
             status_code=400,
             detail="missing x-chalk-attempt header",
         )
+    body = await request.body()
+    reports = json.loads(body)
     return await accept_report(
         reports=reports, request=request, response=response, db=db
     )

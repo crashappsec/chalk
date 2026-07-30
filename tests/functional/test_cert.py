@@ -39,10 +39,10 @@ def test_cert(
                     "_OP_ARTIFACT_PATH": re.compile(r"/cacert.pem$"),
                     "_X509_SIGNATURE": COLON_HEX,
                     "_X509_SUBJECT": {
-                        "commonName": "DigiCert Global Root CA",
+                        "commonName": "COMODO ECC Certification Authority",
                     },
                     "_X509_SUBJECT_SHORT": {
-                        "CN": "DigiCert Global Root CA",
+                        "CN": "COMODO ECC Certification Authority",
                     },
                 },
                 {
