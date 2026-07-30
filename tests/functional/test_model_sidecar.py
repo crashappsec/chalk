@@ -17,13 +17,13 @@ cover the behaviors the design doc asserts:
   - virtual mode (--virtual) does NOT produce a sidecar; mark goes
     to the virtual-chalk sink instead
 """
+
 from pathlib import Path
 
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark
 from .utils.log import get_logger
-
 
 logger = get_logger()
 

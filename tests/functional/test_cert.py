@@ -13,7 +13,6 @@ from .conf import CONFIGS
 from .utils.dict import Contains
 from .utils.log import get_logger
 
-
 logger = get_logger()
 
 COLON_HEX = re.compile(r"^([0-9a-f]{2}:)*([0-9a-f]{2})$")
@@ -40,10 +39,10 @@ def test_cert(
                     "_OP_ARTIFACT_PATH": re.compile(r"/cacert.pem$"),
                     "_X509_SIGNATURE": COLON_HEX,
                     "_X509_SUBJECT": {
-                        "commonName": "DigiCert Global Root CA",
+                        "commonName": "COMODO ECC Certification Authority",
                     },
                     "_X509_SUBJECT_SHORT": {
-                        "CN": "DigiCert Global Root CA",
+                        "CN": "COMODO ECC Certification Authority",
                     },
                 },
                 {

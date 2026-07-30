@@ -21,7 +21,6 @@ from ..utils.git import GIT_NONINTERACTIVE_ENV
 from ..utils.os import CalledProcessError, Program, run
 from ..utils.text import valid_json
 
-
 ChalkCommand = Literal[
     "delete",
     "dump",

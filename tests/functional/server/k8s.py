@@ -9,7 +9,6 @@ from fastapi import Header, HTTPException
 
 from .app import app
 
-
 TOKEN = "test-k8s-token"
 NAMESPACE = "default"
 POD_NAME = "test-pod"

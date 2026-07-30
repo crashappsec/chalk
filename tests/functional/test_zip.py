@@ -12,7 +12,6 @@ from .conf import CONFIGS, ZIPS
 from .utils.dict import Contains, IfExists
 from .utils.log import get_logger
 
-
 logger = get_logger()
 
 # Test data fixtures

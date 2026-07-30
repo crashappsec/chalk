@@ -32,6 +32,7 @@ Tests cover the contract documented in
     error log; chalk continues without attestation
   - no envelope at all → operation is a no-op for this plugin
 """
+
 import json
 from pathlib import Path
 

@@ -6,7 +6,6 @@ import os
 import pathlib
 import sys
 
-
 IP = os.environ.get("IP", "localhost")
 
 parser = argparse.ArgumentParser()
