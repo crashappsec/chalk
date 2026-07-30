@@ -24,7 +24,6 @@ from .app import app
 from .db import models, schemas
 from .db.database import SessionLocal, engine
 
-
 logger = get_logger()
 
 try:

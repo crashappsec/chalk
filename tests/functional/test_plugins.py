@@ -30,7 +30,6 @@ from .utils.git import Git
 from .utils.log import get_logger
 from .utils.tmp import make_tmp_file
 
-
 logger = get_logger()
 
 
@@ -1293,14 +1292,12 @@ def test_semgrep(
 @pytest.mark.skipif(not aws_secrets_configured(), reason="AWS secrets not configured")
 def test_trufflehog(chalk: Chalk, tmp_data_dir: Path, use_docker: bool):
     target = tmp_data_dir / "aws.sh"
-    target.write_text(
-        f"""
+    target.write_text(f"""
 #!/bin/sh
 export AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID}
 export AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY}
 export AWS_SESSION_TOKEN={AWS_SESSION_TOKEN}
-""".strip()
-    )
+""".strip())
     insert = chalk.insert(
         artifact=target,
         env={"EXTERNAL_TOOL_USE_DOCKER": str(use_docker)},
@@ -1351,13 +1348,11 @@ def test_trufflehog_large_git_fallback(chalk: Chalk, tmp_data_dir: Path):
     # Commit real AWS credentials into history, then remove them from the
     # working tree. They should be invisible to a filesystem-mode scan.
     secret_file = repo_dir / "aws.sh"
-    secret_file.write_text(
-        f"""#!/bin/sh
+    secret_file.write_text(f"""#!/bin/sh
 export AWS_ACCESS_KEY_ID={AWS_ACCESS_KEY_ID}
 export AWS_SECRET_ACCESS_KEY={AWS_SECRET_ACCESS_KEY}
 export AWS_SESSION_TOKEN={AWS_SESSION_TOKEN}
-""".strip()
-    )
+""".strip())
     git.add().commit("add secrets")
     secret_file.write_text("#!/bin/sh\n")
     git.add().commit("remove secrets")
@@ -1422,15 +1417,13 @@ def test_jenkins(copy_files: list[Path], chalk: Chalk):
 def test_teamcity(copy_files: list[Path], chalk: Chalk):
     bin_path = copy_files[0]
     with make_tmp_file() as props_file:
-        props_file.write_text(
-            """
+        props_file.write_text("""
 teamcity.build.id=12345
 teamcity.serverUrl=http://teamcity:8111
 teamcity.buildType.id=MyProject_Build
 teamcity.build.branch=main
 teamcity.build.triggeredBy.username=testuser
-        """
-        )
+        """)
         env = {
             "TEAMCITY_VERSION": "2024.12",
             "BUILD_NUMBER": "42",

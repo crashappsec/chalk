@@ -10,6 +10,7 @@ returns NOERROR with no answer records (so chalk's DNS sink treats the lookup
 as successful). Exposes an HTTP API on port 8054 so tests can retrieve and
 clear the recorded queries.
 """
+
 import asyncio
 import struct
 
