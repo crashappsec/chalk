@@ -487,3 +487,8 @@ proc writeReportCache*() =
         getCurrentExceptionMsg())
       error("Please remove it manually to avoid unnecessary double reporting")
       dumpExOnDebug()
+
+proc clearReportCache*() =
+  reportCache.clear()
+  sinkErrors = @[]
+  dirtyCache  = false

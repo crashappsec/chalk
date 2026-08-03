@@ -132,31 +132,37 @@ proc doEmbeddedReport(): Box =
   else:
     pack[seq[Box]](@[])
 
-proc doCustomReporting() =
+proc activeCustomReportTopics*(): seq[string] =
+  let commandName = getBaseCommandName()
   for topic in getChalkSubsections("custom_report"):
-    trace(topic & ": checking custom report")
     let spec = "custom_report." & topic
     let enabledOpt = attrGetOpt[bool](spec & ".enabled")
-    if enabledOpt.isNone() or not enabledOpt.get(): continue
-    var
-      sinkConfs = attrGet[seq[string]](spec & ".sink_configs")
-
-    discard registerTopic(topic)
-
-    let
-      commandName = getBaseCommandName()
-      useWhen     = attrGet[seq[string]](spec & ".use_when")
+    if enabledOpt.isNone() or not enabledOpt.get():
+      continue
+    let useWhen = attrGet[seq[string]](spec & ".use_when")
     if commandName notin useWhen and "*" notin useWhen:
-      trace(spec & ": skipping as " & commandName & " not in " & $useWhen)
       continue
     if topic == "audit" and not attrGet[bool]("publish_audit"):
       continue
+    result.add(topic)
+
+proc doCustomReporting() =
+  for topic in activeCustomReportTopics():
+    trace(topic & ": checking custom report")
+    let spec = "custom_report." & topic
+    var sinkConfs = attrGet[seq[string]](spec & ".sink_configs")
+
+    discard registerTopic(topic)
+
     if len(sinkConfs) == 0 and topic notin ["audit", "chalk_usage_stats"]:
       warn("Report '" & topic & "' has no configured sinks.  Skipping.")
 
     let templateToUse  = getReportTemplate(spec)
 
     for sinkConfName in sinkConfs:
+      if isRuntimeDisabled(sinkConfName):
+        trace(sinkConfName & ": skipping runtime-disabled sink for topic " & topic)
+        continue
       let res = topicSubscribe((@[pack(topic), pack(sinkConfName)])).get()
       if not unpack[bool](res):
         warn("Report '" & topic & "' sink config is invalid. Skipping.")
@@ -173,7 +179,11 @@ proc doCustomReporting() =
       if report != "":
         safePublish(topic, report)
 
-proc doReporting*(topic="report", clearState = false) {.exportc, cdecl.} =
+proc doReporting*(
+    topic      = "report",
+    clearState = false,
+    writeCache = true,
+) {.exportc, cdecl.} =
   if inSubscan():
     let ctx = getCurrentCollectionCtx()
     ctx.report = doEmbeddedReport()
@@ -190,6 +200,9 @@ proc doReporting*(topic="report", clearState = false) {.exportc, cdecl.} =
       doCommandReport(topic)
     if not skipCustom:
       doCustomReporting()
-    writeReportCache()
+    if writeCache:
+      writeReportCache()
+    else:
+      clearReportCache()
   if clearState:
     clearReportingState()
