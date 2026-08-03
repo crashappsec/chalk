@@ -19,6 +19,7 @@ import ".."/[
   plugin_api,
   reporting,
   run_management,
+  sinks,
   subscan,
   types,
   utils/exec,
@@ -186,9 +187,25 @@ proc doHeartbeatReport(chalkOpt: Option[ChalkObj]) =
         chalk.collectedData[k] = v
 
     chalk.collectRunTimeArtifactInfo()
-  doReporting(clearState = true)
+  doReporting(
+    clearState = true,
+    writeCache = false,
+  )
 
-proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
+proc hasNoActiveHeartbeatSinks(): bool =
+  if topicHasActiveSubscribers("report"):
+    return false
+  for topic in activeCustomReportTopics():
+    if topicHasActiveSubscribers(topic):
+      return false
+  return true
+
+proc doHeartbeat(
+    chalkOpt:     Option[ChalkObj],
+    pid:          Pid,
+    hasExited:    (pid: Pid) -> bool,
+    exitOnNoSinks: bool,
+) =
   let
     inMicroSec    = int(attrGet[Con4mDuration]("exec.heartbeat.rate"))
     sleepInterval = int(inMicroSec / 1000)
@@ -203,12 +220,17 @@ proc doHeartbeat(chalkOpt: Option[ChalkObj], pid: Pid, fn: (pid: Pid) -> bool) =
 
   while true:
     sleep(sleepInterval)
+    if hasExited(pid):
+      break
     # reset stats which includes the opTime
     # so that each heartbeat has accurate timestamp
     clearReportingState()
     incHeartbeatCount()
     chalkOpt.doHeartbeatReport()
-    if fn(pid):
+    if hasExited(pid):
+      break
+    if exitOnNoSinks and hasNoActiveHeartbeatSinks():
+      info("All reporting sinks are disabled; stopping heartbeat process.")
       break
 
 type
@@ -470,7 +492,11 @@ proc runCmdExec*(args: seq[string]) =
       postExecState.doPostExec(detach = false)
 
       if attrGet[bool]("exec.heartbeat.run"):
-        chalkOpt.doHeartbeat(pid, getChildExitStatus)
+        chalkOpt.doHeartbeat(
+          pid           = pid,
+          hasExited     = getChildExitStatus,
+          exitOnNoSinks = false,
+        )
       else:
         trace("Waiting for spawned process to exit.")
         var stat_loc: cint
@@ -507,4 +533,8 @@ proc runCmdExec*(args: seq[string]) =
       postExecState.doPostExec(detach = true)
 
       if attrGet[bool]("exec.heartbeat.run"):
-        chalkOpt.doHeartbeat(ppid, getParentExitStatus)
+        chalkOpt.doHeartbeat(
+          pid           = ppid,
+          hasExited     = getParentExitStatus,
+          exitOnNoSinks = true,
+        )

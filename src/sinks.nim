@@ -521,6 +521,9 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
 
 proc getSinkConfigs*(): Table[string, SinkConfig] = return availableSinkConfigs
 
+proc topicHasActiveSubscribers*(topic: string): bool =
+  topic in allTopics and allTopics[topic].getNumSubscribers() > 0
+
 proc tryFallbackChain*(primary: SinkConfig, topicName: string, wrappedMsg: string): bool =
   var current = primary
   while true:
