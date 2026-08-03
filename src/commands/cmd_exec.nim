@@ -470,6 +470,9 @@ proc runCmdExec*(args: seq[string]) =
       setExitCode(1)
     else:
       trace("Chalk is parent process: " & $(ppid) & ". Child pid: " & $(pid))
+      let execNice = attrGet[int]("exec.nice")
+      trace("exec: using nice " & $execNice)
+      discard nice(cint(execNice))
       # add some sleep so that the child process has a chance to exec before
       # we try to collect data from it otherwise the process data collected
       # might be about the chalk binary instead of the target binary, which
@@ -488,6 +491,8 @@ proc runCmdExec*(args: seq[string]) =
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting(clearState = true)
+      trace("exec: reverting nice " & $execNice)
+      discard nice(cint(execNice * -1))
 
       postExecState.doPostExec(detach = false)
 
@@ -514,7 +519,9 @@ proc runCmdExec*(args: seq[string]) =
     else:
       let cpid = getpid() # get pid after fork of child process
       trace("Chalk is child process: " & $(cpid))
-
+      let execNice = attrGet[int]("exec.nice")
+      trace("exec: using nice " & $execNice)
+      discard nice(cint(execNice))
       let
         inMicroSec   = int(attrGet[Con4mDuration]("exec.initial_sleep_time"))
         initialSleep = int(inMicroSec / 1000)
@@ -529,6 +536,8 @@ proc runCmdExec*(args: seq[string]) =
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting(clearState = true)
+      trace("exec: reverting nice " & $execNice)
+      discard nice(cint(execNice * -1))
 
       postExecState.doPostExec(detach = true)
 
