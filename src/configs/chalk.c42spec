@@ -2889,6 +2889,19 @@ If it is NOT true, set exec.searchpath to provide any locations Chalk should che
 """
   }
 
+  field nice {
+    type:    int
+    default: 5
+    range:   (0, 19)
+    doc: """
+Nice level for the chalk exec reporting process to reduce overall system impact.
+Applied after the fork so the exec'd entrypoint is unaffected, and reverted
+before postexec and heartbeat run so each phase applies its own absolute value
+from the same inherited base.
+See https://www.man7.org/linux/man-pages/man2/nice.2.html
+"""
+  }
+
 }
 
 singleton exec_deployment {

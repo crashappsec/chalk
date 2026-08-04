@@ -153,6 +153,12 @@
 
   ([#698](https://github.com/crashappsec/chalk/pull/698))
 
+- New `exec.nice` field sets the nice level for the chalk reporting
+  process after the fork. Reverted before postexec and heartbeat so
+  each phase uses its own independent value. Defaults to `5`,
+  range `0`-`19`.
+  ([#757](https://github.com/crashappsec/chalk/pull/757))
+
 ## 1.1.3
 
 **July 6, 2026**

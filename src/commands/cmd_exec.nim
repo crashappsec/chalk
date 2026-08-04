@@ -46,8 +46,9 @@ else:
   iterator inotify_events(evs: pointer, n: int): ptr InotifyEvent =
     discard
 
-const
-  PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
+proc getpriority(which: cint, who: cint): cint {.importc, header: "<sys/resource.h>".}
+var PRIO_PROCESS {.importc, header: "<sys/resource.h>".}: cint
+const PATH_MAX = 4096 # PROC_PIDPATHINFO_MAXSIZE on mac
 
 proc doExecCollection(allOpts: seq[string], pid: Pid): Option[ChalkObj] =
   # First, check the chalk file location, and if there's one there, then create
@@ -303,7 +304,7 @@ else:
   proc initPostExecWatch(): Option[PostExecState] =
     return none(PostExecState)
 
-proc doPostExec(state: Option[PostExecState], detach: bool) =
+proc doPostExec(state: Option[PostExecState], detach: bool, baseNice: cint) =
   if state.isNone():
     return
 
@@ -320,13 +321,13 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
         return
 
     let
-      ws            = state.get()
-      niceValue     = attrGet[int]("exec.postexec.nice")
+      ws          = state.get()
+      niceValue   = attrGet[int]("exec.postexec.nice")
+      appliedNice = nice(cint(niceValue))
     var
       accessedPaths = initHashSet[string]()
 
     trace("postexec: using nice " & $niceValue)
-    discard nice(cint(niceValue))
 
     try:
       setFullCommandName("postexec")
@@ -400,7 +401,7 @@ proc doPostExec(state: Option[PostExecState], detach: bool) =
     # else restore previous nice as chalk can be doing things after postexec
     else:
       trace("postexec: reverting nice " & $niceValue)
-      discard nice(cint(niceValue * -1))
+      discard nice(cint(baseNice - appliedNice))
 
 proc runCmdExec*(args: seq[string]) =
   when not defined(posix):
@@ -460,6 +461,7 @@ proc runCmdExec*(args: seq[string]) =
 
   let
     postExecState = initPostExecWatch()
+    baseNice      = getpriority(PRIO_PROCESS, 0)
     pid           = fork()
 
   if attrGet[bool]("exec.chalk_as_parent"):
@@ -470,6 +472,10 @@ proc runCmdExec*(args: seq[string]) =
       setExitCode(1)
     else:
       trace("Chalk is parent process: " & $(ppid) & ". Child pid: " & $(pid))
+      let
+        execNice    = attrGet[int]("exec.nice")
+        appliedNice = nice(cint(execNice))
+      trace("exec: using nice " & $execNice)
       # add some sleep so that the child process has a chance to exec before
       # we try to collect data from it otherwise the process data collected
       # might be about the chalk binary instead of the target binary, which
@@ -488,8 +494,13 @@ proc runCmdExec*(args: seq[string]) =
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting(clearState = true)
+      trace("exec: reverting nice " & $execNice)
+      discard nice(cint(baseNice - appliedNice))
 
-      postExecState.doPostExec(detach = false)
+      postExecState.doPostExec(
+        detach   = false,
+        baseNice = baseNice,
+      )
 
       if attrGet[bool]("exec.heartbeat.run"):
         chalkOpt.doHeartbeat(
@@ -514,7 +525,10 @@ proc runCmdExec*(args: seq[string]) =
     else:
       let cpid = getpid() # get pid after fork of child process
       trace("Chalk is child process: " & $(cpid))
-
+      let
+        execNice    = attrGet[int]("exec.nice")
+        appliedNice = nice(cint(execNice))
+      trace("exec: using nice " & $execNice)
       let
         inMicroSec   = int(attrGet[Con4mDuration]("exec.initial_sleep_time"))
         initialSleep = int(inMicroSec / 1000)
@@ -529,8 +543,13 @@ proc runCmdExec*(args: seq[string]) =
       if chalkOpt.isSome():
         chalkOpt.get().collectRunTimeArtifactInfo()
       doReporting(clearState = true)
+      trace("exec: reverting nice " & $execNice)
+      discard nice(cint(baseNice - appliedNice))
 
-      postExecState.doPostExec(detach = true)
+      postExecState.doPostExec(
+        detach   = true,
+        baseNice = baseNice,
+      )
 
       if attrGet[bool]("exec.heartbeat.run"):
         chalkOpt.doHeartbeat(
