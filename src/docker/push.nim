@@ -11,17 +11,70 @@ import ".."/[
   run_management,
   types,
   utils/exec,
+  utils/json,
   utils/subproc,
 ]
 import "."/[
   base,
   context_upload,
   exe,
+  ids,
   login,
   manifest,
+  inspect,
   scan,
   util,
 ]
+
+proc collectAfterSuccessfulPush(chalk: ChalkObj) =
+  chalk.collectRunTimeArtifactInfo()
+  if chalk.isChalked():
+    cleanBuildContextCache()
+    try:
+      chalk.collectedData.merge(chalk.completeBuildContextUploads(
+        source = chalk.extract,
+      ))
+    except:
+      error("docker: build context attestation failed: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
+  collectRunTimeHostInfo()
+  flushAttestationTags()
+
+proc dockerPostPush*(image, expectedDigest: string): bool =
+  ## Collect and report the successful push performed by an SDK. This function
+  ## never invokes `docker push`, including configured mirror pushes.
+  let
+    local        = inspectImageJson(image)
+    expectedRepo = parseImage(image).repo
+  var digestMatches = false
+  for repoDigest in local{"RepoDigests"}.getStrElems():
+    if repoDigest == expectedRepo & "@" & expectedDigest:
+      digestMatches = true
+      break
+  if not digestMatches:
+    error("docker: post-push digest does not match local RepoDigests for " & image)
+    return false
+
+  let chalkOpt = scanImage(image, fromManifest = false)
+  if chalkOpt.isNone():
+    error("docker: " & image & " is not found; post-push collection skipped")
+    return false
+
+  forceChalkKeys(["DOCKER_PLATFORM"])
+  let chalk = chalkOpt.get()
+  chalk.withErrorContext():
+    if not chalk.isChalked():
+      warn("docker: " & chalk.name & " is not chalked. reporting will be limited")
+      suspendChalkCollectionFor("attestation")
+      suspendChalkCollectionFor("docker")
+
+    loginToRegistries()
+    initCollection()
+    chalk.addToAllChalks()
+    chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("push")
+    chalk.collectChalkTimeArtifactInfo()
+    chalk.collectAfterSuccessfulPush()
+  return true
 
 proc dockerPush*(ctx: DockerInvocation): int =
   ctx.newCmdLine = ctx.originalArgs
@@ -76,18 +129,12 @@ proc dockerPush*(ctx: DockerInvocation): int =
           error("docker: could not push image " & image & ". ignoring error")
 
     try:
-      chalk.collectRunTimeArtifactInfo()
-      if chalk.isChalked() and result == 0:
-        cleanBuildContextCache()
-        try:
-          chalk.collectedData.merge(chalk.completeBuildContextUploads(
-            source = chalk.extract,
-          ))
-        except:
-          error("docker: build context attestation failed: " & getCurrentExceptionMsg())
-          dumpExOnDebug()
-      collectRunTimeHostInfo()
-      flushAttestationTags()
+      if result == 0:
+        chalk.collectAfterSuccessfulPush()
+      else:
+        chalk.collectRunTimeArtifactInfo()
+        collectRunTimeHostInfo()
+        flushAttestationTags()
     finally:
       for i in imagesToPrune:
         try:

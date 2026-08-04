@@ -773,6 +773,18 @@ Internal function to generate technical documentation in markdown format.
       shortdoc: "Find files for postexec to watch"
       doc:      "Find chalk artifact paths for postexec to watch access for"
     }
+
+    command docker_post_push {
+      shortdoc: "Post-process a Docker push performed by an SDK"
+      doc:      "Internal versioned stdin API; does not perform a Docker push"
+    }
+
+    command dockerode_run {
+      shortdoc: "Run one command with dockerode push instrumentation"
+      doc:      "Internal publish-step wrapper"
+      args:     (1, high())
+      ignore_all_flags: true
+    }
   }
 
 }

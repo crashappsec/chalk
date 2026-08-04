@@ -326,6 +326,12 @@ proc getDockerAuthConfig*(): JsonNode =
 proc resetDockerAuthConfig*() =
   dockerAuth = none(JsonNode)
 
+proc setDockerAuthConfig*(config: JsonNode) =
+  ## Set process-local registry credentials without writing a Docker config.
+  ## This is used by the dockerode post-push handoff, where credentials arrive
+  ## on stdin and must not be exposed in argv or temporary files.
+  dockerAuth = some(config)
+
 proc supportsBuildContextFlag*(ctx: DockerInvocation): bool =
   # https://github.com/docker/buildx/releases/tag/v0.8.0
   # which requires dockerfile syntax >=1.4
