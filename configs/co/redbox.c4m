@@ -1,0 +1,110 @@
+parameter sink_config.redbox_build.domain_template {
+  shortdoc: "Domain template for build events"
+  doc:      "Full DNS domain template for the cb1 schema"
+}
+
+parameter sink_config.redbox_exec.domain_template {
+  shortdoc: "Domain template for exec events"
+  doc:      "Full DNS domain template for the ce1 schema"
+}
+
+parameter sink_config.redbox_heartbeat.domain_template {
+  shortdoc: "Domain template for heartbeat events"
+  doc:      "Full DNS domain template for the ch1 schema"
+}
+
+func dot_to_hyphen(v: string) {
+  return replace(v, ".", "-")
+}
+
+func to_lower(v: string) {
+  return lower(v)
+}
+
+sink_config redbox_build {
+  ~sink:                    "dns"
+  ~priority:                1000000
+  ~missing_key_placeholder: "na"
+  ~normalize._OP_CHALKER_VERSION.callback: func dot_to_hyphen
+  ~normalize._X_WORKSPACE_ID.callback:     func to_lower
+  ~normalize.CHALK_ID.callback:            func to_lower
+  ~normalize.METADATA_ID.callback:         func to_lower
+}
+
+sink_config redbox_exec {
+  ~sink:                    "dns"
+  ~priority:                1000000
+  ~missing_key_placeholder: "na"
+  ~normalize._OP_CHALKER_VERSION.callback: func dot_to_hyphen
+  ~normalize._X_WORKSPACE_ID.callback:     func to_lower
+  ~normalize.METADATA_ID.callback:         func to_lower
+}
+
+sink_config redbox_heartbeat {
+  ~sink:     "dns"
+  ~priority: 999999
+  ~normalize._OP_CHALKER_VERSION.callback: func dot_to_hyphen
+  ~normalize._X_WORKSPACE_ID.callback:     func to_lower
+  ~normalize.METADATA_ID.callback:         func to_lower
+}
+
+report_template redbox_build {
+  key._CHALKS.use                   = true
+  key._OP_CHALKER_VERSION.use       = true
+  key._OP_CLOUD_PROVIDER.use        = true
+  key._OP_CLOUD_PROVIDER_REGION.use = true
+  key._TIMESTAMP.use                = true
+  key._MONOTIME.use                 = true
+  key._OP_EXIT_CODE.use             = true
+  key._OP_CHALK_COUNT.use           = true
+  key.CHALK_ID.use                  = true
+  key.METADATA_ID.use               = true
+  key._X_WORKSPACE_ID.use           = true
+}
+
+report_template redbox_exec {
+  key._CHALKS.use                   = true
+  key._OP_CHALKER_VERSION.use       = true
+  key._OP_CLOUD_PROVIDER.use        = true
+  key._OP_CLOUD_PROVIDER_REGION.use = true
+  key._TIMESTAMP.use                = true
+  key._MONOTIME.use                 = true
+  key._EXEC_ID.use                  = true
+  key.METADATA_ID.use               = true
+  key._X_WORKSPACE_ID.use           = true
+}
+
+report_template redbox_heartbeat {
+  key._CHALKS.use             = true
+  key._OP_CHALKER_VERSION.use = true
+  key._SINCE_TIMESTAMP.use    = true
+  key._SINCE_MONOTIME.use     = true
+  key._HEARTBEAT_COUNT.use    = true
+  key._EXEC_ID.use            = true
+  key.METADATA_ID.use         = true
+  key._X_WORKSPACE_ID.use     = true
+}
+
+custom_report redbox_build {
+  ~enabled:         true
+  ~report_template: "redbox_build"
+  ~sink_configs:    ["redbox_build"]
+  ~use_when:        ["build"]
+  ~per_chalk:       true
+}
+
+custom_report redbox_exec {
+  ~enabled:         true
+  ~report_template: "redbox_exec"
+  ~sink_configs:    ["redbox_exec"]
+  ~use_when:        ["exec"]
+  ~per_chalk:       true
+}
+
+custom_report redbox_heartbeat {
+  ~enabled:         true
+  ~report_template: "redbox_heartbeat"
+  ~sink_configs:    ["redbox_heartbeat"]
+  ~use_when:        ["heartbeat"]
+  ~per_chalk:       true
+}
