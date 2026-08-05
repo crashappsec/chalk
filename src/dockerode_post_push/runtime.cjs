@@ -12,7 +12,9 @@ const DEFAULT_SOCKETS = new Set([
   '/var/run/docker.sock',
   path.join(os.homedir(), '.docker/run/docker.sock'),
 ]);
-const MAX_DIGEST_SCAN_BYTES = 1024 * 1024;
+const MAX_INCOMPLETE_FRAME_BYTES = 1024 * 1024;
+const MAX_POST_PUSH_TIMEOUT_MS = 5 * 60 * 1000;
+const POST_PUSH_KILL_GRACE_MS = 1000;
 
 function diagnostic(code, fields = {}) {
   const record = {
@@ -53,6 +55,8 @@ async function supportedOperation(image, opts, meta) {
   if (!meta || !String(meta.version || '').startsWith('5.')) {
     return { supported: false, code: 'unsupported_dockerode' };
   }
+  const deadline = postPushDeadline();
+  if (!deadline.supported) return deadline;
   if (!opts || typeof opts.tag !== 'string' || opts.tag.length === 0) {
     return { supported: false, code: 'unsupported_missing_explicit_tag' };
   }
@@ -86,43 +90,109 @@ async function supportedOperation(image, opts, meta) {
     repository: repositoryWithoutTag(String(image.name)),
     tag: opts.tag,
     authconfig: auth,
+    timeoutMs: deadline.timeoutMs,
   };
 }
 
-function terminalDigest(data) {
-  let text;
-  if (Buffer.isBuffer(data)) text = data.toString('utf8');
-  else if (typeof data === 'string') text = data;
-  else if (data && typeof data === 'object') text = JSON.stringify(data);
-  else return null;
-
-  let found = null;
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    try {
-      const frame = JSON.parse(line);
-      const candidate = frame && frame.aux && frame.aux.Digest;
-      if (typeof candidate === 'string' && /^sha256:[0-9a-f]{64}$/.test(candidate)) {
-        found = candidate;
-      }
-      if (typeof frame.status === 'string') {
-        const match = frame.status.match(/digest:\s*(sha256:[0-9a-f]{64})(?:\s|$)/);
-        if (match) found = match[1];
-      }
-      if (typeof frame.error === 'string' || frame.errorDetail) return null;
-    } catch (_) {
-      const match = line.match(/digest:\s*(sha256:[0-9a-f]{64})(?:\s|$)/);
-      if (match) found = match[1];
+function inspectTerminalFrame(raw) {
+  const line = raw.toString('utf8').replace(/\r$/, '');
+  if (!line.trim()) return { digest: null, error: false };
+  try {
+    const frame = JSON.parse(line);
+    let digest = null;
+    const candidate = frame && frame.aux && frame.aux.Digest;
+    if (typeof candidate === 'string' && /^sha256:[0-9a-f]{64}$/.test(candidate)) {
+      digest = candidate;
     }
+    if (typeof frame.status === 'string') {
+      const match = frame.status.match(/digest:\s*(sha256:[0-9a-f]{64})(?:\s|$)/);
+      if (match) digest = match[1];
+    }
+    return {
+      digest,
+      error: typeof frame.error === 'string' || Boolean(frame.errorDetail),
+    };
+  } catch (_) {
+    const match = line.match(/digest:\s*(sha256:[0-9a-f]{64})(?:\s|$)/);
+    return { digest: match ? match[1] : null, error: false };
   }
-  return found;
 }
 
-function timeoutMs() {
+function createTerminalTracker() {
+  let pending = Buffer.alloc(0);
+  let discardUntilNewline = false;
+  let invalid = false;
+  let sawError = false;
+  let lastDigest = null;
+
+  function observe(frame) {
+    const found = inspectTerminalFrame(frame);
+    if (found.error) sawError = true;
+    if (found.digest) lastDigest = found.digest;
+  }
+
+  function write(value) {
+    let chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
+    if (discardUntilNewline) {
+      const newline = chunk.indexOf(0x0a);
+      if (newline === -1) return;
+      discardUntilNewline = false;
+      chunk = chunk.subarray(newline + 1);
+    }
+    if (chunk.length === 0) return;
+
+    let combined = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
+    let start = 0;
+    for (;;) {
+      const newline = combined.indexOf(0x0a, start);
+      if (newline === -1) break;
+      observe(combined.subarray(start, newline));
+      start = newline + 1;
+    }
+    pending = combined.subarray(start);
+    if (pending.length > MAX_INCOMPLETE_FRAME_BYTES) {
+      invalid = true;
+      pending = Buffer.alloc(0);
+      discardUntilNewline = true;
+    }
+  }
+
+  function finish() {
+    if (pending.length > 0 && !discardUntilNewline) observe(pending);
+    return {
+      digest: invalid || sawError ? null : lastDigest,
+      error: sawError,
+      overflow: invalid,
+    };
+  }
+
+  return { write, finish };
+}
+
+function terminalDigest(data) {
+  if (data === undefined || data === null) return null;
+  const tracker = createTerminalTracker();
+  tracker.write(Buffer.isBuffer(data) || typeof data === 'string' ? data : JSON.stringify(data));
+  return tracker.finish().digest;
+}
+
+function postPushDeadline() {
   const raw = process.env.CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS;
-  if (raw === undefined) return null;
+  if (raw === undefined) return { supported: false, code: 'unsupported_no_deadline' };
   const parsed = Number(raw);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+  if (!Number.isSafeInteger(parsed) || parsed <= 0 || parsed > MAX_POST_PUSH_TIMEOUT_MS) {
+    return { supported: false, code: 'unsupported_invalid_deadline' };
+  }
+  return { supported: true, timeoutMs: parsed };
+}
+
+function signalPostHook(child, signal, detached) {
+  try {
+    if (detached && child.pid) process.kill(-child.pid, signal);
+    else child.kill(signal);
+  } catch (_) {
+    // A concurrent exit is equivalent to successful termination here.
+  }
 }
 
 function invokePostPush(operation, digest) {
@@ -139,38 +209,52 @@ function invokePostPush(operation, digest) {
 
   return new Promise((resolve) => {
     let settled = false;
+    let timedOut = false;
     let stderrObserved = false;
+    let killTimer = null;
+    const detached = process.platform !== 'win32';
     const chalkArgs = process.env.CHALK_DOCKERODE_NO_EXTERNAL_CONFIG === '1'
       ? ['--no-use-external-config', '__', 'docker_post_push']
       : ['__', 'docker_post_push'];
     const child = spawn(chalk, chalkArgs, {
+      detached,
       env: process.env,
       stdio: ['pipe', 'ignore', 'pipe'],
     });
-    const limit = timeoutMs();
-    const timer = limit === null ? null : setTimeout(() => {
+    const settle = () => {
       if (settled) return;
       settled = true;
-      child.kill('SIGTERM');
-      diagnostic('posthook_timeout', { operationId: payload.operationId, timeoutMs: limit });
+      clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       resolve();
-    }, limit);
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      timedOut = true;
+      diagnostic('posthook_timeout', {
+        operationId: payload.operationId,
+        timeoutMs: operation.timeoutMs,
+      });
+      signalPostHook(child, 'SIGTERM', detached);
+      killTimer = setTimeout(() => {
+        signalPostHook(child, 'SIGKILL', detached);
+        settle();
+      }, POST_PUSH_KILL_GRACE_MS);
+    }, operation.timeoutMs);
 
     child.stderr.on('data', (chunk) => {
       stderrObserved = stderrObserved || chunk.length > 0;
     });
     child.on('error', (error) => {
       if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
       diagnostic('posthook_spawn_failed', { operationId: payload.operationId, message: error.message });
-      resolve();
+      settle();
     });
     child.on('close', (code, signal) => {
       if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      if (code !== 0) {
+      if (timedOut) {
+        settle();
+      } else if (code !== 0) {
         diagnostic('posthook_failed', {
           operationId: payload.operationId,
           exitCode: code,
@@ -180,7 +264,7 @@ function invokePostPush(operation, digest) {
       } else {
         diagnostic('posthook_complete', { operationId: payload.operationId, digest });
       }
-      resolve();
+      settle();
     });
     child.stdin.on('error', () => {});
     child.stdin.end(JSON.stringify(payload));
@@ -193,42 +277,43 @@ async function finishBuffered(value, operationPromise) {
     diagnostic(operation.code, { socketPath: operation.socketPath });
     return value;
   }
-  const digest = terminalDigest(value);
-  if (!digest) {
-    diagnostic('missing_terminal_digest');
+  const tracker = createTerminalTracker();
+  tracker.write(Buffer.isBuffer(value) || typeof value === 'string' ? value : JSON.stringify(value));
+  const terminal = tracker.finish();
+  if (!terminal.digest) {
+    diagnostic(terminal.overflow ? 'terminal_frame_too_large' : 'missing_terminal_digest');
     return value;
   }
-  await invokePostPush(operation, digest);
+  await invokePostPush(operation, terminal.digest);
   return value;
 }
 
 function finishStream(source, operationPromise) {
   const proxy = new PassThrough();
-  const chunks = [];
-  let bytes = 0;
+  const tracker = createTerminalTracker();
   let ended = false;
+  let sourceFailed = false;
 
   source.on('data', (chunk) => {
-    if (bytes < MAX_DIGEST_SCAN_BYTES) {
-      const copy = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      const remaining = MAX_DIGEST_SCAN_BYTES - bytes;
-      chunks.push(copy.subarray(0, remaining));
-      bytes += Math.min(copy.length, remaining);
-    }
+    tracker.write(chunk);
   });
   source.once('error', (error) => {
-    if (!ended) proxy.destroy(error);
+    sourceFailed = true;
+    ended = true;
+    proxy.destroy(error);
   });
   source.pipe(proxy, { end: false });
   source.once('end', async () => {
+    if (sourceFailed) return;
     try {
       const operation = await operationPromise;
       if (!operation.supported) {
         diagnostic(operation.code, { socketPath: operation.socketPath });
       } else {
-        const digest = terminalDigest(Buffer.concat(chunks));
-        if (!digest) diagnostic('missing_terminal_digest');
-        else await invokePostPush(operation, digest);
+        const terminal = tracker.finish();
+        if (!terminal.digest) {
+          diagnostic(terminal.overflow ? 'terminal_frame_too_large' : 'missing_terminal_digest');
+        } else await invokePostPush(operation, terminal.digest);
       }
       ended = true;
       proxy.end();
@@ -290,7 +375,9 @@ function patchImage(Image, meta) {
 }
 
 module.exports = {
+  createTerminalTracker,
   patchImage,
+  postPushDeadline,
   repositoryWithoutTag,
   terminalDigest,
 };
