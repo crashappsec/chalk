@@ -34,7 +34,7 @@ sink_config redbox_build {
   ~priority:                1000000
   ~missing_key_placeholder: "na"
   ~normalize._OP_CHALKER_VERSION.callback: func dot_to_hyphen
-  ~normalize._X_WORKSPACE_ID.callback:     func to_lower
+  ~normalize._X_WORKSPACE_ID.callback:     func hash_trunc16
   ~normalize.CHALK_ID.callback:            func to_lower
   ~normalize.METADATA_ID.callback:         func to_lower
 }
@@ -44,6 +44,7 @@ sink_config redbox_exec {
   ~priority:                1000000
   ~missing_key_placeholder: "na"
   ~normalize._OP_CHALKER_VERSION.callback:   func dot_to_hyphen
+  ~normalize._EXEC_ID.callback:              func to_lower
   ~normalize._EXEC_DEPLOYMENT_ID.callback:   func trunc16
   ~normalize._X_WORKSPACE_ID.callback:       func hash_trunc16
   ~normalize.METADATA_ID.callback:           func to_lower
@@ -53,7 +54,7 @@ sink_config redbox_heartbeat {
   ~sink:     "dns"
   ~priority: 999999
   ~normalize._OP_CHALKER_VERSION.callback: func dot_to_hyphen
-  ~normalize._X_WORKSPACE_ID.callback:     func to_lower
+  ~normalize._X_WORKSPACE_ID.callback:     func hash_trunc16
   ~normalize.METADATA_ID.callback:         func to_lower
 }
 
