@@ -9,15 +9,14 @@ import std/[
   base64,
   json,
   os,
-  posix,
   sequtils,
-  tempfiles,
 ]
 import ".."/[
   attestation_api,
   config,
   docker/exe,
   docker/push,
+  dockerode_post_push/runner,
   plugin_api,
   reporting,
   run_management,
@@ -28,12 +27,7 @@ import ".."/[
   utils/json,
   utils/sets,
   utils/strings,
-  utils/subproc,
 ]
-
-const
-  dockerodeRegisterSource = staticRead("../dockerode_post_push/register.cjs")
-  dockerodeRuntimeSource  = staticRead("../dockerode_post_push/runtime.cjs")
 
 proc runCmdDockerodeRun*() =
   ## Scope instrumentation to one publish command and preserve its exit code.
@@ -43,30 +37,14 @@ proc runCmdDockerodeRun*() =
   if len(args) == 0:
     error("dockerode_run: expected -- <command> [args...]")
     quitChalk(64)
-  let commandArgs = if len(args) > 1: args[1 .. ^1] else: @[]
-
   let
-    loaderDir  = createTempDir("chalk-dockerode-", "-loader")
-    register   = loaderDir / "register.cjs"
-    runtime    = loaderDir / "runtime.cjs"
-    prior      = getEnv("NODE_OPTIONS")
-  discard chmod(cstring(loaderDir), Mode(0o700))
-  writeFile(register, dockerodeRegisterSource)
-  writeFile(runtime, dockerodeRuntimeSource)
-  discard chmod(cstring(register), Mode(0o600))
-  discard chmod(cstring(runtime), Mode(0o600))
-  putEnv("NODE_OPTIONS", (prior & " --require=\"" & register & "\"").strip())
-  putEnv("CHALK_DOCKERODE_CHALK", getMyAppPath())
-  if not attrGet[bool]("load_external_config"):
-    putEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG", "1")
-
-  try:
-    quitChalk(runCmdNoOutputCapture(args[0], commandArgs))
-  finally:
-    try:
-      removeDir(loaderDir)
-    except:
-      warn("dockerode_run: could not remove temporary loader directory")
+    commandArgs = if len(args) > 1: args[1 .. ^1] else: @[]
+    exitCode    = runDockerodeCommand(
+      args[0],
+      commandArgs,
+      noExternalConfig = not attrGet[bool]("load_external_config"),
+    )
+  quitChalk(exitCode)
 
 proc postPushResult(status, operationId: string) =
   stdout.writeLine($( %*{

@@ -18,10 +18,10 @@ import "."/[
   base,
   context_upload,
   exe,
-  ids,
   login,
   manifest,
   inspect,
+  repo_digest,
   scan,
   util,
 ]
@@ -43,15 +43,8 @@ proc collectAfterSuccessfulPush(chalk: ChalkObj) =
 proc dockerPostPush*(image, expectedDigest: string): bool =
   ## Collect and report the successful push performed by an SDK. This function
   ## never invokes `docker push`, including configured mirror pushes.
-  let
-    local        = inspectImageJson(image)
-    expectedRepo = parseImage(image).repo
-  var digestMatches = false
-  for repoDigest in local{"RepoDigests"}.getStrElems():
-    if repoDigest == expectedRepo & "@" & expectedDigest:
-      digestMatches = true
-      break
-  if not digestMatches:
+  let local = inspectImageJson(image)
+  if not repoDigestMatches(image, expectedDigest, local{"RepoDigests"}.getStrElems()):
     error("docker: post-push digest does not match local RepoDigests for " & image)
     return false
 
