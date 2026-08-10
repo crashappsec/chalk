@@ -30,6 +30,11 @@ function fixture() {
     "process.stdin.on('data', chunk => { data += chunk; });",
     "process.stdin.on('end', () => {",
     "  fs.appendFileSync(process.env.TEST_PAYLOADS, data + '\\n');",
+    "  if (process.env.TEST_HOOK_STDOUT) {",
+    "    const payload = JSON.parse(data);",
+    "    process.stdout.write(process.env.TEST_HOOK_STDOUT + '\\n');",
+    "    process.stdout.write(JSON.stringify({ schema: 'chalk-docker-post-push-result/v1', status: 'complete', operationId: payload.operationId }) + '\\n');",
+    "  }",
     "  if (process.env.TEST_DESCENDANT_PID) {",
     "    const child = spawn(process.execPath, ['-e', 'process.on(\"SIGTERM\", () => {}); setInterval(() => {}, 1000)']);",
     "    fs.writeFileSync(process.env.TEST_DESCENDANT_PID, String(child.pid));",
@@ -230,6 +235,39 @@ test('buffered callback preserves identity and waits for a fail-open hook', asyn
   }
 });
 
+test('configured stdout reports are forwarded while the internal result is consumed', async () => {
+  const fx = fixture();
+  const restore = environment(fx);
+  const originalWrite = process.stdout.write;
+  const writes = [];
+  process.env.TEST_HOOK_STDOUT = 'configured-report-output';
+  process.stdout.write = function (chunk, encoding, callback) {
+    const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, typeof encoding === 'string' ? encoding : undefined);
+    if (value.includes('configured-report-output') || value.includes('chalk-docker-post-push-result/v1')) {
+      writes.push(value);
+      if (typeof encoding === 'function') encoding();
+      else if (typeof callback === 'function') callback();
+      return true;
+    }
+    return originalWrite.apply(this, arguments);
+  };
+  try {
+    try {
+      const Image = imageClass({ stream: false });
+      patchImage(Image, { version: '5.0.1' });
+      const image = new Image(modem(), 'team/app');
+      assert.equal(await image.push({ tag: 'one', stream: false }), BODY);
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+    assert.equal(Buffer.concat(writes).toString('utf8'), 'configured-report-output\n');
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"status":"complete"/);
+  } finally {
+    process.stdout.write = originalWrite;
+    restore();
+  }
+});
+
 test('unsupported, custom-socket, and failed pushes never invoke the post-hook', async () => {
   const fx = fixture();
   const restore = environment(fx);
@@ -369,6 +407,54 @@ test('post-hook spawn failure is diagnostic-only', async () => {
     assert.deepEqual(Buffer.concat(chunks), BODY);
     assert.equal(image.calls, 1);
     assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"posthook_spawn_failed"/);
+  } finally {
+    restore();
+  }
+});
+
+test('instrumentation exceptions are fail-open for buffered promises', async () => {
+  const fx = fixture();
+  const restore = environment(fx);
+  try {
+    const Image = imageClass({ stream: false });
+    patchImage(Image, { version: '5.0.1' });
+    const image = new Image(modem(), 'team/app');
+    Object.defineProperty(image, 'name', {
+      get() { throw new Error('instrumentation-only failure'); },
+    });
+    assert.equal(await image.push({ tag: 'one', stream: false }), BODY);
+    assert.equal(image.calls, 1);
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"posthook_exception"/);
+  } finally {
+    restore();
+  }
+});
+
+test('destroying the proxy aborts the Engine stream and skips post-push', async () => {
+  const fx = fixture();
+  const restore = environment(fx);
+  let source;
+  try {
+    function StreamingImage(modemValue, name) {
+      this.modem = modemValue;
+      this.name = name;
+      this.calls = 0;
+    }
+    StreamingImage.prototype.push = function () {
+      this.calls += 1;
+      source = new Readable({ read() {} });
+      return Promise.resolve(source);
+    };
+    patchImage(StreamingImage, { version: '5.0.1' });
+    const image = new StreamingImage(modem(), 'team/app');
+    const stream = await image.push({ tag: 'one' });
+    const closed = new Promise((resolve) => stream.once('close', resolve));
+    stream.destroy();
+    await closed;
+    assert.equal(source.destroyed, true);
+    assert.equal(image.calls, 1);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(fs.existsSync(fx.payloads), false);
   } finally {
     restore();
   }

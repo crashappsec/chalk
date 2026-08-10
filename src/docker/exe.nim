@@ -308,7 +308,22 @@ proc getFrontendVersion*(ctx: DockerInvocation): Option[Version] =
       frontendVersion = some(parseVersion("0"))
   return frontendVersion
 
-var dockerAuth: Option[JsonNode]
+var
+  dockerAuth:        Option[JsonNode]
+  dockerAuthOverlay: Option[JsonNode]
+
+proc mergeDockerAuthConfig*(base, overlay: JsonNode): JsonNode =
+  ## Merge process-local credentials over the ambient Docker configuration.
+  ## The overlay wins for duplicate registry keys and survives cache resets.
+  result = if base == nil or base.kind != JObject: newJObject() else: base.deepCopy()
+  if overlay == nil or overlay.kind != JObject or
+     overlay{"auths"} == nil or overlay{"auths"}.kind != JObject:
+    return
+  if result{"auths"} == nil or result{"auths"}.kind != JObject:
+    result["auths"] = newJObject()
+  for registry, auth in overlay{"auths"}.pairs():
+    result["auths"][registry] = auth.deepCopy()
+
 proc getDockerAuthConfig*(): JsonNode =
   if dockerAuth.isNone():
     dockerAuth = some(newJObject())
@@ -321,16 +336,20 @@ proc getDockerAuthConfig*(): JsonNode =
         trace("docker: no auth config file at " & path)
     except:
       trace("docker: could not read docker auth config file " & path & " due to: " & getCurrentExceptionMsg())
+    if dockerAuthOverlay.isSome():
+      dockerAuth = some(mergeDockerAuthConfig(dockerAuth.get(), dockerAuthOverlay.get()))
   return dockerAuth.get()
 
 proc resetDockerAuthConfig*() =
   dockerAuth = none(JsonNode)
 
 proc setDockerAuthConfig*(config: JsonNode) =
-  ## Set process-local registry credentials without writing a Docker config.
+  ## Overlay process-local registry credentials without writing a Docker config.
   ## This is used by the dockerode post-push handoff, where credentials arrive
-  ## on stdin and must not be exposed in argv or temporary files.
-  dockerAuth = some(config)
+  ## on stdin and must not be exposed in argv or temporary files. Cache resets
+  ## after `docker login` retain the overlay while reloading ambient entries.
+  dockerAuthOverlay = some(config.deepCopy())
+  resetDockerAuthConfig()
 
 proc supportsBuildContextFlag*(ctx: DockerInvocation): bool =
   # https://github.com/docker/buildx/releases/tag/v0.8.0

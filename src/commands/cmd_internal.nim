@@ -88,7 +88,7 @@ proc runCmdDockerPostPush*() =
        not digest[7 .. ^1].allCharsInSet({'0' .. '9', 'a' .. 'f'}) or
        '\n' in repository or '\r' in repository or
        '\n' in tag or '\r' in tag or
-       socketPath notin ["/var/run/docker.sock", getHomeDir() / ".docker/run/docker.sock"]:
+       not dockerPostPushSocketSupported(socketPath):
       postPushResult("unsupported_input", operationId)
       quitChalk(2)
 

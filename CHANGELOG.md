@@ -27,7 +27,8 @@
   and preserves the application's push result if instrumentation is unsupported
   or post-processing fails. Support is bounded to Linux, an explicit tag, no
   Dockerode platform override, and the default rootful or user Docker socket;
-  post-processing also requires an explicit deadline capped at five minutes.
+  the wrapper supplies a five-minute post-processing deadline by default and
+  rejects longer deadlines.
 
 - New GitLab CI collapsible log section sink. When chalk runs inside a GitLab
   CI job (`GITLAB_CI` is set), the chalk report is automatically wrapped in

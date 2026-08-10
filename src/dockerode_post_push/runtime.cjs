@@ -14,6 +14,7 @@ const DEFAULT_SOCKETS = new Set([
 ]);
 const MAX_INCOMPLETE_FRAME_BYTES = 1024 * 1024;
 const MAX_POST_PUSH_TIMEOUT_MS = 5 * 60 * 1000;
+const MAX_POST_PUSH_STDOUT_LINE_BYTES = 64 * 1024;
 const POST_PUSH_KILL_GRACE_MS = 1000;
 
 function diagnostic(code, fields = {}) {
@@ -212,6 +213,8 @@ function invokePostPush(operation, digest) {
     let settled = false;
     let timedOut = false;
     let stderrObserved = false;
+    let postHookStatus = null;
+    let stdoutPending = Buffer.alloc(0);
     let killTimer = null;
     const detached = process.platform !== 'win32';
     const chalkArgs = process.env.CHALK_DOCKERODE_NO_EXTERNAL_CONFIG === '1'
@@ -220,8 +223,49 @@ function invokePostPush(operation, digest) {
     const child = spawn(chalk, chalkArgs, {
       detached,
       env: process.env,
-      stdio: ['pipe', 'ignore', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+    const forwardStdout = (value) => {
+      try {
+        process.stdout.write(value);
+      } catch (_) {
+        // A report sink must not change the original push result.
+      }
+    };
+    const handleStdoutLine = (line) => {
+      try {
+        const parsed = JSON.parse(line.toString('utf8').trim());
+        if (parsed && parsed.schema === 'chalk-docker-post-push-result/v1' &&
+            parsed.operationId === payload.operationId && typeof parsed.status === 'string') {
+          postHookStatus = parsed.status;
+          return;
+        }
+      } catch (_) {
+        // Non-result output belongs to configured Chalk report sinks.
+      }
+      forwardStdout(line);
+    };
+    const consumeStdout = (chunk) => {
+      let combined = stdoutPending.length === 0 ? chunk : Buffer.concat([stdoutPending, chunk]);
+      let start = 0;
+      for (;;) {
+        const newline = combined.indexOf(0x0a, start);
+        if (newline === -1) break;
+        handleStdoutLine(combined.subarray(start, newline + 1));
+        start = newline + 1;
+      }
+      stdoutPending = combined.subarray(start);
+      if (stdoutPending.length > MAX_POST_PUSH_STDOUT_LINE_BYTES) {
+        forwardStdout(stdoutPending);
+        stdoutPending = Buffer.alloc(0);
+      }
+    };
+    const flushStdout = () => {
+      if (stdoutPending.length > 0) {
+        handleStdoutLine(stdoutPending);
+        stdoutPending = Buffer.alloc(0);
+      }
+    };
     const settle = () => {
       if (settled) return;
       settled = true;
@@ -246,6 +290,7 @@ function invokePostPush(operation, digest) {
     child.stderr.on('data', (chunk) => {
       stderrObserved = stderrObserved || chunk.length > 0;
     });
+    child.stdout.on('data', consumeStdout);
     child.on('error', (error) => {
       if (settled) return;
       diagnostic('posthook_spawn_failed', { operationId: payload.operationId, message: error.message });
@@ -253,6 +298,7 @@ function invokePostPush(operation, digest) {
     });
     child.on('close', (code, signal) => {
       if (settled) return;
+      flushStdout();
       if (timedOut) {
         settle();
       } else if (code !== 0) {
@@ -261,9 +307,14 @@ function invokePostPush(operation, digest) {
           exitCode: code,
           signal,
           stderrObserved,
+          status: postHookStatus,
         });
       } else {
-        diagnostic('posthook_complete', { operationId: payload.operationId, digest });
+        diagnostic('posthook_complete', {
+          operationId: payload.operationId,
+          digest,
+          status: postHookStatus,
+        });
       }
       settle();
     });
@@ -273,27 +324,40 @@ function invokePostPush(operation, digest) {
 }
 
 async function finishBuffered(value, operationPromise) {
-  const operation = await operationPromise;
-  if (!operation.supported) {
-    diagnostic(operation.code, { socketPath: operation.socketPath });
-    return value;
+  try {
+    const operation = await operationPromise;
+    if (!operation.supported) {
+      diagnostic(operation.code, { socketPath: operation.socketPath });
+      return value;
+    }
+    const tracker = createTerminalTracker();
+    tracker.write(Buffer.isBuffer(value) || typeof value === 'string' ? value : JSON.stringify(value));
+    const terminal = tracker.finish();
+    if (!terminal.digest) {
+      diagnostic(terminal.overflow ? 'terminal_frame_too_large' : 'missing_terminal_digest');
+      return value;
+    }
+    await invokePostPush(operation, terminal.digest);
+  } catch (error) {
+    diagnostic('posthook_exception', { message: error.message });
   }
-  const tracker = createTerminalTracker();
-  tracker.write(Buffer.isBuffer(value) || typeof value === 'string' ? value : JSON.stringify(value));
-  const terminal = tracker.finish();
-  if (!terminal.digest) {
-    diagnostic(terminal.overflow ? 'terminal_frame_too_large' : 'missing_terminal_digest');
-    return value;
-  }
-  await invokePostPush(operation, terminal.digest);
   return value;
 }
 
 function finishStream(source, operationPromise) {
-  const proxy = new PassThrough();
   const tracker = createTerminalTracker();
   let ended = false;
   let sourceFailed = false;
+  let cancelled = false;
+  const proxy = new PassThrough({
+    destroy(error, callback) {
+      if (!ended && !sourceFailed) {
+        cancelled = true;
+        source.destroy(error || undefined);
+      }
+      callback(error);
+    },
+  });
 
   source.on('data', (chunk) => {
     tracker.write(chunk);
@@ -305,7 +369,7 @@ function finishStream(source, operationPromise) {
   });
   source.pipe(proxy, { end: false });
   source.once('end', async () => {
-    if (sourceFailed) return;
+    if (sourceFailed || cancelled) return;
     try {
       const operation = await operationPromise;
       if (!operation.supported) {

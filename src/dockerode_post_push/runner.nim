@@ -20,6 +20,7 @@ import ../utils/subproc
 const
   dockerodeRegisterSource = staticRead("register.cjs")
   dockerodeRuntimeSource  = staticRead("runtime.cjs")
+  dockerodePostPushDefaultTimeoutMs* = 5 * 60 * 1000
 
 proc runDockerodeCommand*(command: string,
                           commandArgs: seq[string],
@@ -32,9 +33,11 @@ proc runDockerodeCommand*(command: string,
     priorNodeOptions   = getEnv("NODE_OPTIONS")
     priorChalk         = getEnv("CHALK_DOCKERODE_CHALK")
     priorNoExternal    = getEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG")
+    priorTimeout       = getEnv("CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS")
     hadNodeOptions     = existsEnv("NODE_OPTIONS")
     hadChalk           = existsEnv("CHALK_DOCKERODE_CHALK")
     hadNoExternal      = existsEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG")
+    hadTimeout         = existsEnv("CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS")
 
   try:
     discard chmod(cstring(loaderDir), Mode(0o700))
@@ -44,6 +47,8 @@ proc runDockerodeCommand*(command: string,
     discard chmod(cstring(runtime), Mode(0o600))
     putEnv("NODE_OPTIONS", (priorNodeOptions & " --require=\"" & register & "\"").strip())
     putEnv("CHALK_DOCKERODE_CHALK", getMyAppPath())
+    if not hadTimeout:
+      putEnv("CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS", $dockerodePostPushDefaultTimeoutMs)
     if noExternalConfig:
       putEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG", "1")
     result = runCmdNoOutputCapture(command, commandArgs)
@@ -60,6 +65,10 @@ proc runDockerodeCommand*(command: string,
       putEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG", priorNoExternal)
     else:
       delEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG")
+    if hadTimeout:
+      putEnv("CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS", priorTimeout)
+    else:
+      delEnv("CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS")
     try:
       removeDir(loaderDir)
     except:
