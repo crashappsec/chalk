@@ -207,6 +207,10 @@ tests: $(BINARY) # note this will rebuild chalk if necessary
 unit-tests:
 	CI=true $(DOCKER) nimble test args='$(args)'
 
+.PHONY: node-unit-tests
+node-unit-tests:
+	node --test tests/unit/dockerode_post_push/*.test.cjs
+
 .PHONY: parallel
 tests_parallel: make_args=-nauto
 tests_parallel: tests
