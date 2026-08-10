@@ -25,10 +25,12 @@
   fail-open post-push telemetry to Dockerode 5.x image pushes. It uses the
   versioned `chalk-docker-post-push/v1` stdin handoff after a successful push
   and preserves the application's push result if instrumentation is unsupported
-  or post-processing fails. Support is bounded to Linux, an explicit tag, no
-  Dockerode platform override, and the default rootful or user Docker socket;
-  the wrapper supplies a five-minute post-processing deadline by default and
-  rejects longer deadlines.
+  or post-processing fails. Node 22.15+, 24, and 26 are supported; known-EOL
+  releases are excluded, and later majors with `module.registerHooks()` are
+  enabled on a best-effort basis. Support is bounded to Linux, an explicit tag,
+  no Dockerode platform override, and the default rootful or user Docker
+  socket; the wrapper supplies a five-minute post-processing deadline by
+  default and rejects longer deadlines.
 
 - New GitLab CI collapsible log section sink. When chalk runs inside a GitLab
   CI job (`GITLAB_CI` is set), the chalk report is automatically wrapped in

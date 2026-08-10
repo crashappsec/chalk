@@ -18,8 +18,9 @@ import pkg/nimutils/[
 import ../utils/subproc
 
 const
-  dockerodeRegisterSource = staticRead("register.cjs")
-  dockerodeRuntimeSource  = staticRead("runtime.cjs")
+  dockerodeRegisterSource    = staticRead("register.cjs")
+  dockerodeRuntimeSource     = staticRead("runtime.cjs")
+  dockerodeNodeSupportSource = staticRead("node_support.cjs")
   dockerodePostPushDefaultTimeoutMs* = 5 * 60 * 1000
 
 proc runDockerodeCommand*(command: string,
@@ -30,6 +31,7 @@ proc runDockerodeCommand*(command: string,
     loaderDir          = createTempDir("chalk-dockerode-", "-loader")
     register           = loaderDir / "register.cjs"
     runtime            = loaderDir / "runtime.cjs"
+    nodeSupport        = loaderDir / "node_support.cjs"
     priorNodeOptions   = getEnv("NODE_OPTIONS")
     priorChalk         = getEnv("CHALK_DOCKERODE_CHALK")
     priorNoExternal    = getEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG")
@@ -43,8 +45,10 @@ proc runDockerodeCommand*(command: string,
     discard chmod(cstring(loaderDir), Mode(0o700))
     writeFile(register, dockerodeRegisterSource)
     writeFile(runtime, dockerodeRuntimeSource)
+    writeFile(nodeSupport, dockerodeNodeSupportSource)
     discard chmod(cstring(register), Mode(0o600))
     discard chmod(cstring(runtime), Mode(0o600))
+    discard chmod(cstring(nodeSupport), Mode(0o600))
     putEnv("NODE_OPTIONS", (priorNodeOptions & " --require=\"" & register & "\"").strip())
     putEnv("CHALK_DOCKERODE_CHALK", getMyAppPath())
     if not hadTimeout:

@@ -7,6 +7,7 @@ const path = require('node:path');
 const { fileURLToPath } = require('node:url');
 const { registerHooks } = require('node:module');
 const runtime = require('./runtime.cjs');
+const { classifyNodeSupport, diagnosticForNodeSupport } = require('./node_support.cjs');
 
 const PATCH_SYMBOL = Symbol.for('chalk.dockerode.postPush.patch.v1');
 globalThis[PATCH_SYMBOL] = runtime.patchImage;
@@ -33,11 +34,10 @@ function dockerodePackageFor(filename) {
   return null;
 }
 
-const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
-const supportedNode = (nodeMajor === 22 && nodeMinor >= 15) || nodeMajor === 24;
-if (!supportedNode || typeof registerHooks !== 'function') {
-  process.stderr.write(`[chalk-dockerode] unsupported Node ${process.versions.node}; instrumentation skipped\n`);
-} else registerHooks({
+const nodeSupport = classifyNodeSupport(process.versions.node, registerHooks);
+const nodeSupportDiagnostic = diagnosticForNodeSupport(nodeSupport);
+if (nodeSupportDiagnostic) process.stderr.write(`${nodeSupportDiagnostic}\n`);
+if (nodeSupport.enabled) registerHooks({
   load(url, context, nextLoad) {
     const loaded = nextLoad(url, context);
     if (process.env.CHALK_DOCKERODE_HOOK_DEBUG) {
