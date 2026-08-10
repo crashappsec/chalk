@@ -79,7 +79,8 @@ async function supportedOperation(image, opts, meta) {
   const auth = opts.authconfig;
   if (auth !== undefined && (
     !auth || typeof auth.username !== 'string' || typeof auth.password !== 'string' ||
-    typeof auth.serveraddress !== 'string'
+    typeof auth.serveraddress !== 'string' || auth.username.length === 0 ||
+    auth.password.length === 0 || auth.serveraddress.length === 0
   )) {
     return { supported: false, code: 'unsupported_auth_shape' };
   }

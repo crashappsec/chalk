@@ -273,6 +273,18 @@ test('all guarded option and runtime shapes skip instrumentation fail-open', asy
       { meta: { version: '4.0.0' }, opts: { tag: 'one', stream: false } },
       { meta: { version: '5.0.1' }, opts: { tag: 'one', platform: 'linux/arm64', stream: false } },
       { meta: { version: '5.0.1' }, opts: { tag: 'one', authconfig: {}, stream: false } },
+      {
+        meta: { version: '5.0.1' },
+        opts: { tag: 'one', authconfig: { username: '', password: 'secret', serveraddress: 'registry.example' }, stream: false },
+      },
+      {
+        meta: { version: '5.0.1' },
+        opts: { tag: 'one', authconfig: { username: 'user', password: '', serveraddress: 'registry.example' }, stream: false },
+      },
+      {
+        meta: { version: '5.0.1' },
+        opts: { tag: 'one', authconfig: { username: 'user', password: 'secret', serveraddress: '' }, stream: false },
+      },
     ];
     for (const item of cases) {
       const Image = imageClass({ stream: false });
