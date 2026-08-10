@@ -159,6 +159,14 @@
   range `0`-`19`.
   ([#757](https://github.com/crashappsec/chalk/pull/757))
 
+### Bug Fixes
+
+- Fixed external tools (SBOM, SAST, secret scanners) run directly (not via
+  Docker) always taking the full timeout duration on Alpine Linux, even when
+  the tool completes successfully. First detected via syft.
+  ([#759](https://github.com/crashappsec/chalk/pull/759),
+  [con4m#136](https://github.com/crashappsec/con4m/pull/136))
+
 ## 1.1.3
 
 **July 6, 2026**

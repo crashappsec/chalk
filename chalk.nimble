@@ -20,7 +20,7 @@ requires "nim >= 2.0.8"
 # are the pinned versions used in CI; `make nimble.paths` clones and checks
 # out these commits when the repos are absent.  In interactive shells the
 # Makefile defaults to the `dev` branch instead.
-# con4m:    f2364ee578f22aa0a4ad94e68173c24fe0d5038e
+# con4m:    44dafed4a96f1ce40a6c9bee55e676f9de9837fc
 # nimutils: b34b2d79274cd69d10be19f42e2c68d6f6c96203
 requires "unicodedb == 0.12.0"
 requires "https://github.com/viega/zippy == 0.10.7" # MIT
