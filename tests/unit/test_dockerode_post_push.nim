@@ -1,9 +1,11 @@
 import std/[
   os,
   sequtils,
+  strutils,
   tempfiles,
 ]
 import ../../src/docker/repo_digest
+import ../../src/dockerode_post_push/payload
 import ../../src/dockerode_post_push/runner
 
 const
@@ -29,6 +31,16 @@ proc main() =
   doAssert not repoDigestMatches("alpine:latest", Digest, @[])
   doAssert not repoDigestMatches("alpine:latest", Digest, @["busybox@" & Digest])
   doAssert not repoDigestMatches("alpine:latest", Digest, @["alpine@" & OtherDigest])
+
+  let payloadFixture = createTempFile("chalk-dockerode-payload-", ".json")
+  try:
+    payloadFixture.cfile.write('x'.repeat(dockerPostPushMaxPayloadBytes + 1))
+    payloadFixture.cfile.setFilePos(0)
+    doAssert readDockerPostPushPayload(payloadFixture.cfile).len ==
+      dockerPostPushMaxPayloadBytes + 1
+  finally:
+    payloadFixture.cfile.close()
+    removeFile(payloadFixture.path)
 
   let
     tempRoot = createTempDir("chalk-dockerode-command-test-", "")

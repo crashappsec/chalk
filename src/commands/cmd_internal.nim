@@ -16,6 +16,7 @@ import ".."/[
   config,
   docker/exe,
   docker/push,
+  dockerode_post_push/payload,
   dockerode_post_push/runner,
   plugin_api,
   reporting,
@@ -58,7 +59,11 @@ proc runCmdDockerPostPush*() =
   ## Exit 0: collected; 1: post-processing failed; 2: unsupported input.
   var operationId = ""
   try:
-    let payload = parseJson(stdin.readAll())
+    let payloadInput = readDockerPostPushPayload(stdin)
+    if payloadInput.len > dockerPostPushMaxPayloadBytes:
+      postPushResult("unsupported_input", operationId)
+      quitChalk(2)
+    let payload = parseJson(payloadInput)
     if payload.kind != JObject or
        payload{"schema"}.getStr() != "chalk-docker-post-push/v1":
       postPushResult("unsupported_schema", operationId)
