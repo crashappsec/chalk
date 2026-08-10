@@ -57,7 +57,16 @@ proc postPushResult(status, operationId: string) =
 proc runCmdDockerPostPush*() =
   ## Versioned stdin contract for a push already completed by dockerode.
   ## Exit 0: collected; 1: post-processing failed; 2: unsupported input.
-  var operationId = ""
+  var
+    operationId = ""
+    repository  = ""
+    tag         = ""
+    digest      = ""
+    socketPath  = ""
+    username    = ""
+    password    = ""
+    server      = ""
+    hasAuth     = false
   try:
     let payloadInput = readDockerPostPushPayload(stdin)
     if payloadInput.len > dockerPostPushMaxPayloadBytes:
@@ -70,11 +79,10 @@ proc runCmdDockerPostPush*() =
       quitChalk(2)
 
     operationId = payload{"operationId"}.getStr()
-    let
-      repository = payload{"repository"}.getStr()
-      tag         = payload{"tag"}.getStr()
-      digest      = payload{"digest"}.getStr()
-      socketPath  = payload{"socketPath"}.getStr()
+    repository = payload{"repository"}.getStr()
+    tag = payload{"tag"}.getStr()
+    digest = payload{"digest"}.getStr()
+    socketPath = payload{"socketPath"}.getStr()
     if operationId == "" or repository == "" or tag == "" or
        not digest.startsWith("sha256:") or digest.len != 71 or
        not digest[7 .. ^1].allCharsInSet({'0' .. '9', 'a' .. 'f'}) or
@@ -84,18 +92,25 @@ proc runCmdDockerPostPush*() =
       postPushResult("unsupported_input", operationId)
       quitChalk(2)
 
-    putEnv("DOCKER_HOST", "unix://" & socketPath)
-    delEnv("DOCKER_CONTEXT")
-
     let auth = payload{"authconfig"}
     if auth != nil and auth.kind != JNull:
-      let
-        username = auth{"username"}.getStr()
-        password = auth{"password"}.getStr()
-        server   = auth{"serveraddress"}.getStr()
+      username = auth{"username"}.getStr()
+      password = auth{"password"}.getStr()
+      server = auth{"serveraddress"}.getStr()
       if username == "" or password == "" or server == "":
         postPushResult("unsupported_auth", operationId)
         quitChalk(2)
+      hasAuth = true
+  except:
+    error("docker post-push input: " & getCurrentExceptionMsg())
+    postPushResult("unsupported_input", operationId)
+    quitChalk(2)
+
+  try:
+    putEnv("DOCKER_HOST", "unix://" & socketPath)
+    delEnv("DOCKER_CONTEXT")
+
+    if hasAuth:
       var dockerConfig = %*{"auths": {}}
       dockerConfig["auths"][server] = %*{
         "auth": encode(username & ":" & password),
