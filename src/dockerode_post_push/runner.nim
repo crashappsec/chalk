@@ -18,9 +18,10 @@ import pkg/nimutils/[
 import ../utils/subproc
 
 const
-  dockerodeRegisterSource    = staticRead("register.cjs")
-  dockerodeRuntimeSource     = staticRead("runtime.cjs")
-  dockerodeNodeSupportSource = staticRead("node_support.cjs")
+  dockerodeRegisterSource     = staticRead("register.cjs")
+  dockerodeRegisterImplSource = staticRead("register_impl.cjs")
+  dockerodeRuntimeSource      = staticRead("runtime.cjs")
+  dockerodeNodeSupportSource  = staticRead("node_support.cjs")
   dockerodePostPushDefaultTimeoutMs* = 5 * 60 * 1000
 
 proc runDockerodeCommand*(command: string,
@@ -30,6 +31,7 @@ proc runDockerodeCommand*(command: string,
   let
     loaderDir          = createTempDir("chalk-dockerode-", "-loader")
     register           = loaderDir / "register.cjs"
+    registerImpl       = loaderDir / "register_impl.cjs"
     runtime            = loaderDir / "runtime.cjs"
     nodeSupport        = loaderDir / "node_support.cjs"
     priorNodeOptions   = getEnv("NODE_OPTIONS")
@@ -44,9 +46,11 @@ proc runDockerodeCommand*(command: string,
   try:
     discard chmod(cstring(loaderDir), Mode(0o700))
     writeFile(register, dockerodeRegisterSource)
+    writeFile(registerImpl, dockerodeRegisterImplSource)
     writeFile(runtime, dockerodeRuntimeSource)
     writeFile(nodeSupport, dockerodeNodeSupportSource)
     discard chmod(cstring(register), Mode(0o600))
+    discard chmod(cstring(registerImpl), Mode(0o600))
     discard chmod(cstring(runtime), Mode(0o600))
     discard chmod(cstring(nodeSupport), Mode(0o600))
     putEnv("NODE_OPTIONS", (priorNodeOptions & " --require=\"" & register & "\"").strip())

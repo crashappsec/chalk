@@ -49,3 +49,46 @@ test('registerHooks patches every resolved dockerode 5.x copy, not the shim depe
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('preload fails open when a private loader dependency is missing', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-fail-open-'));
+  try {
+    const sourceRoot = path.resolve(__dirname, '..', '..', '..', 'src', 'dockerode_post_push');
+    for (const filename of ['register.cjs', 'register_impl.cjs', 'runtime.cjs']) {
+      fs.copyFileSync(path.join(sourceRoot, filename), path.join(dir, filename));
+    }
+    // Deliberately omit node_support.cjs so loading register_impl.cjs throws
+    // inside the fail-open preload bootstrap.
+    const dockerodeRoot = path.join(dir, 'node_modules', 'dockerode');
+    fs.mkdirSync(path.join(dockerodeRoot, 'lib'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dockerodeRoot, 'package.json'),
+      JSON.stringify({ name: 'dockerode', version: '5.0.1' }),
+    );
+    fs.writeFileSync(path.join(dockerodeRoot, 'lib', 'image.js'), [
+      'function Image() {}',
+      "Image.prototype.push = function originalPush() { return 'original'; };",
+      'module.exports = Image;',
+      '',
+    ].join('\n'));
+    const probe = path.join(dir, 'probe.cjs');
+    fs.writeFileSync(probe, [
+      "const Image = require('./node_modules/dockerode/lib/image.js');",
+      "if (new Image().push() !== 'original') process.exit(24);",
+      "process.stdout.write('dockerode-original\\n');",
+      'process.exit(23);',
+      '',
+    ].join('\n'));
+
+    const preload = path.join(dir, 'register.cjs');
+    const result = spawnSync(process.execPath, [`--require=${preload}`, probe], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 23, result.stderr || result.stdout);
+    assert.equal(result.stdout, 'dockerode-original\n');
+    assert.equal(result.stderr, '');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
