@@ -27,7 +27,9 @@ const
 proc runDockerodeCommand*(command: string,
                           commandArgs: seq[string],
                           noExternalConfig: bool): int =
-  ## Run one command with a private loader, restoring the process before return.
+  ## Run one foreground command tree with a private loader, restoring the process
+  ## and removing the loader after the command returns. Instrumented descendants
+  ## that outlive the wrapped command are outside this command's support boundary.
   let
     loaderDir          = createTempDir("chalk-dockerode-", "-loader")
     register           = loaderDir / "register.cjs"

@@ -28,10 +28,11 @@
   or post-processing fails. Node 22.15+, 24, and 26 are supported; known-EOL,
   odd-numbered non-LTS, and prerelease builds are excluded, and later capable
   even-numbered majors are enabled on a best-effort basis. Support is bounded
-  to Linux, an explicit tag,
-  no Dockerode platform override, and the default rootful or user Docker
-  socket; the wrapper supplies a five-minute post-processing deadline by
-  default and rejects longer deadlines.
+  to a foreground publisher tree whose instrumented descendants finish before
+  the wrapped command returns, Linux, an explicit tag, no Dockerode platform
+  override, and the default rootful or user Docker socket; backgrounded or
+  daemonized descendants are unsupported. The wrapper supplies a five-minute
+  post-processing deadline by default and rejects longer deadlines.
 
 - New GitLab CI collapsible log section sink. When chalk runs inside a GitLab
   CI job (`GITLAB_CI` is set), the chalk report is automatically wrapped in
