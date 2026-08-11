@@ -48,6 +48,11 @@ proc runCmdDockerodeRun*() =
   quitChalk(exitCode)
 
 proc postPushResult(status, operationId: string) =
+  # The Node wrapper can only recognize and consume a result for the operation
+  # it started. Do not leak an internal control record into application stdout
+  # when malformed input prevents us from recovering that identifier.
+  if operationId == "":
+    return
   stdout.writeLine($( %*{
     "schema":      "chalk-docker-post-push-result/v1",
     "status":      status,

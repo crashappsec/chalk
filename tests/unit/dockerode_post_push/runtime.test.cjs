@@ -424,7 +424,7 @@ test('instrumentation exceptions are fail-open for buffered promises', async () 
     });
     assert.equal(await image.push({ tag: 'one', stream: false }), BODY);
     assert.equal(image.calls, 1);
-    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"posthook_exception"/);
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"instrumentation_exception"/);
   } finally {
     restore();
   }
@@ -510,16 +510,25 @@ test('post-hook timeout terminates its process group, including descendants', as
 test('callback error is the original object and does not invoke the post-hook', async () => {
   const fx = fixture();
   const restore = environment(fx);
+  let unhandled;
+  const observeUnhandled = (error) => { unhandled = error; };
+  process.on('unhandledRejection', observeUnhandled);
   try {
     const Image = imageClass({ fail: true });
     patchImage(Image, { version: '5.0.1' });
     const image = new Image(modem(), 'team/app');
+    Object.defineProperty(image, 'name', {
+      get() { throw new Error('unused instrumentation failure'); },
+    });
     const error = await new Promise((resolve) => {
       image.push({ tag: 'one' }, (found) => resolve(found));
     });
     assert.equal(error.message, 'engine push failed');
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(unhandled, undefined);
     assert.equal(fs.existsSync(fx.payloads), false);
   } finally {
+    process.removeListener('unhandledRejection', observeUnhandled);
     restore();
   }
 });

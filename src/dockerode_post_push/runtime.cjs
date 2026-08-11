@@ -327,7 +327,7 @@ async function finishBuffered(value, operationPromise) {
   try {
     const operation = await operationPromise;
     if (!operation.supported) {
-      diagnostic(operation.code, { socketPath: operation.socketPath });
+      diagnostic(operation.code, { socketPath: operation.socketPath, message: operation.message });
       return value;
     }
     const tracker = createTerminalTracker();
@@ -373,7 +373,7 @@ function finishStream(source, operationPromise) {
     try {
       const operation = await operationPromise;
       if (!operation.supported) {
-        diagnostic(operation.code, { socketPath: operation.socketPath });
+        diagnostic(operation.code, { socketPath: operation.socketPath, message: operation.message });
       } else {
         const terminal = tracker.finish();
         if (!terminal.digest) {
@@ -402,7 +402,14 @@ function patchImage(Image, meta) {
     const callbackFn = typeof opts === 'function' ? opts : callback;
     const operationOpts = { ...normalizedOpts };
     operationOpts.authconfig = normalizedOpts.authconfig || auth;
-    const operationPromise = supportedOperation(this, operationOpts, meta);
+    // Attach a rejection handler immediately. The original push can fail before
+    // callback/stream paths ever consume this classification promise, and an
+    // instrumentation-only rejection must never become unhandled process state.
+    const operationPromise = supportedOperation(this, operationOpts, meta).catch((error) => ({
+      supported: false,
+      code: 'instrumentation_exception',
+      message: error && error.message ? error.message : String(error),
+    }));
 
     if (callbackFn === undefined) {
       let result;
