@@ -40,32 +40,36 @@ if (nodeSupportDiagnostic) process.stderr.write(`${nodeSupportDiagnostic}\n`);
 if (nodeSupport.enabled) registerHooks({
   load(url, context, nextLoad) {
     const loaded = nextLoad(url, context);
-    if (process.env.CHALK_DOCKERODE_HOOK_DEBUG) {
-      process.stderr.write(`[chalk-hook-debug] ${loaded.format} ${url}\n`);
-    }
-    if (!url.startsWith('file:')) return loaded;
+    try {
+      if (process.env.CHALK_DOCKERODE_HOOK_DEBUG) {
+        process.stderr.write(`[chalk-hook-debug] ${loaded.format} ${url}\n`);
+      }
+      if (!url.startsWith('file:')) return loaded;
 
-    const filename = fileURLToPath(url);
-    if (path.basename(filename) !== 'image.js' || path.basename(path.dirname(filename)) !== 'lib') {
+      const filename = fileURLToPath(url);
+      if (path.basename(filename) !== 'image.js' || path.basename(path.dirname(filename)) !== 'lib') {
+        return loaded;
+      }
+
+      const pkg = dockerodePackageFor(filename);
+      if (!pkg || !pkg.version.startsWith('5.')) return loaded;
+      if (loaded.format !== undefined && loaded.format !== 'commonjs') return loaded;
+
+      const rawSource = loaded.source == null ? fs.readFileSync(filename) : loaded.source;
+      const source = Buffer.isBuffer(rawSource)
+        ? rawSource.toString('utf8')
+        : String(rawSource);
+      const footer = [
+        '',
+        ';globalThis[Symbol.for("chalk.dockerode.postPush.patch.v1")](',
+        '  module.exports,',
+        `  ${JSON.stringify({ packageRoot: pkg.root, version: pkg.version })}`,
+        ');',
+        '',
+      ].join('\n');
+      return { ...loaded, format: 'commonjs', source: source + footer };
+    } catch (_) {
       return loaded;
     }
-
-    const pkg = dockerodePackageFor(filename);
-    if (!pkg || !pkg.version.startsWith('5.')) return loaded;
-    if (loaded.format !== undefined && loaded.format !== 'commonjs') return loaded;
-
-    const rawSource = loaded.source == null ? fs.readFileSync(filename) : loaded.source;
-    const source = Buffer.isBuffer(rawSource)
-      ? rawSource.toString('utf8')
-      : String(rawSource);
-    const footer = [
-      '',
-      ';globalThis[Symbol.for("chalk.dockerode.postPush.patch.v1")](',
-      '  module.exports,',
-      `  ${JSON.stringify({ packageRoot: pkg.root, version: pkg.version })}`,
-      ');',
-      '',
-    ].join('\n');
-    return { ...loaded, format: 'commonjs', source: source + footer };
   },
 });

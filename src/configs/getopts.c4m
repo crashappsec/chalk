@@ -781,7 +781,7 @@ Internal function to generate technical documentation in markdown format.
 
     command dockerode_run {
       shortdoc: "Run one command with dockerode push instrumentation"
-      doc:      "Internal fail-open publish-step wrapper for Dockerode 5.x on Linux. Supports Node 22.15+, 24, and 26; newer capable majors are best effort."
+      doc:      "Internal fail-open publish-step wrapper for Dockerode 5.x on Linux. Supports Node 22.15+, 24, and 26; newer capable even majors are best effort, while odd and prerelease builds are excluded."
       args:     (1, high())
       ignore_all_flags: true
     }

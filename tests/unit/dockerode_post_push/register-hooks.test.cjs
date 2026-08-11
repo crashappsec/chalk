@@ -92,3 +92,42 @@ test('preload fails open when a private loader dependency is missing', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('load-hook instrumentation failures return the original unpatched module', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-hook-fail-open-'));
+  try {
+    const dockerodeRoot = path.join(dir, 'node_modules', 'dockerode');
+    fs.mkdirSync(path.join(dockerodeRoot, 'lib'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dockerodeRoot, 'package.json'),
+      JSON.stringify({ name: 'dockerode', version: '5.0.1' }),
+    );
+    fs.writeFileSync(path.join(dockerodeRoot, 'lib', 'image.js'), [
+      'function Image() {}',
+      "Image.prototype.push = function originalPush() { return 'original'; };",
+      'module.exports = Image;',
+      '',
+    ].join('\n'));
+    const probe = path.join(dir, 'probe.cjs');
+    fs.writeFileSync(probe, [
+      "process.env.CHALK_DOCKERODE_HOOK_DEBUG = '1';",
+      "process.stderr.write = function failDiagnostic() { throw new Error('forced hook failure'); };",
+      "const Image = require('./node_modules/dockerode/lib/image.js');",
+      "if (new Image().push() !== 'original') process.exit(30);",
+      "process.stdout.write('hook-failure-original\\n');",
+      'process.exit(29);',
+      '',
+    ].join('\n'));
+
+    const preload = path.resolve(__dirname, '..', '..', '..', 'src', 'dockerode_post_push', 'register.cjs');
+    const result = spawnSync(process.execPath, [`--require=${preload}`, probe], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 29, result.stderr || result.stdout);
+    assert.equal(result.stdout, 'hook-failure-original\n');
+    assert.equal(result.stderr, '');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
