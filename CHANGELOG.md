@@ -21,7 +21,7 @@
 
 ### New Features
 
-- New internal `chalk __ dockerode_run -- <command> [args...]` wrapper adds
+- New `chalk dockerode -- <command> [args...]` wrapper adds
   fail-open post-push telemetry to Dockerode 5.x image pushes. It uses the
   versioned `chalk-docker-post-push/v1` stdin handoff after a successful push
   and preserves the application's push result if instrumentation is unsupported

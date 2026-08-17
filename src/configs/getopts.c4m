@@ -686,6 +686,13 @@ All arguments appearing after the word 'docker' are passed to docker.  No flags 
 """
   }
 
+  command dockerode {
+    shortdoc: "Run a command with Dockerode push instrumentation"
+    doc:      "Fail-open foreground publish-step wrapper for Dockerode 5.x on Linux. Usage: chalk dockerode -- <command> [args...]. Instrumented descendants must finish before the wrapped command returns; backgrounded and daemonized descendants are unsupported. Supports Node 22.15+, 24, and 26; newer capable even majors are best effort, while odd and prerelease builds are excluded."
+    args:     (1, high())
+    ignore_all_flags: true
+  }
+
   command setup {
     arg_sub_mutex: false # should be the default?
     shortdoc: "Set up automatic code signing"
@@ -779,12 +786,6 @@ Internal function to generate technical documentation in markdown format.
       doc:      "Internal versioned stdin API; does not perform a Docker push"
     }
 
-    command dockerode_run {
-      shortdoc: "Run one command with dockerode push instrumentation"
-      doc:      "Internal fail-open foreground publish-step wrapper for Dockerode 5.x on Linux. Instrumented descendants must finish before the wrapped command returns; backgrounded and daemonized descendants are unsupported. Supports Node 22.15+, 24, and 26; newer capable even majors are best effort, while odd and prerelease builds are excluded."
-      args:     (1, high())
-      ignore_all_flags: true
-    }
   }
 
 }

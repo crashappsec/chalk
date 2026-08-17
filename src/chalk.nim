@@ -65,13 +65,13 @@ when isMainModule:
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())
+  of "dockerode":          runCmdDockerode() # in cmd_internal
   of "exec":               runCmdExec(getArgs())
   of "setup":              runCmdSetup()
   of "docgen":             runChalkDocGen() # in cmd_help
   of "__.onbuild":         runCmdOnBuild() # in cmd_internal
   of "__.prep_postexec":   runCmdPrepPostExec() # in cmd_internal
   of "__.docker_post_push": runCmdDockerPostPush() # in cmd_internal
-  of "__.dockerode_run":    runCmdDockerodeRun() # in cmd_internal
   else:
     runChalkHelp(getFullCommandName()) # noreturn, will not show config.
 

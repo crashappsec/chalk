@@ -30,13 +30,13 @@ import ".."/[
   utils/strings,
 ]
 
-proc runCmdDockerodeRun*() =
+proc runCmdDockerode*() =
   ## Scope instrumentation to one publish command and preserve its exit code.
   var args = getArgs()
   if len(args) > 0 and args[0] == "--":
     args = args[1 .. ^1]
   if len(args) == 0:
-    error("dockerode_run: expected -- <command> [args...]")
+    error("dockerode: expected -- <command> [args...]")
     quitChalk(64)
   let
     commandArgs = if len(args) > 1: args[1 .. ^1] else: @[]
@@ -59,6 +59,12 @@ proc postPushResult(status, operationId: string) =
     "operationId": operationId,
   }))
 
+proc requireString(payload: JsonNode, key: string): string =
+  return payload.assertHasKey(key, "docker post-push field is missing")
+    .assertIs(JString, "docker post-push field " & key & " must be a string")
+    .assertHasLen("docker post-push field " & key & " must not be empty")
+    .getStr()
+
 proc runCmdDockerPostPush*() =
   ## Versioned stdin contract for a push already completed by dockerode.
   ## Exit 0: collected; 1: post-processing failed; 2: unsupported input.
@@ -77,19 +83,27 @@ proc runCmdDockerPostPush*() =
     if payloadInput.len > dockerPostPushMaxPayloadBytes:
       postPushResult("unsupported_input", operationId)
       quitChalk(2)
-    let payload = parseJson(payloadInput)
-    if payload.kind != JObject or
-       payload{"schema"}.getStr() != "chalk-docker-post-push/v1":
+    let payload = parseJson(payloadInput).assertIs(
+      JObject,
+      "docker post-push payload must be an object",
+    )
+    let schema =
+      try:
+        payload.requireString("schema")
+      except:
+        postPushResult("unsupported_schema", operationId)
+        quitChalk(2)
+        ""
+    if schema != "chalk-docker-post-push/v1":
       postPushResult("unsupported_schema", operationId)
       quitChalk(2)
 
-    operationId = payload{"operationId"}.getStr()
-    repository = payload{"repository"}.getStr()
-    tag = payload{"tag"}.getStr()
-    digest = payload{"digest"}.getStr()
-    socketPath = payload{"socketPath"}.getStr()
-    if operationId == "" or repository == "" or tag == "" or
-       not digest.startsWith("sha256:") or digest.len != 71 or
+    operationId = payload.requireString("operationId")
+    repository = payload.requireString("repository")
+    tag = payload.requireString("tag")
+    digest = payload.requireString("digest")
+    socketPath = payload.requireString("socketPath")
+    if not digest.startsWith("sha256:") or digest.len != 71 or
        not digest[7 .. ^1].allCharsInSet({'0' .. '9', 'a' .. 'f'}) or
        '\n' in repository or '\r' in repository or
        '\n' in tag or '\r' in tag or
@@ -99,13 +113,15 @@ proc runCmdDockerPostPush*() =
 
     let auth = payload{"authconfig"}
     if auth != nil and auth.kind != JNull:
-      username = auth{"username"}.getStr()
-      password = auth{"password"}.getStr()
-      server = auth{"serveraddress"}.getStr()
-      if username == "" or password == "" or server == "":
+      try:
+        auth.assertIs(JObject, "docker post-push authconfig must be an object")
+        username = auth.requireString("username")
+        password = auth.requireString("password")
+        server = auth.requireString("serveraddress")
+        hasAuth = true
+      except:
         postPushResult("unsupported_auth", operationId)
         quitChalk(2)
-      hasAuth = true
   except:
     error("docker post-push input: " & getCurrentExceptionMsg())
     postPushResult("unsupported_input", operationId)
@@ -120,7 +136,7 @@ proc runCmdDockerPostPush*() =
       dockerConfig["auths"][server] = %*{
         "auth": encode(username & ":" & password),
       }
-      setDockerAuthConfig(dockerConfig)
+      setDockerAuthConfigOverlay(dockerConfig)
 
     setFullCommandName("push", msg = "post-processing")
     loadAttestation(forceLoad = true, withPrivateKey = true)

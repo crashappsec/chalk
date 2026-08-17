@@ -315,14 +315,26 @@ var
 proc mergeDockerAuthConfig*(base, overlay: JsonNode): JsonNode =
   ## Merge process-local credentials over the ambient Docker configuration.
   ## The overlay wins for duplicate registry keys and survives cache resets.
-  result = if base == nil or base.kind != JObject: newJObject() else: base.deepCopy()
-  if overlay == nil or overlay.kind != JObject or
-     overlay{"auths"} == nil or overlay{"auths"}.kind != JObject:
+  result =
+    try:
+      base.default(newJObject()).assertIs(JObject).deepCopy()
+    except:
+      newJObject()
+  let overlayAuths =
+    try:
+      overlay.default(newJObject()).assertIs(JObject){"auths"}
+        .default(newJObject()).assertIs(JObject).deepCopy()
+    except:
+      return
+  let baseAuths =
+    try:
+      result{"auths"}.default(newJObject()).assertIs(JObject)
+    except:
+      newJObject()
+  result["auths"] = baseAuths
+  if len(overlayAuths) == 0:
     return
-  if result{"auths"} == nil or result{"auths"}.kind != JObject:
-    result["auths"] = newJObject()
-  for registry, auth in overlay{"auths"}.pairs():
-    result["auths"][registry] = auth.deepCopy()
+  result["auths"].update(overlayAuths)
 
 proc getDockerAuthConfig*(): JsonNode =
   if dockerAuth.isNone():
@@ -343,7 +355,7 @@ proc getDockerAuthConfig*(): JsonNode =
 proc resetDockerAuthConfig*() =
   dockerAuth = none(JsonNode)
 
-proc setDockerAuthConfig*(config: JsonNode) =
+proc setDockerAuthConfigOverlay*(config: JsonNode) =
   ## Overlay process-local registry credentials without writing a Docker config.
   ## This is used by the dockerode post-push handoff, where credentials arrive
   ## on stdin and must not be exposed in argv or temporary files. Cache resets
