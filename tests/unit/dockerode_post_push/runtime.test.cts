@@ -1,23 +1,55 @@
-'use strict';
-
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { Readable } = require('node:stream');
-const test = require('node:test');
-const {
+import assert = require('node:assert/strict');
+import fs = require('node:fs');
+import os = require('node:os');
+import path = require('node:path');
+import { Readable } from 'node:stream';
+import test = require('node:test');
+import {
   createTerminalTracker,
   patchImage,
   postPushDeadline,
   repositoryWithoutTag,
   terminalDigest,
-} = require('../../../src/dockerode_post_push/runtime.cjs');
+} from '../../../src/dockerode_post_push/runtime.cjs';
+
+interface Fixture {
+  dir: string;
+  payloads: string;
+  hook: string;
+}
+
+interface TestModem {
+  getSocketPath(): Promise<string>;
+}
+
+interface TestPushOptions {
+  tag?: string;
+  platform?: string;
+  authconfig?: object;
+  stream?: boolean;
+}
+
+type TestPushValue = Readable | Buffer;
+type TestPushCallback = (error: Error | null, value?: TestPushValue) => void;
+
+interface TestImage {
+  modem: TestModem;
+  name: string;
+  calls: number;
+  push(options?: TestPushOptions): Promise<TestPushValue>;
+  push(options: TestPushOptions, callback: TestPushCallback): void;
+}
+
+interface ImageClassOptions {
+  stream?: boolean;
+  fail?: boolean;
+  body?: Buffer;
+}
 
 const DIGEST = `sha256:${'a'.repeat(64)}`;
 const BODY = Buffer.from(`${JSON.stringify({ status: 'Pushed' })}\r\n${JSON.stringify({ aux: { Digest: DIGEST } })}\r\n`);
 
-function fixture() {
+function fixture(): Fixture {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-dockerode-test-'));
   const payloads = path.join(dir, 'payloads.jsonl');
   const hook = path.join(dir, 'chalk-hook');
@@ -47,7 +79,7 @@ function fixture() {
   return { dir, payloads, hook };
 }
 
-function environment(fx) {
+function environment(fx: Fixture): () => void {
   const prior = { ...process.env };
   process.env.CHALK_DOCKERODE_TEST_PLATFORM = 'linux';
   process.env.CHALK_DOCKERODE_CHALK = fx.hook;
@@ -63,24 +95,26 @@ function environment(fx) {
   };
 }
 
-function imageClass({ stream = true, fail = false, body = BODY } = {}) {
-  function Image(modem, name) {
-    this.modem = modem;
-    this.name = name;
-    this.calls = 0;
-  }
-  Image.prototype.push = function (opts, callback) {
-    this.calls += 1;
-    const value = stream ? Readable.from([body]) : body;
-    const error = fail ? new Error('engine push failed') : null;
-    if (callback === undefined) return error ? Promise.reject(error) : Promise.resolve(value);
-    process.nextTick(() => callback(error, error ? undefined : value));
-    return undefined;
+function imageClass(options: ImageClassOptions = {}): new (modem: TestModem, name: string) => TestImage {
+  const { stream = true, fail = false, body = BODY } = options;
+  return class Image implements TestImage {
+    calls = 0;
+
+    constructor(public modem: TestModem, public name: string) {}
+
+    push(pushOptions?: TestPushOptions): Promise<TestPushValue>;
+    push(pushOptions: TestPushOptions, callback: TestPushCallback): void;
+    push(_pushOptions: TestPushOptions = {}, callback?: TestPushCallback): Promise<TestPushValue> | void {
+      this.calls += 1;
+      const value = stream ? Readable.from([body]) : body;
+      const error = fail ? new Error('engine push failed') : null;
+      if (callback === undefined) return error ? Promise.reject(error) : Promise.resolve(value);
+      process.nextTick(() => callback(error, error ? undefined : value));
+    }
   };
-  return Image;
 }
 
-function modem() {
+function modem(): TestModem {
   return { getSocketPath: () => Promise.resolve('/var/run/docker.sock') };
 }
 
@@ -149,7 +183,7 @@ test('stream contract performs one push, preserves bytes, and delays end for the
       tag: 'release-1',
       authconfig: { username: 'AWS', password: 'secret', serveraddress: 'registry.example:5000' },
     });
-    const chunks = [];
+    const chunks: Buffer[] = [];
     for await (const chunk of stream) chunks.push(chunk);
     assert.deepEqual(Buffer.concat(chunks), BODY);
     assert.equal(image.calls, 1);
@@ -170,7 +204,7 @@ test('stream contract preserves and instruments a response larger than 1 MiB', a
   const fx = fixture();
   const restore = environment(fx);
   const progress = Buffer.from(`${JSON.stringify({ status: 'Pushing', progress: 'x'.repeat(2048) })}\n`);
-  const pieces = [];
+  const pieces: Buffer[] = [];
   let bytes = 0;
   while (bytes <= 1024 * 1024) {
     pieces.push(progress);
@@ -182,7 +216,7 @@ test('stream contract preserves and instruments a response larger than 1 MiB', a
     const Image = imageClass({ body: largeBody });
     patchImage(Image, { version: '5.0.1' });
     const image = new Image(modem(), 'team/app');
-    const chunks = [];
+    const chunks: Buffer[] = [];
     for await (const chunk of await image.push({ tag: 'one' })) chunks.push(chunk);
     assert.deepEqual(Buffer.concat(chunks), largeBody);
     assert.equal(image.calls, 1);
@@ -200,12 +234,12 @@ test('missing deadline skips the post-hook without changing push success', async
     const Image = imageClass();
     patchImage(Image, { version: '5.0.1' });
     const image = new Image(modem(), 'team/app');
-    const chunks = [];
+    const chunks: Buffer[] = [];
     for await (const chunk of await image.push({ tag: 'one' })) chunks.push(chunk);
     assert.deepEqual(Buffer.concat(chunks), BODY);
     assert.equal(image.calls, 1);
     assert.equal(fs.existsSync(fx.payloads), false);
-    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"unsupported_no_deadline"/);
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'), /"code":"unsupported_no_deadline"/);
   } finally {
     restore();
   }
@@ -219,8 +253,8 @@ test('buffered callback preserves identity and waits for a fail-open hook', asyn
     const Image = imageClass({ stream: false });
     patchImage(Image, { version: '5.0.1' });
     const image = new Image(modem(), 'team/app');
-    const value = await new Promise((resolve, reject) => {
-      const returned = image.push({ tag: 'one', stream: false }, (error, data) => {
+    const value = await new Promise<TestPushValue | undefined>((resolve, reject) => {
+      const returned = image.push({ tag: 'one', stream: false }, (error: Error | null, data?: TestPushValue) => {
         if (error) reject(error);
         else resolve(data);
       });
@@ -228,7 +262,7 @@ test('buffered callback preserves identity and waits for a fail-open hook', asyn
     });
     assert.equal(value, BODY);
     assert.equal(image.calls, 1);
-    const diagnostics = fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8');
+    const diagnostics = fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8');
     assert.match(diagnostics, /"code":"posthook_failed"/);
   } finally {
     restore();
@@ -238,18 +272,26 @@ test('buffered callback preserves identity and waits for a fail-open hook', asyn
 test('configured stdout reports are forwarded while the internal result is consumed', async () => {
   const fx = fixture();
   const restore = environment(fx);
-  const originalWrite = process.stdout.write;
-  const writes = [];
+  const originalWrite = process.stdout.write.bind(process.stdout);
+  const writes: Buffer[] = [];
   process.env.TEST_HOOK_STDOUT = 'configured-report-output';
-  process.stdout.write = function (chunk, encoding, callback) {
-    const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, typeof encoding === 'string' ? encoding : undefined);
+  process.stdout.write = function (
+    chunk: string | Uint8Array,
+    encoding?: BufferEncoding | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void,
+  ): boolean {
+    const value = typeof chunk === 'string'
+      ? Buffer.from(chunk, typeof encoding === 'string' ? encoding : undefined)
+      : Buffer.from(chunk);
     if (value.includes('configured-report-output') || value.includes('chalk-docker-post-push-result/v1')) {
       writes.push(value);
       if (typeof encoding === 'function') encoding();
       else if (typeof callback === 'function') callback();
       return true;
     }
-    return originalWrite.apply(this, arguments);
+    return typeof encoding === 'string'
+      ? originalWrite(chunk, encoding, callback)
+      : originalWrite(chunk, encoding);
   };
   try {
     try {
@@ -261,7 +303,7 @@ test('configured stdout reports are forwarded while the internal result is consu
       process.stdout.write = originalWrite;
     }
     assert.equal(Buffer.concat(writes).toString('utf8'), 'configured-report-output\n');
-    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"status":"complete"/);
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'), /"status":"complete"/);
   } finally {
     process.stdout.write = originalWrite;
     restore();
@@ -295,7 +337,7 @@ test('unsupported, custom-socket, and failed pushes never invoke the post-hook',
     assert.equal(customSocket.calls, 1);
     assert.equal(failing.calls, 1);
     assert.match(
-      fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'),
+      fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'),
       /"code":"unsupported_daemon".*"socketPath":"\/tmp\/other-docker\.sock"/,
     );
   } finally {
@@ -332,7 +374,7 @@ test('all guarded option and runtime shapes skip instrumentation fail-open', asy
       assert.equal(image.calls, 1);
     }
     assert.equal(fs.existsSync(fx.payloads), false);
-    const diagnostics = fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8');
+    const diagnostics = fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8');
     assert.match(diagnostics, /"code":"unsupported_dockerode"/);
     assert.match(diagnostics, /"code":"unsupported_platform_option"/);
     assert.match(diagnostics, /"code":"unsupported_auth_shape"/);
@@ -346,38 +388,36 @@ test('synchronous throws and stream failures preserve the original failure and s
   const restore = environment(fx);
   try {
     const syncError = new Error('synchronous engine failure');
-    function ThrowingImage(modemValue, name) {
-      this.modem = modemValue;
-      this.name = name;
-      this.calls = 0;
+    class ThrowingImage {
+      calls = 0;
+      constructor(public modem: TestModem, public name: string) {}
+      push(_options?: TestPushOptions): never {
+        this.calls += 1;
+        throw syncError;
+      }
     }
-    ThrowingImage.prototype.push = function () {
-      this.calls += 1;
-      throw syncError;
-    };
     patchImage(ThrowingImage, { version: '5.0.1' });
     const throwing = new ThrowingImage(modem(), 'team/app');
-    assert.throws(() => throwing.push({ tag: 'one' }), (error) => error === syncError);
+    assert.throws(() => throwing.push({ tag: 'one' }), (error: unknown) => error === syncError);
     assert.equal(throwing.calls, 1);
 
     const streamError = new Error('response stream failed');
-    function StreamingImage(modemValue, name) {
-      this.modem = modemValue;
-      this.name = name;
-      this.calls = 0;
+    class StreamingImage {
+      calls = 0;
+      constructor(public modem: TestModem, public name: string) {}
+      push(_options?: TestPushOptions): Promise<Readable> {
+        this.calls += 1;
+        const source = new Readable({ read() {} });
+        process.nextTick(() => {
+          source.push(BODY);
+          source.destroy(streamError);
+        });
+        return Promise.resolve(source);
+      }
     }
-    StreamingImage.prototype.push = function () {
-      this.calls += 1;
-      const source = new Readable({ read() {} });
-      process.nextTick(() => {
-        source.push(BODY);
-        source.destroy(streamError);
-      });
-      return Promise.resolve(source);
-    };
     patchImage(StreamingImage, { version: '5.0.1' });
     const streaming = new StreamingImage(modem(), 'team/app');
-    let observed;
+    let observed: unknown;
     try {
       for await (const _chunk of await streaming.push({ tag: 'one' })) {
         // Consume until the original stream error is delivered.
@@ -402,11 +442,11 @@ test('post-hook spawn failure is diagnostic-only', async () => {
     const Image = imageClass();
     patchImage(Image, { version: '5.0.1' });
     const image = new Image(modem(), 'team/app');
-    const chunks = [];
+    const chunks: Buffer[] = [];
     for await (const chunk of await image.push({ tag: 'one' })) chunks.push(chunk);
     assert.deepEqual(Buffer.concat(chunks), BODY);
     assert.equal(image.calls, 1);
-    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"posthook_spawn_failed"/);
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'), /"code":"posthook_spawn_failed"/);
   } finally {
     restore();
   }
@@ -424,7 +464,7 @@ test('instrumentation exceptions are fail-open for buffered promises', async () 
     });
     assert.equal(await image.push({ tag: 'one', stream: false }), BODY);
     assert.equal(image.calls, 1);
-    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"instrumentation_exception"/);
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'), /"code":"instrumentation_exception"/);
   } finally {
     restore();
   }
@@ -433,25 +473,24 @@ test('instrumentation exceptions are fail-open for buffered promises', async () 
 test('destroying the proxy aborts the Engine stream and skips post-push', async () => {
   const fx = fixture();
   const restore = environment(fx);
-  let source;
+  let source: Readable | undefined;
   try {
-    function StreamingImage(modemValue, name) {
-      this.modem = modemValue;
-      this.name = name;
-      this.calls = 0;
+    class StreamingImage {
+      calls = 0;
+      constructor(public modem: TestModem, public name: string) {}
+      push(_options?: TestPushOptions): Promise<Readable> {
+        this.calls += 1;
+        source = new Readable({ read() {} });
+        return Promise.resolve(source);
+      }
     }
-    StreamingImage.prototype.push = function () {
-      this.calls += 1;
-      source = new Readable({ read() {} });
-      return Promise.resolve(source);
-    };
     patchImage(StreamingImage, { version: '5.0.1' });
     const image = new StreamingImage(modem(), 'team/app');
     const stream = await image.push({ tag: 'one' });
     const closed = new Promise((resolve) => stream.once('close', resolve));
     stream.destroy();
     await closed;
-    assert.equal(source.destroyed, true);
+    assert.equal(source?.destroyed, true);
     assert.equal(image.calls, 1);
     await new Promise((resolve) => setTimeout(resolve, 25));
     assert.equal(fs.existsSync(fx.payloads), false);
@@ -471,13 +510,13 @@ test('post-hook deadline delays only to the deadline and preserves stream succes
     const image = new Image(modem(), 'team/app');
     const start = Date.now();
     const stream = await image.push({ tag: 'one' });
-    const chunks = [];
+    const chunks: Buffer[] = [];
     for await (const chunk of stream) chunks.push(chunk);
     const elapsed = Date.now() - start;
     assert.deepEqual(Buffer.concat(chunks), BODY);
     assert.ok(elapsed >= 40 && elapsed < 700, `unexpected timeout completion: ${elapsed}ms`);
-    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"posthook_timeout"/);
-    assert.equal(fs.statSync(process.env.CHALK_DOCKERODE_LOG).mode & 0o777, 0o600);
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'), /"code":"posthook_timeout"/);
+    assert.equal(fs.statSync(process.env.CHALK_DOCKERODE_LOG!).mode & 0o777, 0o600);
   } finally {
     restore();
   }
@@ -494,10 +533,10 @@ test('post-hook timeout terminates its process group, including descendants', as
     const Image = imageClass();
     patchImage(Image, { version: '5.0.1' });
     const image = new Image(modem(), 'team/app');
-    const chunks = [];
+    const chunks: Buffer[] = [];
     for await (const chunk of await image.push({ tag: 'one' })) chunks.push(chunk);
     assert.deepEqual(Buffer.concat(chunks), BODY);
-    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG, 'utf8'), /"code":"posthook_timeout"/);
+    assert.match(fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'), /"code":"posthook_timeout"/);
     assert.equal(fs.existsSync(descendantPid), true);
     const pid = Number(fs.readFileSync(descendantPid, 'utf8'));
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -510,8 +549,8 @@ test('post-hook timeout terminates its process group, including descendants', as
 test('callback error is the original object and does not invoke the post-hook', async () => {
   const fx = fixture();
   const restore = environment(fx);
-  let unhandled;
-  const observeUnhandled = (error) => { unhandled = error; };
+  let unhandled: unknown;
+  const observeUnhandled = (error: unknown): void => { unhandled = error; };
   process.on('unhandledRejection', observeUnhandled);
   try {
     const Image = imageClass({ fail: true });
@@ -520,8 +559,8 @@ test('callback error is the original object and does not invoke the post-hook', 
     Object.defineProperty(image, 'name', {
       get() { throw new Error('unused instrumentation failure'); },
     });
-    const error = await new Promise((resolve) => {
-      image.push({ tag: 'one' }, (found) => resolve(found));
+    const error = await new Promise<Error>((resolve) => {
+      image.push({ tag: 'one' }, (found: Error | null) => resolve(found!));
     });
     assert.equal(error.message, 'engine push failed');
     await new Promise((resolve) => setTimeout(resolve, 25));

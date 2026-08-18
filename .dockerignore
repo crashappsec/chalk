@@ -5,6 +5,7 @@ chalk
 chalk.bck
 chalk-reports.jsonl
 chalk-tmp
+build
 dist
 docker
 docker-compose*
@@ -12,3 +13,4 @@ server
 tests
 nimble.develop
 nimble.paths
+node_modules

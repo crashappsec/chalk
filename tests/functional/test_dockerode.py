@@ -46,6 +46,14 @@ match = re.search(r'--require="([^"]+)"', os.environ['NODE_OPTIONS'])
 assert match
 register = Path(match.group(1))
 loader = register.parent
+requires = sorted({
+    specifier
+    for loader_file in loader.iterdir()
+    for specifier in re.findall(
+        r'''require\s*\(\s*["']([^"']+)["']\s*\)''',
+        loader_file.read_text(),
+    )
+})
 state = {
     'timeout': os.environ['CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS'],
     'chalk': os.environ['CHALK_DOCKERODE_CHALK'],
@@ -54,6 +62,7 @@ state = {
     'dir_mode': stat.S_IMODE(loader.stat().st_mode),
     'register_mode': stat.S_IMODE(register.stat().st_mode),
     'file_count': len(list(loader.iterdir())),
+    'requires': requires,
     'forwarded': sys.argv[1],
 }
 Path(sys.argv[2]).write_text(json.dumps(state))
@@ -83,6 +92,19 @@ raise SystemExit(7)
     assert values["dir_mode"] == 0o700
     assert values["register_mode"] == 0o600
     assert values["file_count"] == 4
+    assert values["requires"] == [
+        "./node_support.cjs",
+        "./register_impl.cjs",
+        "./runtime.cjs",
+        "node:child_process",
+        "node:crypto",
+        "node:fs",
+        "node:module",
+        "node:os",
+        "node:path",
+        "node:stream",
+        "node:url",
+    ]
     assert values["forwarded"] == "argument with spaces"
     assert not loader.exists()
 

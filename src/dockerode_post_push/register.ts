@@ -1,4 +1,4 @@
-'use strict';
+declare function require(id: string): unknown;
 
 // Loaded with --require in every Node process in the wrapped command tree.
 // Keep this bootstrap syntax deliberately old and make loading completely

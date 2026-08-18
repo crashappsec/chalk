@@ -7,7 +7,12 @@ on:
     paths:
       - src/**
       - tests/unit/**
+      - .dockerignore
       - config.nims
+      - Makefile
+      - package.json
+      - package-lock.json
+      - "tsconfig*.json"
       - "*.nimble"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
@@ -16,7 +21,12 @@ on:
     paths:
       - src/**
       - tests/unit/**
+      - .dockerignore
       - config.nims
+      - Makefile
+      - package.json
+      - package-lock.json
+      - "tsconfig*.json"
       - "*.nimble"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
@@ -128,3 +138,27 @@ jobs:
 
       - name: Run Node unit tests
         run: make node-unit-tests
+
+  typescript-build:
+    name: "typescript-build"
+    runs-on: ubuntu-22.04
+
+    concurrency:
+      group: ${{ github.workflow }}-typescript-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Verify strict types and deterministic output
+        run: make typecheck verify-transpile
+
+      - name: Verify emitted bootstrap on Node 12
+        run: make node12-bootstrap-test

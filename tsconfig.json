@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./build/.tsbuildinfo"
+  },
+  "include": [
+    "src/dockerode_post_push/node_support.cts",
+    "src/dockerode_post_push/register_impl.cts",
+    "src/dockerode_post_push/runtime.cts",
+    "tests/unit/dockerode_post_push/*.cts"
+  ]
+}

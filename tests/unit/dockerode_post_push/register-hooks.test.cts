@@ -1,11 +1,9 @@
-'use strict';
-
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const test = require('node:test');
+import assert = require('node:assert/strict');
+import fs = require('node:fs');
+import os = require('node:os');
+import path = require('node:path');
+import { spawnSync } from 'node:child_process';
+import test = require('node:test');
 
 test('registerHooks patches every resolved dockerode 5.x copy, not the shim dependency tree', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-hooks-'));

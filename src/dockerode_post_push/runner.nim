@@ -20,11 +20,14 @@ import ../utils/[
   subproc,
 ]
 
+when getEnv("CHALK_TYPESCRIPT_BUILT") != "1":
+  {.fatal: "Dockerode TypeScript artifacts are unavailable or stale; run `make` (or `make transpile`) instead of `nimble build`.".}
+
 const
-  dockerodeRegisterSource     = staticRead("register.cjs")
-  dockerodeRegisterImplSource = staticRead("register_impl.cjs")
-  dockerodeRuntimeSource      = staticRead("runtime.cjs")
-  dockerodeNodeSupportSource  = staticRead("node_support.cjs")
+  dockerodeRegisterSource     = staticRead("../../build/src/dockerode_post_push/register.cjs")
+  dockerodeRegisterImplSource = staticRead("../../build/src/dockerode_post_push/register_impl.cjs")
+  dockerodeRuntimeSource      = staticRead("../../build/src/dockerode_post_push/runtime.cjs")
+  dockerodeNodeSupportSource  = staticRead("../../build/src/dockerode_post_push/node_support.cjs")
   dockerodePostPushDefaultTimeoutMs* = 5 * 60 * 1000
 
 proc runDockerodeCommand*(command: string,

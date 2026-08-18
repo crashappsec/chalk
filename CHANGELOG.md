@@ -33,6 +33,10 @@
   override, and the default rootful or user Docker socket; backgrounded or
   daemonized descendants are unsupported. The wrapper supplies a five-minute
   post-processing deadline by default and rejects longer deadlines.
+  Its embedded Node loader is authored and strictly checked in TypeScript at
+  build time; the minimal fail-open preload bootstrap is compiled separately
+  to ES5 so unsupported legacy Node processes can still parse it safely. The
+  resulting Chalk binary and instrumented application have no npm dependency.
 
 - New GitLab CI collapsible log section sink. When chalk runs inside a GitLab
   CI job (`GITLAB_CI` is set), the chalk report is automatically wrapped in

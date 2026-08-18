@@ -1,26 +1,35 @@
-'use strict';
-
 // registerHooks is synchronous, so it applies to both subsequent require()
 // and import() calls without racing application startup.
-const fs = require('node:fs');
-const path = require('node:path');
-const { fileURLToPath } = require('node:url');
-const { registerHooks } = require('node:module');
-const runtime = require('./runtime.cjs');
-const { classifyNodeSupport, diagnosticForNodeSupport } = require('./node_support.cjs');
+import fs = require('node:fs');
+import path = require('node:path');
+import { fileURLToPath } from 'node:url';
+import { registerHooks } from 'node:module';
+import type { LoadHookSync } from 'node:module';
+const runtime = require('./runtime.cjs') as typeof import('./runtime.cjs');
+const { classifyNodeSupport, diagnosticForNodeSupport } = require('./node_support.cjs') as typeof import('./node_support.cjs');
+
+interface DockerodePackage {
+  root: string;
+  version: string;
+}
+
+interface PackageManifest {
+  name?: unknown;
+  version?: unknown;
+}
 
 const PATCH_SYMBOL = Symbol.for('chalk.dockerode.postPush.patch.v1');
-globalThis[PATCH_SYMBOL] = runtime.patchImage;
+(globalThis as typeof globalThis & Record<symbol, unknown>)[PATCH_SYMBOL] = runtime.patchImage;
 
-const packageCache = new Map();
+const packageCache = new Map<string, DockerodePackage>();
 
-function dockerodePackageFor(filename) {
+function dockerodePackageFor(filename: string): DockerodePackage | null {
   let dir = path.dirname(filename);
   while (dir !== path.dirname(dir)) {
-    if (packageCache.has(dir)) return packageCache.get(dir);
+    if (packageCache.has(dir)) return packageCache.get(dir)!;
     const manifest = path.join(dir, 'package.json');
     try {
-      const parsed = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+      const parsed = JSON.parse(fs.readFileSync(manifest, 'utf8')) as PackageManifest;
       if (parsed.name === 'dockerode') {
         const found = { root: dir, version: String(parsed.version || '') };
         packageCache.set(dir, found);
@@ -38,7 +47,7 @@ const nodeSupport = classifyNodeSupport(process.versions.node, registerHooks);
 const nodeSupportDiagnostic = diagnosticForNodeSupport(nodeSupport);
 if (nodeSupportDiagnostic) process.stderr.write(`${nodeSupportDiagnostic}\n`);
 if (nodeSupport.enabled) registerHooks({
-  load(url, context, nextLoad) {
+  load(url: string, context: Parameters<LoadHookSync>[1], nextLoad: Parameters<LoadHookSync>[2]) {
     const loaded = nextLoad(url, context);
     try {
       if (process.env.CHALK_DOCKERODE_HOOK_DEBUG) {

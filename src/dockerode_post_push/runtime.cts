@@ -1,11 +1,121 @@
-'use strict';
+import fs = require('node:fs');
+import os = require('node:os');
+import path = require('node:path');
+import { spawn } from 'node:child_process';
+import { PassThrough } from 'node:stream';
+import { randomUUID } from 'node:crypto';
+import type Dockerode = require('dockerode');
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { Readable } from 'node:stream';
 
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { spawn } = require('node:child_process');
-const { PassThrough } = require('node:stream');
-const { randomUUID } = require('node:crypto');
+type DiagnosticFields = Record<string, unknown>;
+type DiagnosticCode =
+  | 'instrumentation_exception'
+  | 'missing_terminal_digest'
+  | 'posthook_complete'
+  | 'posthook_exception'
+  | 'posthook_failed'
+  | 'posthook_spawn_failed'
+  | 'posthook_timeout'
+  | 'socket_resolution_failed'
+  | 'terminal_frame_too_large'
+  | 'unsupported_auth_shape'
+  | 'unsupported_daemon'
+  | 'unsupported_dockerode'
+  | 'unsupported_invalid_deadline'
+  | 'unsupported_missing_explicit_tag'
+  | 'unsupported_modem'
+  | 'unsupported_no_deadline'
+  | 'unsupported_platform'
+  | 'unsupported_platform_option';
+
+interface DiagnosticRecord extends DiagnosticFields {
+  schema: 'chalk-dockerode-diagnostic/v1';
+  time: string;
+  code: DiagnosticCode;
+}
+
+interface PushOptions {
+  tag?: unknown;
+  platform?: unknown;
+  authconfig?: unknown;
+  stream?: unknown;
+  [key: string]: unknown;
+}
+
+interface DockerodeImageLike {
+  modem?: { getSocketPath?: () => Promise<string> | string };
+  name?: unknown;
+}
+
+interface OperationMetadata {
+  packageRoot?: string;
+  version?: string;
+}
+
+interface SupportedOperation {
+  supported: true;
+  socketPath: string;
+  repository: string;
+  tag: string;
+  authconfig: Dockerode.AuthConfig | undefined;
+  timeoutMs: number;
+}
+
+interface UnsupportedOperation {
+  supported: false;
+  code: DiagnosticCode;
+  socketPath?: string;
+  message?: string;
+}
+
+type Operation = SupportedOperation | UnsupportedOperation;
+type Deadline = { supported: true; timeoutMs: number } | UnsupportedOperation;
+
+interface TerminalFrame {
+  aux?: { Digest?: unknown };
+  status?: unknown;
+  error?: unknown;
+  errorDetail?: unknown;
+}
+
+interface TerminalResult {
+  digest: string | null;
+  error: boolean;
+  overflow: boolean;
+}
+
+interface TerminalTracker {
+  write(value: Buffer | string): void;
+  finish(): TerminalResult;
+}
+
+interface PostPushPayload {
+  schema: 'chalk-docker-post-push/v1';
+  operationId: string;
+  repository: string;
+  tag: string;
+  digest: string;
+  socketPath: string;
+  authconfig: Dockerode.AuthConfig | undefined;
+}
+
+interface PostPushResult {
+  schema: 'chalk-docker-post-push-result/v1';
+  operationId: string;
+  status: string;
+}
+
+type PushResult = NodeJS.ReadableStream | Buffer | string | object;
+type PushCallback = (error: Error | null, value?: PushResult) => void;
+type PushArguments =
+  | [options?: Dockerode.ImagePushOptions]
+  | [options: Dockerode.ImagePushOptions, callback: PushCallback, auth?: Dockerode.AuthConfig]
+  | [callback: PushCallback, auth?: Dockerode.AuthConfig];
+type PushFunction = (this: DockerodeImageLike, ...args: PushArguments) => Promise<PushResult> | void;
+interface ImageConstructor {
+  prototype: DockerodeImageLike & { push: PushFunction };
+}
 
 const PATCHED = Symbol.for('chalk.dockerode.postPush.patched.v1');
 const DEFAULT_SOCKETS = new Set([
@@ -17,8 +127,8 @@ const MAX_POST_PUSH_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_POST_PUSH_STDOUT_LINE_BYTES = 64 * 1024;
 const POST_PUSH_KILL_GRACE_MS = 1000;
 
-function diagnostic(code, fields = {}) {
-  const record = {
+function diagnostic(code: DiagnosticCode, fields: DiagnosticFields = {}): void {
+  const record: DiagnosticRecord = {
     schema: 'chalk-dockerode-diagnostic/v1',
     time: new Date().toISOString(),
     code,
@@ -41,7 +151,7 @@ function diagnostic(code, fields = {}) {
   }
 }
 
-function repositoryWithoutTag(name) {
+function repositoryWithoutTag(name: string): string {
   const digestAt = name.indexOf('@');
   const withoutDigest = digestAt === -1 ? name : name.slice(0, digestAt);
   const slash = withoutDigest.lastIndexOf('/');
@@ -49,7 +159,11 @@ function repositoryWithoutTag(name) {
   return colon > slash ? withoutDigest.slice(0, colon) : withoutDigest;
 }
 
-async function supportedOperation(image, opts, meta) {
+async function supportedOperation(
+  image: DockerodeImageLike,
+  opts: PushOptions,
+  meta?: OperationMetadata,
+): Promise<Operation> {
   if (process.platform !== 'linux' && process.env.CHALK_DOCKERODE_TEST_PLATFORM !== 'linux') {
     return { supported: false, code: 'unsupported_platform' };
   }
@@ -67,7 +181,7 @@ async function supportedOperation(image, opts, meta) {
   if (!image.modem || typeof image.modem.getSocketPath !== 'function') {
     return { supported: false, code: 'unsupported_modem' };
   }
-  let socketPath;
+  let socketPath: string;
   try {
     socketPath = await image.modem.getSocketPath();
   } catch (_) {
@@ -78,10 +192,15 @@ async function supportedOperation(image, opts, meta) {
   }
 
   const auth = opts.authconfig;
+  const authFields = auth as {
+    username?: unknown;
+    password?: unknown;
+    serveraddress?: unknown;
+  };
   if (auth !== undefined && (
-    !auth || typeof auth.username !== 'string' || typeof auth.password !== 'string' ||
-    typeof auth.serveraddress !== 'string' || auth.username.length === 0 ||
-    auth.password.length === 0 || auth.serveraddress.length === 0
+    !auth || typeof authFields.username !== 'string' || typeof authFields.password !== 'string' ||
+    typeof authFields.serveraddress !== 'string' || authFields.username.length === 0 ||
+    authFields.password.length === 0 || authFields.serveraddress.length === 0
   )) {
     return { supported: false, code: 'unsupported_auth_shape' };
   }
@@ -91,24 +210,24 @@ async function supportedOperation(image, opts, meta) {
     socketPath,
     repository: repositoryWithoutTag(String(image.name)),
     tag: opts.tag,
-    authconfig: auth,
+    authconfig: auth as Dockerode.AuthConfig | undefined,
     timeoutMs: deadline.timeoutMs,
   };
 }
 
-function inspectTerminalFrame(raw) {
+function inspectTerminalFrame(raw: Buffer): Omit<TerminalResult, 'overflow'> {
   const line = raw.toString('utf8').replace(/\r$/, '');
   if (!line.trim()) return { digest: null, error: false };
   try {
-    const frame = JSON.parse(line);
-    let digest = null;
+    const frame = JSON.parse(line) as TerminalFrame;
+    let digest: string | null = null;
     const candidate = frame && frame.aux && frame.aux.Digest;
     if (typeof candidate === 'string' && /^sha256:[0-9a-f]{64}$/.test(candidate)) {
       digest = candidate;
     }
     if (typeof frame.status === 'string') {
       const match = frame.status.match(/digest:\s*(sha256:[0-9a-f]{64})(?:\s|$)/);
-      if (match) digest = match[1];
+      if (match) digest = match[1]!;
     }
     return {
       digest,
@@ -116,24 +235,24 @@ function inspectTerminalFrame(raw) {
     };
   } catch (_) {
     const match = line.match(/digest:\s*(sha256:[0-9a-f]{64})(?:\s|$)/);
-    return { digest: match ? match[1] : null, error: false };
+    return { digest: match ? match[1]! : null, error: false };
   }
 }
 
-function createTerminalTracker() {
-  let pending = Buffer.alloc(0);
+function createTerminalTracker(): TerminalTracker {
+  let pending: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   let discardUntilNewline = false;
   let invalid = false;
   let sawError = false;
-  let lastDigest = null;
+  let lastDigest: string | null = null;
 
-  function observe(frame) {
+  function observe(frame: Buffer): void {
     const found = inspectTerminalFrame(frame);
     if (found.error) sawError = true;
     if (found.digest) lastDigest = found.digest;
   }
 
-  function write(value) {
+  function write(value: Buffer | string): void {
     let chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
     if (discardUntilNewline) {
       const newline = chunk.indexOf(0x0a);
@@ -143,7 +262,7 @@ function createTerminalTracker() {
     }
     if (chunk.length === 0) return;
 
-    let combined = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
+    const combined = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
     let start = 0;
     for (;;) {
       const newline = combined.indexOf(0x0a, start);
@@ -159,7 +278,7 @@ function createTerminalTracker() {
     }
   }
 
-  function finish() {
+  function finish(): TerminalResult {
     if (pending.length > 0 && !discardUntilNewline) observe(pending);
     return {
       digest: invalid || sawError ? null : lastDigest,
@@ -171,14 +290,14 @@ function createTerminalTracker() {
   return { write, finish };
 }
 
-function terminalDigest(data) {
+function terminalDigest(data: unknown): string | null {
   if (data === undefined || data === null) return null;
   const tracker = createTerminalTracker();
   tracker.write(Buffer.isBuffer(data) || typeof data === 'string' ? data : JSON.stringify(data));
   return tracker.finish().digest;
 }
 
-function postPushDeadline() {
+function postPushDeadline(): Deadline {
   const raw = process.env.CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS;
   if (raw === undefined) return { supported: false, code: 'unsupported_no_deadline' };
   const parsed = Number(raw);
@@ -188,7 +307,11 @@ function postPushDeadline() {
   return { supported: true, timeoutMs: parsed };
 }
 
-function signalPostHook(child, signal, detached) {
+function signalPostHook(
+  child: ChildProcessWithoutNullStreams,
+  signal: NodeJS.Signals,
+  detached: boolean,
+): void {
   try {
     if (detached && child.pid) process.kill(-child.pid, signal);
     else child.kill(signal);
@@ -197,9 +320,9 @@ function signalPostHook(child, signal, detached) {
   }
 }
 
-function invokePostPush(operation, digest) {
+function invokePostPush(operation: SupportedOperation, digest: string): Promise<void> {
   const chalk = process.env.CHALK_DOCKERODE_CHALK || 'chalk';
-  const payload = {
+  const payload: PostPushPayload = {
     schema: 'chalk-docker-post-push/v1',
     operationId: randomUUID(),
     repository: operation.repository,
@@ -209,13 +332,13 @@ function invokePostPush(operation, digest) {
     authconfig: operation.authconfig,
   };
 
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     let settled = false;
     let timedOut = false;
     let stderrObserved = false;
-    let postHookStatus = null;
-    let stdoutPending = Buffer.alloc(0);
-    let killTimer = null;
+    let postHookStatus: string | null = null;
+    let stdoutPending: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let killTimer: NodeJS.Timeout | null = null;
     const detached = process.platform !== 'win32';
     const chalkArgs = process.env.CHALK_DOCKERODE_NO_EXTERNAL_CONFIG === '1'
       ? ['--no-use-external-config', '__', 'docker_post_push']
@@ -225,16 +348,16 @@ function invokePostPush(operation, digest) {
       env: process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    const forwardStdout = (value) => {
+    const forwardStdout = (value: Buffer): void => {
       try {
         process.stdout.write(value);
       } catch (_) {
         // A report sink must not change the original push result.
       }
     };
-    const handleStdoutLine = (line) => {
+    const handleStdoutLine = (line: Buffer): void => {
       try {
-        const parsed = JSON.parse(line.toString('utf8').trim());
+        const parsed = JSON.parse(line.toString('utf8').trim()) as Partial<PostPushResult>;
         if (parsed && parsed.schema === 'chalk-docker-post-push-result/v1' &&
             parsed.operationId === payload.operationId && typeof parsed.status === 'string') {
           postHookStatus = parsed.status;
@@ -245,8 +368,8 @@ function invokePostPush(operation, digest) {
       }
       forwardStdout(line);
     };
-    const consumeStdout = (chunk) => {
-      let combined = stdoutPending.length === 0 ? chunk : Buffer.concat([stdoutPending, chunk]);
+    const consumeStdout = (chunk: Buffer): void => {
+      const combined = stdoutPending.length === 0 ? chunk : Buffer.concat([stdoutPending, chunk]);
       let start = 0;
       for (;;) {
         const newline = combined.indexOf(0x0a, start);
@@ -260,13 +383,13 @@ function invokePostPush(operation, digest) {
         stdoutPending = Buffer.alloc(0);
       }
     };
-    const flushStdout = () => {
+    const flushStdout = (): void => {
       if (stdoutPending.length > 0) {
         handleStdoutLine(stdoutPending);
         stdoutPending = Buffer.alloc(0);
       }
     };
-    const settle = () => {
+    const settle = (): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -287,16 +410,16 @@ function invokePostPush(operation, digest) {
       }, POST_PUSH_KILL_GRACE_MS);
     }, operation.timeoutMs);
 
-    child.stderr.on('data', (chunk) => {
+    child.stderr.on('data', (chunk: Buffer) => {
       stderrObserved = stderrObserved || chunk.length > 0;
     });
     child.stdout.on('data', consumeStdout);
-    child.on('error', (error) => {
+    child.on('error', (error: Error) => {
       if (settled) return;
       diagnostic('posthook_spawn_failed', { operationId: payload.operationId, message: error.message });
       settle();
     });
-    child.on('close', (code, signal) => {
+    child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
       if (settled) return;
       flushStdout();
       if (timedOut) {
@@ -323,7 +446,7 @@ function invokePostPush(operation, digest) {
   });
 }
 
-async function finishBuffered(value, operationPromise) {
+async function finishBuffered<T>(value: T, operationPromise: Promise<Operation>): Promise<T> {
   try {
     const operation = await operationPromise;
     if (!operation.supported) {
@@ -339,18 +462,18 @@ async function finishBuffered(value, operationPromise) {
     }
     await invokePostPush(operation, terminal.digest);
   } catch (error) {
-    diagnostic('posthook_exception', { message: error.message });
+    diagnostic('posthook_exception', { message: error instanceof Error ? error.message : String(error) });
   }
   return value;
 }
 
-function finishStream(source, operationPromise) {
+function finishStream(source: Readable, operationPromise: Promise<Operation>): Readable {
   const tracker = createTerminalTracker();
   let ended = false;
   let sourceFailed = false;
   let cancelled = false;
   const proxy = new PassThrough({
-    destroy(error, callback) {
+    destroy(error: Error | null, callback: (error?: Error | null) => void) {
       if (!ended && !sourceFailed) {
         cancelled = true;
         source.destroy(error || undefined);
@@ -359,10 +482,10 @@ function finishStream(source, operationPromise) {
     },
   });
 
-  source.on('data', (chunk) => {
+  source.on('data', (chunk: Buffer | string) => {
     tracker.write(chunk);
   });
-  source.once('error', (error) => {
+  source.once('error', (error: Error) => {
     sourceFailed = true;
     ended = true;
     proxy.destroy(error);
@@ -383,7 +506,7 @@ function finishStream(source, operationPromise) {
       ended = true;
       proxy.end();
     } catch (error) {
-      diagnostic('posthook_exception', { message: error.message });
+      diagnostic('posthook_exception', { message: error instanceof Error ? error.message : String(error) });
       ended = true;
       proxy.end();
     }
@@ -391,41 +514,50 @@ function finishStream(source, operationPromise) {
   return proxy;
 }
 
-function patchImage(Image, meta) {
-  if (!Image || !Image.prototype || typeof Image.prototype.push !== 'function') return;
-  if (Image.prototype.push[PATCHED]) return;
+function patchImage(Image: unknown, meta?: OperationMetadata): void {
+  if (typeof Image !== 'function' || !('prototype' in Image)) return;
+  const imageConstructor = Image as ImageConstructor;
+  if (!imageConstructor.prototype || typeof imageConstructor.prototype.push !== 'function') return;
+  if ((imageConstructor.prototype.push as PushFunction & Record<symbol, unknown>)[PATCHED]) return;
 
-  const original = Image.prototype.push;
-  function chalkPostPush(opts, callback, auth) {
-    const rawArgs = arguments;
+  const original = imageConstructor.prototype.push;
+  function chalkPostPush(
+    this: DockerodeImageLike,
+    opts?: Dockerode.ImagePushOptions | PushCallback,
+    callback?: PushCallback | Dockerode.AuthConfig,
+    auth?: Dockerode.AuthConfig,
+  ): Promise<PushResult> | void {
+    const rawArgs = Array.from(arguments) as PushArguments;
     const normalizedOpts = typeof opts === 'function' ? {} : (opts || {});
-    const callbackFn = typeof opts === 'function' ? opts : callback;
-    const operationOpts = { ...normalizedOpts };
-    operationOpts.authconfig = normalizedOpts.authconfig || auth;
+    const callbackFn = typeof opts === 'function' ? opts : callback as PushCallback | undefined;
+    const operationOpts: PushOptions = { ...normalizedOpts };
+    operationOpts.authconfig = normalizedOpts.authconfig ||
+      (typeof callback === 'function' ? auth : callback);
     // Attach a rejection handler immediately. The original push can fail before
     // callback/stream paths ever consume this classification promise, and an
     // instrumentation-only rejection must never become unhandled process state.
-    const operationPromise = supportedOperation(this, operationOpts, meta).catch((error) => ({
+    const operationPromise: Promise<Operation> = supportedOperation(this, operationOpts, meta).catch((error): UnsupportedOperation => ({
       supported: false,
       code: 'instrumentation_exception',
-      message: error && error.message ? error.message : String(error),
+      message: error instanceof Error ? error.message : String(error),
     }));
 
     if (callbackFn === undefined) {
-      let result;
+      let result: Promise<PushResult> | void;
       try {
         result = original.apply(this, rawArgs);
       } catch (error) {
         throw error;
       }
-      return result.then((value) => {
+      if (!result || typeof result.then !== 'function') return result;
+      return result.then((value: PushResult) => {
         if (normalizedOpts.stream === false) return finishBuffered(value, operationPromise);
-        return finishStream(value, operationPromise);
+        return finishStream(value as Readable, operationPromise);
       });
     }
 
     const self = this;
-    const replacement = function (error, value) {
+    const replacement: PushCallback = function (error, value) {
       if (error) return callbackFn(error, value);
       if (normalizedOpts.stream === false) {
         finishBuffered(value, operationPromise).then(
@@ -433,20 +565,20 @@ function patchImage(Image, meta) {
           () => callbackFn(null, value),
         );
       } else {
-        callbackFn(null, finishStream(value, operationPromise));
+        callbackFn(null, finishStream(value as Readable, operationPromise));
       }
     };
-    const args = Array.from(rawArgs);
+    const args = Array.from(rawArgs) as PushArguments;
     if (typeof opts === 'function') args[0] = replacement;
     else args[1] = replacement;
     return original.apply(self, args);
   }
   Object.defineProperty(chalkPostPush, PATCHED, { value: true });
   Object.defineProperty(chalkPostPush, 'name', { value: 'push' });
-  Image.prototype.push = chalkPostPush;
+  imageConstructor.prototype.push = chalkPostPush;
 }
 
-module.exports = {
+export {
   createTerminalTracker,
   patchImage,
   postPushDeadline,

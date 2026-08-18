@@ -1,31 +1,50 @@
-'use strict';
-
 // Keep this policy aligned with the official Node.js release schedule.
 // Last reviewed: 2026-08-11.
 const NODE_RELEASE_SCHEDULE_URL = 'https://github.com/nodejs/Release#release-schedule';
 const NODE_SUPPORT_LAST_REVIEWED = '2026-08-11';
 
-function disabled(version, code, reason) {
+type NodeSupportMode = 'disabled' | 'supported' | 'best_effort';
+type NodeSupportCode =
+  | 'below_minimum'
+  | 'best_effort'
+  | 'eol_release'
+  | 'invalid_version'
+  | 'missing_capability'
+  | 'non_lts_release'
+  | 'prerelease'
+  | 'supported';
+
+interface NodeSupport {
+  enabled: boolean;
+  mode: NodeSupportMode;
+  version: string;
+  code: NodeSupportCode;
+  reason?: string;
+}
+
+type RegisterHooksCapability = unknown;
+
+function disabled(version: string, code: NodeSupportCode, reason: string): NodeSupport {
   return { enabled: false, mode: 'disabled', version, code, reason };
 }
 
-function classifyNodeSupport(version, registerHooks) {
+function classifyNodeSupport(version: unknown, registerHooks: RegisterHooksCapability): NodeSupport {
   const normalized = String(version || '');
   const match = /^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(normalized);
   if (!match) {
     return disabled(normalized, 'invalid_version', 'the Node version is invalid');
   }
 
-  const major = Number(match[1]);
-  const minor = Number(match[2]);
-  const patch = Number(match[3]);
+  const major = Number(match[1]!);
+  const minor = Number(match[2]!);
+  const patch = Number(match[3]!);
   if (![major, minor, patch].every(Number.isSafeInteger)) {
     return disabled(normalized, 'invalid_version', 'the Node version is invalid');
   }
   if (match[4]) {
     return disabled(normalized, 'prerelease', 'prerelease builds are not supported');
   }
-  let mode;
+  let mode: 'supported' | 'best_effort';
 
   if (major <= 21 || major === 23 || major === 25) {
     return disabled(normalized, 'eol_release', `Node ${major} is excluded because it is end-of-life`);
@@ -48,7 +67,7 @@ function classifyNodeSupport(version, registerHooks) {
   return { enabled: true, mode, version: normalized, code: mode };
 }
 
-function diagnosticForNodeSupport(classification) {
+function diagnosticForNodeSupport(classification: NodeSupport): string | null {
   const prefix = `[chalk-dockerode] Node ${classification.version || '<invalid>'}`;
   const review = `policy last reviewed ${NODE_SUPPORT_LAST_REVIEWED}; ${NODE_RELEASE_SCHEDULE_URL}`;
   switch (classification.code) {
@@ -69,7 +88,7 @@ function diagnosticForNodeSupport(classification) {
   }
 }
 
-module.exports = {
+export {
   NODE_RELEASE_SCHEDULE_URL,
   NODE_SUPPORT_LAST_REVIEWED,
   classifyNodeSupport,
