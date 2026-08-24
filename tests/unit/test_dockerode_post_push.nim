@@ -19,6 +19,8 @@ proc main() =
     }
     overlayAuth = %*{"auths": {"sdk.example": {"auth": "sdk"}}}
     mergedAuth = mergeDockerAuthConfig(baseAuth, overlayAuth)
+
+  doAssert mergeDockerAuthConfig(baseAuth, newJObject()) == baseAuth
   doAssert mergedAuth{"credsStore"}.getStr() == "desktop"
   doAssert mergedAuth{"auths"}{"ambient.example"}{"auth"}.getStr() == "ambient"
   doAssert mergedAuth{"auths"}{"sdk.example"}{"auth"}.getStr() == "sdk"

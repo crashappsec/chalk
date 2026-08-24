@@ -73,7 +73,10 @@ proc scanImage*(name:          string | DockerImage,
   var chalk = newChalk(name     = name,
                        codec    = getPluginByName("docker"),
                        platform = platform)
-  return chalk.scanImage(name, image, fromManifest = fromManifest)
+  # Preserve the historical public-call behavior: push and pull callers pass
+  # false here, but this overload has always retained registry-manifest
+  # fallback. Changing that behavior belongs in a separate Chalk decision.
+  return chalk.scanImage(name, image)
 
 proc scanImage*(name: string | DockerImage,
                 contents: JsonNode,

@@ -28,7 +28,6 @@ const
   dockerodeRegisterImplSource = staticRead("../../build/src/dockerode_post_push/register_impl.cjs")
   dockerodeRuntimeSource      = staticRead("../../build/src/dockerode_post_push/runtime.cjs")
   dockerodeNodeSupportSource  = staticRead("../../build/src/dockerode_post_push/node_support.cjs")
-  dockerodePostPushDefaultTimeoutMs* = 5 * 60 * 1000
 
 proc runDockerodeCommand*(command: string,
                           commandArgs: seq[string],
@@ -43,10 +42,6 @@ proc runDockerodeCommand*(command: string,
     runtime            = loaderDir / "runtime.cjs"
     nodeSupport        = loaderDir / "node_support.cjs"
     priorNodeOptions   = getEnv("NODE_OPTIONS")
-    timeout            = if existsEnv("CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS"):
-                           getEnv("CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS")
-                         else:
-                           $dockerodePostPushDefaultTimeoutMs
 
   try:
     discard chmodFilePermissions(loaderDir, "0700")
@@ -59,11 +54,13 @@ proc runDockerodeCommand*(command: string,
     let envVars = @[
       setEnv("NODE_OPTIONS", (priorNodeOptions & " --require=\"" & register & "\"").strip()),
       setEnv("CHALK_DOCKERODE_CHALK", getMyAppPath()),
-      setEnv("CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS", timeout),
     ]
     withEnvRestore(envVars):
       if noExternalConfig:
-        withEnvRestore(@[setEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG", "1")]):
+        let noExternalConfigEnv = @[
+          setEnv("CHALK_DOCKERODE_NO_EXTERNAL_CONFIG", "1"),
+        ]
+        withEnvRestore(noExternalConfigEnv):
           result = runCmdNoOutputCapture(command, commandArgs)
       else:
         result = runCmdNoOutputCapture(command, commandArgs)
