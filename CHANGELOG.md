@@ -27,6 +27,15 @@
 - Fixed chalk reporting an invented `:latest` tag for `push-by-digest=true`
   builds. buildkit publishes the manifest by digest only and never creates a
   tag for it, so the tag-less image name is now reported without a tag.
+- Fixed `_REPO_TAGS` dropping a tag, and `_REPO_LIST_DIGESTS` omitting a
+  registry, when the same image is published under more than one OCI index.
+  A build with two image exporters produces exactly that: buildkit attaches a
+  provenance attestation per exporter and the attestation records the image
+  name, so each copy of the image gets its own index digest over an identical
+  image manifest. Chalk matched tags only against index digests it already
+  knew, so the second copy's tag was discarded with a
+  `could not match docker image tag` warning. Tags are now also matched on the
+  platform image manifest, and the newly discovered index digest is recorded.
 
 ## 1.2.0
 

@@ -436,6 +436,72 @@ def test_push_by_digest_metadata_file(
     assert "DOCKER_TAGS" not in build.mark
 
 
+@pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
+def test_push_by_digest_provenance_indexes(
+    chalk: Chalk,
+    dockerfile: Path,
+    random_hex: str,
+    tmp_data_dir: Path,
+):
+    """
+    Same two-exporter build, but with provenance attestations left on. buildkit
+    attaches a provenance manifest per exporter and the attestation records the
+    image name, so each copy of the image ends up under its own index digest
+    over an identical image manifest. chalk must still resolve its own copy
+    rather than dropping it for having an unrecognised index digest.
+    """
+    repo = f"{random_hex}/app"
+    mirror_repo = f"{random_hex}/mirror"
+    metadata_file = tmp_data_dir / "metadata.json"
+    _, build = chalk.docker_build(
+        dockerfile=dockerfile / "Dockerfile",
+        buildx=True,
+        load=False,
+        run_docker=False,
+        provenance=True,
+        outputs=[
+            ",".join(
+                [
+                    "type=image",
+                    f"name={REGISTRY}/{repo}",
+                    "push-by-digest=true",
+                    "name-canonical=true",
+                    "push=true",
+                ]
+            )
+        ],
+        metadata_file=metadata_file,
+        config=CONFIGS / "docker_push_by_digest.c4m",
+        env={"CHALK_MIRROR_REPO": mirror_repo},
+    )
+
+    metadata = json.loads(metadata_file.read_text())
+    assert metadata["image.name"] == f"{REGISTRY}/{repo}"
+
+    # the index digest in the metadata file belongs to the build's copy only;
+    # chalk's copy is wrapped in its own index
+    index = metadata["containerimage.digest"]
+    assert Docker.manifest_exists(f"{REGISTRY}/{repo}@{index}")
+    assert not Docker.manifest_exists(f"{REGISTRY}/{mirror_repo}@{index}")
+
+    # both copies must still be reported, each against its own index digest,
+    # and chalk's tag must survive rather than being dropped for not matching
+    # the build's index
+    assert build.mark.lifted.has(
+        _REPO_LIST_DIGESTS={
+            REGISTRY: {
+                repo: ANY,
+                mirror_repo: ANY,
+            },
+        },
+        _REPO_TAGS={
+            REGISTRY: {
+                mirror_repo: ANY,
+            },
+        },
+    )
+
+
 @pytest.mark.parametrize("buildkit", [True, False])
 @pytest.mark.parametrize(
     "base, test",
