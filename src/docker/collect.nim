@@ -315,12 +315,29 @@ proc collectImageFrom(chalk:    ChalkObj,
       for i in repo.tagImages:
         try:
           let
-            manifest = fetchListOrImageManifest(i, platforms = @[platform])
-            digest   = manifest.digest.extractDockerHash()
+            image       = fetchImageManifest(i, platform)
+            list        = image.list
+            imageDigest = image.digest.extractDockerHash()
+            digest      = (
+              if list != nil: list.digest.extractDockerHash()
+              else:           imageDigest
+            )
           if digest notin allDigests:
-            warn("docker: could not match docker image tag " & $i & " digest " & digest &
-                 " to a known list or image digest " & $allDigests)
-            continue
+            # The same image manifest can be wrapped in more than one index.
+            # A build with two image exporters is exactly that: buildkit
+            # attaches a provenance attestation per exporter and the
+            # attestation records the image name, so each copy of the image
+            # gets its own index digest over an identical image manifest.
+            # Match on the platform image manifest in that case, and record
+            # the index digest we just learned about.
+            if imageDigest notin allDigests:
+              warn("docker: could not match docker image tag " & $i & " digest " & digest &
+                   " to a known list or image digest " & $allDigests)
+              continue
+            discard repoListDigests.hasKeyOrPut(registry, newOrderedTable[string, seq[string]]())
+            discard repoListDigests[registry].hasKeyOrPut(i.name, @[])
+            if digest notin repoListDigests[registry][i.name]:
+              repoListDigests[registry][i.name].add(digest)
           discard repoTags.hasKeyOrPut(registry, newOrderedTable[string, OrderedTableRef[string, string]]())
           discard repoTags[registry].hasKeyOrPut(i.name, newOrderedTable[string, string]())
           repoTags[registry][i.name][i.tag] = digest

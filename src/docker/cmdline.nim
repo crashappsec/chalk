@@ -180,11 +180,18 @@ proc extractOutputs(ctx: DockerInvocation) =
             trace("docker: found --push equivalent with --output=" & i)
             ctx.foundPush = true
           of "image":
-            if kv.getOrDefault("push") == "true" or kv.getOrDefault("push-by-digest") == "true":
+            let pushByDigest = kv.getOrDefault("push-by-digest") == "true"
+            if kv.getOrDefault("push") == "true" or pushByDigest:
               trace("docker: found --push equivalent with --output=" & i)
               ctx.foundPush = true
             if kv.getOrDefault("name") != "":
-              ctx.allTags.add(parseImage(kv.getOrDefault("name")))
+              # push-by-digest publishes the manifest by digest only and
+              # buildkit never creates a tag for it, so a tag-less name
+              # genuinely has no tag and we must not invent :latest for it
+              ctx.allTags.add(parseImage(
+                kv.getOrDefault("name"),
+                defaultTag = if pushByDigest: "" else: "latest",
+              ))
           of "docker":
             trace("docker: found --load equivalent with --output=" & i)
             ctx.foundLoad = true
