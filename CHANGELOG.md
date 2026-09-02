@@ -1,5 +1,33 @@
 # Chalk Release Notes
 
+## 1.2.1
+
+**September 2nd, 2026**
+
+### Bug Fixes
+
+- Fixed `--metadata-file` and `--iidfile` describing chalk's copy of the image
+  instead of the image the build actually pushed, when the build pushes via
+  `docker buildx build --output type=image,...` without any `-t` tag (for
+  example a `push-by-digest=true` build) and chalk is configured to also push
+  the image to a registry of its own. buildkit merges the exporter response of
+  every exporter into a single flat object where the last exporter wins keys
+  such as `image.name` and `containerimage.digest`, and chalk appended its own
+  exporter last. Chalk's exporter is now inserted before the exporters the
+  build asked for, so `--metadata-file` keeps describing the build's own image.
+  Downstream steps reading the digest out of `--metadata-file` were previously
+  handed a digest belonging to chalk's registry, and any `docker tag`,
+  `docker pull` or `aws ecr put-image` built from it failed with a not-found
+  error.
+- Chalk's own image exporter now mirrors the `compression`,
+  `compression-level`, `force-compression` and `oci-mediatypes` params of the
+  build's image exporter. buildkit derives the manifest digest from the
+  exported layer blobs, so without this the two copies of the same build got
+  different digests and neither digest described both images.
+- Fixed chalk reporting an invented `:latest` tag for `push-by-digest=true`
+  builds. buildkit publishes the manifest by digest only and never creates a
+  tag for it, so the tag-less image name is now reported without a tag.
+
 ## 1.2.0
 
 **August 11, 2026**

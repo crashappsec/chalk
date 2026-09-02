@@ -114,6 +114,8 @@ class Docker:
         labels: Optional[dict[str, str]] = None,
         annotations: Optional[dict[str, str]] = None,
         named_contexts: Optional[dict[str, Path | str]] = None,
+        outputs: Optional[list[str]] = None,
+        metadata_file: Optional[Path | str] = None,
     ):
         stdin = b""
         tags = tags or []
@@ -125,6 +127,8 @@ class Docker:
             buildx = True
         cmd += ["build"]
         if buildx and not platforms and not provenance and not sbom and load:
+            if outputs:
+                raise ValueError("--output is incompatible with --load")
             cmd += ["--load"]
         for t in tags:
             cmd += ["-t", t]
@@ -163,6 +167,15 @@ class Docker:
                 raise ValueError("--build-context only works with buildx")
             for name, path in named_contexts.items():
                 cmd += [f"--build-context={name}={path}"]
+        if outputs:
+            if not buildx:
+                raise ValueError("--output only works with buildx")
+            for output in outputs:
+                cmd += [f"--output={output}"]
+        if metadata_file:
+            if not buildx:
+                raise ValueError("--metadata-file only works with buildx")
+            cmd += [f"--metadata-file={metadata_file}"]
         cmd += [str(context or ".")]
         yield cmd, stdin
 
@@ -190,6 +203,8 @@ class Docker:
         labels: Optional[dict[str, str]] = None,
         annotations: Optional[dict[str, str]] = None,
         named_contexts: Optional[dict[str, Path | str]] = None,
+        outputs: Optional[list[str]] = None,
+        metadata_file: Optional[Path | str] = None,
     ) -> tuple[DockerDigests, Program]:
         """
         run docker build with parameters
@@ -213,6 +228,8 @@ class Docker:
             labels=labels,
             annotations=annotations,
             named_contexts=named_contexts,
+            outputs=outputs,
+            metadata_file=metadata_file,
         ) as (params, stdin):
             return Docker.with_digests(
                 run(
@@ -575,6 +592,13 @@ class Docker:
         """Return True if a blob with the given digest exists in the registry."""
         ref = f"{registry}/{repo}@sha256:{digest}"
         return bool(run(["crane", "blob", "--insecure", ref], check=False, binary=True))
+
+    @staticmethod
+    def manifest_exists(ref: str) -> bool:
+        """Return True if the registry serves a manifest for the given ref."""
+        return bool(
+            run(["crane", "manifest", "--insecure", ref], check=False, binary=True)
+        )
 
     @staticmethod
     def is_overlayfs() -> bool:

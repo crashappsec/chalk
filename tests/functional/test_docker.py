@@ -373,6 +373,69 @@ def test_multiple_tags(
     assert cosign.verify(tags[0])
 
 
+@pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
+def test_push_by_digest_metadata_file(
+    chalk: Chalk,
+    dockerfile: Path,
+    random_hex: str,
+    tmp_data_dir: Path,
+):
+    """
+    A tag-less push-by-digest --output, combined with a chalk-configured
+    registry push, puts two image exporters in a single buildx invocation.
+    buildkit merges the response of every exporter into the one
+    --metadata-file, with the last exporter winning duplicated keys, so
+    chalk's exporter must not displace the one the build asked for.
+    """
+    repo = f"{random_hex}/app"
+    mirror_repo = f"{random_hex}/mirror"
+    metadata_file = tmp_data_dir / "metadata.json"
+    _, build = chalk.docker_build(
+        dockerfile=dockerfile / "Dockerfile",
+        buildx=True,
+        # the --output below is what pushes; chalk has to discover the push
+        # from there rather than from --push or -t
+        load=False,
+        run_docker=False,
+        outputs=[
+            ",".join(
+                [
+                    "type=image",
+                    f"name={REGISTRY}/{repo}",
+                    "push-by-digest=true",
+                    "name-canonical=true",
+                    "push=true",
+                    "compression=zstd",
+                    "force-compression=true",
+                    "oci-mediatypes=true",
+                ]
+            )
+        ],
+        metadata_file=metadata_file,
+        config=CONFIGS / "docker_push_by_digest.c4m",
+        env={"CHALK_MIRROR_REPO": mirror_repo},
+    )
+
+    metadata = json.loads(metadata_file.read_text())
+
+    # the metadata file must describe the image the build pushed, not chalk's
+    # copy of it, otherwise every downstream step which reads the digest out
+    # of the file targets an image that was never pushed to the build's repo
+    assert metadata["image.name"] == f"{REGISTRY}/{repo}"
+    assert mirror_repo not in metadata["image.name"]
+
+    digest = metadata["containerimage.digest"]
+    assert Docker.manifest_exists(f"{REGISTRY}/{repo}@{digest}")
+
+    # chalk mirrors the compression and media-type params of the build's
+    # exporter onto its own, so a single digest describes both copies
+    assert Docker.manifest_exists(f"{REGISTRY}/{mirror_repo}@{digest}")
+
+    # buildkit publishes the manifest by digest only and never creates a tag
+    # for it, so chalk must not report one
+    assert "DOCKER_TAGS" not in build.mark
+
+
 @pytest.mark.parametrize("buildkit", [True, False])
 @pytest.mark.parametrize(
     "base, test",
