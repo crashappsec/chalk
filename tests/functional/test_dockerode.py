@@ -135,8 +135,7 @@ def _write_npm_dockerode_fixture(root: Path) -> None:
         json.dumps({"name": "dockerode", "version": "5.0.1"})
     )
     (dockerode / "lib").mkdir()
-    (dockerode / "lib" / "image.js").write_text(
-        """
+    (dockerode / "lib" / "image.js").write_text("""
 const fs = require('node:fs');
 function Image() {}
 Image.prototype.push = function originalPush() {
@@ -144,10 +143,8 @@ Image.prototype.push = function originalPush() {
   return 'original-result';
 };
 module.exports = Image;
-""".lstrip()
-    )
-    (root / "publish.cjs").write_text(
-        """
+""".lstrip())
+    (root / "publish.cjs").write_text("""
 const fs = require('node:fs');
 const Image = require('./node_modules/dockerode/lib/image.js');
 const patched = Object.getOwnPropertySymbols(Image.prototype.push)
@@ -161,8 +158,7 @@ fs.writeFileSync(process.env.STATE_PATH, JSON.stringify({
   timeout: process.env.CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS || null,
   chalk: process.env.CHALK_DOCKERODE_CHALK || null,
 }));
-""".lstrip()
-    )
+""".lstrip())
 
 
 def test_unwrapped_dockerode_remains_unobserved(
