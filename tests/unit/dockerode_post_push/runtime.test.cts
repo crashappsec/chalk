@@ -6,11 +6,19 @@ import { Readable } from 'node:stream';
 import test = require('node:test');
 import {
   createTerminalTracker,
+  isSupportedDockerodeVersion,
   patchImage,
   postPushDeadline,
   repositoryWithoutTag,
   terminalDigest,
 } from '../../../src/dockerode_post_push/runtime.cjs';
+
+test('only Dockerode 5.0.1 is supported', () => {
+  assert.equal(isSupportedDockerodeVersion('5.0.1'), true);
+  for (const version of ['3.3.47', '4.0.9', '5.0.0', '5.0.2', '5.1.0', '']) {
+    assert.equal(isSupportedDockerodeVersion(version), false, version);
+  }
+});
 
 interface Fixture {
   dir: string;

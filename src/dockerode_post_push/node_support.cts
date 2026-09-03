@@ -3,32 +3,34 @@
 const NODE_RELEASE_SCHEDULE_URL = 'https://github.com/nodejs/Release#release-schedule';
 const NODE_SUPPORT_LAST_REVIEWED = '2026-08-11';
 
-type NodeSupportMode = 'disabled' | 'supported' | 'best_effort';
+type NodeSupportMode = 'disabled' | 'supported';
 type NodeSupportCode =
   | 'below_minimum'
-  | 'best_effort'
-  | 'eol_release'
   | 'invalid_version'
   | 'missing_capability'
-  | 'non_lts_release'
+  | 'outside_reviewed_set'
   | 'prerelease'
   | 'supported';
+
+interface NodeCapabilities {
+  registerHooks?: unknown;
+  legacyJsLoader?: unknown;
+}
 
 interface NodeSupport {
   enabled: boolean;
   mode: NodeSupportMode;
   version: string;
   code: NodeSupportCode;
+  loader?: 'hooks' | 'legacy';
   reason?: string;
 }
-
-type RegisterHooksCapability = unknown;
 
 function disabled(version: string, code: NodeSupportCode, reason: string): NodeSupport {
   return { enabled: false, mode: 'disabled', version, code, reason };
 }
 
-function classifyNodeSupport(version: unknown, registerHooks: RegisterHooksCapability): NodeSupport {
+function classifyNodeSupport(version: unknown, capabilities: NodeCapabilities): NodeSupport {
   const normalized = String(version || '');
   const match = /^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(normalized);
   if (!match) {
@@ -44,41 +46,30 @@ function classifyNodeSupport(version: unknown, registerHooks: RegisterHooksCapab
   if (match[4]) {
     return disabled(normalized, 'prerelease', 'prerelease builds are not supported');
   }
-  let mode: 'supported' | 'best_effort';
-
-  if (major <= 21 || major === 23 || major === 25) {
-    return disabled(normalized, 'eol_release', `Node ${major} is excluded because it is end-of-life`);
-  }
   if (major === 22 && minor < 15) {
     return disabled(normalized, 'below_minimum', 'Node 22.15.0 or newer is required');
   }
-  if (major === 22 || major === 24 || major === 26) {
-    mode = 'supported';
-  } else if (major > 26 && major % 2 === 0) {
-    mode = 'best_effort';
-  } else {
-    return disabled(normalized, 'non_lts_release', `Node ${major} is an odd-numbered non-LTS release`);
+  if (major !== 20 && major !== 22 && major !== 24 && major !== 26) {
+    return disabled(normalized, 'outside_reviewed_set', `Node ${major} is outside the reviewed support set`);
   }
 
-  if (typeof registerHooks !== 'function') {
-    return disabled(normalized, 'missing_capability', 'module.registerHooks() is unavailable');
+  const loader = major === 20 ? 'legacy' : 'hooks';
+  const capability = loader === 'legacy' ? capabilities.legacyJsLoader : capabilities.registerHooks;
+  if (typeof capability !== 'function') {
+    return disabled(normalized, 'missing_capability', 'the required module loader is unavailable');
   }
 
-  return { enabled: true, mode, version: normalized, code: mode };
+  return { enabled: true, mode: 'supported', version: normalized, code: 'supported', loader };
 }
 
 function diagnosticForNodeSupport(classification: NodeSupport): string | null {
   const prefix = `[chalk-dockerode] Node ${classification.version || '<invalid>'}`;
   const review = `policy last reviewed ${NODE_SUPPORT_LAST_REVIEWED}; ${NODE_RELEASE_SCHEDULE_URL}`;
   switch (classification.code) {
-    case 'eol_release':
-      return `${prefix} is excluded as end-of-life; instrumentation skipped (${review})`;
-    case 'non_lts_release':
-      return `${prefix} is excluded as an odd-numbered non-LTS release; instrumentation skipped (${review})`;
+    case 'outside_reviewed_set':
+      return `${prefix} is outside the reviewed support set; instrumentation skipped (${review})`;
     case 'missing_capability':
-      return `${prefix} module.registerHooks() is unavailable; instrumentation skipped`;
-    case 'best_effort':
-      return `${prefix} is newer than the reviewed support set; enabling best-effort instrumentation (${review})`;
+      return `${prefix} required module loader is unavailable; instrumentation skipped`;
     case 'below_minimum':
     case 'prerelease':
     case 'invalid_version':

@@ -103,6 +103,7 @@ jobs:
           make unit-tests
 
   node-tests:
+    needs: typescript-build
     if: |
       (
         github.event_name == 'pull_request' &&
@@ -118,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["22.15.0", "22", "24", "26"]
+        node-version: ["20", "22.15.0", "22", "24", "26"]
 
     name: "node-${{ matrix.node-version }}"
     runs-on: ubuntu-22.04
@@ -136,8 +137,14 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Run Node unit tests
-        run: make node-unit-tests
+      - name: Download emitted Node files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dockerode-node-build
+          path: build
+
+      - name: Test emitted Node files
+        run: npm run test:node
 
   typescript-build:
     name: "typescript-build"
@@ -162,3 +169,10 @@ jobs:
 
       - name: Verify emitted bootstrap on Node 12
         run: make node12-bootstrap-test
+
+      - name: Upload emitted Node files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dockerode-node-build
+          path: build
+          retention-days: 1

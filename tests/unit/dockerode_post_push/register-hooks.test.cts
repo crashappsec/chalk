@@ -5,7 +5,38 @@ import path = require('node:path');
 import { spawnSync } from 'node:child_process';
 import test = require('node:test');
 
-test('registerHooks patches every resolved dockerode 5.x copy, not the shim dependency tree', () => {
+test('preload preserves an unrelated Node command', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-unrelated-'));
+  try {
+    const probe = path.join(dir, 'probe.cjs');
+    fs.writeFileSync(probe, [
+      "const fs = require('node:fs');",
+      "fs.writeFileSync(process.argv[2], process.env.UNRELATED_VALUE);",
+      "process.stdout.write('ordinary stdout\\n');",
+      "process.stderr.write('ordinary stderr\\n');",
+      'process.exit(17);',
+      '',
+    ].join('\n'));
+    const baselineFile = path.join(dir, 'baseline');
+    const candidateFile = path.join(dir, 'candidate');
+    const env = { ...process.env, UNRELATED_VALUE: 'preserved' };
+    const baseline = spawnSync(process.execPath, [probe, baselineFile], { encoding: 'utf8', env });
+    const preload = path.resolve(__dirname, '..', '..', '..', 'src', 'dockerode_post_push', 'register.cjs');
+    const candidate = spawnSync(process.execPath, [`--require=${preload}`, probe, candidateFile], {
+      encoding: 'utf8',
+      env,
+    });
+    assert.deepEqual(
+      { status: candidate.status, stdout: candidate.stdout, stderr: candidate.stderr },
+      { status: baseline.status, stdout: baseline.stdout, stderr: baseline.stderr },
+    );
+    assert.equal(fs.readFileSync(candidateFile, 'utf8'), fs.readFileSync(baselineFile, 'utf8'));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('preload patches every resolved Dockerode 5.0.1 copy and no other version', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-hooks-'));
   try {
     const copies = ['one/node_modules/dockerode', 'two/node_modules/dockerode'];
@@ -20,10 +51,13 @@ test('registerHooks patches every resolved dockerode 5.x copy, not the shim depe
         '',
       ].join('\n'));
     }
-    const oldRoot = path.join(dir, 'old/node_modules/dockerode');
-    fs.mkdirSync(path.join(oldRoot, 'lib'), { recursive: true });
-    fs.writeFileSync(path.join(oldRoot, 'package.json'), JSON.stringify({ name: 'dockerode', version: '4.0.9' }));
-    fs.writeFileSync(path.join(oldRoot, 'lib/image.js'), 'function Image() {}\nImage.prototype.push = function originalPush() {};\nmodule.exports = Image;\n');
+    const unsupported = ['4.0.9', '5.0.0', '5.0.2', '5.1.0'];
+    for (const version of unsupported) {
+      const root = path.join(dir, version, 'node_modules/dockerode');
+      fs.mkdirSync(path.join(root, 'lib'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'dockerode', version }));
+      fs.writeFileSync(path.join(root, 'lib/image.js'), 'function Image() {}\nImage.prototype.push = function originalPush() {};\nmodule.exports = Image;\n');
+    }
     const probe = path.join(dir, 'probe.cjs');
     fs.writeFileSync(probe, [
       "const path = require('node:path');",
@@ -32,8 +66,10 @@ test('registerHooks patches every resolved dockerode 5.x copy, not the shim depe
       "  const symbols = Object.getOwnPropertySymbols(Image.prototype.push).map(String);",
       "  if (!symbols.some(s => s.includes('chalk.dockerode.postPush.patched.v1'))) { console.error(copy, symbols); process.exit(2); }",
       "}",
-      "const OldImage = require(path.join(process.cwd(), 'old/node_modules/dockerode/lib/image.js'));",
-      "if (Object.getOwnPropertySymbols(OldImage.prototype.push).length !== 0) process.exit(3);",
+      `for (const version of ${JSON.stringify(unsupported)}) {`,
+      "  const Image = require(path.join(process.cwd(), version, 'node_modules/dockerode/lib/image.js'));",
+      "  if (Object.getOwnPropertySymbols(Image.prototype.push).length !== 0) process.exit(3);",
+      "}",
       '',
     ].join('\n'));
 

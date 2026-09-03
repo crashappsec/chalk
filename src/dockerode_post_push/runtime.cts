@@ -118,6 +118,7 @@ interface ImageConstructor {
 }
 
 const PATCHED = Symbol.for('chalk.dockerode.postPush.patched.v1');
+const SUPPORTED_DOCKERODE_VERSION = '5.0.1';
 const DEFAULT_SOCKETS = new Set([
   '/var/run/docker.sock',
   path.join(os.homedir(), '.docker/run/docker.sock'),
@@ -126,6 +127,10 @@ const MAX_INCOMPLETE_FRAME_BYTES = 1024 * 1024;
 const MAX_POST_PUSH_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_POST_PUSH_STDOUT_LINE_BYTES = 64 * 1024;
 const POST_PUSH_KILL_GRACE_MS = 1000;
+
+function isSupportedDockerodeVersion(version: unknown): boolean {
+  return version === SUPPORTED_DOCKERODE_VERSION;
+}
 
 function diagnostic(code: DiagnosticCode, fields: DiagnosticFields = {}): void {
   const record: DiagnosticRecord = {
@@ -167,7 +172,7 @@ async function supportedOperation(
   if (process.platform !== 'linux' && process.env.CHALK_DOCKERODE_TEST_PLATFORM !== 'linux') {
     return { supported: false, code: 'unsupported_platform' };
   }
-  if (!meta || !String(meta.version || '').startsWith('5.')) {
+  if (!meta || !isSupportedDockerodeVersion(meta.version)) {
     return { supported: false, code: 'unsupported_dockerode' };
   }
   const deadline = postPushDeadline();
@@ -580,6 +585,7 @@ function patchImage(Image: unknown, meta?: OperationMetadata): void {
 
 export {
   createTerminalTracker,
+  isSupportedDockerodeVersion,
   patchImage,
   postPushDeadline,
   repositoryWithoutTag,
