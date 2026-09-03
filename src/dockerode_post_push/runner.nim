@@ -19,15 +19,7 @@ import ../utils/[
   files,
   subproc,
 ]
-
-when getEnv("CHALK_TYPESCRIPT_BUILT") != "1":
-  {.fatal: "Dockerode TypeScript artifacts are unavailable or stale; run `make` (or `make transpile`) instead of `nimble build`.".}
-
-const
-  dockerodeRegisterSource     = staticRead("../../build/src/dockerode_post_push/register.cjs")
-  dockerodeRegisterImplSource = staticRead("../../build/src/dockerode_post_push/register_impl.cjs")
-  dockerodeRuntimeSource      = staticRead("../../build/src/dockerode_post_push/runtime.cjs")
-  dockerodeNodeSupportSource  = staticRead("../../build/src/dockerode_post_push/node_support.cjs")
+import ./assets
 
 proc runDockerodeCommand*(command: string,
                           commandArgs: seq[string],
@@ -37,20 +29,11 @@ proc runDockerodeCommand*(command: string,
   ## that outlive the wrapped command are outside this command's support boundary.
   let
     loaderDir          = createTempDir("chalk-dockerode-", "-loader")
-    register           = loaderDir / "register.cjs"
-    registerImpl       = loaderDir / "register_impl.cjs"
-    runtime            = loaderDir / "runtime.cjs"
-    nodeSupport        = loaderDir / "node_support.cjs"
     priorNodeOptions   = getEnv("NODE_OPTIONS")
 
   try:
     discard chmodFilePermissions(loaderDir, "0700")
-    writeFile(register, dockerodeRegisterSource)
-    writeFile(registerImpl, dockerodeRegisterImplSource)
-    writeFile(runtime, dockerodeRuntimeSource)
-    writeFile(nodeSupport, dockerodeNodeSupportSource)
-    for path in [register, registerImpl, runtime, nodeSupport]:
-      discard chmodFilePermissions(path, "0600")
+    let register = writeDockerodeAssets(loaderDir, "0600")
     let envVars = @[
       setEnv("NODE_OPTIONS", (priorNodeOptions & " --require=\"" & register & "\"").strip()),
       setEnv("CHALK_DOCKERODE_CHALK", getMyAppPath()),
