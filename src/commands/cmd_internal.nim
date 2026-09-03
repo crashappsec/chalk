@@ -17,6 +17,7 @@ import ".."/[
   docker/exe,
   docker/push,
   dockerode_post_push/payload,
+  dockerode_post_push/policy_install,
   dockerode_post_push/runner,
   plugin_api,
   reporting,
@@ -46,6 +47,17 @@ proc runCmdDockerode*() =
       noExternalConfig = not attrGet[bool]("load_external_config"),
     )
   quitChalk(exitCode)
+
+proc runCmdDockerodePolicyInstall*() =
+  let args = getArgs()
+  if args.len != 2 or args[0] != "--root":
+    error("dockerode policy install: expected --root <absolute-path>")
+    quitChalk(64)
+  try:
+    stdout.writeLine(installDockerodePolicy(args[1], getAppFilename()))
+  except:
+    error("dockerode policy install: " & getCurrentExceptionMsg())
+    quitChalk(1)
 
 proc postPushResult(status, operationId: string) =
   # The Node wrapper can only recognize and consume a result for the operation

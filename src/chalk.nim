@@ -72,6 +72,7 @@ when isMainModule:
   of "__.onbuild":         runCmdOnBuild() # in cmd_internal
   of "__.prep_postexec":   runCmdPrepPostExec() # in cmd_internal
   of "__.docker_post_push": runCmdDockerPostPush() # in cmd_internal
+  of "__.dockerode_policy_install": runCmdDockerodePolicyInstall() # in cmd_internal
   else:
     runChalkHelp(getFullCommandName()) # noreturn, will not show config.
 
