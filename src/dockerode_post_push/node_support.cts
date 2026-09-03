@@ -3,30 +3,37 @@
 const NODE_RELEASE_SCHEDULE_URL = 'https://github.com/nodejs/Release#release-schedule';
 const NODE_SUPPORT_LAST_REVIEWED = '2026-08-11';
 
-type NodeSupportMode = 'disabled' | 'supported';
-type NodeSupportCode =
+type DisabledNodeSupportCode =
   | 'below_minimum'
   | 'invalid_version'
   | 'missing_capability'
   | 'outside_reviewed_set'
-  | 'prerelease'
-  | 'supported';
+  | 'prerelease';
 
 interface NodeCapabilities {
   registerHooks?: unknown;
   legacyJsLoader?: unknown;
 }
 
-interface NodeSupport {
-  enabled: boolean;
-  mode: NodeSupportMode;
+interface DisabledNodeSupport {
+  enabled: false;
+  mode: 'disabled';
   version: string;
-  code: NodeSupportCode;
-  loader?: 'hooks' | 'legacy';
-  reason?: string;
+  code: DisabledNodeSupportCode;
+  reason: string;
 }
 
-function disabled(version: string, code: NodeSupportCode, reason: string): NodeSupport {
+interface SupportedNodeSupport {
+  enabled: true;
+  mode: 'supported';
+  version: string;
+  code: 'supported';
+  loader: 'hooks' | 'legacy';
+}
+
+type NodeSupport = DisabledNodeSupport | SupportedNodeSupport;
+
+function disabled(version: string, code: DisabledNodeSupportCode, reason: string): NodeSupport {
   return { enabled: false, mode: 'disabled', version, code, reason };
 }
 

@@ -19,6 +19,16 @@ proc expectValueError(action: proc()) =
     rejected = true
   doAssert rejected
 
+proc makeWritable(path: string) =
+  if symlinkExists(path):
+    return
+  if dirExists(path):
+    setFilePermissions(path, chmodPermissions("0700"))
+    for _, child in walkDir(path):
+      makeWritable(child)
+  elif fileExists(path):
+    setFilePermissions(path, chmodPermissions("0600"))
+
 proc main() =
   let
     parent = createTempDir("chalk-policy-test-", "")
@@ -26,6 +36,7 @@ proc main() =
     binary = getAppFilename()
     binaryHash = newFileStringStream(binary).sha256Hex()
   defer:
+    makeWritable(parent)
     removeDir(parent)
 
   let activation = installDockerodePolicy(root, binary)

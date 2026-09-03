@@ -71,7 +71,7 @@ function installLegacyLoader(originalLoader: LegacyJsLoader): void {
       if (!isDockerodeImage(filename)) return;
       const pkg = dockerodePackageFor(filename);
       if (!pkg || !runtime.isSupportedDockerodeVersion(pkg.version)) return;
-      runtime.patchImage(module.exports as Parameters<typeof runtime.patchImage>[0], pkg);
+      runtime.patchImage(module.exports, pkg);
     } catch (_) {
       return;
     }
