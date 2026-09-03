@@ -219,7 +219,7 @@ def test_dockerode_wrapper_reaches_npm_child(
         pytest.skip("Node and npm are required")
     node_version = run([node, "-p", "process.versions.node"]).text.strip()
     major, minor, _ = (int(part) for part in node_version.split(".", maxsplit=2))
-    if major not in {22, 24} or (major == 22 and minor < 15):
+    if major not in {20, 22, 24, 26} or (major == 22 and minor < 15):
         pytest.skip(f"Node {node_version} is outside the V1 support boundary")
 
     consumer = tmp_path / "consumer"
