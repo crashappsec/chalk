@@ -10,6 +10,9 @@ FROM docker:$DOCKER_VERSION AS docker
 FROM docker/buildx-bin:$BUILDX_VERSION AS buildx
 FROM ghcr.io/sigstore/cosign/cosign:v$COSIGN_VERSION AS cosign
 FROM gcr.io/go-containerregistry/crane:latest AS crane
+FROM node:24.9.0-bookworm-slim@sha256:3e69116c924bfcba6c6979aff60d966c37aef56d488ce091c69d442ebec9f103 AS node-ubuntu
+FROM node:24.9.0-alpine3.22@sha256:b0d33ed19a912e1a18ceb83e139815233cd49c123fe025e67a7c506c93e3f728 AS node-alpine
+FROM node-${BASE} AS node_runtime
 
 # ----------------------------------------------------------------------------
 
@@ -77,6 +80,7 @@ COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=buildx /buildx /usr/lib/docker/cli-plugins/docker-buildx
 COPY --from=crane /ko-app/crane /usr/local/bin/crane
 COPY --from=hello_go /hello_go /usr/local/bin/hello_go
+COPY --from=node_runtime /usr/local/ /usr/local/
 
 RUN docker context create node-amd64
 RUN docker context create node-arm64

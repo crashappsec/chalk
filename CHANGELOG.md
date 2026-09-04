@@ -21,6 +21,22 @@
 
 ### New Features
 
+- New `chalk dockerode -- <command> [args...]` wrapper adds
+  fail-open post-push telemetry to Dockerode 3.3.5 image pushes. It uses the
+  versioned `chalk-docker-post-push/v1` stdin handoff after a successful push
+  and preserves the application's push result if instrumentation is unsupported
+  or post-processing fails. Node 20, Node 22.15 or newer, Node 24, and Node 26
+  are supported. Other Node releases are excluded. Support is bounded
+  to a foreground publisher tree whose instrumented descendants finish before
+  the wrapped command returns, Linux, an explicit tag, no Dockerode platform
+  override, and the default rootful Docker socket; backgrounded or
+  daemonized descendants are unsupported. The wrapper supplies a five-minute
+  post-processing deadline by default and rejects longer deadlines.
+  Its embedded Node loader is authored and strictly checked in TypeScript at
+  build time; the minimal fail-open preload bootstrap is compiled separately
+  to ES5 so unsupported legacy Node processes can still parse it safely. The
+  resulting Chalk binary and instrumented application have no npm dependency.
+
 - New GitLab CI collapsible log section sink. When chalk runs inside a GitLab
   CI job (`GITLAB_CI` is set), the chalk report is automatically wrapped in
   GitLab's `section_start`/`section_end` markers with `collapsed=true`, making

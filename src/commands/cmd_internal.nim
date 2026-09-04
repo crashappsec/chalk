@@ -6,17 +6,162 @@
 ##
 
 import std/[
+  base64,
+  json,
+  os,
   sequtils,
 ]
 import ".."/[
+  attestation_api,
+  config,
+  docker/exe,
+  docker/push,
+  dockerode_post_push/payload,
+  dockerode_post_push/policy_install,
+  dockerode_post_push/runner,
   plugin_api,
+  reporting,
   run_management,
   subscan,
   types,
+  utils/exec,
+  utils/files,
   utils/json,
   utils/sets,
   utils/strings,
 ]
+
+proc runCmdDockerode*() =
+  ## Scope instrumentation to one publish command and preserve its exit code.
+  var args = getArgs()
+  if len(args) > 0 and args[0] == "--":
+    args = args[1 .. ^1]
+  if len(args) == 0:
+    error("dockerode: expected -- <command> [args...]")
+    quitChalk(64)
+  let
+    commandArgs = if len(args) > 1: args[1 .. ^1] else: @[]
+    exitCode    = runDockerodeCommand(
+      args[0],
+      commandArgs,
+      noExternalConfig = not attrGet[bool]("load_external_config"),
+    )
+  quitChalk(exitCode)
+
+proc runCmdDockerodePolicyInstall*() =
+  let args = getArgs()
+  if args.len != 2 or args[0] != "--root":
+    error("dockerode policy install: expected --root <absolute-path>")
+    quitChalk(64)
+  try:
+    stdout.writeLine(installDockerodePolicy(args[1], getAppFilename()))
+  except:
+    error("dockerode policy install: " & getCurrentExceptionMsg())
+    quitChalk(1)
+
+proc postPushResult(status, operationId: string) =
+  # The Node wrapper can only recognize and consume a result for the operation
+  # it started. Do not leak an internal control record into application stdout
+  # when malformed input prevents us from recovering that identifier.
+  if operationId == "":
+    return
+  stdout.writeLine($( %*{
+    "schema":      "chalk-docker-post-push-result/v1",
+    "status":      status,
+    "operationId": operationId,
+  }))
+
+proc requireString(payload: JsonNode, key: string): string =
+  return payload.assertHasKey(key, "docker post-push field is missing")
+    .assertIs(JString, "docker post-push field " & key & " must be a string")
+    .assertHasLen("docker post-push field " & key & " must not be empty")
+    .getStr()
+
+proc runCmdDockerPostPush*() =
+  ## Versioned stdin contract for a push already completed by dockerode.
+  ## Exit 0: collected; 1: post-processing failed; 2: unsupported input.
+  var
+    operationId = ""
+    repository  = ""
+    tag         = ""
+    digest      = ""
+    socketPath  = ""
+    username    = ""
+    password    = ""
+    server      = ""
+    hasAuth     = false
+  try:
+    let payloadInput = readDockerPostPushPayload(stdin)
+    if payloadInput.len > dockerPostPushMaxPayloadBytes:
+      postPushResult("unsupported_input", operationId)
+      quitChalk(2)
+    let payload = parseJson(payloadInput).assertIs(
+      JObject,
+      "docker post-push payload must be an object",
+    )
+    let schema =
+      try:
+        payload.requireString("schema")
+      except:
+        postPushResult("unsupported_schema", operationId)
+        quitChalk(2)
+        ""
+    if schema != "chalk-docker-post-push/v1":
+      postPushResult("unsupported_schema", operationId)
+      quitChalk(2)
+
+    operationId = payload.requireString("operationId")
+    repository = payload.requireString("repository")
+    tag = payload.requireString("tag")
+    digest = payload.requireString("digest")
+    socketPath = payload.requireString("socketPath")
+    if not digest.startsWith("sha256:") or digest.len != 71 or
+       not digest[7 .. ^1].allCharsInSet({'0' .. '9', 'a' .. 'f'}) or
+       '\n' in repository or '\r' in repository or
+       '\n' in tag or '\r' in tag or
+       not dockerPostPushSocketSupported(socketPath):
+      postPushResult("unsupported_input", operationId)
+      quitChalk(2)
+
+    let auth = payload{"authconfig"}
+    if auth != nil and auth.kind != JNull:
+      try:
+        auth.assertIs(JObject, "docker post-push authconfig must be an object")
+        username = auth.requireString("username")
+        password = auth.requireString("password")
+        server = auth.requireString("serveraddress")
+        hasAuth = true
+      except:
+        postPushResult("unsupported_auth", operationId)
+        quitChalk(2)
+  except:
+    error("docker post-push input: " & getCurrentExceptionMsg())
+    postPushResult("unsupported_input", operationId)
+    quitChalk(2)
+
+  try:
+    putEnv("DOCKER_HOST", "unix://" & socketPath)
+    delEnv("DOCKER_CONTEXT")
+
+    if hasAuth:
+      var dockerConfig = %*{"auths": {}}
+      dockerConfig["auths"][server] = %*{
+        "auth": encode(username & ":" & password),
+      }
+      setDockerAuthConfigOverlay(dockerConfig)
+
+    setFullCommandName("push", msg = "post-processing")
+    loadAttestation(forceLoad = true, withPrivateKey = true)
+    if not dockerPostPush(repository & ":" & tag, digest):
+      postPushResult("digest_mismatch_or_collection_failed", operationId)
+      quitChalk(1)
+    reporting.doReporting("report")
+    postPushResult("complete", operationId)
+    quitChalk(0)
+  except:
+    error("docker post-push: " & getCurrentExceptionMsg())
+    postPushResult("failed", operationId)
+    quitChalk(1)
 
 proc onbuild() =
   let data = readFile("/chalk.json")

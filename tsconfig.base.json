@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "declaration": false,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "outDir": "build",
+    "rootDir": ".",
+    "skipLibCheck": false,
+    "strict": true,
+    "target": "ES2022",
+    "types": ["node"]
+  }
+}

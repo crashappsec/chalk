@@ -339,6 +339,17 @@ proc normalize(self: DockerImage): DockerImage =
     self.digest,
   )
 
+proc repoDigestMatches*(image, expectedDigest: string,
+                        repoDigests: seq[string]): bool =
+  ## Match a completed push against Docker's local RepoDigests using the same
+  ## canonical DockerImage representation used by the rest of Chalk.
+  let expected = parseImage(image).normalize().withDigest(expectedDigest)
+  for value in repoDigests:
+    let candidate = parseImage(value, defaultTag = expected.tag).normalize()
+    if candidate == expected:
+      return true
+  return false
+
 proc registry*(self: DockerImage): string =
   let parts = self.normalize().repo.split('/', maxsplit = 1)
   if len(parts) == 1:

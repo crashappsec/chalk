@@ -1,0 +1,167 @@
+import assert = require('node:assert/strict');
+import fs = require('node:fs');
+import os = require('node:os');
+import path = require('node:path');
+import { spawnSync } from 'node:child_process';
+import test = require('node:test');
+
+test('preload preserves an unrelated Node command', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-unrelated-'));
+  try {
+    const probe = path.join(dir, 'probe.cjs');
+    fs.writeFileSync(probe, [
+      "const fs = require('node:fs');",
+      "fs.writeFileSync(process.argv[2], process.env.UNRELATED_VALUE);",
+      "process.stdout.write('ordinary stdout\\n');",
+      "process.stderr.write('ordinary stderr\\n');",
+      'process.exit(17);',
+      '',
+    ].join('\n'));
+    const baselineFile = path.join(dir, 'baseline');
+    const candidateFile = path.join(dir, 'candidate');
+    const env = { ...process.env, UNRELATED_VALUE: 'preserved' };
+    const baseline = spawnSync(process.execPath, [probe, baselineFile], { encoding: 'utf8', env });
+    const preload = path.resolve(__dirname, '..', '..', '..', 'src', 'dockerode_post_push', 'register.cjs');
+    const candidate = spawnSync(process.execPath, [`--require=${preload}`, probe, candidateFile], {
+      encoding: 'utf8',
+      env,
+    });
+    assert.deepEqual(
+      { status: candidate.status, stdout: candidate.stdout, stderr: candidate.stderr },
+      { status: baseline.status, stdout: baseline.stdout, stderr: baseline.stderr },
+    );
+    assert.equal(fs.readFileSync(candidateFile, 'utf8'), fs.readFileSync(baselineFile, 'utf8'));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('preload patches every resolved Dockerode 3.3.5 copy and no other version', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-hooks-'));
+  try {
+    const copies = ['one/node_modules/dockerode', 'two/node_modules/dockerode'];
+    for (const relative of copies) {
+      const root = path.join(dir, relative);
+      fs.mkdirSync(path.join(root, 'lib'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'dockerode', version: '3.3.5' }));
+      fs.writeFileSync(path.join(root, 'lib/image.js'), [
+        'function Image() {}',
+        'Image.prototype.push = function originalPush() { return Promise.resolve(); };',
+        'module.exports = Image;',
+        '',
+      ].join('\n'));
+    }
+    const unsupported = ['3.3.4', '3.3.47', '4.0.9', '5.0.1', '5.0.2'];
+    for (const version of unsupported) {
+      const root = path.join(dir, version, 'node_modules/dockerode');
+      fs.mkdirSync(path.join(root, 'lib'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'dockerode', version }));
+      fs.writeFileSync(path.join(root, 'lib/image.js'), 'function Image() {}\nImage.prototype.push = function originalPush() {};\nmodule.exports = Image;\n');
+    }
+    const probe = path.join(dir, 'probe.cjs');
+    fs.writeFileSync(probe, [
+      "const path = require('node:path');",
+      "for (const copy of ['one', 'two']) {",
+      "  const Image = require(path.join(process.cwd(), copy, 'node_modules/dockerode/lib/image.js'));",
+      "  const symbols = Object.getOwnPropertySymbols(Image.prototype.push).map(String);",
+      "  if (!symbols.some(s => s.includes('chalk.dockerode.postPush.patched.v1'))) { console.error(copy, symbols); process.exit(2); }",
+      "}",
+      `for (const version of ${JSON.stringify(unsupported)}) {`,
+      "  const Image = require(path.join(process.cwd(), version, 'node_modules/dockerode/lib/image.js'));",
+      "  if (Object.getOwnPropertySymbols(Image.prototype.push).length !== 0) process.exit(3);",
+      "}",
+      '',
+    ].join('\n'));
+
+    const preload = path.resolve(__dirname, '..', '..', '..', 'src', 'dockerode_post_push', 'register.cjs');
+    const result = spawnSync(process.execPath, [`--require=${preload}`, probe], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('preload fails open when a private loader dependency is missing', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-fail-open-'));
+  try {
+    const sourceRoot = path.resolve(__dirname, '..', '..', '..', 'src', 'dockerode_post_push');
+    for (const filename of ['register.cjs', 'register_impl.cjs', 'runtime.cjs']) {
+      fs.copyFileSync(path.join(sourceRoot, filename), path.join(dir, filename));
+    }
+    // Deliberately omit node_support.cjs so loading register_impl.cjs throws
+    // inside the fail-open preload bootstrap.
+    const dockerodeRoot = path.join(dir, 'node_modules', 'dockerode');
+    fs.mkdirSync(path.join(dockerodeRoot, 'lib'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dockerodeRoot, 'package.json'),
+      JSON.stringify({ name: 'dockerode', version: '3.3.5' }),
+    );
+    fs.writeFileSync(path.join(dockerodeRoot, 'lib', 'image.js'), [
+      'function Image() {}',
+      "Image.prototype.push = function originalPush() { return 'original'; };",
+      'module.exports = Image;',
+      '',
+    ].join('\n'));
+    const probe = path.join(dir, 'probe.cjs');
+    fs.writeFileSync(probe, [
+      "const Image = require('./node_modules/dockerode/lib/image.js');",
+      "if (new Image().push() !== 'original') process.exit(24);",
+      "process.stdout.write('dockerode-original\\n');",
+      'process.exit(23);',
+      '',
+    ].join('\n'));
+
+    const preload = path.join(dir, 'register.cjs');
+    const result = spawnSync(process.execPath, [`--require=${preload}`, probe], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 23, result.stderr || result.stdout);
+    assert.equal(result.stdout, 'dockerode-original\n');
+    assert.equal(result.stderr, '');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('load-hook instrumentation failures return the original unpatched module', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-hook-fail-open-'));
+  try {
+    const dockerodeRoot = path.join(dir, 'node_modules', 'dockerode');
+    fs.mkdirSync(path.join(dockerodeRoot, 'lib'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dockerodeRoot, 'package.json'),
+      JSON.stringify({ name: 'dockerode', version: '3.3.5' }),
+    );
+    fs.writeFileSync(path.join(dockerodeRoot, 'lib', 'image.js'), [
+      'function Image() {}',
+      "Image.prototype.push = function originalPush() { return 'original'; };",
+      'module.exports = Image;',
+      '',
+    ].join('\n'));
+    const probe = path.join(dir, 'probe.cjs');
+    fs.writeFileSync(probe, [
+      "process.env.CHALK_DOCKERODE_HOOK_DEBUG = '1';",
+      "process.stderr.write = function failDiagnostic() { throw new Error('forced hook failure'); };",
+      "const Image = require('./node_modules/dockerode/lib/image.js');",
+      "if (new Image().push() !== 'original') process.exit(30);",
+      "process.stdout.write('hook-failure-original\\n');",
+      'process.exit(29);',
+      '',
+    ].join('\n'));
+
+    const preload = path.resolve(__dirname, '..', '..', '..', 'src', 'dockerode_post_push', 'register.cjs');
+    const result = spawnSync(process.execPath, [`--require=${preload}`, probe], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 29, result.stderr || result.stdout);
+    assert.equal(result.stdout, 'hook-failure-original\n');
+    assert.equal(result.stderr, '');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

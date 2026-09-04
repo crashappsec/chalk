@@ -43,6 +43,9 @@ SOURCES+=$(shell find src/ -name '*.c4m')
 SOURCES+=$(shell find src/ -name '*.c42spec')
 SOURCES+=$(shell find src/ -name '*.md')
 SOURCES+=$(shell find src/ -name '*.c')
+SOURCES+=$(shell find src/ -name '*.cts')
+SOURCES+=$(shell find src/ -name '*.ts')
+SOURCES+=package.json package-lock.json tsconfig.json tsconfig.base.json tsconfig.bootstrap.json
 SOURCES+=$(shell find ../con4m -name '*.nim' 2> /dev/null)
 SOURCES+=$(shell find ../con4m -name '*.c4m' 2> /dev/null)
 SOURCES+=$(shell find ../nimutils -name '*.nim' 2> /dev/null)
@@ -70,12 +73,13 @@ endif
 # as chalk load modifies existing binary,
 # when no source files change, recopy the backup
 # to get back to original compiled binary
-$(BINARY).bck: $(SOURCES)
+$(BINARY).bck: NODE_RUN=$(DOCKER)
+$(BINARY).bck: transpile $(SOURCES)
 ifneq "$(TMUX)" ""
 	@test -t 0 && reset || true
 	@test -t 0 && tmux clear-history || true
 endif
-	$(DOCKER) nimble -y $(CHALK_BUILD); \
+	CHALK_TYPESCRIPT_BUILT=1 $(DOCKER) nimble -y $(CHALK_BUILD); \
 		_rc=$$?; \
 		touch $(WATCH_DONE); \
 		exit $$_rc
@@ -99,7 +103,7 @@ version:
 
 .PHONY: clean
 clean:
-	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck dist nimble.develop nimble.paths
+	-$(DOCKER) rm -rf $(BINARY) $(BINARY).bck build dist nimble.develop nimble.paths
 
 # WATCH_LOG  - build output is tee'd here on every rebuild cycle.
 #              Truncated once when "make watch" starts (tee opens for write);
@@ -204,8 +208,44 @@ tests: $(BINARY) # note this will rebuild chalk if necessary
 	CI=true docker compose run --rm tests $(make_args) $(args)
 
 .PHONY: unit-tests
-unit-tests:
-	CI=true $(DOCKER) nimble test args='$(args)'
+unit-tests: NODE_RUN=$(DOCKER)
+unit-tests: transpile
+	CHALK_TYPESCRIPT_BUILT=1 CI=true $(DOCKER) nimble test args='$(args)'
+
+.PHONY: node-deps
+node-deps:
+	$(NODE_RUN) npm ci --ignore-scripts --no-audit --no-fund
+
+.PHONY: typecheck
+typecheck: node-deps
+	$(NODE_RUN) npm run typecheck
+
+.PHONY: transpile
+transpile: node-deps
+	$(NODE_RUN) rm -rf build
+	$(NODE_RUN) npm run build:node
+
+.PHONY: verify-transpile
+verify-transpile: node-deps
+	@first=$$(mktemp); second=$$(mktemp); \
+	trap 'rm -f "$$first" "$$second"' EXIT; \
+	$(MAKE) --no-print-directory transpile; \
+	find build -type f -name '*.cjs' | sort | xargs shasum -a 256 > "$$first"; \
+	$(MAKE) --no-print-directory transpile; \
+	find build -type f -name '*.cjs' | sort | xargs shasum -a 256 > "$$second"; \
+	diff -u "$$first" "$$second"
+
+.PHONY: node-unit-tests
+node-unit-tests: typecheck transpile
+	$(NODE_RUN) npm run test:node
+
+.PHONY: node12-bootstrap-test
+node12-bootstrap-test: transpile
+	docker run --rm \
+		-v "$(CURDIR)/build:/chalk/build:ro" \
+		-w /chalk \
+		node:12.22.12-alpine \
+		node build/tests/unit/dockerode_post_push/bootstrap-regression.cjs
 
 .PHONY: parallel
 tests_parallel: make_args=-nauto

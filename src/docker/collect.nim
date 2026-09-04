@@ -376,14 +376,22 @@ proc collectSBOM(chalk: ChalkObj) =
       continue
 
 proc collectLocalImage*(chalk: ChalkObj,
+                        contents: JsonNode,
+                        name: string,
+                        repos: seq[DockerImage] = @[],
+                        configDigest            = "",
+                        ) =
+  chalk.collectImageFrom(contents, name, repos = repos, configDigest = configDigest)
+  chalk.collectProvenance()
+  chalk.collectSBOM()
+
+proc collectLocalImage*(chalk: ChalkObj,
                         name: string,
                         repos: seq[DockerImage] = @[],
                         configDigest            = "",
                         ) =
   let contents = inspectImageJson(name)
-  chalk.collectImageFrom(contents, name, repos = repos, configDigest = configDigest)
-  chalk.collectProvenance()
-  chalk.collectSBOM()
+  chalk.collectLocalImage(contents, name, repos = repos, configDigest = configDigest)
 
 proc collectImageManifest*(chalk: ChalkObj,
                            name:  DockerImage,
@@ -437,6 +445,23 @@ proc collectImage*(chalk: ChalkObj,
       )
     else:
       raise
+
+proc collectImage*(chalk: ChalkObj,
+                   name: DockerImage,
+                   contents: JsonNode,
+                   repos: seq[DockerImage] = @[],
+                   configDigest            = "",
+                   ) =
+  ## Collect from an image inspection already obtained by the caller. This is
+  ## intentionally local-only: a caller with inspected JSON has already chosen
+  ## not to fall back to a registry manifest.
+  trace("docker: collecting image from existing local inspection " & $name)
+  chalk.collectLocalImage(
+    contents,
+    name.asRepoRef(),
+    repos        = @[name] & repos,
+    configDigest = configDigest,
+  )
 
 proc collectContainer*(chalk: ChalkObj, name: string) =
   let

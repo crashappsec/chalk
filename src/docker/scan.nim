@@ -13,6 +13,7 @@ import ".."/[
   plugin_api,
   run_management,
   types,
+  utils/json,
 ]
 import "."/[
   collect,
@@ -24,6 +25,7 @@ import "."/[
 proc scanImage(chalk:         ChalkObj,
                name:          string,
                image:         DockerImage,
+               contents       = JsonNode(nil),
                fromManifest = true,
                ): Option[ChalkObj] =
   if name == "scratch":
@@ -31,11 +33,14 @@ proc scanImage(chalk:         ChalkObj,
   var chalk = chalk
   chalk.withErrorContext():
     try:
-      chalk.collectImage(
-        image,
-        collectFromManifest  = fromManifest,
-        ifManySystemPlatform = true,
-      )
+      if contents == nil:
+        chalk.collectImage(
+          image,
+          collectFromManifest  = fromManifest,
+          ifManySystemPlatform = true,
+        )
+      else:
+        chalk.collectImage(image, contents)
     except:
       trace("docker: " & getCurrentExceptionMsg())
       return none(ChalkObj)
@@ -68,7 +73,26 @@ proc scanImage*(name:          string | DockerImage,
   var chalk = newChalk(name     = name,
                        codec    = getPluginByName("docker"),
                        platform = platform)
+  # Preserve the historical public-call behavior: push and pull callers pass
+  # false here, but this overload has always retained registry-manifest
+  # fallback. Changing that behavior belongs in a separate Chalk decision.
   return chalk.scanImage(name, image)
+
+proc scanImage*(name: string | DockerImage,
+                contents: JsonNode,
+                platform = DockerPlatform(nil),
+                ): Option[ChalkObj] =
+  let
+    image =
+      when name is string:
+        parseImage(name, defaultTag = "")
+      else:
+        name
+    name = $name
+  var chalk = newChalk(name     = name,
+                       codec    = getPluginByName("docker"),
+                       platform = platform)
+  return chalk.scanImage(name, image, contents = contents, fromManifest = false)
 
 proc scanImageOrContainer*(name: string): Option[ChalkObj] =
   var

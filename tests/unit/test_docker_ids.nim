@@ -2,6 +2,10 @@ import std/uri
 import ../../src/types
 import ../../src/docker/ids
 
+const
+  Digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  OtherDigest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
 
@@ -9,6 +13,25 @@ proc image(a, b, c: string): DockerImage =
   return (a, b, c)
 
 proc main() =
+  doAssert repoDigestMatches(
+    "docker.io/library/alpine:latest",
+    Digest,
+    @["alpine@" & Digest],
+  )
+  doAssert repoDigestMatches(
+    "index.docker.io/team/app:release",
+    Digest,
+    @["registry-1.docker.io/team/app@" & Digest],
+  )
+  doAssert repoDigestMatches(
+    "registry.example:5000/team/app:release",
+    Digest,
+    @["registry.example:5000/team/app@" & Digest],
+  )
+  doAssert not repoDigestMatches("alpine:latest", Digest, @[])
+  doAssert not repoDigestMatches("alpine:latest", Digest, @["busybox@" & Digest])
+  doAssert not repoDigestMatches("alpine:latest", Digest, @["alpine@" & OtherDigest])
+
   assertEq(parseImage("foo"), image("foo", "latest", ""))
   assertEq(parseImage("foo/bar"), image("foo/bar", "latest", ""))
   assertEq(parseImage("foo:tag"), image("foo", "tag", ""))

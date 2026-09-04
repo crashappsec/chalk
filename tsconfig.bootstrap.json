@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "alwaysStrict": false,
+    "ignoreDeprecations": "6.0",
+    "lib": ["ES5"],
+    "module": "None",
+    "moduleDetection": "legacy",
+    "moduleResolution": "Classic",
+    "noEmitHelpers": true,
+    "target": "ES5",
+    "tsBuildInfoFile": "./build/.bootstrap.tsbuildinfo",
+    "types": []
+  },
+  "include": ["src/dockerode_post_push/register.ts"]
+}

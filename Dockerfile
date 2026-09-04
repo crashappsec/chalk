@@ -15,6 +15,8 @@ RUN apk add --no-cache \
     git \
     make \
     musl-dev \
+    nodejs \
+    npm \
     openssl \
     strace
 
@@ -32,6 +34,8 @@ RUN apt-get update -y && \
         git \
         make \
         musl-tools \
+        nodejs \
+        npm \
         strace \
         && \
     apt-get clean -y

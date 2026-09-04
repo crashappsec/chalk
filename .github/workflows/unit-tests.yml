@@ -7,7 +7,12 @@ on:
     paths:
       - src/**
       - tests/unit/**
+      - .dockerignore
       - config.nims
+      - Makefile
+      - package.json
+      - package-lock.json
+      - "tsconfig*.json"
       - "*.nimble"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
@@ -16,7 +21,12 @@ on:
     paths:
       - src/**
       - tests/unit/**
+      - .dockerignore
       - config.nims
+      - Makefile
+      - package.json
+      - package-lock.json
+      - "tsconfig*.json"
       - "*.nimble"
       # ignore docs not to waste CI minutes
       - "!src/docs/**"
@@ -91,3 +101,81 @@ jobs:
       - name: Run unit tests
         run: |
           make unit-tests
+
+  node-tests:
+    needs: typescript-build
+    if: |
+      (
+        github.event_name == 'pull_request' &&
+        !contains(github.event.pull_request.body, format('skip:{0}', github.workflow))
+      ) || (
+        github.event_name == 'push'
+      ) || (
+        github.event_name == 'workflow_dispatch'
+      ) || (
+        github.event_name == 'schedule'
+      )
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20", "22.15.0", "22", "24", "26"]
+
+    name: "node-${{ matrix.node-version }}"
+    runs-on: ubuntu-22.04
+
+    concurrency:
+      group: ${{ github.workflow }}-node-${{ matrix.node-version }}-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download emitted Node files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dockerode-node-build
+          path: build
+
+      - name: Install Node test dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Test emitted Node files
+        run: npm run test:node
+
+  typescript-build:
+    name: "typescript-build"
+    runs-on: ubuntu-22.04
+
+    concurrency:
+      group: ${{ github.workflow }}-typescript-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Verify strict types and deterministic output
+        run: make typecheck verify-transpile
+
+      - name: Verify emitted bootstrap on Node 12
+        run: make node12-bootstrap-test
+
+      - name: Upload emitted Node files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dockerode-node-build
+          path: build
+          retention-days: 1

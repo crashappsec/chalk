@@ -1,0 +1,20 @@
+{
+  "name": "@crashoverride/chalk-build",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build-time TypeScript toolchain for Chalk's embedded Dockerode integration",
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.bootstrap.json --noEmit",
+    "build:node": "tsc --project tsconfig.json && tsc --project tsconfig.bootstrap.json && mv build/src/dockerode_post_push/register.js build/src/dockerode_post_push/register.cjs",
+    "test:node": "node --test build/tests/unit/dockerode_post_push/*.test.cjs"
+  },
+  "devDependencies": {
+    "@types/dockerode": "3.3.47",
+    "@types/node": "22.20.1",
+    "dockerode": "3.3.5",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": "^20 || >=22.15"
+  }
+}

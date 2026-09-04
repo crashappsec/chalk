@@ -5,6 +5,7 @@ CLAUDE.md
 /src/utils/pingttl
 /src/getlibpath
 /deps
+/node_modules
 /nimcache
 /pkg
 # universal tags
@@ -20,7 +21,9 @@ chalk-*.tmp
 *.json
 *.jsonl
 !package.json
+!package-lock.json
 !tsconfig.json
+!tsconfig.*.json
 !.github/**.json
 *.pyc
 *.lck
