@@ -132,7 +132,7 @@ def _write_npm_dockerode_fixture(root: Path) -> None:
         )
     )
     (dockerode / "package.json").write_text(
-        json.dumps({"name": "dockerode", "version": "5.0.1"})
+        json.dumps({"name": "dockerode", "version": "3.3.5"})
     )
     (dockerode / "lib").mkdir()
     (dockerode / "lib" / "image.js").write_text("""

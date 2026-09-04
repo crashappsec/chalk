@@ -143,6 +143,9 @@ jobs:
           name: dockerode-node-build
           path: build
 
+      - name: Install Node test dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
       - name: Test emitted Node files
         run: npm run test:node
 

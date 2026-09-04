@@ -36,14 +36,14 @@ test('preload preserves an unrelated Node command', () => {
   }
 });
 
-test('preload patches every resolved Dockerode 5.0.1 copy and no other version', () => {
+test('preload patches every resolved Dockerode 3.3.5 copy and no other version', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chalk-register-hooks-'));
   try {
     const copies = ['one/node_modules/dockerode', 'two/node_modules/dockerode'];
     for (const relative of copies) {
       const root = path.join(dir, relative);
       fs.mkdirSync(path.join(root, 'lib'), { recursive: true });
-      fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'dockerode', version: '5.0.1' }));
+      fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'dockerode', version: '3.3.5' }));
       fs.writeFileSync(path.join(root, 'lib/image.js'), [
         'function Image() {}',
         'Image.prototype.push = function originalPush() { return Promise.resolve(); };',
@@ -51,7 +51,7 @@ test('preload patches every resolved Dockerode 5.0.1 copy and no other version',
         '',
       ].join('\n'));
     }
-    const unsupported = ['4.0.9', '5.0.0', '5.0.2', '5.1.0'];
+    const unsupported = ['3.3.4', '3.3.47', '4.0.9', '5.0.1', '5.0.2'];
     for (const version of unsupported) {
       const root = path.join(dir, version, 'node_modules/dockerode');
       fs.mkdirSync(path.join(root, 'lib'), { recursive: true });
@@ -97,7 +97,7 @@ test('preload fails open when a private loader dependency is missing', () => {
     fs.mkdirSync(path.join(dockerodeRoot, 'lib'), { recursive: true });
     fs.writeFileSync(
       path.join(dockerodeRoot, 'package.json'),
-      JSON.stringify({ name: 'dockerode', version: '5.0.1' }),
+      JSON.stringify({ name: 'dockerode', version: '3.3.5' }),
     );
     fs.writeFileSync(path.join(dockerodeRoot, 'lib', 'image.js'), [
       'function Image() {}',
@@ -134,7 +134,7 @@ test('load-hook instrumentation failures return the original unpatched module', 
     fs.mkdirSync(path.join(dockerodeRoot, 'lib'), { recursive: true });
     fs.writeFileSync(
       path.join(dockerodeRoot, 'package.json'),
-      JSON.stringify({ name: 'dockerode', version: '5.0.1' }),
+      JSON.stringify({ name: 'dockerode', version: '3.3.5' }),
     );
     fs.writeFileSync(path.join(dockerodeRoot, 'lib', 'image.js'), [
       'function Image() {}',

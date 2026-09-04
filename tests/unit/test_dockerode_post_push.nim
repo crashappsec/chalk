@@ -32,23 +32,9 @@ proc main() =
   resetDockerAuthConfig()
   doAssert getDockerAuthConfig(){"auths"}{"sdk.example"}{"auth"}.getStr() == "sdk"
 
-  let
-    priorHome = getEnv("HOME")
-    hadHome = existsEnv("HOME")
-    passwd = getpwuid(getuid())
-  putEnv("HOME", "/tmp/chalk-dockerode-home")
-  doAssert dockerPostPushSocketSupported(
+  doAssert not dockerPostPushSocketSupported(
     "/tmp/chalk-dockerode-home/.docker/run/docker.sock",
   )
-  delEnv("HOME")
-  if passwd != nil and passwd.pw_dir != nil:
-    doAssert dockerPostPushSocketSupported(
-      $passwd.pw_dir / ".docker/run/docker.sock",
-    )
-  if hadHome:
-    putEnv("HOME", priorHome)
-  else:
-    delEnv("HOME")
 
   let payloadFixture = createTempFile("chalk-dockerode-payload-", ".json")
   try:

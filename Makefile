@@ -214,7 +214,7 @@ unit-tests: transpile
 
 .PHONY: node-deps
 node-deps:
-	$(NODE_RUN) npm ci --ignore-scripts
+	$(NODE_RUN) npm ci --ignore-scripts --no-audit --no-fund
 
 .PHONY: typecheck
 typecheck: node-deps

@@ -150,10 +150,10 @@ proc ensureDiagnosticFile(root: string) =
 proc installDockerodePolicy*(root, binaryPath: string): string =
   if not root.isAbsolute():
     raise newException(ValueError, "policy root must be an absolute path")
-  root.requireDirectory("0700", create = true)
+  root.requireDirectory("0711", create = true)
   root.ensureDiagnosticFile()
   let releases = root / "releases"
-  releases.requireDirectory("0700", create = true)
+  releases.requireDirectory("0711", create = true)
 
   let
     binaryHash = newFileStringStream(binaryPath).sha256Hex()

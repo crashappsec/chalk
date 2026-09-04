@@ -42,7 +42,8 @@ proc main() =
   let activation = installDockerodePolicy(root, binary)
   doAssert activation == root / "releases" / binaryHash / "activate.sh"
   doAssert installDockerodePolicy(root, binary) == activation
-  doAssert getFilePermissions(root) == chmodPermissions("0700")
+  doAssert getFilePermissions(root) == chmodPermissions("0711")
+  doAssert getFilePermissions(root / "releases") == chmodPermissions("0711")
   doAssert getFilePermissions(root / "dockerode-diagnostics.jsonl") ==
     chmodPermissions("0600")
   doAssert getFilePermissions(activation.parentDir()) == chmodPermissions("0555")

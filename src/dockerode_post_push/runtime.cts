@@ -1,6 +1,4 @@
 import fs = require('node:fs');
-import os = require('node:os');
-import path = require('node:path');
 import { spawn } from 'node:child_process';
 import { PassThrough } from 'node:stream';
 import { randomUUID } from 'node:crypto';
@@ -17,7 +15,6 @@ type DiagnosticCode =
   | 'posthook_failed'
   | 'posthook_spawn_failed'
   | 'posthook_timeout'
-  | 'socket_resolution_failed'
   | 'terminal_frame_too_large'
   | 'unsupported_auth_shape'
   | 'unsupported_daemon'
@@ -44,7 +41,7 @@ interface PushOptions {
 }
 
 interface DockerodeImageLike {
-  modem?: { getSocketPath?: () => Promise<string> | string };
+  modem?: { socketPath?: unknown; host?: unknown };
   name?: unknown;
 }
 
@@ -118,11 +115,8 @@ interface ImageConstructor {
 }
 
 const PATCHED = Symbol.for('chalk.dockerode.postPush.patched.v1');
-const SUPPORTED_DOCKERODE_VERSION = '5.0.1';
-const DEFAULT_SOCKETS = new Set([
-  '/var/run/docker.sock',
-  path.join(os.homedir(), '.docker/run/docker.sock'),
-]);
+const SUPPORTED_DOCKERODE_VERSION = '3.3.5';
+const SUPPORTED_SOCKET = '/var/run/docker.sock';
 const MAX_INCOMPLETE_FRAME_BYTES = 1024 * 1024;
 const MAX_POST_PUSH_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_POST_PUSH_STDOUT_LINE_BYTES = 64 * 1024;
@@ -164,11 +158,11 @@ function repositoryWithoutTag(name: string): string {
   return colon > slash ? withoutDigest.slice(0, colon) : withoutDigest;
 }
 
-async function supportedOperation(
+function supportedOperation(
   image: DockerodeImageLike,
   opts: PushOptions,
   meta?: OperationMetadata,
-): Promise<Operation> {
+): Operation {
   if (process.platform !== 'linux' && process.env.CHALK_DOCKERODE_TEST_PLATFORM !== 'linux') {
     return { supported: false, code: 'unsupported_platform' };
   }
@@ -183,16 +177,14 @@ async function supportedOperation(
   if (opts.platform !== undefined) {
     return { supported: false, code: 'unsupported_platform_option' };
   }
-  if (!image.modem || typeof image.modem.getSocketPath !== 'function') {
+  if (!image.modem || typeof image.modem !== 'object') {
     return { supported: false, code: 'unsupported_modem' };
   }
-  let socketPath: string;
-  try {
-    socketPath = await image.modem.getSocketPath();
-  } catch (_) {
-    return { supported: false, code: 'socket_resolution_failed' };
+  const socketPath = image.modem.socketPath;
+  if (typeof socketPath !== 'string') {
+    return { supported: false, code: 'unsupported_modem' };
   }
-  if (!DEFAULT_SOCKETS.has(socketPath)) {
+  if (socketPath !== SUPPORTED_SOCKET) {
     return { supported: false, code: 'unsupported_daemon', socketPath };
   }
 
@@ -451,9 +443,8 @@ function invokePostPush(operation: SupportedOperation, digest: string): Promise<
   });
 }
 
-async function finishBuffered<T>(value: T, operationPromise: Promise<Operation>): Promise<T> {
+async function finishBuffered<T>(value: T, operation: Operation): Promise<T> {
   try {
-    const operation = await operationPromise;
     if (!operation.supported) {
       diagnostic(operation.code, { socketPath: operation.socketPath, message: operation.message });
       return value;
@@ -472,7 +463,7 @@ async function finishBuffered<T>(value: T, operationPromise: Promise<Operation>)
   return value;
 }
 
-function finishStream(source: Readable, operationPromise: Promise<Operation>): Readable {
+function finishStream(source: Readable, operation: Operation): Readable {
   const tracker = createTerminalTracker();
   let ended = false;
   let sourceFailed = false;
@@ -499,7 +490,6 @@ function finishStream(source: Readable, operationPromise: Promise<Operation>): R
   source.once('end', async () => {
     if (sourceFailed || cancelled) return;
     try {
-      const operation = await operationPromise;
       if (!operation.supported) {
         diagnostic(operation.code, { socketPath: operation.socketPath, message: operation.message });
       } else {
@@ -508,12 +498,16 @@ function finishStream(source: Readable, operationPromise: Promise<Operation>): R
           diagnostic(terminal.overflow ? 'terminal_frame_too_large' : 'missing_terminal_digest');
         } else await invokePostPush(operation, terminal.digest);
       }
-      ended = true;
-      proxy.end();
+      if (!cancelled && !proxy.destroyed) {
+        ended = true;
+        proxy.end();
+      }
     } catch (error) {
       diagnostic('posthook_exception', { message: error instanceof Error ? error.message : String(error) });
-      ended = true;
-      proxy.end();
+      if (!cancelled && !proxy.destroyed) {
+        ended = true;
+        proxy.end();
+      }
     }
   });
   return proxy;
@@ -538,14 +532,16 @@ function patchImage(Image: unknown, meta?: OperationMetadata): void {
     const operationOpts: PushOptions = { ...normalizedOpts };
     operationOpts.authconfig = normalizedOpts.authconfig ||
       (typeof callback === 'function' ? auth : callback);
-    // Attach a rejection handler immediately. The original push can fail before
-    // callback/stream paths ever consume this classification promise, and an
-    // instrumentation-only rejection must never become unhandled process state.
-    const operationPromise: Promise<Operation> = supportedOperation(this, operationOpts, meta).catch((error): UnsupportedOperation => ({
-      supported: false,
-      code: 'instrumentation_exception',
-      message: error instanceof Error ? error.message : String(error),
-    }));
+    let operation: Operation;
+    try {
+      operation = supportedOperation(this, operationOpts, meta);
+    } catch (error) {
+      operation = {
+        supported: false,
+        code: 'instrumentation_exception',
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
 
     if (callbackFn === undefined) {
       let result: Promise<PushResult> | void;
@@ -556,8 +552,8 @@ function patchImage(Image: unknown, meta?: OperationMetadata): void {
       }
       if (!result || typeof result.then !== 'function') return result;
       return result.then((value: PushResult) => {
-        if (normalizedOpts.stream === false) return finishBuffered(value, operationPromise);
-        return finishStream(value as Readable, operationPromise);
+        if (normalizedOpts.stream === false) return finishBuffered(value, operation);
+        return finishStream(value as Readable, operation);
       });
     }
 
@@ -565,12 +561,12 @@ function patchImage(Image: unknown, meta?: OperationMetadata): void {
     const replacement: PushCallback = function (error, value) {
       if (error) return callbackFn(error, value);
       if (normalizedOpts.stream === false) {
-        finishBuffered(value, operationPromise).then(
+        finishBuffered(value, operation).then(
           (result) => callbackFn(null, result),
           () => callbackFn(null, value),
         );
       } else {
-        callbackFn(null, finishStream(value as Readable, operationPromise));
+        callbackFn(null, finishStream(value as Readable, operation));
       }
     };
     const args = Array.from(rawArgs) as PushArguments;

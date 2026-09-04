@@ -22,15 +22,14 @@
 ### New Features
 
 - New `chalk dockerode -- <command> [args...]` wrapper adds
-  fail-open post-push telemetry to Dockerode 5.x image pushes. It uses the
+  fail-open post-push telemetry to Dockerode 3.3.5 image pushes. It uses the
   versioned `chalk-docker-post-push/v1` stdin handoff after a successful push
   and preserves the application's push result if instrumentation is unsupported
-  or post-processing fails. Node 22.15+, 24, and 26 are supported; known-EOL,
-  odd-numbered non-LTS, and prerelease builds are excluded, and later capable
-  even-numbered majors are enabled on a best-effort basis. Support is bounded
+  or post-processing fails. Node 20, Node 22.15 or newer, Node 24, and Node 26
+  are supported. Other Node releases are excluded. Support is bounded
   to a foreground publisher tree whose instrumented descendants finish before
   the wrapped command returns, Linux, an explicit tag, no Dockerode platform
-  override, and the default rootful or user Docker socket; backgrounded or
+  override, and the default rootful Docker socket; backgrounded or
   daemonized descendants are unsupported. The wrapper supplies a five-minute
   post-processing deadline by default and rejects longer deadlines.
   Its embedded Node loader is authored and strictly checked in TypeScript at

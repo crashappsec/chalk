@@ -13,9 +13,9 @@ import {
   terminalDigest,
 } from '../../../src/dockerode_post_push/runtime.cjs';
 
-test('only Dockerode 5.0.1 is supported', () => {
-  assert.equal(isSupportedDockerodeVersion('5.0.1'), true);
-  for (const version of ['3.3.47', '4.0.9', '5.0.0', '5.0.2', '5.1.0', '']) {
+test('only Dockerode 3.3.5 is supported', () => {
+  assert.equal(isSupportedDockerodeVersion('3.3.5'), true);
+  for (const version of ['3.3.4', '3.3.47', '4.0.9', '5.0.1', '5.0.2', '']) {
     assert.equal(isSupportedDockerodeVersion(version), false, version);
   }
 });
@@ -27,7 +27,8 @@ interface Fixture {
 }
 
 interface TestModem {
-  getSocketPath(): Promise<string>;
+  socketPath?: string;
+  getSocketPath?: () => Promise<string>;
 }
 
 interface TestPushOptions {
@@ -123,7 +124,7 @@ function imageClass(options: ImageClassOptions = {}): new (modem: TestModem, nam
 }
 
 function modem(): TestModem {
-  return { getSocketPath: () => Promise.resolve('/var/run/docker.sock') };
+  return { socketPath: '/var/run/docker.sock' };
 }
 
 test('reference helpers parse registry ports, tags, and terminal digests', () => {
@@ -184,7 +185,7 @@ test('stream contract performs one push, preserves bytes, and delays end for the
   process.env.TEST_HOOK_DELAY = '80';
   try {
     const Image = imageClass();
-    patchImage(Image, { version: '5.0.1', packageRoot: '/fixture/dockerode' });
+    patchImage(Image, { version: '3.3.5', packageRoot: '/fixture/dockerode' });
     const image = new Image(modem(), 'registry.example:5000/team/app:ignored');
     const start = Date.now();
     const stream = await image.push({
@@ -222,7 +223,7 @@ test('stream contract preserves and instruments a response larger than 1 MiB', a
   const largeBody = Buffer.concat(pieces);
   try {
     const Image = imageClass({ body: largeBody });
-    patchImage(Image, { version: '5.0.1' });
+    patchImage(Image, { version: '3.3.5' });
     const image = new Image(modem(), 'team/app');
     const chunks: Buffer[] = [];
     for await (const chunk of await image.push({ tag: 'one' })) chunks.push(chunk);
@@ -240,7 +241,7 @@ test('missing deadline skips the post-hook without changing push success', async
   delete process.env.CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS;
   try {
     const Image = imageClass();
-    patchImage(Image, { version: '5.0.1' });
+    patchImage(Image, { version: '3.3.5' });
     const image = new Image(modem(), 'team/app');
     const chunks: Buffer[] = [];
     for await (const chunk of await image.push({ tag: 'one' })) chunks.push(chunk);
@@ -259,7 +260,7 @@ test('buffered callback preserves identity and waits for a fail-open hook', asyn
   process.env.TEST_HOOK_EXIT = '1';
   try {
     const Image = imageClass({ stream: false });
-    patchImage(Image, { version: '5.0.1' });
+    patchImage(Image, { version: '3.3.5' });
     const image = new Image(modem(), 'team/app');
     const value = await new Promise<TestPushValue | undefined>((resolve, reject) => {
       const returned = image.push({ tag: 'one', stream: false }, (error: Error | null, data?: TestPushValue) => {
@@ -304,7 +305,7 @@ test('configured stdout reports are forwarded while the internal result is consu
   try {
     try {
       const Image = imageClass({ stream: false });
-      patchImage(Image, { version: '5.0.1' });
+      patchImage(Image, { version: '3.3.5' });
       const image = new Image(modem(), 'team/app');
       assert.equal(await image.push({ tag: 'one', stream: false }), BODY);
     } finally {
@@ -323,30 +324,43 @@ test('unsupported, custom-socket, and failed pushes never invoke the post-hook',
   const restore = environment(fx);
   try {
     const Unsupported = imageClass({ stream: false });
-    patchImage(Unsupported, { version: '5.0.1' });
+    patchImage(Unsupported, { version: '3.3.5' });
     const unsupported = new Unsupported(modem(), 'team/app');
     assert.equal(await unsupported.push({ stream: false }), BODY);
 
     const CustomSocket = imageClass({ stream: false });
-    patchImage(CustomSocket, { version: '5.0.1' });
+    patchImage(CustomSocket, { version: '3.3.5' });
     const customSocket = new CustomSocket(
-      { getSocketPath: () => Promise.resolve('/tmp/other-docker.sock') },
+      { socketPath: '/tmp/other-docker.sock' },
       'team/app',
     );
     assert.equal(await customSocket.push({ tag: 'one', stream: false }), BODY);
 
+    const NewerModem = imageClass({ stream: false });
+    patchImage(NewerModem, { version: '3.3.5' });
+    const newerModem = new NewerModem(
+      { getSocketPath: () => Promise.resolve('/var/run/docker.sock') },
+      'team/app',
+    );
+    assert.equal(await newerModem.push({ tag: 'one', stream: false }), BODY);
+
     const Failing = imageClass({ fail: true });
-    patchImage(Failing, { version: '5.0.1' });
+    patchImage(Failing, { version: '3.3.5' });
     const failing = new Failing(modem(), 'team/app');
     await assert.rejects(failing.push({ tag: 'one' }), /engine push failed/);
 
     assert.equal(fs.existsSync(fx.payloads), false);
     assert.equal(unsupported.calls, 1);
     assert.equal(customSocket.calls, 1);
+    assert.equal(newerModem.calls, 1);
     assert.equal(failing.calls, 1);
     assert.match(
       fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'),
       /"code":"unsupported_daemon".*"socketPath":"\/tmp\/other-docker\.sock"/,
+    );
+    assert.match(
+      fs.readFileSync(process.env.CHALK_DOCKERODE_LOG!, 'utf8'),
+      /"code":"unsupported_modem"/,
     );
   } finally {
     restore();
@@ -359,18 +373,18 @@ test('all guarded option and runtime shapes skip instrumentation fail-open', asy
   try {
     const cases = [
       { meta: { version: '4.0.0' }, opts: { tag: 'one', stream: false } },
-      { meta: { version: '5.0.1' }, opts: { tag: 'one', platform: 'linux/arm64', stream: false } },
-      { meta: { version: '5.0.1' }, opts: { tag: 'one', authconfig: {}, stream: false } },
+      { meta: { version: '3.3.5' }, opts: { tag: 'one', platform: 'linux/arm64', stream: false } },
+      { meta: { version: '3.3.5' }, opts: { tag: 'one', authconfig: {}, stream: false } },
       {
-        meta: { version: '5.0.1' },
+        meta: { version: '3.3.5' },
         opts: { tag: 'one', authconfig: { username: '', password: 'secret', serveraddress: 'registry.example' }, stream: false },
       },
       {
-        meta: { version: '5.0.1' },
+        meta: { version: '3.3.5' },
         opts: { tag: 'one', authconfig: { username: 'user', password: '', serveraddress: 'registry.example' }, stream: false },
       },
       {
-        meta: { version: '5.0.1' },
+        meta: { version: '3.3.5' },
         opts: { tag: 'one', authconfig: { username: 'user', password: 'secret', serveraddress: '' }, stream: false },
       },
     ];
@@ -404,7 +418,7 @@ test('synchronous throws and stream failures preserve the original failure and s
         throw syncError;
       }
     }
-    patchImage(ThrowingImage, { version: '5.0.1' });
+    patchImage(ThrowingImage, { version: '3.3.5' });
     const throwing = new ThrowingImage(modem(), 'team/app');
     assert.throws(() => throwing.push({ tag: 'one' }), (error: unknown) => error === syncError);
     assert.equal(throwing.calls, 1);
@@ -423,7 +437,7 @@ test('synchronous throws and stream failures preserve the original failure and s
         return Promise.resolve(source);
       }
     }
-    patchImage(StreamingImage, { version: '5.0.1' });
+    patchImage(StreamingImage, { version: '3.3.5' });
     const streaming = new StreamingImage(modem(), 'team/app');
     let observed: unknown;
     try {
@@ -448,7 +462,7 @@ test('post-hook spawn failure is diagnostic-only', async () => {
   process.env.CHALK_DOCKERODE_CHALK = path.join(fx.dir, 'missing-chalk');
   try {
     const Image = imageClass();
-    patchImage(Image, { version: '5.0.1' });
+    patchImage(Image, { version: '3.3.5' });
     const image = new Image(modem(), 'team/app');
     const chunks: Buffer[] = [];
     for await (const chunk of await image.push({ tag: 'one' })) chunks.push(chunk);
@@ -465,7 +479,7 @@ test('instrumentation exceptions are fail-open for buffered promises', async () 
   const restore = environment(fx);
   try {
     const Image = imageClass({ stream: false });
-    patchImage(Image, { version: '5.0.1' });
+    patchImage(Image, { version: '3.3.5' });
     const image = new Image(modem(), 'team/app');
     Object.defineProperty(image, 'name', {
       get() { throw new Error('instrumentation-only failure'); },
@@ -492,7 +506,7 @@ test('destroying the proxy aborts the Engine stream and skips post-push', async 
         return Promise.resolve(source);
       }
     }
-    patchImage(StreamingImage, { version: '5.0.1' });
+    patchImage(StreamingImage, { version: '3.3.5' });
     const image = new StreamingImage(modem(), 'team/app');
     const stream = await image.push({ tag: 'one' });
     const closed = new Promise((resolve) => stream.once('close', resolve));
@@ -514,7 +528,7 @@ test('post-hook deadline delays only to the deadline and preserves stream succes
   process.env.CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS = '50';
   try {
     const Image = imageClass();
-    patchImage(Image, { version: '5.0.1' });
+    patchImage(Image, { version: '3.3.5' });
     const image = new Image(modem(), 'team/app');
     const start = Date.now();
     const stream = await image.push({ tag: 'one' });
@@ -539,7 +553,7 @@ test('post-hook timeout terminates its process group, including descendants', as
   process.env.CHALK_DOCKERODE_POST_PUSH_TIMEOUT_MS = '500';
   try {
     const Image = imageClass();
-    patchImage(Image, { version: '5.0.1' });
+    patchImage(Image, { version: '3.3.5' });
     const image = new Image(modem(), 'team/app');
     const chunks: Buffer[] = [];
     for await (const chunk of await image.push({ tag: 'one' })) chunks.push(chunk);
@@ -562,7 +576,7 @@ test('callback error is the original object and does not invoke the post-hook', 
   process.on('unhandledRejection', observeUnhandled);
   try {
     const Image = imageClass({ fail: true });
-    patchImage(Image, { version: '5.0.1' });
+    patchImage(Image, { version: '3.3.5' });
     const image = new Image(modem(), 'team/app');
     Object.defineProperty(image, 'name', {
       get() { throw new Error('unused instrumentation failure'); },
