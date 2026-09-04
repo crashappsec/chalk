@@ -103,7 +103,6 @@ raise SystemExit(7)
         "node:crypto",
         "node:fs",
         "node:module",
-        "node:os",
         "node:path",
         "node:stream",
         "node:url",
