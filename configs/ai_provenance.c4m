@@ -26,8 +26,9 @@ in this build:
 - `build_agent=<name>` -- the agent harness that invoked chalk, detected from
   the environment. Detection order mirrors `gh`'s, so chalk and `gh` attribute
   a build to the same agent.
-- `trailer=<line>` -- an AI-authorship trailer on HEAD (`Co-Authored-By:`,
-  `Assisted-by:`, `Generated-by:`, `Claude-Session:`). Repeatable.
+- `trailer=<line>` -- an AI-authorship trailer on HEAD (`Assisted-by:`,
+  `Generated-by:`, `Claude-Session:`, plus `Co-Authored-By:` when it names a
+  known agent identity). Repeatable.
 - `identity=<role> <name> <email>` -- HEAD author or committer matching a known
   agent identity. Catches tools such as Aider that rewrite the git identity
   instead of adding a trailer.
@@ -46,16 +47,32 @@ raw trailer text is always available in COMMIT_MESSAGE regardless.
 # attribute the same build to the same agent:
 # https://github.com/cli/cli/blob/trunk/internal/agents/detect.go
 #
-# AI_AGENT is checked first and returned verbatim. It is a de facto convention
-# originating from Vercel's detect-agent, not a ratified standard: it is
-# undocumented by Anthropic, unset by Codex and Gemini CLI, and the competing
-# proposal (agentsmd/agents.md#136) names the variable AGENT instead. Hence the
-# per-vendor fallbacks below.
+# AI_AGENT is a de facto convention originating from Vercel's detect-agent, not
+# a ratified standard. Like gh, we accept it only when it is safe for
+# attribution surfaces. AGENT is currently recognized only for Amp; other values
+# are too broad to override the vendor-specific fallbacks below.
+func ai_valid_agent_name(name: string) {
+  if name == "" {
+    return false
+  }
+
+  chars := to_chars(name)
+  for i from 0 to len(chars) {
+    ch := chars[i]
+    if not ((ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') or
+            (ch >= '0' and ch <= '9') or ch == '-' or ch == '_') {
+      return false
+    }
+  }
+  return true
+}
+
 func ai_build_agent() {
-  if env("AI_AGENT") != "" {
-    return env("AI_AGENT")
-  } elif env("AGENT") != "" {
-    return env("AGENT")
+  agent := env("AI_AGENT")
+  if ai_valid_agent_name(agent) {
+    return agent
+  } elif env("AGENT") == "amp" {
+    return "amp"
   } elif env_exists("CODEX_SANDBOX") or env_exists("CODEX_CI") or env_exists("CODEX_THREAD_ID") {
     return "codex"
   } elif env_exists("GEMINI_CLI") {
@@ -71,25 +88,35 @@ func ai_build_agent() {
   } elif env_exists("REPL_ID") {
     return "replit"
   } elif env_exists("CLAUDE_CODE_IS_COWORK") {
-    return "claude-cowork"
+    return "cowork"
   } elif env_exists("CLAUDECODE") or env_exists("CLAUDE_CODE") {
     return "claude-code"
   } elif env_exists("CURSOR_TRACE_ID") {
     return "cursor"
   } elif env_exists("CURSOR_AGENT") or env("CURSOR_EXTENSION_HOST_ROLE") == "agent-exec" {
     return "cursor-cli"
+  } elif env("TERM_PROGRAM") == "kiro" {
+    return "kiro"
+  } elif contains(env("PATH"), "/.pi/agent") or contains(env("PATH"), "\\.pi\\agent") {
+    return "pi"
   } elif env_exists("GOOSE_PROVIDER") {
     return "goose"
   }
   return ""
 }
 
-# Trailer tokens: the vendor defaults (co-authored-by, claude-session) plus the
-# forms mandated by project policy -- Fedora and the Linux kernel both require
-# `Assisted-by:`, and the kernel forbids AI agents adding Signed-off-by at all.
+# Trailer tokens: vendor defaults plus the forms mandated by project policy --
+# Fedora and the Linux kernel both require `Assisted-by:`, and the kernel
+# forbids AI agents adding Signed-off-by at all. `Co-Authored-By:` is also
+# common human authorship metadata, so we keep only entries naming known agent
+# identities.
 # https://docs.kernel.org/process/coding-assistants.html
+func ai_identity_pattern() {
+  return "aider@aider\\.chat|noreply@anthropic\\.com|copilot@github\\.com|noreply@openai\\.com|aider \\("
+}
+
 func ai_trailer_grep() {
-  return "grep -iE '^(co-authored-by|assisted-by|generated-by|claude-session):'"
+  return "grep -iE '^(assisted-by|generated-by|claude-session):|^co-authored-by:.*(" + ai_identity_pattern() + ")'"
 }
 
 # Aider is the case a trailer-only check misses: `attribute_co_authored_by`
@@ -97,7 +124,7 @@ func ai_trailer_grep() {
 # vendor addresses plus aider's literal `aider (<model>)` name form, rather than
 # on bare product names, which collide with human names (e.g. "Devin").
 func ai_identity_grep() {
-  return "grep -iE 'aider@aider\\.chat|noreply@anthropic\\.com|copilot@github\\.com|noreply@openai\\.com|aider \\('"
+  return "grep -iE '" + ai_identity_pattern() + "'"
 }
 
 # Appends each non-empty line of `text` to `acc` as `field=<line>`.
@@ -139,14 +166,14 @@ func ai_authorship(contexts: string) {
   for i from 0 to len(dirs) {
     dir := dirs[i]
     if dir != "" and is_dir(dir) {
-      base := git_exe + " -C '" + dir + "' log -1 "
+      base := quote(git_exe) + " -C " + quote(dir) + " log -1 "
 
-      trailers := strip(run(base + "--format=%B 2>/dev/null | " +
+      trailers := strip(run(base + quote("--format=%B") + " 2>/dev/null | " +
                             ai_trailer_grep() + " || true"))
       result := ai_append_lines(result, "trailer", trailers)
 
       idents := strip(run(base +
-                          "--format='author %an <%ae>%ncommitter %cn <%ce>' " +
+                          quote("--format=author %an <%ae>%ncommitter %cn <%ce>") + " " +
                           "2>/dev/null | " + ai_identity_grep() + " || true"))
       result := ai_append_lines(result, "identity", idents)
     }
