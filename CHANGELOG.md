@@ -14,12 +14,14 @@
   `retrying without chalk` and rebuilt unwrapped, so CI stayed green while the
   pushed image carried no chalk mark -- no build/push records and no deployment
   correlation for the affected images.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
 
 - Fixed a heap buffer overflow in the certs codec's `BIO_all()`. It built its
   result with `strndup()`, which stops at the first NUL, while the running
   `total` counted every byte read. On binary payloads the allocation was
   therefore smaller than `total` claimed, so the copy loop over-read and the
   trailing NUL-termination writes ran past the end of the buffer.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
 
 - Fixed X.509 metadata being dropped for EC certificates. The public key was
   encoded with the `PKCS1` structure, which is RSA-only, so for EC keys the
@@ -28,6 +30,7 @@
   every field after `Serial` -- key type, signature type, validity, signature
   and all extensions -- was silently lost. The encoder now uses
   `SubjectPublicKeyInfo`, which covers every key type.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
 
 - Fixed memory leaks in the certs codec. `extract_cert_data()` never released
   the `X509`, `EVP_PKEY`, `BIGNUM` or encoder context; `cleanup_key_value()`
@@ -35,6 +38,7 @@
   `issuer_short` were never freed at all. Scanning a 119-certificate CA bundle
   leaked 771KB. The serial was also allocated by OpenSSL and released with
   `free()` rather than `OPENSSL_free()`.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
 
 ## 1.2.0
 
