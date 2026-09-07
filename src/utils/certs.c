@@ -20,8 +20,20 @@ int
 convert_ASN1TIME(ASN1_TIME *t, char *buf, size_t len)
 {
     int  rc;
-    BIO *b = BIO_new(BIO_s_mem());
-    rc     = ASN1_TIME_print(b, t);
+    BIO *b;
+
+    if (buf == NULL || len == 0) {
+        return -1;
+    }
+    buf[0] = 0;
+    if (t == NULL) {
+        return -1;
+    }
+    b = BIO_new(BIO_s_mem());
+    if (b == NULL) {
+        return -1;
+    }
+    rc = ASN1_TIME_print(b, t);
     if (rc <= 0) {
         BIO_free(b);
         return -1;
@@ -32,17 +44,27 @@ convert_ASN1TIME(ASN1_TIME *t, char *buf, size_t len)
         return -1;
     }
     BIO_free(b);
-    return -1;
+    return 0;
 }
 
 char *
 convert_ASN1STRING(ASN1_BIT_STRING *s)
 {
-    int            l      = ASN1_STRING_length(s);
+    int            l      = (s == NULL) ? 0 : ASN1_STRING_length(s);
+    unsigned char *data;
+    char          *result;
+    char          *cur;
+
+    if (l <= 0) {
+        return calloc(1, 1);
+    }
     // each byte is 2 hex plus colon or last char NULL
-    char          *result = calloc(l * 3, 1);
-    unsigned char *data   = ASN1_STRING_get0_data(s);
-    char          *cur    = result;
+    result = calloc(l * 3, 1);
+    if (result == NULL) {
+        return NULL;
+    }
+    data   = ASN1_STRING_get0_data(s);
+    cur    = result;
 
     for (int i = 0; i < l - 1; i++) {
         sprintf(cur, "%02x:", data[i]);
@@ -72,11 +94,9 @@ convert_NAME(X509_NAME *n, int short_name)
             OBJ_obj2txt(scratch, 200, key, 1);
             key_value[ix++] = strdup(scratch);
         } else {
-            if (short_name) {
-                key_value[ix++] = strdup(OBJ_nid2sn(nid));
-            } else {
-                key_value[ix++] = strdup(OBJ_nid2ln(nid));
-            }
+            const char *nid_name = short_name ? OBJ_nid2sn(nid)
+                                             : OBJ_nid2ln(nid);
+            key_value[ix++] = strdup(nid_name == NULL ? "" : nid_name);
         }
 
         int len = ASN1_STRING_to_UTF8(&utf8, value);
@@ -99,17 +119,31 @@ BIO_all(BIO *bio)
     char    *cur;
     char     scratch[PIPE_BUF];
     int      total;
+    int      lastchar;
 
-    BIO_get_mem_ptr(bio, &bptr);
-    int n = BIO_read(bio, scratch, PIPE_BUF);
-    if (!n) {
+    if (BIO_get_mem_ptr(bio, &bptr) <= 0 || bptr == NULL) {
         return NULL;
     }
-    result = strndup(scratch, n);
+    int n = BIO_read(bio, scratch, PIPE_BUF);
+    if (n <= 0) {
+        return NULL;
+    }
+    // memcpy, not strndup: the payload is binary and may contain NULs, in
+    // which case strndup would allocate only up to the first one while `total`
+    // kept counting every byte read -- so every later index derived from
+    // `total` or bptr->length ran off the end of the allocation.
+    result = calloc((size_t)n + 1, 1);
+    if (result == NULL) {
+        return NULL;
+    }
+    memcpy(result, scratch, n);
     total  = n;
 
     while ((n = BIO_read(bio, scratch, PIPE_BUF)) > 0) {
-        cur = calloc(total + n + 1, 1);
+        cur = calloc((size_t)total + n + 1, 1);
+        if (cur == NULL) {
+            return result;
+        }
         memcpy(cur, result, total);
         memcpy(cur + total, scratch, n);
         free(result);
@@ -117,12 +151,12 @@ BIO_all(BIO *bio)
         total  = total + n;
     }
 
-    int lastchar = bptr->length;
+    lastchar = (int)bptr->length;
 
     // BIO_read sometimes reads more bytes,
     // possibly for not-NULL terminated objects
-    if (bptr->length < total) {
-        result[bptr->length] = 0;
+    if (lastchar >= 0 && lastchar < total) {
+        result[lastchar] = 0;
 
         // remove newlines
         if (lastchar > 1
@@ -170,18 +204,35 @@ extract_cert_data(BIO *fdb)
     char              scratch[2000];
     int               version    = ((int)X509_get_version(cert)) + 1;
     EVP_PKEY         *pub        = X509_get_pubkey(cert);
+    if (pub == NULL) {
+        // Unparseable/unsupported public key. Treat the whole record as not a
+        // certificate rather than dereferencing NULL below.
+        X509_free(cert);
+        return NULL;
+    }
     int               keynid     = EVP_PKEY_base_id(pub);
-    char             *keytype    = strdup(OBJ_nid2ln(keynid));
+    const char       *keytype_ln = OBJ_nid2ln(keynid);
+    char             *keytype    = strdup(keytype_ln == NULL ? "" : keytype_ln);
     int               keysize    = EVP_PKEY_get_bits(pub);
     int               signid     = X509_get_signature_nid(cert);
-    char             *sigtype    = strdup(OBJ_nid2ln(signid));
+    const char       *sigtype_ln = OBJ_nid2ln(signid);
+    char             *sigtype    = strdup(sigtype_ln == NULL ? "" : sigtype_ln);
     ASN1_BIT_STRING  *sig;
     X509_ALGOR       *sigalg;
     X509_NAME        *subj       = X509_get_subject_name(cert);
     X509_NAME        *issuer     = X509_get_issuer_name(cert);
     ASN1_INTEGER     *sn         = X509_get_serialNumber(cert);
     BIGNUM           *bn         = ASN1_INTEGER_to_BN(sn, NULL);
-    char             *serial     = BN_bn2dec(bn);
+    char             *bn_dec     = (bn == NULL) ? NULL : BN_bn2dec(bn);
+    // Copy onto the normal heap: everything in key_value is released with
+    // free(), not OPENSSL_free().
+    char             *serial     = strdup(bn_dec == NULL ? "" : bn_dec);
+    if (bn_dec != NULL) {
+        OPENSSL_free(bn_dec);
+    }
+    if (bn != NULL) {
+        BN_free(bn);
+    }
     ASN1_TIME        *atime      = X509_get_notBefore(cert);
     convert_ASN1TIME(atime, scratch, 200);
     char             *not_before = strdup(scratch);
@@ -193,9 +244,12 @@ extract_cert_data(BIO *fdb)
         pub,
         OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
         "PEM",
-        "PKCS1",
+        "SubjectPublicKeyInfo",
         NULL);
-    OSSL_ENCODER_to_bio(encoder, key_bio);
+    if (encoder != NULL) {
+        OSSL_ENCODER_to_bio(encoder, key_bio);
+        OSSL_ENCODER_CTX_free(encoder);
+    }
 
     X509_get0_signature(&sig, &sigalg, cert);
 
@@ -209,12 +263,17 @@ extract_cert_data(BIO *fdb)
     }
 
     char **key_value = calloc(sizeof(char *), FIXED_LEN + num_exts * 2);
+    if (key_value == NULL) {
+        EVP_PKEY_free(pub);
+        X509_free(cert);
+        return NULL;
+    }
 
     int ix              = 0;
     key_value[ix++]     = strdup("Serial");
     key_value[ix++]     = serial;
     key_value[ix++]     = strdup("Key");
-    key_value[ix++]     = key_contents;
+    key_value[ix++]     = (key_contents == NULL) ? strdup("") : key_contents;
     key_value[ix++]     = strdup("Key Type");
     key_value[ix++]     = keytype;
     key_value[ix++]     = strdup("Signature Type");
@@ -266,6 +325,11 @@ extract_cert_data(BIO *fdb)
     key_value[ix++] = 0;
 
     Cert *result          = malloc(sizeof(Cert));
+    if (result == NULL) {
+        EVP_PKEY_free(pub);
+        X509_free(cert);
+        return NULL;
+    }
     result->key_value     = key_value;
     result->subject       = convert_NAME(subj, 0);
     result->subject_short = convert_NAME(subj, 1);
@@ -273,26 +337,40 @@ extract_cert_data(BIO *fdb)
     result->issuer_short  = convert_NAME(issuer, 1);
     result->version       = version;
     result->key_size      = keysize;
+
+    // subj/issuer point into cert, so this must come after convert_NAME.
+    EVP_PKEY_free(pub);
+    X509_free(cert);
+
     return result;
 }
 
 void
 cleanup_key_value(char **kv)
 {
+    if (kv == NULL) {
+        return;
+    }
     char **info = kv;
     char *p     = *info++;
     while (p) {
         free(p);
         p = *info++;
     }
+    free(kv);
 }
 
 void
 cleanup_cert_info(Cert *cert)
 {
+    if (cert == NULL) {
+        return;
+    }
     cleanup_key_value(cert->key_value);
     cleanup_key_value(cert->subject);
+    cleanup_key_value(cert->subject_short);
     cleanup_key_value(cert->issuer);
+    cleanup_key_value(cert->issuer_short);
     free(cert);
 }
 
