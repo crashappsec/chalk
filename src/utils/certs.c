@@ -15,6 +15,10 @@
 #include <openssl/types.h>
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
+#include <limits.h>
+#include <stdint.h>
+
+void cleanup_key_value(char **kv);
 
 int
 convert_ASN1TIME(ASN1_TIME *t, char *buf, size_t len)
@@ -58,8 +62,11 @@ convert_ASN1STRING(ASN1_BIT_STRING *s)
     if (l <= 0) {
         return calloc(1, 1);
     }
+    if ((size_t)l > SIZE_MAX / 3) {
+        return NULL;
+    }
     // each byte is 2 hex plus colon or last char NULL
-    result = calloc(l * 3, 1);
+    result = calloc((size_t)l * 3, 1);
     if (result == NULL) {
         return NULL;
     }
@@ -78,34 +85,48 @@ convert_ASN1STRING(ASN1_BIT_STRING *s)
 char **
 convert_NAME(X509_NAME *n, int short_name)
 {
-    int l            = X509_NAME_entry_count(n);
-    char **key_value = calloc(sizeof(char *), l * 2 + 1);
-    int ix           = 0;
-    for (int i = 0; i < l; i++) {
+    int count        = X509_NAME_entry_count(n);
+    size_t capacity  = (size_t)count * 2 + 1;
+    char **key_value = calloc(capacity, sizeof(*key_value));
+    size_t ix         = 0;
+    if (key_value == NULL) {
+        return NULL;
+    }
+    for (int i = 0; i < count; i++) {
         X509_NAME_ENTRY *entry = X509_NAME_get_entry(n, i);
         ASN1_OBJECT     *key   = X509_NAME_ENTRY_get_object(entry);
-        unsigned         nid   = OBJ_obj2nid(key);
         ASN1_STRING     *value = X509_NAME_ENTRY_get_data(entry);
-        unsigned char   *utf8;
+        unsigned char *utf8;
+        int nid = OBJ_obj2nid(key);
 
         if (nid == NID_undef) {
             // raw OID as the key
             char scratch[200];
             OBJ_obj2txt(scratch, 200, key, 1);
-            key_value[ix++] = strdup(scratch);
+            key_value[ix] = strdup(scratch);
         } else {
             const char *nid_name = short_name ? OBJ_nid2sn(nid)
                                              : OBJ_nid2ln(nid);
-            key_value[ix++] = strdup(nid_name == NULL ? "" : nid_name);
+            key_value[ix] = strdup(nid_name == NULL ? "" : nid_name);
         }
+        if (key_value[ix] == NULL) {
+            cleanup_key_value(key_value);
+            return NULL;
+        }
+        ix++;
 
         int len = ASN1_STRING_to_UTF8(&utf8, value);
         if (len < 0) {
-            key_value[ix++] = strdup("");
+            key_value[ix] = strdup("");
         } else {
-            key_value[ix++] = strndup(utf8, len);
+            key_value[ix] = strndup((const char *)utf8, (size_t)len);
             OPENSSL_free(utf8);
         }
+        if (key_value[ix] == NULL) {
+            cleanup_key_value(key_value);
+            return NULL;
+        }
+        ix++;
     }
     return key_value;
 }
@@ -116,60 +137,32 @@ BIO_all(BIO *bio)
 {
     BUF_MEM *bptr = NULL;
     char    *result;
-    char    *cur;
-    char     scratch[PIPE_BUF];
-    int      total;
-    int      lastchar;
+    size_t   total = 0;
+    size_t   expected;
 
-    if (BIO_get_mem_ptr(bio, &bptr) <= 0 || bptr == NULL) {
+    if (bio == NULL || BIO_get_mem_ptr(bio, &bptr) <= 0 || bptr == NULL) {
         return NULL;
     }
-    int n = BIO_read(bio, scratch, PIPE_BUF);
-    if (n <= 0) {
+    expected = bptr->length;
+    if (expected == 0 || expected == SIZE_MAX) {
         return NULL;
     }
-    // memcpy, not strndup: the payload is binary and may contain NULs, in
-    // which case strndup would allocate only up to the first one while `total`
-    // kept counting every byte read -- so every later index derived from
-    // `total` or bptr->length ran off the end of the allocation.
-    result = calloc((size_t)n + 1, 1);
+    result = malloc(expected + 1);
     if (result == NULL) {
         return NULL;
     }
-    memcpy(result, scratch, n);
-    total  = n;
 
-    while ((n = BIO_read(bio, scratch, PIPE_BUF)) > 0) {
-        cur = calloc((size_t)total + n + 1, 1);
-        if (cur == NULL) {
-            return result;
+    while (total < expected) {
+        size_t remaining = expected - total;
+        int chunk = remaining > INT_MAX ? INT_MAX : (int)remaining;
+        int n = BIO_read(bio, result + total, chunk);
+        if (n <= 0) {
+            free(result);
+            return NULL;
         }
-        memcpy(cur, result, total);
-        memcpy(cur + total, scratch, n);
-        free(result);
-        result = cur;
-        total  = total + n;
+        total += (size_t)n;
     }
-
-    lastchar = (int)bptr->length;
-
-    // BIO_read sometimes reads more bytes,
-    // possibly for not-NULL terminated objects
-    if (lastchar >= 0 && lastchar < total) {
-        result[lastchar] = 0;
-
-        // remove newlines
-        if (lastchar > 1
-            && (bptr->data[lastchar - 1] == '\n'
-                || bptr->data[lastchar - 1] == '\r')) {
-            result[lastchar - 1] = 0;
-        }
-        if (lastchar > 0
-            && (bptr->data[lastchar] == '\n'
-                || bptr->data[lastchar] == '\r')) {
-            result[lastchar] = 0;
-        }
-    }
+    result[total] = 0;
 
     return result;
 }
@@ -262,8 +255,15 @@ extract_cert_data(BIO *fdb)
         num_exts = 0;
     }
 
-    char **key_value = calloc(sizeof(char *), FIXED_LEN + num_exts * 2);
+    size_t capacity   = FIXED_LEN + (size_t)num_exts * 2;
+    char **key_value = calloc(capacity, sizeof(*key_value));
     if (key_value == NULL) {
+        free(serial);
+        free(key_contents);
+        free(keytype);
+        free(sigtype);
+        free(not_before);
+        free(not_after);
         EVP_PKEY_free(pub);
         X509_free(cert);
         return NULL;
@@ -326,6 +326,7 @@ extract_cert_data(BIO *fdb)
 
     Cert *result          = malloc(sizeof(Cert));
     if (result == NULL) {
+        cleanup_key_value(key_value);
         EVP_PKEY_free(pub);
         X509_free(cert);
         return NULL;
