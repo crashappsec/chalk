@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `X509_KEY` and `_X509_KEY` now report RSA public keys in `SubjectPublicKeyInfo`
+  form (`-----BEGIN PUBLIC KEY-----`) rather than PKCS#1 form
+  (`-----BEGIN RSA PUBLIC KEY-----`). The certs codec previously encoded the
+  public key with the `PKCS1` structure, which is RSA-only and produced no
+  output at all for other key types; it now uses `SubjectPublicKeyInfo`, which
+  covers every key type. Anything downstream that matches on the PEM header of
+  this field needs updating.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
+
 ### Bug Fixes
 
 - Fixed a segfault in the certs codec that aborted chalked Docker builds. The
@@ -16,20 +27,24 @@
   correlation for the affected images.
   ([#766](https://github.com/crashappsec/chalk/pull/766))
 
-- Fixed a heap buffer overflow in the certs codec's `BIO_all()`. It built its
-  result with `strndup()`, which stops at the first NUL, while the running
-  `total` counted every byte read. On binary payloads the allocation was
-  therefore smaller than `total` claimed, so the copy loop over-read and the
-  trailing NUL-termination writes ran past the end of the buffer.
+- Fixed a heap buffer over-read in the certs codec's `BIO_all()`. It built its
+  first chunk with `strndup()`, which stops at the first NUL, while the running
+  `total` counted every byte read; for a payload larger than `PIPE_BUF` that
+  contained a NUL, the subsequent `memcpy(cur, result, total)` then read past
+  the end of that allocation. Separately, on an empty BIO the first `BIO_read()`
+  returns `-1` rather than `0`, so the length guard never fired and
+  `strndup(scratch, (size_t)-1)` ran `strnlen` over an uninitialised stack
+  buffer with no bound. `BIO_all()` now sizes the result from the BIO up front
+  and copies with explicit bounds.
   ([#766](https://github.com/crashappsec/chalk/pull/766))
 
-- Fixed X.509 metadata being dropped for EC certificates. The public key was
-  encoded with the `PKCS1` structure, which is RSA-only, so for EC keys the
-  encoder produced nothing and a `NULL` landed mid-`key_value`. That truncated
-  both `cleanup_key_value()` and the `cstringArrayToSeq()` on the Nim side, so
-  every field after `Serial` -- key type, signature type, validity, signature
-  and all extensions -- was silently lost. The encoder now uses
-  `SubjectPublicKeyInfo`, which covers every key type.
+- Fixed the public key being omitted from reports for EC certificates. The
+  public key was encoded with the `PKCS1` structure, which is RSA-only, so for
+  an EC key the encoder produced no output and `X509_KEY` came back empty. Empty
+  values are dropped from reports, so the key was simply absent; every other
+  field was unaffected. The encoder now uses `SubjectPublicKeyInfo`, which
+  covers every key type. See Breaking Changes above for the effect this has on
+  RSA certificates.
   ([#766](https://github.com/crashappsec/chalk/pull/766))
 
 - Fixed memory leaks in the certs codec. `extract_cert_data()` never released

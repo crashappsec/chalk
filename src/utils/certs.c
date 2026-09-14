@@ -82,15 +82,27 @@ convert_ASN1STRING(ASN1_BIT_STRING *s)
     return result;
 }
 
+// The Nim side runs cstringArrayToSeq() over every array returned from here,
+// and that dereferences a[0] without a NULL check. NULL is therefore not a safe
+// return value; hand back an empty terminated array instead.
+static char **
+empty_key_value(void)
+{
+    return calloc(1, sizeof(char *));
+}
+
 char **
 convert_NAME(X509_NAME *n, int short_name)
 {
-    int count        = X509_NAME_entry_count(n);
+    int count = X509_NAME_entry_count(n);
+    if (count < 0) {
+        count = 0;
+    }
     size_t capacity  = (size_t)count * 2 + 1;
     char **key_value = calloc(capacity, sizeof(*key_value));
-    size_t ix         = 0;
+    size_t ix        = 0;
     if (key_value == NULL) {
-        return NULL;
+        return empty_key_value();
     }
     for (int i = 0; i < count; i++) {
         X509_NAME_ENTRY *entry = X509_NAME_get_entry(n, i);
@@ -111,7 +123,7 @@ convert_NAME(X509_NAME *n, int short_name)
         }
         if (key_value[ix] == NULL) {
             cleanup_key_value(key_value);
-            return NULL;
+            return empty_key_value();
         }
         ix++;
 
@@ -124,7 +136,7 @@ convert_NAME(X509_NAME *n, int short_name)
         }
         if (key_value[ix] == NULL) {
             cleanup_key_value(key_value);
-            return NULL;
+            return empty_key_value();
         }
         ix++;
     }
@@ -293,18 +305,18 @@ extract_cert_data(BIO *fdb)
         X509_EXTENSION *ex      = sk_X509_EXTENSION_value(exts, i);
         ASN1_OBJECT    *obj     = X509_EXTENSION_get_object(ex);
         BIO            *ext_bio = BIO_new(BIO_s_mem());
-        BUF_MEM        *bptr    = NULL;
-        BIO_get_mem_ptr(ext_bio, &bptr);
         BIO_set_close(ext_bio, BIO_CLOSE);
 
-        unsigned nid = OBJ_obj2nid(obj);
-        if (nid == NID_undef) {
-            // raw OID as extension name
+        int         nid        = OBJ_obj2nid(obj);
+        const char *c_ext_name = (nid == NID_undef) ? NULL : OBJ_nid2ln(nid);
+        if (c_ext_name == NULL) {
+            // raw OID as extension name. Never fall back to "": an empty key
+            // reaches certsCallback(), which indexes k[0] unconditionally.
             char extname[200];
-            OBJ_obj2txt(extname, 200, (const ASN1_OBJECT *)obj, 1);
+            extname[0] = 0;
+            OBJ_obj2txt(extname, sizeof(extname), (const ASN1_OBJECT *)obj, 1);
             name = strdup(extname);
         } else {
-            const char *c_ext_name = OBJ_nid2ln(nid);
             name = strdup(c_ext_name);
         }
 
