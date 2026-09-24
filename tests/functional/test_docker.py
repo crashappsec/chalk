@@ -437,6 +437,62 @@ def test_push_by_digest_metadata_file(
 
 
 @pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
+def test_push_by_digest_multiple_output_compression(
+    chalk: Chalk,
+    dockerfile: Path,
+    random_hex: str,
+    tmp_data_dir: Path,
+):
+    """The mirror must match the last image exporter recorded in build metadata."""
+    first_repo = f"{random_hex}/first"
+    last_repo = f"{random_hex}/last"
+    mirror_repo = f"{random_hex}/mirror"
+    metadata_file = tmp_data_dir / "metadata.json"
+    _, build = chalk.docker_build(
+        dockerfile=dockerfile / "Dockerfile",
+        buildx=True,
+        load=False,
+        run_docker=False,
+        outputs=[
+            ",".join(
+                [
+                    "type=image",
+                    f"name={REGISTRY}/{first_repo}",
+                    "push-by-digest=true",
+                    "push=true",
+                    "compression=zstd",
+                    "force-compression=true",
+                    "oci-mediatypes=true",
+                ]
+            ),
+            ",".join(
+                [
+                    "type=image",
+                    f"name={REGISTRY}/{last_repo}",
+                    "push-by-digest=true",
+                    "push=true",
+                    "compression=gzip",
+                    "force-compression=true",
+                    "oci-mediatypes=true",
+                ]
+            ),
+        ],
+        metadata_file=metadata_file,
+        config=CONFIGS / "docker_push_by_digest.c4m",
+        env={"CHALK_MIRROR_REPO": mirror_repo},
+    )
+
+    metadata = json.loads(metadata_file.read_text())
+    assert metadata["image.name"] == f"{REGISTRY}/{last_repo}"
+    digest = metadata["containerimage.digest"]
+    assert Docker.manifest_exists(f"{REGISTRY}/{last_repo}@{digest}")
+    assert not Docker.manifest_exists(f"{REGISTRY}/{first_repo}@{digest}")
+    assert Docker.manifest_exists(f"{REGISTRY}/{mirror_repo}@{digest}")
+    assert build.mark.has(CHALK_ID=ANY)
+    assert "DOCKER_TAGS" not in build.mark
+
+
+@pytest.mark.parametrize("dockerfile", [DOCKERFILES / "valid" / "sample_1"])
 def test_push_by_digest_provenance_indexes(
     chalk: Chalk,
     dockerfile: Path,

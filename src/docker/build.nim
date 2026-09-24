@@ -394,19 +394,21 @@ const DIGEST_OUTPUT_PARAMS = [
   "oci-mediatypes",
 ]
 
-proc getDigestOutputParams(ctx: DockerInvocation): string =
-  ## Render the digest-affecting params of the image exporter the user asked
-  ## for, so that chalk's own exporter can mirror them. Without mirroring,
-  ## chalk's copy of the image and the user's copy get different digests and
-  ## neither digest describes both images.
-  result = ""
+proc lastImageOutput(ctx: DockerInvocation): OrderedTableRef[string, string] =
+  # Buildkit's metadata file keeps the last image exporter's image fields.
+  # Other exporters (for example local files) do not supply those fields.
   for output in ctx.foundOutputs:
-    if output.getOrDefault("type") notin ["image", "registry"]:
-      continue
+    if output.getOrDefault("type") in ["image", "registry"]:
+      result = output
+
+proc getDigestOutputParams(ctx: DockerInvocation): string =
+  ## Mirror the exporter that supplies the image digest in --metadata-file.
+  result = ""
+  let output = ctx.lastImageOutput()
+  if output != nil:
     for param in DIGEST_OUTPUT_PARAMS:
       if param in output:
         result &= param & "=" & output[param] & ","
-    break
 
 proc addOutput(ctx: DockerInvocation, output: string) =
   ## Add an image exporter to the build.
@@ -521,10 +523,8 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerFile())
 
 proc isPushByDigest(ctx: DockerInvocation): bool =
-  for output in ctx.foundOutputs:
-    if output.getOrDefault("push-by-digest") == "true":
-      return true
-  return false
+  let output = ctx.lastImageOutput()
+  return output != nil and output.getOrDefault("push-by-digest") == "true"
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
   let
@@ -567,7 +567,7 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       configDigest        = metadataConfig
     listOrImageDigest     = metadataImage
     localId               = listOrImageDigest
-    repos                 = (ctx.allTags & metadataNames).withDigest(listOrImageDigest)
+    repos                 = (metadataNames & ctx.allTags).withDigest(listOrImageDigest)
 
   else:
     # iidfile can be one of in order of precedence:
@@ -584,12 +584,12 @@ proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerP
       else:
         # otherwise this is list digest therefore we need to check registry
         listOrImageDigest = metadataImage
-        repos             = (ctx.allTags & metadataNames).withDigest(listOrImageDigest)
+        repos             = (metadataNames & ctx.allTags).withDigest(listOrImageDigest)
     else:
       configDigest        = iidFile
       localId             = iidFile
       listOrImageDigest   = metadataImage
-      repos               = (ctx.allTags & metadataNames).withDigest(listOrImageDigest)
+      repos               = (metadataNames & ctx.allTags).withDigest(listOrImageDigest)
 
   if dockerImageExists(localId):
     trace("docker: built image is loaded locally")
