@@ -1,0 +1,14 @@
+# Configures a second push destination so that a tag-less push-by-digest
+# --output build ends up with two image exporters in one buildx invocation.
+# Both destinations live in the same insecure registry so that the test can
+# look either copy up by digest without authenticating.
+docker {
+  docker_registry local {
+    enabled: true
+    uri: env("IP") + ":5044"
+    docker_push scan {
+      repository: env("CHALK_MIRROR_REPO")
+      tags: ["scan"]
+    }
+  }
+}

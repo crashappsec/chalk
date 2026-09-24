@@ -383,9 +383,53 @@ proc readMetadataFile(ctx: DockerInvocation) =
     data = "{}"
   ctx.metadataFile = data.tryParseMetadataFile()
 
+# buildkit derives the manifest digest from the exported layer blobs, so the
+# same build exported twice with different compression or media-type settings
+# gets two different digests. These are the --output params which change the
+# digest of the exported image.
+const DIGEST_OUTPUT_PARAMS = [
+  "compression",
+  "compression-level",
+  "force-compression",
+  "oci-mediatypes",
+]
+
+proc getDigestOutputParams(ctx: DockerInvocation): string =
+  ## Render the digest-affecting params of the image exporter the user asked
+  ## for, so that chalk's own exporter can mirror them. Without mirroring,
+  ## chalk's copy of the image and the user's copy get different digests and
+  ## neither digest describes both images.
+  result = ""
+  for output in ctx.foundOutputs:
+    if output.getOrDefault("type") notin ["image", "registry"]:
+      continue
+    for param in DIGEST_OUTPUT_PARAMS:
+      if param in output:
+        result &= param & "=" & output[param] & ","
+    break
+
+proc addOutput(ctx: DockerInvocation, output: string) =
+  ## Add an image exporter to the build.
+  ##
+  ## buildkit merges the --metadata-file response of every exporter into a
+  ## single flat json object in which the last exporter wins the duplicated
+  ## keys - image.name, containerimage.digest, containerimage.descriptor:
+  ## https://github.com/moby/buildkit/blob/master/solver/llbsolver/export.go
+  ## Exporter order follows --output order on the command line, so chalk's
+  ## exporter is inserted *before* any exporter the user asked for. That way
+  ## --metadata-file keeps describing the image the user is pushing, both for
+  ## the user's own build steps and for chalk's own post-build collection.
+  let args = @["--output", output]
+  for i, arg in ctx.newCmdLine:
+    if arg in ["-o", "--output"] or arg.startsWith("-o=") or arg.startsWith("--output="):
+      ctx.newCmdLine = ctx.newCmdLine[0 ..< i] & args & ctx.newCmdLine[i .. ^1]
+      return
+  ctx.newCmdLine &= args
+
 proc setPushTags(ctx: DockerInvocation, chalk: ChalkObj): seq[string] =
   if not ctx.foundPush:
     return
+  let digestParams = ctx.getDigestOutputParams()
   for image in chalk.iterPushTags():
     trace("docker: adding tag to the build - " & image)
     if len(ctx.foundTags) > 0 or not ctx.foundBuildx:
@@ -394,7 +438,7 @@ proc setPushTags(ctx: DockerInvocation, chalk: ChalkObj): seq[string] =
     else:
       # --output directly pushes to the registry. no need to add to result
       # as those images are pruned later on
-      ctx.newCmdLine &= @["--output", "type=image,push=true,name=" & image]
+      ctx.addOutput("type=image,push=true," & digestParams & "name=" & image)
     ctx.allTags.add(parseImage(image))
 
 proc launchDockerSubchalk(ctx:     DockerInvocation,
@@ -476,10 +520,21 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_CHALK_ADDED_LABELS",        ctx.addedLabels)
   dict.setIfNeeded("DOCKER_FILE_CHALKED",              ctx.getUpdatedDockerFile())
 
+proc isPushByDigest(ctx: DockerInvocation): bool =
+  for output in ctx.foundOutputs:
+    if output.getOrDefault("push-by-digest") == "true":
+      return true
+  return false
+
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
   let
     iidFile               = ctx.iidFile
-    metadataNames         = parseImages(ctx.metadataFile{"image.name"}.getStr().split(","))
+    # for push-by-digest builds buildkit never creates a tag, so the tag-less
+    # names it reports back genuinely have no tag and we must not invent one
+    metadataNames         = parseImages(
+      ctx.metadataFile{"image.name"}.getStr().split(","),
+      defaultTag = if ctx.isPushByDigest(): "" else: "latest",
+    )
     metadataImage         = ctx.metadataFile{"containerimage.digest"}.getStr().extractDockerHash()
     metadataConfig        = ctx.metadataFile{"containerimage.config.digest"}.getStr().extractDockerHash()
     descriptor            = ctx.metadataFile{"containerimage.descriptor"}
