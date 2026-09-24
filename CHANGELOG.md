@@ -4,6 +4,45 @@
 
 ### Bug Fixes
 
+- Fixed a segfault in the certs codec that aborted chalked Docker builds. The
+  `prep_postexec` step subscans `/` with the certs codec, which feeds every
+  candidate file to `d2i_X509_bio` after the PEM read fails. On arbitrary binary
+  content (a statically linked Go binary, for instance) that occasionally yields
+  a structurally valid but malformed certificate, for which
+  `X509_get_pubkey()` returns `NULL`; the result went straight into
+  `EVP_PKEY_base_id()` and crashed the build with SIGSEGV. Chalk then logged
+  `retrying without chalk` and rebuilt unwrapped, so CI stayed green while the
+  pushed image carried no chalk mark -- no build/push records and no deployment
+  correlation for the affected images.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
+
+- Fixed a heap buffer over-read in the certs codec's `BIO_all()`. It built its
+  first chunk with `strndup()`, which stops at the first NUL, while the running
+  `total` counted every byte read; for a payload larger than `PIPE_BUF` that
+  contained a NUL, the subsequent `memcpy(cur, result, total)` then read past
+  the end of that allocation. Separately, on an empty BIO the first `BIO_read()`
+  returns `-1` rather than `0`, so the length guard never fired and
+  `strndup(scratch, (size_t)-1)` ran `strnlen` over an uninitialised stack
+  buffer with no bound. `BIO_all()` now sizes the result from the BIO up front
+  and copies with explicit bounds.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
+
+- Fixed the public key being omitted from reports for EC certificates. The
+  public key was encoded with the `PKCS1` structure, which is RSA-only, so for
+  an EC key the encoder produced no output and `X509_KEY` came back empty. Empty
+  values are dropped from reports, so the key was simply absent; every other
+  field was unaffected. Non-RSA keys now use `SubjectPublicKeyInfo`; RSA keys
+  retain their existing PKCS#1 format for downstream compatibility.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
+
+- Fixed memory leaks in the certs codec. `extract_cert_data()` never released
+  the `X509`, `EVP_PKEY`, `BIGNUM` or encoder context; `cleanup_key_value()`
+  freed the strings but never the arrays holding them; and `subject_short` and
+  `issuer_short` were never freed at all. Scanning a 119-certificate CA bundle
+  leaked 771KB. The serial was also allocated by OpenSSL and released with
+  `free()` rather than `OPENSSL_free()`.
+  ([#766](https://github.com/crashappsec/chalk/pull/766))
+
 - Fixed `--metadata-file` and `--iidfile` describing chalk's copy of the image
   instead of the image the build actually pushed, when the build pushes via
   `docker buildx build --output type=image,...` without any `-t` tag (for
@@ -446,8 +485,8 @@
 - New caller attestation plugin. The plugin ingests a JSON envelope from the
   spawning process - either inline via `CHALK_CALLER_ATTESTATION` or from a
   file path in `CHALK_CALLER_ATTESTATION_FILE`. It allows a trusted system daemon
-  like `crayon` to inject useful metadata into the artifact which otherwise
-  chalk cannot derive.
+  like Crash Override Endpoint to inject useful metadata into the artifact
+  which chalk cannot otherwise derive.
   ([#658](https://github.com/crashappsec/chalk/pull/658))
 - Docker `busybox` dependency is removed for:
   - docker platform probe

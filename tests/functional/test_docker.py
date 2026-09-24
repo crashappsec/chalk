@@ -21,6 +21,7 @@ from unittest import mock
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark, ChalkProgram
+from .test_cert import malformed_public_key_der
 from .conf import (
     AWS_ECR_REPO,
     CONFIGS,
@@ -1513,6 +1514,26 @@ def test_postexec(chalk_copy: Chalk, server_cert: Path):
             },
         }
     )
+
+
+def test_prep_postexec_malformed_cert_keeps_image_mark(
+    chalk_copy: Chalk, server_cert: Path, tmp_data_dir: Path
+):
+    """A parser failure during image preparation must not produce an unmarked build."""
+    (tmp_data_dir / "malformed").write_bytes(
+        malformed_public_key_der(server_cert.read_bytes())
+    )
+    dockerfile = tmp_data_dir / "Dockerfile"
+    dockerfile.write_text('FROM alpine\nCOPY malformed /etc/badcert\nCMD ["true"]\n')
+    chalk_copy.load(CONFIGS / "docker_postexec.c4m", use_embedded=True, replace=False)
+
+    digests, build = chalk_copy.docker_build(
+        dockerfile=dockerfile, context=tmp_data_dir, run_docker=False
+    )
+    assert build.mark.has(CHALK_ID=ANY)
+    extracted = chalk_copy.extract(digests.id[:12])
+    assert extracted.report.has(_OP_CHALK_COUNT=1, _OP_UNMARKED_COUNT=0)
+    assert extracted.mark["CHALK_ID"] == build.mark["CHALK_ID"]
 
 
 def test_k8s(chalk_copy: Chalk, server_http: str, tmp_path: Path):

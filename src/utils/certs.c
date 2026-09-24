@@ -15,13 +15,29 @@
 #include <openssl/types.h>
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
+#include <limits.h>
+#include <stdint.h>
+
+void cleanup_key_value(char **kv);
 
 int
 convert_ASN1TIME(ASN1_TIME *t, char *buf, size_t len)
 {
     int  rc;
-    BIO *b = BIO_new(BIO_s_mem());
-    rc     = ASN1_TIME_print(b, t);
+    BIO *b;
+
+    if (buf == NULL || len == 0) {
+        return -1;
+    }
+    buf[0] = 0;
+    if (t == NULL) {
+        return -1;
+    }
+    b = BIO_new(BIO_s_mem());
+    if (b == NULL) {
+        return -1;
+    }
+    rc = ASN1_TIME_print(b, t);
     if (rc <= 0) {
         BIO_free(b);
         return -1;
@@ -32,17 +48,30 @@ convert_ASN1TIME(ASN1_TIME *t, char *buf, size_t len)
         return -1;
     }
     BIO_free(b);
-    return -1;
+    return 0;
 }
 
 char *
 convert_ASN1STRING(ASN1_BIT_STRING *s)
 {
-    int            l      = ASN1_STRING_length(s);
+    int            l      = (s == NULL) ? 0 : ASN1_STRING_length(s);
+    unsigned char *data;
+    char          *result;
+    char          *cur;
+
+    if (l <= 0) {
+        return calloc(1, 1);
+    }
+    if ((size_t)l > SIZE_MAX / 3) {
+        return NULL;
+    }
     // each byte is 2 hex plus colon or last char NULL
-    char          *result = calloc(l * 3, 1);
-    unsigned char *data   = ASN1_STRING_get0_data(s);
-    char          *cur    = result;
+    result = calloc((size_t)l * 3, 1);
+    if (result == NULL) {
+        return NULL;
+    }
+    data   = ASN1_STRING_get0_data(s);
+    cur    = result;
 
     for (int i = 0; i < l - 1; i++) {
         sprintf(cur, "%02x:", data[i]);
@@ -53,39 +82,63 @@ convert_ASN1STRING(ASN1_BIT_STRING *s)
     return result;
 }
 
+// The Nim side runs cstringArrayToSeq() over every array returned from here,
+// and that dereferences a[0] without a NULL check. NULL is therefore not a safe
+// return value; hand back an empty terminated array instead.
+static char **
+empty_key_value(void)
+{
+    return calloc(1, sizeof(char *));
+}
+
 char **
 convert_NAME(X509_NAME *n, int short_name)
 {
-    int l            = X509_NAME_entry_count(n);
-    char **key_value = calloc(sizeof(char *), l * 2 + 1);
-    int ix           = 0;
-    for (int i = 0; i < l; i++) {
+    int count = X509_NAME_entry_count(n);
+    if (count < 0) {
+        count = 0;
+    }
+    size_t capacity  = (size_t)count * 2 + 1;
+    char **key_value = calloc(capacity, sizeof(*key_value));
+    size_t ix        = 0;
+    if (key_value == NULL) {
+        return empty_key_value();
+    }
+    for (int i = 0; i < count; i++) {
         X509_NAME_ENTRY *entry = X509_NAME_get_entry(n, i);
         ASN1_OBJECT     *key   = X509_NAME_ENTRY_get_object(entry);
-        unsigned         nid   = OBJ_obj2nid(key);
         ASN1_STRING     *value = X509_NAME_ENTRY_get_data(entry);
-        unsigned char   *utf8;
+        unsigned char *utf8;
+        int nid = OBJ_obj2nid(key);
 
         if (nid == NID_undef) {
             // raw OID as the key
             char scratch[200];
             OBJ_obj2txt(scratch, 200, key, 1);
-            key_value[ix++] = strdup(scratch);
+            key_value[ix] = strdup(scratch);
         } else {
-            if (short_name) {
-                key_value[ix++] = strdup(OBJ_nid2sn(nid));
-            } else {
-                key_value[ix++] = strdup(OBJ_nid2ln(nid));
-            }
+            const char *nid_name = short_name ? OBJ_nid2sn(nid)
+                                             : OBJ_nid2ln(nid);
+            key_value[ix] = strdup(nid_name == NULL ? "" : nid_name);
         }
+        if (key_value[ix] == NULL) {
+            cleanup_key_value(key_value);
+            return empty_key_value();
+        }
+        ix++;
 
         int len = ASN1_STRING_to_UTF8(&utf8, value);
         if (len < 0) {
-            key_value[ix++] = strdup("");
+            key_value[ix] = strdup("");
         } else {
-            key_value[ix++] = strndup(utf8, len);
+            key_value[ix] = strndup((const char *)utf8, (size_t)len);
             OPENSSL_free(utf8);
         }
+        if (key_value[ix] == NULL) {
+            cleanup_key_value(key_value);
+            return empty_key_value();
+        }
+        ix++;
     }
     return key_value;
 }
@@ -96,46 +149,32 @@ BIO_all(BIO *bio)
 {
     BUF_MEM *bptr = NULL;
     char    *result;
-    char    *cur;
-    char     scratch[PIPE_BUF];
-    int      total;
+    size_t   total = 0;
+    size_t   expected;
 
-    BIO_get_mem_ptr(bio, &bptr);
-    int n = BIO_read(bio, scratch, PIPE_BUF);
-    if (!n) {
+    if (bio == NULL || BIO_get_mem_ptr(bio, &bptr) <= 0 || bptr == NULL) {
         return NULL;
     }
-    result = strndup(scratch, n);
-    total  = n;
-
-    while ((n = BIO_read(bio, scratch, PIPE_BUF)) > 0) {
-        cur = calloc(total + n + 1, 1);
-        memcpy(cur, result, total);
-        memcpy(cur + total, scratch, n);
-        free(result);
-        result = cur;
-        total  = total + n;
+    expected = bptr->length;
+    if (expected == 0 || expected == SIZE_MAX) {
+        return NULL;
+    }
+    result = malloc(expected + 1);
+    if (result == NULL) {
+        return NULL;
     }
 
-    int lastchar = bptr->length;
-
-    // BIO_read sometimes reads more bytes,
-    // possibly for not-NULL terminated objects
-    if (bptr->length < total) {
-        result[bptr->length] = 0;
-
-        // remove newlines
-        if (lastchar > 1
-            && (bptr->data[lastchar - 1] == '\n'
-                || bptr->data[lastchar - 1] == '\r')) {
-            result[lastchar - 1] = 0;
+    while (total < expected) {
+        size_t remaining = expected - total;
+        int chunk = remaining > INT_MAX ? INT_MAX : (int)remaining;
+        int n = BIO_read(bio, result + total, chunk);
+        if (n <= 0) {
+            free(result);
+            return NULL;
         }
-        if (lastchar > 0
-            && (bptr->data[lastchar] == '\n'
-                || bptr->data[lastchar] == '\r')) {
-            result[lastchar] = 0;
-        }
+        total += (size_t)n;
     }
+    result[total] = 0;
 
     return result;
 }
@@ -170,18 +209,35 @@ extract_cert_data(BIO *fdb)
     char              scratch[2000];
     int               version    = ((int)X509_get_version(cert)) + 1;
     EVP_PKEY         *pub        = X509_get_pubkey(cert);
+    if (pub == NULL) {
+        // Unparseable/unsupported public key. Treat the whole record as not a
+        // certificate rather than dereferencing NULL below.
+        X509_free(cert);
+        return NULL;
+    }
     int               keynid     = EVP_PKEY_base_id(pub);
-    char             *keytype    = strdup(OBJ_nid2ln(keynid));
+    const char       *keytype_ln = OBJ_nid2ln(keynid);
+    char             *keytype    = strdup(keytype_ln == NULL ? "" : keytype_ln);
     int               keysize    = EVP_PKEY_get_bits(pub);
     int               signid     = X509_get_signature_nid(cert);
-    char             *sigtype    = strdup(OBJ_nid2ln(signid));
+    const char       *sigtype_ln = OBJ_nid2ln(signid);
+    char             *sigtype    = strdup(sigtype_ln == NULL ? "" : sigtype_ln);
     ASN1_BIT_STRING  *sig;
     X509_ALGOR       *sigalg;
     X509_NAME        *subj       = X509_get_subject_name(cert);
     X509_NAME        *issuer     = X509_get_issuer_name(cert);
     ASN1_INTEGER     *sn         = X509_get_serialNumber(cert);
     BIGNUM           *bn         = ASN1_INTEGER_to_BN(sn, NULL);
-    char             *serial     = BN_bn2dec(bn);
+    char             *bn_dec     = (bn == NULL) ? NULL : BN_bn2dec(bn);
+    // Copy onto the normal heap: everything in key_value is released with
+    // free(), not OPENSSL_free().
+    char             *serial     = strdup(bn_dec == NULL ? "" : bn_dec);
+    if (bn_dec != NULL) {
+        OPENSSL_free(bn_dec);
+    }
+    if (bn != NULL) {
+        BN_free(bn);
+    }
     ASN1_TIME        *atime      = X509_get_notBefore(cert);
     convert_ASN1TIME(atime, scratch, 200);
     char             *not_before = strdup(scratch);
@@ -189,13 +245,23 @@ extract_cert_data(BIO *fdb)
     convert_ASN1TIME(atime, scratch, 200);
     char             *not_after  = strdup(scratch);
     BIO              *key_bio    = BIO_new(BIO_s_mem());
+    // Preserve the existing PKCS#1 representation for RSA consumers. Other
+    // key types need SubjectPublicKeyInfo; PKCS#1 cannot encode them.
+    const char       *key_format = keynid == EVP_PKEY_RSA
+                                     ? "PKCS1"
+                                     : "SubjectPublicKeyInfo";
     OSSL_ENCODER_CTX *encoder    = OSSL_ENCODER_CTX_new_for_pkey(
         pub,
         OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
         "PEM",
-        "PKCS1",
+        key_format,
         NULL);
-    OSSL_ENCODER_to_bio(encoder, key_bio);
+    if (encoder != NULL && key_bio != NULL) {
+        OSSL_ENCODER_to_bio(encoder, key_bio);
+    }
+    if (encoder != NULL) {
+        OSSL_ENCODER_CTX_free(encoder);
+    }
 
     X509_get0_signature(&sig, &sigalg, cert);
 
@@ -208,13 +274,25 @@ extract_cert_data(BIO *fdb)
         num_exts = 0;
     }
 
-    char **key_value = calloc(sizeof(char *), FIXED_LEN + num_exts * 2);
+    size_t capacity   = FIXED_LEN + (size_t)num_exts * 2;
+    char **key_value = calloc(capacity, sizeof(*key_value));
+    if (key_value == NULL) {
+        free(serial);
+        free(key_contents);
+        free(keytype);
+        free(sigtype);
+        free(not_before);
+        free(not_after);
+        EVP_PKEY_free(pub);
+        X509_free(cert);
+        return NULL;
+    }
 
     int ix              = 0;
     key_value[ix++]     = strdup("Serial");
     key_value[ix++]     = serial;
     key_value[ix++]     = strdup("Key");
-    key_value[ix++]     = key_contents;
+    key_value[ix++]     = (key_contents == NULL) ? strdup("") : key_contents;
     key_value[ix++]     = strdup("Key Type");
     key_value[ix++]     = keytype;
     key_value[ix++]     = strdup("Signature Type");
@@ -234,18 +312,18 @@ extract_cert_data(BIO *fdb)
         X509_EXTENSION *ex      = sk_X509_EXTENSION_value(exts, i);
         ASN1_OBJECT    *obj     = X509_EXTENSION_get_object(ex);
         BIO            *ext_bio = BIO_new(BIO_s_mem());
-        BUF_MEM        *bptr    = NULL;
-        BIO_get_mem_ptr(ext_bio, &bptr);
         BIO_set_close(ext_bio, BIO_CLOSE);
 
-        unsigned nid = OBJ_obj2nid(obj);
-        if (nid == NID_undef) {
-            // raw OID as extension name
+        int         nid        = OBJ_obj2nid(obj);
+        const char *c_ext_name = (nid == NID_undef) ? NULL : OBJ_nid2ln(nid);
+        if (c_ext_name == NULL) {
+            // raw OID as extension name. Never fall back to "": an empty key
+            // reaches certsCallback(), which indexes k[0] unconditionally.
             char extname[200];
-            OBJ_obj2txt(extname, 200, (const ASN1_OBJECT *)obj, 1);
+            extname[0] = 0;
+            OBJ_obj2txt(extname, sizeof(extname), (const ASN1_OBJECT *)obj, 1);
             name = strdup(extname);
         } else {
-            const char *c_ext_name = OBJ_nid2ln(nid);
             name = strdup(c_ext_name);
         }
 
@@ -266,6 +344,12 @@ extract_cert_data(BIO *fdb)
     key_value[ix++] = 0;
 
     Cert *result          = malloc(sizeof(Cert));
+    if (result == NULL) {
+        cleanup_key_value(key_value);
+        EVP_PKEY_free(pub);
+        X509_free(cert);
+        return NULL;
+    }
     result->key_value     = key_value;
     result->subject       = convert_NAME(subj, 0);
     result->subject_short = convert_NAME(subj, 1);
@@ -273,26 +357,40 @@ extract_cert_data(BIO *fdb)
     result->issuer_short  = convert_NAME(issuer, 1);
     result->version       = version;
     result->key_size      = keysize;
+
+    // subj/issuer point into cert, so this must come after convert_NAME.
+    EVP_PKEY_free(pub);
+    X509_free(cert);
+
     return result;
 }
 
 void
 cleanup_key_value(char **kv)
 {
+    if (kv == NULL) {
+        return;
+    }
     char **info = kv;
     char *p     = *info++;
     while (p) {
         free(p);
         p = *info++;
     }
+    free(kv);
 }
 
 void
 cleanup_cert_info(Cert *cert)
 {
+    if (cert == NULL) {
+        return;
+    }
     cleanup_key_value(cert->key_value);
     cleanup_key_value(cert->subject);
+    cleanup_key_value(cert->subject_short);
     cleanup_key_value(cert->issuer);
+    cleanup_key_value(cert->issuer_short);
     free(cert);
 }
 

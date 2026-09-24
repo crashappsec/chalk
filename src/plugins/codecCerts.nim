@@ -48,6 +48,10 @@ proc cleanup_cert_info(cert: Cert) {.importc.}
 
 proc toTable(t: cstringArray): TableRef[string, string] =
   result = newTable[string, string]()
+  # cstringArrayToSeq walks a[0] without a nil check, so guard the C side
+  # handing back nil under allocation failure.
+  if t == nil:
+    return
   let kv = cstringArrayToSeq(t)
   for i in 0..<int(len(kv)/2):
     let
@@ -242,7 +246,7 @@ proc certsCallback(chalk: ChalkObj, prefix = ""): ChalkDict =
   result.setIfNeeded(prefix & "X509_NOT_BEFORE",               kv.popOrDefault("Not Before", ""))
   result.setIfNeeded(prefix & "X509_NOT_AFTER",                kv.popOrDefault("Not After", ""))
   for k, v in kv:
-    if k.startsWith("X509") or k[0].isDigit():
+    if k.startsWith("X509") or (k.len > 0 and k[0].isDigit()):
       extensions[k] = v
   result.setIfNeeded(prefix & "X509_EXTRA_EXTENSIONS",         extensions)
 
