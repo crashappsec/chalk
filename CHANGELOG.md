@@ -58,9 +58,11 @@
   error.
 - Chalk's own image exporter now mirrors the `compression`,
   `compression-level`, `force-compression` and `oci-mediatypes` params of the
-  build's image exporter. buildkit derives the manifest digest from the
-  exported layer blobs, so without this the two copies of the same build got
-  different digests and neither digest described both images.
+  image exporter represented by the final build metadata. buildkit derives
+  the manifest digest from the exported layer blobs, so without this the two
+  copies of the same build got different digests. With multiple user image
+  outputs, Chalk inspects the metadata repository first and mirrors that
+  output's digest even when an earlier output uses different compression.
 - Fixed chalk reporting an invented `:latest` tag for `push-by-digest=true`
   builds. buildkit publishes the manifest by digest only and never creates a
   tag for it, so the tag-less image name is now reported without a tag.
