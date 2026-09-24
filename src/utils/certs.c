@@ -245,14 +245,21 @@ extract_cert_data(BIO *fdb)
     convert_ASN1TIME(atime, scratch, 200);
     char             *not_after  = strdup(scratch);
     BIO              *key_bio    = BIO_new(BIO_s_mem());
+    // Preserve the existing PKCS#1 representation for RSA consumers. Other
+    // key types need SubjectPublicKeyInfo; PKCS#1 cannot encode them.
+    const char       *key_format = keynid == EVP_PKEY_RSA
+                                     ? "PKCS1"
+                                     : "SubjectPublicKeyInfo";
     OSSL_ENCODER_CTX *encoder    = OSSL_ENCODER_CTX_new_for_pkey(
         pub,
         OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
         "PEM",
-        "SubjectPublicKeyInfo",
+        key_format,
         NULL);
-    if (encoder != NULL) {
+    if (encoder != NULL && key_bio != NULL) {
         OSSL_ENCODER_to_bio(encoder, key_bio);
+    }
+    if (encoder != NULL) {
         OSSL_ENCODER_CTX_free(encoder);
     }
 

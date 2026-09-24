@@ -2,17 +2,6 @@
 
 ## Unreleased
 
-### Breaking Changes
-
-- `X509_KEY` and `_X509_KEY` now report RSA public keys in `SubjectPublicKeyInfo`
-  form (`-----BEGIN PUBLIC KEY-----`) rather than PKCS#1 form
-  (`-----BEGIN RSA PUBLIC KEY-----`). The certs codec previously encoded the
-  public key with the `PKCS1` structure, which is RSA-only and produced no
-  output at all for other key types; it now uses `SubjectPublicKeyInfo`, which
-  covers every key type. Anything downstream that matches on the PEM header of
-  this field needs updating.
-  ([#766](https://github.com/crashappsec/chalk/pull/766))
-
 ### Bug Fixes
 
 - Fixed a segfault in the certs codec that aborted chalked Docker builds. The
@@ -42,9 +31,8 @@
   public key was encoded with the `PKCS1` structure, which is RSA-only, so for
   an EC key the encoder produced no output and `X509_KEY` came back empty. Empty
   values are dropped from reports, so the key was simply absent; every other
-  field was unaffected. The encoder now uses `SubjectPublicKeyInfo`, which
-  covers every key type. See Breaking Changes above for the effect this has on
-  RSA certificates.
+  field was unaffected. Non-RSA keys now use `SubjectPublicKeyInfo`; RSA keys
+  retain their existing PKCS#1 format for downstream compatibility.
   ([#766](https://github.com/crashappsec/chalk/pull/766))
 
 - Fixed memory leaks in the certs codec. `extract_cert_data()` never released
