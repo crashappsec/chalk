@@ -1339,9 +1339,7 @@ def test_prep_postexec_malformed_cert_keeps_image_mark(
         malformed_public_key_der(server_cert.read_bytes())
     )
     dockerfile = tmp_data_dir / "Dockerfile"
-    dockerfile.write_text(
-        'FROM alpine\nCOPY malformed /etc/badcert\nCMD ["true"]\n'
-    )
+    dockerfile.write_text('FROM alpine\nCOPY malformed /etc/badcert\nCMD ["true"]\n')
     chalk_copy.load(CONFIGS / "docker_postexec.c4m", use_embedded=True, replace=False)
 
     digests, build = chalk_copy.docker_build(
