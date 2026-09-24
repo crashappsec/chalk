@@ -409,8 +409,8 @@
 - New caller attestation plugin. The plugin ingests a JSON envelope from the
   spawning process - either inline via `CHALK_CALLER_ATTESTATION` or from a
   file path in `CHALK_CALLER_ATTESTATION_FILE`. It allows a trusted system daemon
-  like `crayon` to inject useful metadata into the artifact which otherwise
-  chalk cannot derive.
+  like Crash Override Endpoint to inject useful metadata into the artifact
+  which chalk cannot otherwise derive.
   ([#658](https://github.com/crashappsec/chalk/pull/658))
 - Docker `busybox` dependency is removed for:
   - docker platform probe
