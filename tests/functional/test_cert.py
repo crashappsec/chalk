@@ -19,6 +19,7 @@ logger = get_logger()
 
 COLON_HEX = re.compile(r"^([0-9a-f]{2}:)*([0-9a-f]{2})$")
 PEM_PUBLIC_KEY = re.compile(r"^-----BEGIN PUBLIC KEY-----")
+PEM_RSA_PUBLIC_KEY = re.compile(r"^-----BEGIN RSA PUBLIC KEY-----")
 
 
 def malformed_public_key_der(cert_pem: bytes) -> bytes:
@@ -67,7 +68,7 @@ def test_cert(
                 {
                     "_OP_ARTIFACT_ENV_VAR_NAME": "CO_CERT",
                     "_X509_SIGNATURE": COLON_HEX,
-                    "_X509_KEY": PEM_PUBLIC_KEY,
+                    "_X509_KEY": PEM_RSA_PUBLIC_KEY,
                     "_X509_KEY_TYPE": "rsaEncryption",
                     "_X509_SUBJECT": {
                         "commonName": "tls.chalk.local",
