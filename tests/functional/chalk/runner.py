@@ -15,7 +15,7 @@ from ..conf import MAGIC, TESTS
 from ..utils.bin import sha256
 from ..utils.cosign import Cosign
 from ..utils.dict import ANY, MISSING, Contains, ContainsDict, ContainsList, IfExists
-from ..utils.docker import Docker, DockerDigests
+from ..utils.docker import Docker, DockerDigests, is_overlayfs
 from ..utils.log import get_logger
 from ..utils.git import GIT_NONINTERACTIVE_ENV
 from ..utils.os import CalledProcessError, Program, run
@@ -793,11 +793,21 @@ class Chalk:
             for chalk in result.marks:
                 assert chalk.has(_OP_ARTIFACT_TYPE="Docker Image")
             # sanity check that chalk mark includes basic chalk keys
+            expected_current_hash = digests.either_ids
+            if is_overlayfs() and metadata_file and len(outputs or []) > 1:
+                # Docker.with_digests reads the first exporter digest from the
+                # build log. With several image exporters, BuildKit's metadata
+                # file instead records the last exporter, which is the image
+                # Chalk reports and marks.
+                metadata = json.loads(Path(metadata_file).read_text())
+                metadata_digest = metadata["containerimage.digest"]
+                assert metadata_digest.startswith("sha256:")
+                expected_current_hash = metadata_digest.removeprefix("sha256:")
             assert result.marks.contains(
                 Contains(
                     [
                         {
-                            "_CURRENT_HASH": digests.either_ids,
+                            "_CURRENT_HASH": expected_current_hash,
                         }
                     ]
                 )
