@@ -1,0 +1,27 @@
+func check_minutes(m) {
+  if m <= 0.0 {
+    return "must be positive"
+  }
+  return ""
+}
+
+parameter var report_file {
+  default:  "/tmp/chalk-component-params-default.jsonl"
+  shortdoc: "Report file"
+  doc:      "File the test component writes reports to"
+}
+
+parameter var minutes {
+  default:   30.0
+  validator: func check_minutes(float) -> string
+  shortdoc:  "Minutes"
+  doc:       "Float parameter, appended to the report file name in seconds"
+}
+
+sink_config param_report {
+  enabled:  true
+  sink:     "file"
+  filename: report_file + "." + $(int(minutes * 60.0))
+}
+
+subscribe("report", "param_report")

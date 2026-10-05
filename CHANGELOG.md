@@ -21,6 +21,16 @@
 
 ### Bug Fixes
 
+- Component variable parameters (`parameter var`) now use configured values,
+  including values supplied via `chalk load --params`. Previously parameters
+  with defaults always used them (e.g. a custom heartbeat interval from
+  `use_heartbeats.c4m` stayed at 30 minutes) and configured parameters without
+  defaults failed with "Component not configured". Whole-number JSON values
+  for float parameters are converted, and values supplied via `--params` are
+  checked by the parameter's validator at load time. Generated Crash Override
+  profiles keep their existing behavior: their scanner parameters match the
+  defaults and profile metadata is written directly into the configuration.
+  ([con4m#137](https://github.com/crashappsec/con4m/pull/137))
 - Fixed a segfault in the certs codec that aborted chalked Docker builds. The
   `prep_postexec` step subscans `/` with the certs codec, which feeds every
   candidate file to `d2i_X509_bio` after the PEM read fails. On arbitrary binary

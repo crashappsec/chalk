@@ -496,6 +496,17 @@ proc handleConfigLoad*(inpath: string): bool =
           runtime.setAttributeParamValue(url, sym, value, c4mType)
         else:
           runtime.setVariableParamValue(url, sym, value, c4mType)
+          # interactive configuration validates every value; validate the
+          # variable values supplied here too, now that con4m applies them.
+          # Only at load time: saved values are not revalidated on every run
+          # and attribute values keep their behavior (crashoverride2's token
+          # validator rejects expired JWTs)
+          let param = runtime.getComponentReference(url).varParams[sym]
+          if param.validator.isSome():
+            let err = unpack[string](runtime.sCall(param.validator.get(),
+                                                   @[param.value.get()]).get())
+            if err != "":
+              raise newException(ValueError, sym & ": " & err)
     except:
       error("Invalid json parameters via stdin: " & getCurrentExceptionMsg())
       dumpExOnDebug()

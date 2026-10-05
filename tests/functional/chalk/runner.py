@@ -624,11 +624,17 @@ class Chalk:
         ignore_errors: bool = False,
         log_level: ChalkLogLevel = "trace",
         stdin: Optional[bytes] = None,
+        # [is_attribute, component url, name, type, value] as setup-chalk-action passes them
+        component_params: Optional[list[list[Any]]] = None,
     ) -> ChalkProgram:
         hash = sha256(self.binary)
+        params = [str(config)]
+        if component_params is not None:
+            params.append("--params")
+            stdin = json.dumps(component_params).encode()
         result = self.run(
             command="load",
-            params=[str(config)],
+            params=params,
             log_level=log_level,
             replace=replace,
             use_embedded=use_embedded,
