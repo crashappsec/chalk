@@ -843,18 +843,21 @@ class Chalk:
         digests: Optional[DockerDigests] = None,
         config: Optional[Path] = None,
         ignore_errors: bool = False,
-    ) -> tuple[DockerDigests, ChalkProgram]:
+        expected_success: bool = True,
+    ) -> tuple[Optional[DockerDigests], ChalkProgram]:
         push = self.run(
             params=["docker", "push", image],
             config=config,
             ignore_errors=ignore_errors,
+            expected_success=expected_success,
             env={
                 **Docker.build_env(buildkit=buildkit),
                 **(env or {}),
             },
         )
+        # failed push leaves nothing in the registry for crane to inspect
         return (
-            Docker.crane_digests(image, digests),
+            Docker.crane_digests(image, digests) if expected_success else None,
             push,
         )
 

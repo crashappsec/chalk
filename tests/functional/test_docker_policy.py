@@ -255,6 +255,7 @@ def test_enforce_docker_push(
         config=CONFIGS / "policy.c4m",
         env=policy_env("enforce", random_hex),
         ignore_errors=True,
+        expected_success=expected_exit == 0,
     )
     assert result.exit_code == expected_exit
     assert (registry_tags(random_hex) != []) == pushed
