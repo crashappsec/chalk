@@ -901,6 +901,10 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       )
       if section.image.repo == "":
         raise newException(ValueError, "Could not eval image")
+      # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/dockerfile2llb/convert.go
+      # addState links a stage to its base only by names registered so far
+      if image in ctx.dfSectionAliases:
+        section.parent = ctx.dfSectionAliases[image]
       if item.asArg.isSome():
         section.alias = parse.evalOrReturnEmptyString(item.asArg, errors)
         if section.alias == "":
@@ -908,7 +912,7 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
 
       ctx.dfSections.add(section)
       if section.alias != "":
-          ctx.dfSectionAliases[section.alias] = section
+          ctx.dfSectionAliases[section.alias.toLowerAscii()] = section
 
       if "--platform" in item.flags:
         let platform = parse.evalFlag(item.flags["--platform"], errors)
@@ -999,17 +1003,17 @@ proc getTargetDockerSection*(ctx: DockerInvocation): DockerFileSection =
       raise newException(ValueError, "there are no docker sections")
     return ctx.dfSections[^1]
   else:
-    if ctx.foundTarget notin ctx.dfSectionAliases:
+    if ctx.foundTarget.toLowerAscii() notin ctx.dfSectionAliases:
       raise newException(KeyError, ctx.foundTarget & ": is not found in Dockerfile")
-    return ctx.dfSectionAliases[ctx.foundTarget]
+    return ctx.dfSectionAliases[ctx.foundTarget.toLowerAscii()]
 
 iterator getTargetDockerSections*(ctx: DockerInvocation, section: DockerFileSection): DockerFileSection =
   ## iterator for all chain of docker sections used to build section
   ## last section is the base section which will pull an external image
   var s = section
   yield s
-  while $(s.image) in ctx.dfSectionAliases:
-    s = ctx.dfSectionAliases[$(s.image)]
+  while s.parent != nil:
+    s = s.parent
     yield s
 
 iterator getTargetDockerSections*(ctx: DockerInvocation): DockerFileSection =
@@ -1053,19 +1057,126 @@ iterator getBasesDockerSections*(ctx: DockerInvocation): DockerFileSection =
       seen.add(base)
       yield base
 
+proc isDockerStageIndex*(name: string, count: int): bool =
+  ## A numeric image name need not fit in a machine integer. Only parse
+  ## values small enough to name a stage, without overflowing.
+  if name.len == 0 or count <= 0:
+    return false
+  var value = 0
+  for c in name:
+    if c notin {'0'..'9'}:
+      return false
+    let digit = ord(c) - ord('0')
+    if value > (count - 1) div 10 or
+        (value == (count - 1) div 10 and digit > (count - 1) mod 10):
+      return false
+    value = value * 10 + digit
+  return true
+
+proc stageByName*(ctx: DockerInvocation, name: string): DockerFileSection =
+  ## stage names are case-insensitive; nil when no stage has this name
+  ctx.dfSectionAliases.getOrDefault(name.toLowerAscii(), nil)
+
+proc contextKey(name: string): string =
+  ## BuildKit looks up named contexts by the familiar reference without ":latest"
+  ## https://github.com/moby/buildkit/blob/master/frontend/dockerui/context.go (Client.NamedContext)
+  if name.toLowerAscii() in ["scratch", "context"]:
+    return ""
+  try:
+    let image = parseImage(name, defaultTag = "")
+    if image.repo == "":
+      return ""
+    result = image.familiar()
+    result.removeSuffix(":latest")
+  except CatchableError:
+    return ""
+
+proc namedContext*(ctx: DockerInvocation, name: string): Option[NamedContext] =
+  ## Never raises: unsupported context values are reported as unresolved
+  ## so callers outside the policy error boundary stay safe.
+  if ctx.foundExtraContexts == nil or name == "":
+    return none(NamedContext)
+  let key = contextKey(name)
+  if key == "":
+    return none(NamedContext)
+  for k, value in ctx.foundExtraContexts:
+    # BuildKit also accepts platform-specific "<name>::<platform>" keys
+    if k != key and not k.startsWith(key & "::"):
+      continue
+    var context = NamedContext(name: k, value: value, kind: nckLocal)
+    if value.startsWith("docker-image://"):
+      try:
+        context.image = parseImage(value["docker-image://".len .. ^1], defaultTag = "")
+        context.kind = if context.image.repo == "": nckUnresolved else: nckImage
+      except CatchableError:
+        context.kind = nckUnresolved
+    elif value.startsWith("oci-layout://"):
+      context.kind = nckUnresolved
+    return some(context)
+  return none(NamedContext)
+
+proc hasNamedContext*(ctx: DockerInvocation, name: string): bool =
+  ctx.namedContext(name).isSome()
+
+proc stageContext*(ctx: DockerInvocation, section: DockerFileSection): Option[NamedContext] =
+  ## A context named after a stage replaces that stage entirely, otherwise a
+  ## context named after the FROM image replaces the image.
+  if section.alias != "":
+    result = ctx.namedContext(section.alias)
+    if result.isSome():
+      return
+  if section.parent == nil:
+    return ctx.namedContext($section.foundImage)
+
+type BaseImageInfo = object
+  image:   DockerImage
+  context: Option[NamedContext]
+
+proc baseImageInfo(ctx: DockerInvocation, section: DockerFileSection): BaseImageInfo =
+  ## the external image a stage ultimately builds on
+  var s = section
+  while true:
+    let context = ctx.stageContext(s)
+    if context.isSome():
+      result.context = context
+      # local directories are filesystem bases rather than images
+      result.image =
+        case context.get().kind
+        of nckImage: context.get().image
+        of nckLocal: parseImage("scratch")
+        of nckUnresolved: ("", "", "")
+      return
+    if s.parent == nil:
+      result.image = s.image
+      return
+    s = s.parent
+
+proc addImageFields[T](result: var T, image: DockerImage, context: Option[NamedContext]) =
+  if context.isSome():
+    result["named_context"] = context.get().value
+  if not image.exists():
+    # unresolved context: there is no image identity to record
+    result["uri"] = ""
+    return
+  result["uri"]      = $image
+  result["repo"]     = image.repo
+  if image.registry != "":
+    result["registry"] = image.registry
+  result["name"]     = image.name
+  if image.tag != "":
+    result["tag"]    = image.tag
+  if image.digest != "":
+    result["digest"] = image.digest
+
 proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection): TableRef[string, string] =
-  let base = ctx.getBaseDockerSection(section)
+  let
+    base = ctx.getBaseDockerSection(section)
+    info = ctx.baseImageInfo(section)
   result = newTable[string, string]()
+  # lets consumers tell these marks apart from ones that predate named context metadata
+  result["named_contexts"] = "resolved"
   result["from"]     = $section.image
-  result["uri"]      = $base.image
-  result["repo"]     = base.image.repo
-  if base.image.registry != "":
-    result["registry"] = base.image.registry
-  result["name"]     = base.image.name
-  if base.image.tag != "":
-    result["tag"]    = base.image.tag
-  if base.image.digest != "":
-    result["digest"] = base.image.digest
+  result.addImageFields(info.image, info.context)
   if base.chalk != nil:
     let
       config   = unpack[string](base.chalk.collectedData.getOrDefault("_IMAGE_CONFIG_DIGEST", pack("")))
@@ -1080,25 +1191,30 @@ proc formatBaseImages*(ctx: DockerInvocation): ChalkDict =
   for section in ctx.dfSections:
     result[section.alias] = pack(ctx.formatBaseImage(section))
 
+proc copyStage*(ctx: DockerInvocation, frm: string): DockerFileSection =
+  ## COPY --from resolves stage names and indexes before named contexts
+  result = ctx.stageByName(frm)
+  if result == nil and isDockerStageIndex(frm, len(ctx.dfSections)):
+    result = ctx.dfSections[parseInt(frm)]
+
 proc formatCopyImage(ctx: DockerInvocation, copy: CopyInfo): ChalkDict =
-  let image =
-    if copy.frm in ctx.dfSectionAliases:
-      ctx.getBaseDockerSection(ctx.dfSectionAliases[copy.frm]).image
-    elif isUInt(copy.frm) and parseInt(copy.frm) < len(ctx.dfSections):
-      ctx.getBaseDockerSection(ctx.dfSections[parseInt(copy.frm)]).image
-    else:
-      parseImage(copy.frm, defaultTag = "")
+  var fields = newTable[string, string]()
+  let stage = ctx.copyStage(copy.frm)
+  if stage != nil:
+    let info = ctx.baseImageInfo(stage)
+    fields.addImageFields(info.image, info.context)
+  else:
+    let context = ctx.namedContext(copy.frm)
+    let image =
+      if context.isSome(): (if context.get().kind == nckImage: context.get().image else: ("", "", ""))
+      else: parseImage(copy.frm, defaultTag = "")
+    fields.addImageFields(image, context)
   result = ChalkDict()
-  result["from"]     = pack(copy.frm)
-  result["uri"]      = pack($image)
-  result["repo"]     = pack(image.repo)
-  result["name"]     = pack(image.name)
-  if image.registry != "":
-    result["registry"] = pack(image.registry)
-  if image.tag != "":
-    result["tag"]    = pack(image.tag)
-  if image.digest != "":
-    result["digest"] = pack(image.digest)
+  result["from"] = pack(copy.frm)
+  if stage != nil:
+    result["from_stage"] = pack(true)
+  for k, v in fields:
+    result[k] = pack(v)
   result["src"]      = pack(copy.rawSrc)
   result["dest"]     = pack(copy.rawDst)
 
@@ -1109,9 +1225,11 @@ proc formatCopyImages*(ctx: DockerInvocation): ChalkDict =
     for copy in section.copies:
       if copy.frm == "":
         continue
-      # copying from custom context, not another image
-      if copy.frm in ctx.foundExtraContexts:
-        continue
+      # copying from a local directory context, not another image
+      if ctx.copyStage(copy.frm) == nil:
+        let context = ctx.namedContext(copy.frm)
+        if context.isSome() and context.get().kind == nckLocal:
+          continue
       copies.add(ctx.formatCopyImage(copy))
     if len(copies) > 0:
       result[section.alias] = pack(copies)

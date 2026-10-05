@@ -6,124 +6,54 @@
 ##
 
 ## Build policy evaluation. Callers collect the images a docker
-## command references and this module checks them against the
-## `policy` configuration section.
+## command references and this module runs every registered policy
+## rule (see policy/rules.nim) against them.
 
 import ".."/[
-  config,
   types,
 ]
 import "."/[
-  golden_images,
-  state,
+  api,
+  configuration,
+  rules,
 ]
 
-export state
+export api, configuration
 
 type
-  PolicySubject* = object
-    image*:   DockerImage # as referenced, used for matching
-    raw*:     string      # as referenced, used for reporting
-    digests*: seq[string] # all known digests of the image
-    stage*:   string
-    source*:  string      # "from" or "copy_from"
+  PolicyCollector* = proc(): PolicyInput {.closure.}
 
-# sections declared without some fields (or not declared at all when set via
-# dotted assignment) do not get spec defaults, hence explicit defaults here
-
-proc policyMode*(): string =
-  return attrGetOpt[string]("policy.mode").get("off")
-
-proc goldenImagesEnabled*(): bool =
-  return attrGetOpt[bool]("policy.golden_images.enabled").get(false)
-
-proc policyEnabled*(): bool =
-  return policyMode() in ["audit", "enforce"]
-
-proc getAllowedImages(): seq[AllowedImage] =
-  # con4m boxes tuples as lists
-  let entries = attrGetOpt[seq[Box]]("policy.golden_images.allowed").get(@[])
-  for entry in entries:
-    let parts = unpack[seq[Box]](entry)
-    if len(parts) != 2:
-      raise newException(ValueError, "policy.golden_images.allowed entries must be (kind, value) tuples")
-    result.add((unpack[string](parts[0]), unpack[string](parts[1])))
-
-proc firstDigest(self: PolicySubject): string =
-  if len(self.digests) > 0:
-    return self.digests[0]
-  return ""
-
-proc newFinding(subject: PolicySubject, rule, kind, reason: string): PolicyFinding =
-  return PolicyFinding(
-    rule:   rule,
-    kind:   kind,
-    image:  subject.raw,
-    digest: subject.firstDigest(),
-    stage:  subject.stage,
-    source: subject.source,
-    reason: reason,
-  )
-
-proc checkGoldenImages(subjects: seq[PolicySubject]): seq[PolicyFinding] =
-  if not goldenImagesEnabled():
-    return
-  let
-    allowed      = getAllowedImages()
-    checkCopy    = attrGetOpt[bool]("policy.golden_images.check_copy_from").get(true)
-    message      = attrGetOpt[string]("policy.golden_images.message").get("")
-  for subject in subjects:
-    if subject.source == "copy_from" and not checkCopy:
-      continue
-    let (res, reason) = subject.image.checkImage(subject.digests, allowed)
-    case res
-    of mrAllowed:
-      continue
-    of mrDenied:
-      var fullReason = reason
-      if message != "":
-        fullReason &= ". " & message
-      result.add(subject.newFinding("golden_images", "violation", fullReason))
-    of mrUnknown:
-      result.add(subject.newFinding("golden_images", "error", reason))
-
-proc runCustomCheck(subjects: seq[PolicySubject]): seq[PolicyFinding] =
-  let cb = attrGetOpt[CallbackObj]("policy.custom_check")
-  if cb.isNone():
-    return
-  for subject in subjects:
-    try:
-      let
-        args = @[
-          pack(subject.raw),
-          pack(subject.firstDigest()),
-          pack(subject.stage),
-          pack(subject.source),
-        ]
-        reason = unpack[string](runCallback(cb.get(), args).get())
-      if reason != "":
-        result.add(subject.newFinding("custom_check", "violation", reason))
-    except:
-      result.add(subject.newFinding("custom_check", "error",
-                                    "custom_check failed: " & getCurrentExceptionMsg()))
-
-proc evaluatePolicies*(subjects: seq[PolicySubject],
+proc evaluatePolicies*(settings: PolicyConfig,
+                       rules:    seq[PolicyRule],
+                       input:    PolicyInput,
                        build:    ChalkDict,
-                       errors:   seq[PolicyFinding] = @[]) =
-  ## Evaluates all enabled policies, records the outcome for reporting
-  ## and raises `PolicyViolation` when an enforced policy blocks the build.
-  let mode = policyMode()
+                       findings: seq[PolicyFinding] = @[]) =
+  ## Runs `rules`, records the outcome for reporting and raises
+  ## `PolicyViolation` when an enforced policy blocks the command.
+  let mode = settings.mode
   if mode notin ["audit", "enforce"]:
     return
 
-  var findings = errors
-  try:
-    findings.add(checkGoldenImages(subjects))
-  except:
-    findings.add(PolicyFinding(rule:   "golden_images",
-                               kind:   "error",
-                               reason: "could not evaluate: " & getCurrentExceptionMsg()))
-  findings.add(runCustomCheck(subjects))
+  var
+    findings   = findings
+    attributed = false
+  for rule in rules:
+    if rule.requiresAllSubjects:
+      attributed = true
+      for e in input.errors:
+        var f = e
+        f.rule = rule.name
+        findings.add(f)
+    try:
+      findings.add(rule.check(input.subjects))
+    except CatchableError:
+      findings.add(PolicyFinding(rule:   rule.name,
+                                 kind:   "error",
+                                 reason: "could not evaluate: " & getCurrentExceptionMsg()))
+
+  if not attributed:
+    for e in input.errors:
+      trace("policy: no enabled rule needs all subjects, ignoring: " & $e)
 
   if len(findings) == 0:
     trace("policy: all policies passed")
@@ -139,7 +69,7 @@ proc evaluatePolicies*(subjects: seq[PolicySubject],
       inc(failures)
 
   let
-    blockOnError = attrGetOpt[string]("policy.on_error").get("allow") == "block"
+    blockOnError = settings.onError == "block"
     blocked      = mode == "enforce" and (violations > 0 or (failures > 0 and blockOnError))
     outcome      =
       if blocked:
@@ -169,3 +99,32 @@ proc evaluatePolicies*(subjects: seq[PolicySubject],
     raise newException(PolicyViolation,
                        command & " blocked by policy (" & $violations & " violation(s), " &
                        $failures & " error(s))")
+
+proc evaluatePolicies*(build: ChalkDict, collect: PolicyCollector) =
+  ## Rule loading and subject collection belong to evaluation: failures here
+  ## must never reach docker's generic failsafe without honoring policy.on_error.
+  let settings = policyControls()
+  if settings.mode notin ["audit", "enforce"]:
+    return
+  loadPolicyRules()
+  var
+    findings: seq[PolicyFinding]
+    enabled:  seq[PolicyRule]
+  for rule in policyRules():
+    try:
+      if rule.load():
+        enabled.add(rule)
+    except CatchableError:
+      findings.add(PolicyFinding(rule:   rule.name,
+                                 kind:   "error",
+                                 reason: "could not load configuration: " & getCurrentExceptionMsg()))
+  if len(enabled) == 0 and len(findings) == 0:
+    return
+  var input: PolicyInput
+  if len(enabled) > 0:
+    try:
+      input = collect()
+    except CatchableError:
+      input.errors.add(collectionError("could not collect policy subjects: " &
+                                       getCurrentExceptionMsg()))
+  evaluatePolicies(settings, enabled, input, build, findings)

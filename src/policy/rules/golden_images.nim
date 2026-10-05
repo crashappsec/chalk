@@ -5,16 +5,17 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-## Golden image allowlist matching.
-## See docs/design-build-policy.md for the matching semantics.
+## `policy.golden_images`: only allow building on and copying from
+## allowlisted images. See docs/design-build-policy.md for the matching semantics.
 
 import std/[
   strutils,
 ]
-import ".."/[
+import "../.."/[
   docker/ids,
   types,
 ]
+import ".."/api
 
 type
   AllowedImage* = tuple
@@ -100,3 +101,54 @@ proc checkImage*(image:   DockerImage,
   if hasDigestRules and len(digests) == 0:
     return (mrUnknown, "image digest could not be resolved to compare against allowed digests")
   return (mrDenied, "image is not in the list of allowed golden images")
+
+type
+  GoldenImagesConfig* = object
+    checkCopyFrom*: bool
+    allowed*:       seq[AllowedImage]
+    message*:       string
+
+proc check*(settings: GoldenImagesConfig, subjects: seq[PolicySubject]): seq[PolicyFinding] =
+  for subject in subjects:
+    if subject.source == "copy_from" and not settings.checkCopyFrom:
+      continue
+    let (res, reason) = subject.image.checkImage(subject.digests, settings.allowed)
+    case res
+    of mrAllowed:
+      continue
+    of mrDenied:
+      var fullReason = reason
+      if settings.message != "":
+        fullReason &= ". " & settings.message
+      result.add(subject.newFinding("golden_images", "violation", fullReason))
+    of mrUnknown:
+      result.add(subject.newFinding("golden_images", "error", reason))
+
+proc loadGoldenImagesConfig*(): Option[GoldenImagesConfig] =
+  if not attrGetOpt[bool]("policy.golden_images.enabled").get(false):
+    return none(GoldenImagesConfig)
+  var settings = GoldenImagesConfig(
+    checkCopyFrom: attrGetOpt[bool]("policy.golden_images.check_copy_from").get(true),
+    message:       attrGetOpt[string]("policy.golden_images.message").get(""),
+  )
+  for entry in attrGetOpt[seq[Box]]("policy.golden_images.allowed").get(@[]):
+    let parts = unpack[seq[Box]](entry)
+    if len(parts) != 2:
+      raise newException(ValueError, "policy.golden_images.allowed entries must be (kind, value) tuples")
+    settings.allowed.add((unpack[string](parts[0]), unpack[string](parts[1])))
+  return some(settings)
+
+var loaded: GoldenImagesConfig
+
+proc loadGoldenImages(): bool =
+  let settings = loadGoldenImagesConfig()
+  if settings.isSome():
+    loaded = settings.get()
+  return settings.isSome()
+
+proc checkGoldenImages(subjects: seq[PolicySubject]): seq[PolicyFinding] =
+  loaded.check(subjects)
+
+proc loadGoldenImagesRule*() =
+  newPolicyRule("golden_images", loadGoldenImages, checkGoldenImages,
+                requiresAllSubjects = true)

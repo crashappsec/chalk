@@ -148,7 +148,12 @@ proc processPlatforms(self: DockerInvocation) =
   self.platforms = self.foundPlatforms
   if len(self.platforms) == 0:
     trace("docker: no --platform is provided")
-    self.platforms.add(self.findBaseImagePlatform())
+    let base = self.getBaseDockerSection()
+    if self.stageContext(base).isSome():
+      # Docker resolves the context, not the registry image named in FROM
+      self.platforms.add(if base.platform != nil: base.platform else: findDockerPlatform())
+    else:
+      self.platforms.add(self.findBaseImagePlatform())
 
 proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
   if len(ctx.platforms) == 0:
@@ -159,6 +164,8 @@ proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
       continue
     if s.image.isPinned():
       continue
+    if ctx.stageContext(s).isSome():
+      continue # Docker resolves this context; pinning the name changes its meaning.
     try:
       let
         platforms = s.platformsOrDefault(ctx.platforms)

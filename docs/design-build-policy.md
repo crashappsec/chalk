@@ -50,14 +50,25 @@ block never falls back to running docker without chalk.
 
 - `chalk docker build`: every external image referenced by a `FROM` in any
   stage (stages built on other stages are resolved to their external base),
-  and every image referenced by `COPY --from=<image>`. `FROM scratch` and
+  and every image referenced by `COPY --from=<image>`. Named contexts with
+  `docker-image://` sources are checked too, including overrides of `FROM`
+  images, `COPY --from` references and whole stages. Context names are
+  matched the way BuildKit does (familiar reference without `:latest`), so
+  `alpine`, `alpine:latest` and `docker.io/library/alpine` all resolve to an
+  `alpine` context. A `FROM` naming a stage defined later in the Dockerfile is
+  an external image, as in Docker. Local, Git and HTTP contexts are not
+  container images. OCI layout contexts whose image identity cannot be
+  determined produce an evaluation error. `FROM scratch` and
   references to other stages of the same Dockerfile are always allowed.
   Policies are evaluated after chalk resolves base image digests and before
   chalk modifies anything or invokes docker, including `--push` builds.
 - `chalk docker push`: the base and `COPY --from` images recorded in the
   image's chalk mark (`DOCKER_BASE_IMAGES`, `DOCKER_COPY_IMAGES`). If the image
   is not chalked its base images are unknown, which is an evaluation error
-  handled by `on_error`.
+  handled by `on_error`. With `--all-tags`, every local tag in the requested
+  repository is checked before any tag is pushed. Findings are combined into
+  one policy report. Failure to enumerate tags or read image metadata is an
+  evaluation error, also handled by `on_error`.
 
 ## Configuration
 
@@ -114,7 +125,7 @@ so configurations written for newer chalk versions fail safe on older ones.
 
 `custom_check` is called once per checked image with:
 
-1. the image as referenced in the Dockerfile;
+1. the image reference (for named image contexts, the context's image reference);
 2. the resolved image digest (empty when unknown);
 3. the Dockerfile stage alias;
 4. the source of the reference, `from` or `copy_from`.
@@ -179,6 +190,21 @@ other configuration: embedded with `chalk load`, provided as an external
 config file, or published as a reusable component whose values are set via
 component parameters.
 
+Policy configuration is read once per evaluation. Subject collection,
+metadata decoding and rule evaluation use the same `on_error` setting;
+errors in these steps cannot silently bypass `on_error = "block"`.
+Subject collection errors (for example pushing an unchalked image) are
+reported against rules that need every referenced image, such as
+`golden_images`; `custom_check` only sees the images that could be determined.
+
+## Adding rules
+
+Each rule is a standalone module under `src/policy/rules/` that registers
+itself with `newPolicyRule` (see `src/policy/api.nim`) and is listed in
+`src/policy/rules.nim`. A rule reads its own configuration in `load`, returns
+findings from `check`, and sets `requiresAllSubjects` when an incomplete list
+of images could let a disallowed one through.
+
 ## Limitations
 
 - Policies are a guardrail, not a security boundary: running the real `docker`
@@ -187,6 +213,11 @@ component parameters.
   again.
 - `docker buildx bake` and `docker compose build` are not wrapped by chalk
   and are therefore not covered.
+- Older chalk marks may omit images supplied through named contexts. When
+  such metadata is incomplete, push policies report an evaluation error;
+  `on_error` determines whether to allow the push. Rebuilding with this
+  version of chalk records the image context references for subsequent push
+  checks, whether or not policies are enabled.
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.

@@ -34,6 +34,7 @@ import ".."/[
   attestation_api,
   commands/cmd_help,
   config,
+  policy/state,
   reporting,
   types,
   utils/exec,
@@ -73,6 +74,8 @@ proc runCmdDocker*(args: seq[string]) =
   try:
     if exitCode == 0:
       reporting.doReporting("report")
+    elif policyOutcome != nil:
+      reporting.doReporting("fail")
     showConfigValues()
   except:
     # ignore any errors reporting/etc as we need to ensure

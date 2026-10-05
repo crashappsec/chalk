@@ -2514,7 +2514,9 @@ singleton policy {
   user_def_ok:   false
   doc: """
 Build policies evaluated by `chalk docker build` and `chalk docker push`
-before the wrapped docker command runs.
+before the wrapped docker command runs. Pushes with `--all-tags` evaluate
+all local tags in the requested repository before any tag is pushed.
+Image-backed named build contexts are checked as well.
 
 In `audit` mode violations are only reported. In `enforce` mode
 violations are reported and chalk exits with a non-zero exit code
@@ -2550,7 +2552,8 @@ See `docs/design-build-policy.md` in the chalk repository for details.
     shortdoc: "What to do when a policy cannot be evaluated"
     doc: """
 When a policy cannot reach a decision (e.g. an image digest could not be
-resolved or an allowlist entry kind is unknown), `allow` lets the build
+resolved, subject metadata could not be read, repository tags could not
+be enumerated, or an allowlist entry kind is unknown), `allow` lets the build
 continue while `block` treats it as a violation. In both cases the error
 is reported.
 """

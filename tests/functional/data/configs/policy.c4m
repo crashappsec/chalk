@@ -22,3 +22,7 @@ sink_config policy_file {
 }
 
 subscribe("policy", "policy_file")
+
+if env_exists("POLICY_ON_ERROR") {
+  policy.on_error = env("POLICY_ON_ERROR")
+}

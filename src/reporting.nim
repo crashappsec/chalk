@@ -12,6 +12,7 @@ import "."/[
   collect,
   config,
   object_store/api,
+  policy/configuration,
   policy/state,
   reportcache,
   run_management,
@@ -187,7 +188,7 @@ proc doPolicyReporting() =
     return
   policyOutcome.published = true
   trace("policy: generating policy report")
-  let report = buildHostReport(getReportTemplate("policy", default = "policy_report"))
+  let report = buildHostReport(policyReportTemplate())
   if report != "":
     safePublish("policy", report)
 

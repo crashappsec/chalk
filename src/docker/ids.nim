@@ -490,6 +490,22 @@ proc `$`*(self: DockerImage): string =
       "docker image is empty to be represented correctly"
     )
 
+proc familiar*(self: DockerImage): string =
+  ## docker's short form of a reference, e.g. registry-1.docker.io/library/alpine -> alpine
+  ## https://github.com/distribution/reference/blob/main/normalize.go
+  if self.repo == "scratch":
+    return $self
+  var repo = self.normalize().repo
+  if repo.startsWith(DEFAULT_REGISTRY & "/"):
+    repo = repo[len(DEFAULT_REGISTRY) + 1 .. ^1]
+    if repo.startsWith(LIBRARY) and '/' notin repo[len(LIBRARY) .. ^1]:
+      repo = repo[len(LIBRARY) .. ^1]
+  result = repo
+  if self.tag != "":
+    result &= ":" & self.tag
+  if self.digest != "":
+    result &= "@" & HASH_HEADER & self.digest
+
 proc exists*(self: DockerImage): bool =
   return self != ("", "", "")
 

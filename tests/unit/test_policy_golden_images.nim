@@ -1,6 +1,7 @@
 import ../../src/types
 import ../../src/docker/ids
-import ../../src/policy/golden_images
+import ../../src/policy/api
+import ../../src/policy/rules/golden_images
 
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
