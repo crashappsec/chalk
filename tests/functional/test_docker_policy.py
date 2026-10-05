@@ -269,8 +269,13 @@ def test_enforce_blocks_named_image_context(chalk: Chalk, random_hex: str, sourc
         else "FROM scratch\nCOPY --from=external /bin/busybox /busybox\n"
     )
     _, result = build(
-        chalk, content, "enforce", random_hex, tag=random_hex,
-        named_contexts={"external": "docker-image://busybox:latest"}, buildx=True,
+        chalk,
+        content,
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        named_contexts={"external": "docker-image://busybox:latest"},
+        buildx=True,
         expected_success=False,
     )
     assert result.exit_code == 1
@@ -278,54 +283,74 @@ def test_enforce_blocks_named_image_context(chalk: Chalk, random_hex: str, sourc
     (report,) = policy_reports(random_hex)
     assert report.has(
         _POLICY_RESULT="blocked",
-        _POLICY_FINDINGS=Contains([
-            {"image": "busybox:latest", "source": source, "kind": "violation"}
-        ]),
+        _POLICY_FINDINGS=Contains(
+            [{"image": "busybox:latest", "source": source, "kind": "violation"}]
+        ),
     )
 
 
 @pytest.mark.parametrize("reference", ["alpine:latest", "docker.io/library/alpine"])
-def test_enforce_blocks_context_by_familiar_name(chalk: Chalk, random_hex: str, reference: str):
+def test_enforce_blocks_context_by_familiar_name(
+    chalk: Chalk, random_hex: str, reference: str
+):
     # BuildKit resolves both spellings to the "alpine" context, not to alpine
     _, result = build(
-        chalk, f"FROM scratch\nCOPY --from={reference} /bin/busybox /busybox\n",
-        "enforce", random_hex, tag=random_hex,
-        named_contexts={"alpine": "docker-image://busybox:latest"}, buildx=True,
+        chalk,
+        f"FROM scratch\nCOPY --from={reference} /bin/busybox /busybox\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        named_contexts={"alpine": "docker-image://busybox:latest"},
+        buildx=True,
         expected_success=False,
     )
     assert result.exit_code == 1
     assert not image_exists(random_hex)
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_FINDINGS=Contains([
-        {"image": "busybox:latest", "source": "copy_from", "kind": "violation"}
-    ]))
+    assert report.has(
+        _POLICY_FINDINGS=Contains(
+            [{"image": "busybox:latest", "source": "copy_from", "kind": "violation"}]
+        )
+    )
 
 
 def test_enforce_blocks_forward_stage_name(chalk: Chalk, random_hex: str):
     # FROM only resolves earlier stages, so the target builds on the busybox image
     _, result = build(
-        chalk, "FROM busybox AS first\nFROM alpine AS busybox\nFROM first\nCMD true\n",
-        "enforce", random_hex, tag=random_hex, expected_success=False,
+        chalk,
+        "FROM busybox AS first\nFROM alpine AS busybox\nFROM first\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
     )
     assert result.exit_code == 1
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_FINDINGS=Contains([
-        {"image": "busybox", "source": "from", "kind": "violation"}
-    ]))
+    assert report.has(
+        _POLICY_FINDINGS=Contains(
+            [{"image": "busybox", "source": "from", "kind": "violation"}]
+        )
+    )
 
 
 def test_large_numeric_copy_reference_is_checked(chalk: Chalk, random_hex: str):
     image = "999999999999999999999999999999"
     _, result = build(
-        chalk, f"FROM scratch\nCOPY --from={image} /bin/x /x\n",
-        "enforce", random_hex, tag=random_hex, expected_success=False,
+        chalk,
+        f"FROM scratch\nCOPY --from={image} /bin/x /x\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
     )
     assert result.exit_code == 1
     assert "retrying without chalk" not in result.logs
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_FINDINGS=Contains([
-        {"image": image, "kind": "violation", "source": "copy_from"}
-    ]))
+    assert report.has(
+        _POLICY_FINDINGS=Contains(
+            [{"image": image, "kind": "violation", "source": "copy_from"}]
+        )
+    )
 
 
 def test_enforce_push_checks_all_tags(chalk: Chalk, random_hex: str):
@@ -336,7 +361,8 @@ def test_enforce_push_checks_all_tags(chalk: Chalk, random_hex: str):
         subprocess.run(["docker", "tag", local, f"{repo}:{tag}"], check=True)
     result = chalk.run(
         params=["docker", "push", "--all-tags", repo],
-        config=CONFIGS / "policy.c4m", env=policy_env("enforce", random_hex),
+        config=CONFIGS / "policy.c4m",
+        env=policy_env("enforce", random_hex),
         expected_success=False,
     )
     assert result.exit_code == 1
@@ -344,7 +370,10 @@ def test_enforce_push_checks_all_tags(chalk: Chalk, random_hex: str):
     (report,) = policy_reports(random_hex)
     assert report.has(
         _POLICY_RESULT="blocked",
-        _POLICY_BUILD={"command": "push", "tags": Contains([f"{repo}:latest", f"{repo}:other"])},
+        _POLICY_BUILD={
+            "command": "push",
+            "tags": Contains([f"{repo}:latest", f"{repo}:other"]),
+        },
         _POLICY_FINDINGS=Contains([{"image": ANY, "kind": "violation"}]),
     )
 
@@ -352,47 +381,67 @@ def test_enforce_push_checks_all_tags(chalk: Chalk, random_hex: str):
 def test_named_image_context_is_checked_again_on_push(chalk: Chalk, random_hex: str):
     tag = f"{REGISTRY}/{random_hex}"
     build(
-        chalk, "FROM scratch\nCOPY --from=external /bin/busybox /busybox\n",
-        "audit", random_hex, tag=random_hex,
-        named_contexts={"external": "docker-image://busybox:latest"}, buildx=True,
+        chalk,
+        "FROM scratch\nCOPY --from=external /bin/busybox /busybox\n",
+        "audit",
+        random_hex,
+        tag=random_hex,
+        named_contexts={"external": "docker-image://busybox:latest"},
+        buildx=True,
     )
     subprocess.run(["docker", "tag", random_hex, tag], check=True)
     # Keep only the push report for this assertion.
     report_file(random_hex).write_text("")
     result = chalk.run(
-        params=["docker", "push", tag], config=CONFIGS / "policy.c4m",
-        env=policy_env("enforce", random_hex), expected_success=False,
+        params=["docker", "push", tag],
+        config=CONFIGS / "policy.c4m",
+        env=policy_env("enforce", random_hex),
+        expected_success=False,
     )
     assert result.exit_code == 1
     assert registry_tags(random_hex) == []
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_RESULT="blocked", _POLICY_FINDINGS=Contains([
-        {"image": "busybox:latest", "source": "copy_from", "kind": "violation"}
-    ]))
+    assert report.has(
+        _POLICY_RESULT="blocked",
+        _POLICY_FINDINGS=Contains(
+            [{"image": "busybox:latest", "source": "copy_from", "kind": "violation"}]
+        ),
+    )
 
 
-@pytest.mark.parametrize("mode,on_error,result_kind", [
-    ("enforce", "block", "blocked"),
-    ("enforce", "allow", "error"),
-    ("audit", "block", "error"),
-])
+@pytest.mark.parametrize(
+    "mode,on_error,result_kind",
+    [
+        ("enforce", "block", "blocked"),
+        ("enforce", "allow", "error"),
+        ("audit", "block", "error"),
+    ],
+)
 def test_subject_collection_errors_honor_configuration(
     chalk: Chalk, random_hex: str, mode: str, on_error: str, result_kind: str
 ):
     _, result = build(
-        chalk, "FROM scratch\nCOPY --from=external /x /x\n",
-        mode, random_hex, tag=random_hex,
-        named_contexts={"external": "docker-image://"}, buildx=True,
-        env={"POLICY_ON_ERROR": on_error}, expected_success=False,
+        chalk,
+        "FROM scratch\nCOPY --from=external /x /x\n",
+        mode,
+        random_hex,
+        tag=random_hex,
+        named_contexts={"external": "docker-image://"},
+        buildx=True,
+        env={"POLICY_ON_ERROR": on_error},
+        expected_success=False,
     )
     assert result.exit_code != 0
     if result_kind == "blocked":
         assert result.exit_code == 1
         assert "retrying without chalk" not in result.logs
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_RESULT=result_kind, _POLICY_FINDINGS=Contains([
-        {"rule": "golden_images", "kind": "error", "reason": ANY}
-    ]))
+    assert report.has(
+        _POLICY_RESULT=result_kind,
+        _POLICY_FINDINGS=Contains(
+            [{"rule": "golden_images", "kind": "error", "reason": ANY}]
+        ),
+    )
 
 
 @pytest.mark.parametrize("source", ["from", "copy_from"])
@@ -403,7 +452,12 @@ def test_enforce_allows_named_image_context(chalk: Chalk, random_hex: str, sourc
         else "FROM scratch\nCOPY --from=external /etc/os-release /os-release\n"
     )
     _, result = build(
-        chalk, content, "enforce", random_hex, tag=random_hex, buildx=True,
+        chalk,
+        content,
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        buildx=True,
         named_contexts={"external": "docker-image://alpine:latest"},
     )
     assert result.exit_code == 0
