@@ -1,0 +1,18 @@
+func deny_latest(image: string, digest: string, stage: string, source: string) {
+  if image.ends_with(":latest") {
+    return "images must be pinned to a version tag"
+  }
+  return ""
+}
+
+# dotted assignments without declaring the policy sections
+policy.mode: "enforce"
+policy.custom_check: func deny_latest
+
+sink_config policy_file {
+  enabled:  true
+  sink:     "file"
+  filename: env("POLICY_REPORT_FILE")
+}
+
+subscribe("policy", "policy_file")

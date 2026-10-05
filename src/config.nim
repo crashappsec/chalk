@@ -99,14 +99,14 @@ proc copyReportTemplateKeys(destinationSection: string) =
         Con4mType(kind: TypeBool),
       )
 
-proc getReportTemplate*(spec = ""): string =
+proc getReportTemplate*(spec = "", default = "null"): string =
   let
     ns =
       if spec == "":
         getOutputConfig()
       else:
         spec
-    tmplName = attrGetOpt[string](ns & ".report_template").get("").elseWhenEmpty("null")
+    tmplName = attrGetOpt[string](ns & ".report_template").get("").elseWhenEmpty(default)
   result = "report_template." & tmplName
   result.copyReportTemplateKeys()
 

@@ -315,7 +315,7 @@ proc qualify(self: DockerImage): DockerImage =
     self.digest,
   )
 
-proc normalize(self: DockerImage): DockerImage =
+proc normalize*(self: DockerImage): DockerImage =
   ## normalize qualified registry domain
   ## normalization maps some hardcoded registry domains
   ## to their standard API domains

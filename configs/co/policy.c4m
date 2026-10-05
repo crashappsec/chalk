@@ -1,0 +1,19 @@
+# Sends build policy reports (the `policy` topic) to Crash Override.
+# Policies themselves are configured via the `policy` section and are
+# disabled unless `policy.mode` is set.
+# Requires crashoverride2 for the crashoverride_reporting auth config.
+
+parameter sink_config.crashoverride_policy.uri {
+  shortdoc: "Reporting URL where to send build policy reports"
+  doc:      "Reporting URL where to send build policy reports"
+  default:  "https://chalk.crashoverride.run/v0.1/report/policy"
+}
+
+sink_config crashoverride_policy {
+  ~enabled:         true
+  ~sink:            "presign"
+  ~priority:        999999
+  ~auth:            "crashoverride_reporting"
+}
+
+subscribe("policy", "crashoverride_policy")

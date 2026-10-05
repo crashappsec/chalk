@@ -52,7 +52,7 @@
 ##     the more basic per-op stuff such as "_CHALKS" and "ACTION_ID" I did not.
 
 ## CHALK SCHEMA
-chalk_version :=   "1.2.0"
+chalk_version :=   "1.3.0-dev"
 ascii_magic   :=   "dadfedabbadabbed"
 
 # Field starting with an underscore (_) are "system" metadata fields, that
@@ -5639,6 +5639,77 @@ For operations such as docker builds, chalk invokes an external command
 which chalk proxies through. This key reports the external command
 exit code. This is useful for example for reports without any
 chalkmarks due to an external command failure.
+"""
+}
+
+keyspec _POLICY_MODE {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  system:   false
+  since:    "1.3.0"
+  shortdoc: "Build policy mode"
+  doc:      """
+The `policy.mode` build policies were evaluated with, either `audit`
+or `enforce`. Only reported when policies produced a violation or an
+evaluation error.
+"""
+}
+
+keyspec _POLICY_RESULT {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  system:   false
+  since:    "1.3.0"
+  shortdoc: "Build policy evaluation result"
+  doc:      """
+Outcome of build policy evaluation:
+
+* `violation` - a policy was violated in `audit` mode; the build continued
+* `blocked` - a policy was violated in `enforce` mode; the build failed
+* `error` - a policy could not be evaluated and `on_error` allowed the build
+
+Only reported when policies produced a violation or an evaluation error.
+"""
+}
+
+keyspec _POLICY_FINDINGS {
+  kind:     RunTimeHost
+  type:     list[dict[string, string]]
+  standard: true
+  system:   false
+  since:    "1.3.0"
+  shortdoc: "Build policy violations and errors"
+  doc:      """
+Each finding has the following fields:
+
+* `rule` - policy that produced the finding, e.g. `golden_images`
+* `kind` - `violation` or `error`
+* `image` - image as referenced in the Dockerfile
+* `digest` - resolved image digest, if known
+* `stage` - Dockerfile stage alias
+* `source` - `from` or `copy_from`
+* `reason` - human-readable explanation
+"""
+}
+
+keyspec _POLICY_BUILD {
+  kind:     RunTimeHost
+  type:     dict[string, `x]
+  standard: true
+  system:   false
+  since:    "1.3.0"
+  shortdoc: "Build that build policies were evaluated for"
+  doc:      """
+Identifies the build or push that build policies were evaluated for,
+as the policy report may be published before any artifact is created:
+
+* `command` - `build` or `push`
+* `dockerfile_path` - Dockerfile path (build only)
+* `context` - build context (build only)
+* `tags` - image tags
+* `platforms` - target platforms (build only)
 """
 }
 

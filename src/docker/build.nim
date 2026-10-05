@@ -36,6 +36,7 @@ import "."/[
   login,
   manifest,
   platform,
+  policy,
   registry,
   scan,
   util,
@@ -684,6 +685,8 @@ proc dockerBuild*(ctx: DockerInvocation): int =
 
   ctx.processPlatforms()
   ctx.pinBuildSectionBaseImages()
+  # before any build mutations so a blocked build leaves nothing to clean up
+  ctx.evaluateBuildPolicies()
 
   cleanBuildContextCache()
   # Upload context blobs / create local tarballs on baseChalk before

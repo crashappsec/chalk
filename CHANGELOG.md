@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### New Features
+
+- Opt-in build policies for `chalk docker build` and `chalk docker push`,
+  disabled by default (`policy.mode = "off"`) with no change in behavior
+  unless enabled. The new `policy` configuration section restricts base images (and `COPY --from`
+  images) to an allowlist of golden images via glob or digest entries, and
+  supports a `custom_check` con4m callback. In `audit` mode violations are
+  reported; in `enforce` mode chalk also exits non-zero before running docker,
+  so the image is neither built nor pushed. Unlike other failures, a policy
+  block never falls back to running docker without chalk. Violations and
+  evaluation errors are published to the new `policy` topic with the
+  `policy_report` template and the new `_POLICY_MODE`, `_POLICY_RESULT`,
+  `_POLICY_FINDINGS` and `_POLICY_BUILD` keys. See
+  `docs/design-build-policy.md`.
+
 ### Bug Fixes
 
 - Fixed a segfault in the certs codec that aborted chalked Docker builds. The

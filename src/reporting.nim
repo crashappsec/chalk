@@ -12,6 +12,7 @@ import "."/[
   collect,
   config,
   object_store/api,
+  policy/state,
   reportcache,
   run_management,
   sinks,
@@ -179,6 +180,17 @@ proc doCustomReporting() =
       if report != "":
         safePublish(topic, report)
 
+proc doPolicyReporting() =
+  # published at most once per run, alongside whichever report
+  # ("report" or "fail") ends the docker command
+  if policyOutcome == nil or policyOutcome.published:
+    return
+  policyOutcome.published = true
+  trace("policy: generating policy report")
+  let report = buildHostReport(getReportTemplate("policy", default = "policy_report"))
+  if report != "":
+    safePublish("policy", report)
+
 proc doReporting*(
     topic      = "report",
     clearState = false,
@@ -200,6 +212,7 @@ proc doReporting*(
       doCommandReport(topic)
     if not skipCustom:
       doCustomReporting()
+    doPolicyReporting()
     if writeCache:
       writeReportCache()
     else:

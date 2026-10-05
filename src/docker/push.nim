@@ -19,6 +19,7 @@ import "."/[
   exe,
   login,
   manifest,
+  policy,
   scan,
   util,
 ]
@@ -29,6 +30,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
   let chalkOpt = scanImage(ctx.foundImage, fromManifest = false)
   if chalkOpt.isNone():
     error("docker: " & ctx.foundImage & " is not found. pushing without chalk")
+    ctx.evaluatePushPolicies(nil)
     return setExitCode(ctx.runMungedDockerInvocation())
 
   # force DOCKER_PLATFORM to be included in chalk normalization
@@ -36,6 +38,7 @@ proc dockerPush*(ctx: DockerInvocation): int =
   forceChalkKeys(["DOCKER_PLATFORM"])
 
   let chalk = chalkOpt.get()
+  ctx.evaluatePushPolicies(chalk)
 
   chalk.withErrorContext():
     if not chalk.isChalked():

@@ -150,6 +150,9 @@ proc initCollection*(collectHost = true) =
         continue
     registerKeys(getReportTemplate(report))
 
+  if attrGetOpt[string]("policy.mode").get("off") in ["audit", "enforce"]:
+    registerKeys(getReportTemplate("policy", default = "policy_report"))
+
   if isChalkingOp() and collectHost:
       collectChalkTimeHostInfo()
 

@@ -2510,6 +2510,135 @@ Go `filepath.Match` extended with `**`):
   }
 }
 
+singleton policy {
+  user_def_ok:   false
+  doc: """
+Build policies evaluated by `chalk docker build` and `chalk docker push`
+before the wrapped docker command runs.
+
+In `audit` mode violations are only reported. In `enforce` mode
+violations are reported and chalk exits with a non-zero exit code
+without running docker, so the image is neither built nor pushed.
+Unlike other chalk failures, a policy violation never falls back to
+running docker without chalk.
+
+Violations and evaluation errors are published to the `policy` topic
+using the `policy_report` report template. Nothing is published when
+all policies pass.
+
+See `docs/design-build-policy.md` in the chalk repository for details.
+"""
+
+  allow golden_images
+
+  field mode {
+    type:     string
+    default:  "off"
+    choices:  ["off", "audit", "enforce"]
+    shortdoc: "Policy enforcement mode"
+    doc: """
+* `off` - policies are not evaluated
+* `audit` - violations are reported but the build continues
+* `enforce` - violations are reported and the build fails
+"""
+  }
+
+  field on_error {
+    type:     string
+    default:  "allow"
+    choices:  ["allow", "block"]
+    shortdoc: "What to do when a policy cannot be evaluated"
+    doc: """
+When a policy cannot reach a decision (e.g. an image digest could not be
+resolved or an allowlist entry kind is unknown), `allow` lets the build
+continue while `block` treats it as a violation. In both cases the error
+is reported.
+"""
+  }
+
+  field report_template {
+    type:     string
+    default:  "policy_report"
+    validator: func custom_report_template_check
+    shortdoc: "Report template for the policy topic"
+    doc: """
+Report template used for reports published to the `policy` topic.
+"""
+  }
+
+  field custom_check {
+    type:     func (string, string, string, string) -> string
+    require:  false
+    shortdoc: "Custom policy callback"
+    doc: """
+Optional callback invoked once for every external image referenced by
+the build (`FROM` and `COPY --from`). It receives:
+
+1. the image as referenced in the Dockerfile
+2. the resolved image digest (empty when unknown)
+3. the Dockerfile stage alias the image belongs to
+4. the source of the reference, either `from` or `copy_from`
+
+Return an empty string to pass or a reason string to report a violation.
+"""
+  }
+}
+
+singleton golden_images {
+  user_def_ok:   false
+  doc: """
+Restricts base images (and optionally `COPY --from` images) to an
+allowlist of approved "golden" images.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable golden image policy"
+    doc: """
+When enabled with an empty `allowed` list every external image is a
+violation.
+"""
+  }
+
+  field check_copy_from {
+    type:     bool
+    default:  true
+    shortdoc: "Also check COPY --from images"
+    doc: """
+Whether images referenced via `COPY --from=<image>` must also be allowed.
+"""
+  }
+
+  field allowed {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Allowed images as (kind, value) tuples"
+    doc: """
+Each entry is a `(kind, value)` tuple. Supported kinds:
+
+* `glob` - shell-style glob over `registry/repo[:tag]`, e.g.
+  `docker.io/library/alpine:*`. Without a tag any tag matches.
+  Docker Hub short names are normalized (`alpine` is
+  `docker.io/library/alpine`).
+* `digest` - `[registry/repo]@sha256:<digest>`. Matches the digest chalk
+  resolved for the image. When the repo is present it must match too.
+
+Unknown kinds are reported as evaluation errors.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance shown to the user and included in the report when an
+image is not allowed, e.g. a link to the list of golden images.
+"""
+  }
+}
+
 singleton zip {
   user_def_ok:   true
   doc: """
@@ -3767,6 +3896,7 @@ root {
   allow cloud_provider
   allow git
   allow network
+  allow policy
   allow certs
   allow zip
 
