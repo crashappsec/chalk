@@ -5656,6 +5656,20 @@ evaluation error.
 """
 }
 
+keyspec _POLICY_ID {
+  kind:     RunTimeHost
+  type:     string
+  standard: true
+  system:   false
+  since:    "1.3.0"
+  shortdoc: "Build policy identifier"
+  doc:      """
+The `policy.id` build policies were evaluated with. Only reported when
+policies produced a violation or an evaluation error and `policy.id`
+is set.
+"""
+}
+
 keyspec _POLICY_RESULT {
   kind:     RunTimeHost
   type:     string

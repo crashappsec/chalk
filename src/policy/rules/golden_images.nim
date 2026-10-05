@@ -15,7 +15,10 @@ import "../.."/[
   docker/ids,
   types,
 ]
-import ".."/api
+import ".."/[
+  api,
+  configuration,
+]
 
 type
   AllowedImage* = tuple
@@ -128,17 +131,14 @@ proc check*(settings: GoldenImagesConfig, subjects: seq[PolicySubject]): seq[Pol
       result.add(subject.newFinding("golden_images", "error", reason))
 
 proc loadGoldenImagesConfig*(): Option[GoldenImagesConfig] =
-  if not attrGetOpt[bool]("policy.golden_images.enabled").get(false):
+  if not policyBoolSetting(["golden_images", "enabled"], false):
     return none(GoldenImagesConfig)
   var settings = GoldenImagesConfig(
-    checkCopyFrom: attrGetOpt[bool]("policy.golden_images.check_copy_from").get(true),
-    message:       attrGetOpt[string]("policy.golden_images.message").get(""),
+    checkCopyFrom: policyBoolSetting(["golden_images", "check_copy_from"], true),
+    message:       policyStringSetting(["golden_images", "message"], ""),
   )
-  for entry in attrGetOpt[seq[Box]]("policy.golden_images.allowed").get(@[]):
-    let parts = unpack[seq[Box]](entry)
-    if len(parts) != 2:
-      raise newException(ValueError, "policy.golden_images.allowed entries must be (kind, value) tuples")
-    settings.allowed.add((unpack[string](parts[0]), unpack[string](parts[1])))
+  for (kind, value) in policyPairsSetting(["golden_images", "allowed"]):
+    settings.allowed.add((kind, value))
   return some(settings)
 
 var loaded: GoldenImagesConfig

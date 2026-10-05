@@ -463,3 +463,83 @@ def test_enforce_allows_named_image_context(chalk: Chalk, random_hex: str, sourc
     assert result.exit_code == 0
     assert image_exists(random_hex)
     assert policy_reports(random_hex) == []
+
+
+# same document an external policy authoring system produces (shared with unit tests)
+POLICY_CONFIG = Path(__file__).parents[1] / "unit" / "fixtures" / "policy_config.json"
+
+
+def build_json(chalk: Chalk, content: str, config_json: str, random_hex: str, **kwargs):
+    return chalk.docker_build(
+        content=Docker.dockerfile(content),
+        config=CONFIGS / "policy_json.c4m",
+        env={
+            "POLICY_CONFIG_JSON": config_json,
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+        },
+        run_docker=False,
+        **kwargs,
+    )
+
+
+def test_config_json_enforces(chalk: Chalk, random_hex: str):
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        POLICY_CONFIG.read_text(),
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_ID="golden-images@3",
+        _POLICY_MODE="enforce",
+        _POLICY_RESULT="blocked",
+    )
+
+
+def test_config_json_allows_golden_image(chalk: Chalk, random_hex: str):
+    _, result = build_json(
+        chalk,
+        "FROM alpine\nCMD true\n",
+        POLICY_CONFIG.read_text(),
+        random_hex,
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    assert policy_reports(random_hex) == []
+
+
+def test_config_json_invalid_never_blocks(chalk: Chalk, random_hex: str):
+    config = json.loads(POLICY_CONFIG.read_text())
+    config["on_error"] = "block"
+    config["golden_images"]["enabled"] = "yes"
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        json.dumps(config),
+        random_hex,
+        tag=random_hex,
+        # the broken configuration is logged as an error
+        ignore_errors=True,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="error", _POLICY_ID=MISSING)
+    assert report.contains(
+        {
+            "_POLICY_FINDINGS": [
+                {
+                    "rule": "config",
+                    "kind": "error",
+                    "reason": ANY,
+                }
+            ]
+        }
+    )
+    assert "policy.golden_images.enabled" in report["_POLICY_FINDINGS"][0]["reason"]

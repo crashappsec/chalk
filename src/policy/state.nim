@@ -24,6 +24,7 @@ type
     reason*: string
 
   PolicyOutcome* = ref object
+    id*:        string
     mode*:      string
     result*:    string # "violation", "blocked" or "error"
     findings*:  seq[PolicyFinding]
@@ -55,6 +56,8 @@ proc asChalkDict*(self: PolicyOutcome): ChalkDict =
   for f in self.findings:
     findings.add(f.asDict())
   result["_POLICY_MODE"]     = pack(self.mode)
+  if self.id != "":
+    result["_POLICY_ID"]     = pack(self.id)
   result["_POLICY_RESULT"]   = pack(self.result)
   result["_POLICY_FINDINGS"] = pack(findings)
   result["_POLICY_BUILD"]    = pack(self.build)

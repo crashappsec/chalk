@@ -1,7 +1,15 @@
 # Sends build policy reports (the `policy` topic) to Crash Override.
-# Policies themselves are configured via the `policy` section and are
-# disabled unless `policy.mode` is set.
+# Policies are configured via the `policy.config_json` parameter (a JSON
+# document) and are disabled unless it sets `mode`.
 # Requires crashoverride2 for the crashoverride_reporting auth config.
+
+# an attribute parameter so the document is set as-is, without con4m code;
+# older con4m versions also ignore saved values of `parameter var` parameters
+parameter policy.config_json {
+  shortdoc: "Build policy configuration as JSON"
+  doc:      "Build policy configuration as JSON, see policy.config_json"
+  default:  ""
+}
 
 parameter sink_config.crashoverride_policy.uri {
   shortdoc: "Reporting URL where to send build policy reports"

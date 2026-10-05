@@ -1,0 +1,14 @@
+{
+  "id": "golden-images@3",
+  "mode": "enforce",
+  "on_error": "allow",
+  "golden_images": {
+    "enabled": true,
+    "check_copy_from": true,
+    "allowed": [
+      ["glob", "docker.io/library/alpine:*"],
+      ["glob", "cgr.dev/chainguard/*"]
+    ],
+    "message": "Use an approved golden image"
+  }
+}

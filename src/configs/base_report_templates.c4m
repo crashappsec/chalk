@@ -2283,6 +2283,7 @@ Published to the `policy` topic when build policies produce a violation
 or an evaluation error.
 """
   key._POLICY_MODE.use                        = true
+  key._POLICY_ID.use                          = true
   key._POLICY_RESULT.use                      = true
   key._POLICY_FINDINGS.use                    = true
   key._POLICY_BUILD.use                       = true

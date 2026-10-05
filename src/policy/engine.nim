@@ -80,6 +80,7 @@ proc evaluatePolicies*(settings: PolicyConfig,
         "error"
 
   policyOutcome = PolicyOutcome(
+    id:       settings.id,
     mode:     mode,
     result:   outcome,
     findings: findings,
@@ -105,6 +106,11 @@ proc evaluatePolicies*(build: ChalkDict, collect: PolicyCollector) =
   ## must never reach docker's generic failsafe without honoring policy.on_error.
   let settings = policyControls()
   if settings.mode notin ["audit", "enforce"]:
+    return
+  if settings.configError != "":
+    # rules must not run on a configuration that could not be read
+    evaluatePolicies(settings, @[], PolicyInput(), build,
+                     @[PolicyFinding(rule: "config", kind: "error", reason: settings.configError)])
     return
   loadPolicyRules()
   var

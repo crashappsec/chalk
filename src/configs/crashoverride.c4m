@@ -50,6 +50,7 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._OPERATION.use                                 = true
   ~key._OP_EXIT_CODE.use                              = true
   ~key._POLICY_MODE.use                               = true
+  ~key._POLICY_ID.use                                 = true
   ~key._POLICY_RESULT.use                             = true
   ~key._POLICY_FINDINGS.use                           = true
   ~key._POLICY_BUILD.use                              = true
