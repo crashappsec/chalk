@@ -59,7 +59,10 @@ proc normalizeRef(image: DockerImage): DockerImage =
 proc matchesGlob*(image: DockerImage, pattern: string): bool =
   # tag-less patterns match any tag
   let normalizedPattern = parseImage(pattern, defaultTag = "*").normalizeRef()
-  let normalizedImage   = image.normalizeRef()
+  var normalizedImage   = image.normalizeRef()
+  # docker pulls :latest for a reference without tag or digest
+  if normalizedImage.tag == "" and normalizedImage.digest == "":
+    normalizedImage.tag = "latest"
   return (
     globMatch(normalizedPattern.repo, normalizedImage.repo) and
     globMatch(normalizedPattern.tag, normalizedImage.tag)

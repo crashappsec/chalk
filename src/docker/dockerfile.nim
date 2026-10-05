@@ -902,9 +902,9 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       if section.image.repo == "":
         raise newException(ValueError, "Could not eval image")
       # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/dockerfile2llb/convert.go
-      # addState links a stage to its base only by names registered so far
-      if image in ctx.dfSectionAliases:
-        section.parent = ctx.dfSectionAliases[image]
+      # addState links a stage to its base only by names registered so far,
+      # compared case-insensitively like stage names
+      section.parent = ctx.dfSectionAliases.getOrDefault(image.toLowerAscii(), nil)
       if item.asArg.isSome():
         section.alias = parse.evalOrReturnEmptyString(item.asArg, errors)
         if section.alias == "":

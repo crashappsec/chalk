@@ -57,6 +57,9 @@ proc testForwardStageNameIsExternal() =
   let chained = invocation("FROM alpine AS Base\nFROM base\n")
   doAssert chained.dfSections[1].parent == chained.dfSections[0]
   doAssert chained.buildSubjects().repos() == @["from:alpine"]
+  let mixedCase = invocation("FROM alpine AS base\nFROM Base\n")
+  doAssert mixedCase.dfSections[1].parent == mixedCase.dfSections[0]
+  doAssert mixedCase.buildSubjects().repos() == @["from:alpine"]
   # used to loop forever following aliases
   let cyclic = invocation("FROM b AS a\nFROM a AS b\n")
   doAssert cyclic.getBaseDockerSection().image.repo == "b"

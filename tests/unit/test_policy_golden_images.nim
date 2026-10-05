@@ -42,6 +42,10 @@ proc main() =
   let tagged: seq[AllowedImage] = @[("glob", "alpine:3.*")]
   assertEq(check("alpine:3.20", tagged), mrAllowed)
   assertEq(check("alpine:edge", tagged), mrDenied)
+  assertEq(check("alpine", tagged), mrDenied)
+  let latest: seq[AllowedImage] = @[("glob", "alpine:latest")]
+  assertEq(check("alpine", latest), mrAllowed)
+  assertEq(check("alpine@sha256:" & digest, latest), mrDenied)
 
   # digests
   let pinned: seq[AllowedImage] = @[("digest", "ghcr.io/acme/base@sha256:" & digest)]
