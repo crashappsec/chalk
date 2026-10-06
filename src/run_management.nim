@@ -349,6 +349,29 @@ proc lookupCollectedKey*(k: string): Option[Box] =
   if k in hostInfo: return some(hostInfo[k])
   return none(Box)
 
+proc newActionId*(): string =
+  ## Same shape as the `_ACTION_ID` keyspec callback (`call_rand` in
+  ## base_init.c4m): a 64-bit secure random value as lowercase hex.
+  return secureRand[uint64]().toHex().toLower()
+
+template withActionId*(id: string, body: untyped) =
+  ## Runs `body` with `hostInfo["_ACTION_ID"]` set to `id` and restores the
+  ## previous value afterwards. `_ACTION_ID` is unique per report, and sinks
+  ## read it from hostInfo while publishing (X-Chalk-Action-Id), so a report
+  ## published under its own id needs the swap to span the whole publish.
+  let hadActionId = "_ACTION_ID" in hostInfo
+  var previousActionId: Box
+  if hadActionId:
+    previousActionId = hostInfo["_ACTION_ID"]
+  hostInfo["_ACTION_ID"] = pack(id)
+  try:
+    body
+  finally:
+    if hadActionId:
+      hostInfo["_ACTION_ID"] = previousActionId
+    else:
+      hostInfo.del("_ACTION_ID")
+
 proc setArgs*(a: seq[string]) =
   collectionCtx.args = a
 proc getArgs*(): seq[string] = collectionCtx.args

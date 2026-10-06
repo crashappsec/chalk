@@ -212,6 +212,12 @@ Artifact-level keys are not included because a blocked build stops before any
 artifact exists; `_POLICY_BUILD` identifies the build instead. Use
 `policy.report_template` to select a different template.
 
+The policy report is a report of its own. Like every chalk report it carries a
+unique `_ACTION_ID`, which therefore differs from the `_ACTION_ID` of the
+`build` or `push` report published by the same command. To correlate the two,
+use `BUILD_URI` (the CI run) together with `_POLICY_BUILD` (`tags`,
+`dockerfile_path`), which identifies the docker invocation within that run.
+
 The `_POLICY_*` keys can also be added to any other report template. When a
 build is blocked, chalk additionally publishes the regular `fail` report with
 `_OP_EXIT_CODE = 1`.

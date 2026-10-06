@@ -16,7 +16,9 @@
   block never falls back to running docker without chalk. Violations and
   evaluation errors are published to the new `policy` topic with the
   `policy_report` template and the new `_POLICY_MODE`, `_POLICY_ID`, `_POLICY_RESULT`,
-  `_POLICY_FINDINGS` and `_POLICY_BUILD` keys. See
+  `_POLICY_FINDINGS` and `_POLICY_BUILD` keys. Each policy report carries its
+  own `_ACTION_ID`, like every chalk report; correlate it with the build or
+  push report via `BUILD_URI` and `_POLICY_BUILD`. See
   `docs/design-build-policy.md`.
 
 ### Bug Fixes

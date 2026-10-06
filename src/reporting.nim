@@ -188,9 +188,13 @@ proc doPolicyReporting() =
     return
   policyOutcome.published = true
   trace("policy: generating policy report")
-  let report = buildHostReport(policyReportTemplate())
-  if report != "":
-    safePublish("policy", report)
+  # _ACTION_ID is unique per report (see its keyspec), so the policy report
+  # gets its own instead of reusing the docker command's. The two reports are
+  # correlated via BUILD_URI and _POLICY_BUILD.
+  withActionId(newActionId()):
+    let report = buildHostReport(policyReportTemplate())
+    if report != "":
+      safePublish("policy", report)
 
 proc doReporting*(
     topic      = "report",

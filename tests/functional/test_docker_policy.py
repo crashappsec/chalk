@@ -114,6 +114,10 @@ def test_audit_reports_without_blocking(chalk: Chalk, random_hex: str):
     assert image_exists(random_hex)
     (report,) = policy_reports(random_hex)
     assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation", _OP_EXIT_CODE=0)
+    # a report of its own: fresh _ACTION_ID, correlated with the build report
+    # via BUILD_URI/_POLICY_BUILD rather than by sharing the id
+    assert report["_ACTION_ID"] != result.report["_ACTION_ID"]
+    assert report.has(_POLICY_BUILD=Contains({"tags": [f"{random_hex}:latest"]}))
 
 
 def test_mode_off(chalk: Chalk, random_hex: str):
