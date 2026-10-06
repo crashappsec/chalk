@@ -670,3 +670,38 @@ def test_load_component_var_params_validated(chalk_copy: Chalk, tmp_path: Path):
     )
     assert result.exit_code != 0
     assert "minutes: must be positive" in result.logs
+
+
+def test_load_component_params_invalid_saved_value(
+    chalk_copy: Chalk, tmp_path: Path, random_hex: str
+):
+    """
+    Older chalk versions embedded saved parameter values unchecked. A value
+    con4m now rejects must not abort startup: that parameter keeps its default
+    while the other saved values still apply.
+    """
+    report_file = tmp_path / f"{random_hex}.jsonl"
+    _load_component_params(
+        chalk_copy,
+        tmp_path,
+        ["report_file", "string", str(report_file)],
+        ["minutes", "float", 2],
+    )
+    dump = chalk_copy.run(command="dump", params=["all"], expecting_report=False).json()
+    for row in dump["$CHALK_SAVED_COMPONENT_PARAMETERS"]:
+        if row[2] == "minutes":
+            row[4] = None
+    dump_file = tmp_path / "dump.json"
+    dump_file.write_text(json.dumps(dump))
+    # --no-validation embeds the rows as-is, like a chalk without the check did
+    chalk_copy.run(
+        command="load",
+        params=[str(dump_file), "--all", "--no-validation"],
+        replace=True,
+        expecting_report=False,
+    )
+    result = chalk_copy.run(command="env", expecting_report=False, ignore_errors=True)
+    assert any(
+        "minutes: ignoring saved parameter value" in e for e in result.errors
+    ), result.errors
+    assert Path(f"{report_file}.1800").exists()

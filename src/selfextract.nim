@@ -254,19 +254,35 @@ proc loadCachedComponents*(runtime: ConfigState, cache: OrderedTableRef[string, 
     component.cacheComponent(src)
     trace("Loaded cached version of: " & url & ".c4m")
 
-proc loadComponentParams*(runtime: ConfigState, params: seq[Box]) =
+proc loadComponentParams*(runtime: ConfigState,
+                          params:  seq[Box],
+                          strict = true) =
+  ## con4m rejects saved values that do not match the parameter's type.
+  ## Older chalk versions embedded such values unchecked (and ignored them
+  ## for variable parameters), so restoring the embedded configuration must
+  ## not abort startup on one: the row is skipped and the parameter keeps
+  ## its default. `chalk load` validates with strict = true.
   for item in params:
-    let
-      row     = unpack[seq[Box]](item)
-      attr    = unpack[bool](row[0])
-      url     = unpack[string](row[1])
-      sym     = unpack[string](row[2])
-      c4mType = toCon4mType(unpack[string](row[3]))
-      value   = row[4]
-    if attr:
-      runtime.setAttributeParamValue(url, sym, value, c4mType)
-    else:
-      runtime.setVariableParamValue(url, sym, value, c4mType)
+    var name = "component parameter"
+    try:
+      let
+        row     = unpack[seq[Box]](item)
+        attr    = unpack[bool](row[0])
+        url     = unpack[string](row[1])
+        sym     = unpack[string](row[2])
+      name = url & ": " & sym
+      let
+        c4mType = toCon4mType(unpack[string](row[3]))
+        value   = row[4]
+      if attr:
+        runtime.setAttributeParamValue(url, sym, value, c4mType)
+      else:
+        runtime.setVariableParamValue(url, sym, value, c4mType)
+    except:
+      if strict:
+        raise
+      error(name & ": ignoring saved parameter value, using its default: " &
+            getCurrentExceptionMsg())
 
 proc testConfigFile(newCon4m: string,
                     params:   seq[Box],

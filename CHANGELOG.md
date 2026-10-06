@@ -30,6 +30,9 @@
   checked by the parameter's validator at load time. Generated Crash Override
   profiles keep their existing behavior: their scanner parameters match the
   defaults and profile metadata is written directly into the configuration.
+  Saved values that do not match the parameter's type are rejected by
+  `chalk load`; if a binary already embeds one, it is skipped with an error
+  and the parameter keeps its default instead of chalk failing to start.
   ([con4m#137](https://github.com/crashappsec/con4m/pull/137))
 - Fixed a segfault in the certs codec that aborted chalked Docker builds. The
   `prep_postexec` step subscans `/` with the certs codec, which feeds every
