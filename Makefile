@@ -231,3 +231,10 @@ lint-dust:
 .PHONY: lint-all
 lint-all:
 	pre-commit run --all-files
+
+localhost+2.pem localhost+2-key.pem:
+	mkcert localhost 127.0.0.1 $(IP)
+	mkcert -install
+
+chalkdust: localhost+2.pem localhost+2-key.pem
+	miniserve --tls-cert localhost+2.pem --tls-key localhost+2-key.pem -p 9999 configs
