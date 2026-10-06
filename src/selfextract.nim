@@ -395,10 +395,6 @@ proc handleConfigLoadAll*(inpath: string): bool =
       currentCache   = getCache()
       currentMemoize = getMemoize()
 
-    echo(config, currentConfig)
-    echo(params, currentParams)
-    echo(cache, currentCache)
-    echo(memoize, currentMemoize)
     if (
       config  == currentConfig and
       params  == currentParams and

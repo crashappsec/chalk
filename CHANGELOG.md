@@ -34,6 +34,10 @@
   `chalk load`; if a binary already embeds one, it is skipped with an error
   and the parameter keeps its default instead of chalk failing to start.
   ([con4m#137](https://github.com/crashappsec/con4m/pull/137))
+- `chalk load --replace --all` no longer prints the loaded and current
+  configuration, saved component parameters (including sensitive values such
+  as tokens) and component cache to stdout. Leftover debug output from
+  [#286](https://github.com/crashappsec/chalk/pull/286).
 - Fixed a segfault in the certs codec that aborted chalked Docker builds. The
   `prep_postexec` step subscans `/` with the certs codec, which feeds every
   candidate file to `d2i_X509_bio` after the PEM read fails. On arbitrary binary
