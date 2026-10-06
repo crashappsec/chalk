@@ -26,9 +26,11 @@ in this build:
 - `build_agent=<name>` -- the agent harness that invoked chalk, detected from
   the environment. Detection order mirrors `gh`'s, so chalk and `gh` attribute
   a build to the same agent.
-- `trailer=<line>` -- an AI-authorship trailer on HEAD (`Assisted-by:`,
-  `Generated-by:`, `Claude-Session:`, plus `Co-Authored-By:` when it names a
-  known agent identity). Repeatable.
+- `trailer=<line>` -- an AI-authorship trailer on HEAD. `Assisted-by:` and
+  `Claude-Session:` are always recorded; `Co-Authored-By:` and `Generated-by:`
+  only when they name a known agent identity, since both are also ordinary
+  human/tooling metadata. The `Claude-Session:` value is an account-linked
+  session URL and is replaced with `<<redact>>`. Repeatable.
 - `identity=<role> <name> <email>` -- HEAD author or committer matching a known
   agent identity. Catches tools such as Aider that rewrite the git identity
   instead of adding a trailer.
@@ -97,7 +99,7 @@ func ai_build_agent() {
     return "cursor-cli"
   } elif env("TERM_PROGRAM") == "kiro" {
     return "kiro"
-  } elif contains(env("PATH"), "/.pi/agent") or contains(env("PATH"), "\\.pi\\agent") {
+  } elif contains(env("PATH"), "/.pi/agent") {
     return "pi"
   } elif env_exists("GOOSE_PROVIDER") {
     return "goose"
@@ -105,44 +107,81 @@ func ai_build_agent() {
   return ""
 }
 
-# Trailer tokens: vendor defaults plus the forms mandated by project policy --
-# Fedora and the Linux kernel both require `Assisted-by:`, and the kernel
-# forbids AI agents adding Signed-off-by at all. `Co-Authored-By:` is also
-# common human authorship metadata, so we keep only entries naming known agent
-# identities.
-# https://docs.kernel.org/process/coding-assistants.html
-func ai_identity_pattern() {
-  return "aider@aider\\.chat|noreply@anthropic\\.com|copilot@github\\.com|noreply@openai\\.com|aider \\("
+# Lower-cased substrings that identify an agent in a trailer value or a git
+# identity. Vendor addresses only, plus Aider's literal `<name> (aider)`
+# rewrite (aider/repo.py: `committer_name = f"{original_user_name} (aider)"`).
+# Bare product names are deliberately excluded: "Claude" and "Devin" are human
+# names too.
+#
+# Copilot's coding agent commits as `<id>+Copilot@users.noreply.github.com`,
+# never `copilot@github.com`. Codex uses both `codex@` and `noreply@openai.com`.
+func ai_identity_tokens() {
+  return ["aider@aider.chat",
+          "(aider)",
+          "noreply@anthropic.com",
+          "copilot@users.noreply.github.com",
+          "codex@openai.com",
+          "noreply@openai.com"]
 }
 
-func ai_trailer_grep() {
-  return "grep -iE '^(assisted-by|generated-by|claude-session):|^co-authored-by:.*(" + ai_identity_pattern() + ")'"
-}
-
-# Aider is the case a trailer-only check misses: `attribute_co_authored_by`
-# defaults to false and it rewrites the git author/committer instead. Matched on
-# vendor addresses plus aider's literal `aider (<model>)` name form, rather than
-# on bare product names, which collide with human names (e.g. "Devin").
-func ai_identity_grep() {
-  return "grep -iE '" + ai_identity_pattern() + "'"
-}
-
-# Appends each non-empty line of `text` to `acc` as `field=<line>`.
-func ai_append_lines(acc: string, field: string, text: string) {
-  result := acc
-  if text == "" {
-    return
-  }
-  parts := split(text, "\n")
-  for i from 0 to len(parts) {
-    part := strip(parts[i])
-    if part != "" {
-      if result != "" {
-        result := result + "\n"
-      }
-      result := result + field + "=" + part
+func ai_is_agent_identity(line: string) {
+  text   := lower(line)
+  tokens := ai_identity_tokens()
+  for i from 0 to len(tokens) {
+    if contains(text, tokens[i]) {
+      return true
     }
   }
+  return false
+}
+
+# `Assisted-by:` is AI-specific by definition (Linux kernel and Fedora policy).
+# `Claude-Session:` is only ever emitted by Claude Code. `Co-Authored-By:` and
+# `Generated-by:` are shared with human co-authors and codegen tooling
+# (`Generated-by: protoc-gen-go`), so they count only when the value names a
+# known agent identity.
+# https://docs.kernel.org/process/coding-assistants.html
+func ai_is_agent_trailer(line: string) {
+  text := lower(line)
+  if starts_with(text, "assisted-by:") or starts_with(text, "claude-session:") {
+    return true
+  }
+  if starts_with(text, "co-authored-by:") or starts_with(text, "generated-by:") {
+    return ai_is_agent_identity(text)
+  }
+  return false
+}
+
+# The session URL is linked to the committer's claude.ai account and chalk
+# marks ship inside public artifacts, so record presence only.
+func ai_redact_trailer(line: string) {
+  if starts_with(lower(line), "claude-session:") {
+    return "Claude-Session: <<redact>>"
+  }
+  return line
+}
+
+func ai_append(acc: string, field: string, value: string) {
+  result := acc
+  if result != "" {
+    result := result + "\n"
+  }
+  result := result + field + "=" + value
+}
+
+# One `git log` per context directory, matching libgit2's behaviour elsewhere in
+# chalk: GIT_DIR and friends are unset because chalk opens the repository found
+# from the directory, not from the environment, and `safe.directory=*` avoids
+# the "dubious ownership" refusal when chalk runs as root over a bind-mounted
+# workspace owned by another uid (libgit2 has no such check). Failures are
+# silent by design: a non-repo, an unborn HEAD or a refused repo all yield an
+# empty string.
+func ai_git_head(git_exe: string, dir: string) {
+  return run("unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_CEILING_DIRECTORIES; " +
+             quote(git_exe) + " -c " + quote("safe.directory=*") +
+             " -C " + quote(dir) + " log -1 --no-show-signature " +
+             quote("--format=%H%nauthor %an <%ae>%ncommitter %cn <%ce>%n%B") +
+             " 2>/dev/null")
 }
 
 func ai_authorship(contexts: string) {
@@ -162,20 +201,37 @@ func ai_authorship(contexts: string) {
     return
   }
 
+  # Several context directories usually resolve to one repository; record each
+  # HEAD commit once.
+  seen := []
   dirs := split(contexts, ":")
   for i from 0 to len(dirs) {
     dir := dirs[i]
-    if dir != "" and is_dir(dir) {
-      base := quote(git_exe) + " -C " + quote(dir) + " log -1 "
+    if dir == "" or not is_dir(dir) {
+      continue
+    }
 
-      trailers := strip(run(base + quote("--format=%B") + " 2>/dev/null | " +
-                            ai_trailer_grep() + " || true"))
-      result := ai_append_lines(result, "trailer", trailers)
+    lines := split(ai_git_head(git_exe, dir), "\n")
+    if len(lines) < 3 {
+      continue
+    }
+    commit := strip(lines[0])
+    if commit == "" or contains(seen, commit) {
+      continue
+    }
+    seen := array_add(seen, [commit])
 
-      idents := strip(run(base +
-                          quote("--format=author %an <%ae>%ncommitter %cn <%ce>") + " " +
-                          "2>/dev/null | " + ai_identity_grep() + " || true"))
-      result := ai_append_lines(result, "identity", idents)
+    for j from 3 to len(lines) {
+      line := strip(lines[j])
+      if ai_is_agent_trailer(line) {
+        result := ai_append(result, "trailer", ai_redact_trailer(line))
+      }
+    }
+    for j from 1 to 3 {
+      line := strip(lines[j])
+      if ai_is_agent_identity(line) {
+        result := ai_append(result, "identity", line)
+      }
     }
   }
 }
@@ -219,5 +275,11 @@ report_template report_default {
 }
 
 report_template insertion_default {
+  ~key.X_AI_AUTHORSHIP.use = true
+}
+
+# The built-in Crash Override template enumerates every key explicitly, so the
+# key must be subscribed here or it never reaches a Crash Override report.
+report_template crashoverride {
   ~key.X_AI_AUTHORSHIP.use = true
 }
