@@ -10,7 +10,7 @@ from typing import Optional
 import pytest
 
 from .chalk.runner import Chalk
-from .conf import LS_PATH
+from .conf import LS_PATH, REPO
 from .utils.dict import ANY, MISSING, Contains, Iso8601
 from .utils.git import Git
 
@@ -191,6 +191,90 @@ def test_repo(
     assert result.report.has(
         _ORIGIN_URI=expected_remote or remote or "local",
     )
+
+
+AI_PROVENANCE = REPO / "configs" / "ai_provenance.c4m"
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_ai_authorship(
+    tmp_data_dir: Path,
+    chalk_copy: Chalk,
+    copy_files: list[Path],
+):
+    # Trailer forms as the agents really emit them, interleaved with bait that
+    # must not match: a human co-author named Claude, a codegen Generated-by:,
+    # and an ordinary line mentioning a product name.
+    commit_message = "\n".join(
+        [
+            "fix widget",
+            "",
+            "Pairs nicely with the copilot refactor from last week.",
+            "",
+            "Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>",
+            "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",
+            "Co-authored-by: Codex <codex@openai.com>",
+            "Co-authored-by: Claude Monet <claude@example.com>",
+            "Generated-by: protoc-gen-go",
+            "Generated-by: Codex <noreply@openai.com>",
+            "Assisted-by: LLM claude-code",
+            "Claude-Session: https://claude.ai/code/session/abc123",
+        ]
+    )
+    # Aider's default attribution rewrites the author name and adds no trailer
+    Git(tmp_data_dir).init().add().commit(
+        commit_message, author="author (aider) <author@test.com>"
+    )
+    # AI_AGENT is checked first, so pinning it keeps build_agent= stable even
+    # when the test suite itself runs under an agent
+    result = chalk_copy.insert(
+        copy_files[0],
+        config=AI_PROVENANCE,
+        env={"AI_AGENT": "claude-code_2-1-220_agent"},
+    )
+    expected = "\n".join(
+        [
+            "build_agent=claude-code_2-1-220_agent",
+            "trailer=Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>",
+            "trailer=Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",
+            "trailer=Co-authored-by: Codex <codex@openai.com>",
+            "trailer=Generated-by: Codex <noreply@openai.com>",
+            "trailer=Assisted-by: LLM claude-code",
+            "trailer=Claude-Session: <<redact>>",
+            "identity=author author (aider) <author@test.com>",
+        ]
+    )
+    # host keys sit at the report top level; the on-disk mark is checked via
+    # extract since the insert report's _CHALKS carries only artifact keys
+    assert result.report.has(X_AI_AUTHORSHIP=expected)
+    extract = chalk_copy.extract(copy_files[0], config=AI_PROVENANCE)
+    assert extract.mark.has(X_AI_AUTHORSHIP=expected)
+
+
+@pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)
+def test_ai_authorship_human_commit(
+    tmp_data_dir: Path,
+    chalk_copy: Chalk,
+    copy_files: list[Path],
+):
+    commit_message = "\n".join(
+        [
+            "fix widget",
+            "",
+            "Co-authored-by: Claude Monet <claude@example.com>",
+            "Generated-by: protoc-gen-go",
+            "Signed-off-by: author <author@test.com>",
+        ]
+    )
+    Git(tmp_data_dir).init().add().commit(commit_message)
+    result = chalk_copy.insert(
+        copy_files[0],
+        config=AI_PROVENANCE,
+        env={"AI_AGENT": "test-agent"},
+    )
+    assert result.report.has(X_AI_AUTHORSHIP="build_agent=test-agent")
+    extract = chalk_copy.extract(copy_files[0], config=AI_PROVENANCE)
+    assert extract.mark.has(X_AI_AUTHORSHIP="build_agent=test-agent")
 
 
 @pytest.mark.parametrize("copy_files", [[LS_PATH]], indirect=True)

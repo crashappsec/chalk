@@ -25,6 +25,25 @@
   push report via `BUILD_URI` and `_POLICY_BUILD`. See
   `docs/design-build-policy.md`.
 
+- New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`
+  chalk-time host key, which records AI coding agent involvement in a build as
+  newline-separated `field=value` records: `build_agent=` (the agent harness
+  that invoked chalk, detected from the environment in the same order as
+  `gh`), `trailer=` (AI-authorship trailers on HEAD such as `Assisted-by:` or a
+  `Co-Authored-By:` naming a known agent identity) and `identity=` (HEAD
+  author/committer rewritten by an agent, as Aider does by default). All three
+  signals are advisory and user-suppressible; absence is no evidence either
+  way. Trailer and identity records need the `git` binary and are skipped
+  without it.
+  ([#765](https://github.com/crashappsec/chalk/pull/765))
+
+- The Crash Override `env_vars` config now allowlists the environment
+  variables that AI coding agents set (`AI_AGENT`, `CLAUDECODE`,
+  `CODEX_SANDBOX`, `CURSOR_TRACE_ID`, `GEMINI_CLI`, ...) so they reach
+  `INJECTOR_ENV` instead of being silently dropped by the default
+  `env_default_action`.
+  ([#765](https://github.com/crashappsec/chalk/pull/765))
+
 ### Bug Fixes
 
 - Component variable parameters (`parameter var`) now use configured values,
