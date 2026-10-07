@@ -71,11 +71,13 @@ class Git:
         self.run(["git", "add", "."])
         return self
 
-    def commit(self, message="dummy"):
+    def commit(self, message="dummy", author: Optional[str] = None):
         args = ["git", "commit", "--allow-empty"]
         if message == "":
             args += ["--allow-empty-message"]
         args += ["-m", message]
+        if author:
+            args += [f"--author={author}"]
         self.run(args)
         return self
 
