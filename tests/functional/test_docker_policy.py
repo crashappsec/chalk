@@ -564,6 +564,8 @@ def test_enforce_allows_named_image_context(chalk: Chalk, random_hex: str, sourc
 
 # same document an external policy authoring system produces (shared with unit tests)
 POLICY_CONFIG = Path(__file__).parents[1] / "unit" / "fixtures" / "policy_config.json"
+# enforced golden-images@3 plus audited chainguard-only@1
+POLICY_CONFIG_MULTI = POLICY_CONFIG.with_name("policy_config_multi.json")
 
 
 def build_json(chalk: Chalk, content: str, config_json: str, random_hex: str, **kwargs):
@@ -596,6 +598,15 @@ def test_config_json_enforces(chalk: Chalk, random_hex: str):
         _POLICY_MODE="enforce",
         _POLICY_RESULT="blocked",
     )
+    assert report["_POLICY_RESULTS"] == [
+        {
+            "id": "golden-images@3",
+            "mode": "enforce",
+            "on_error": "allow",
+            "result": "blocked",
+        }
+    ]
+    assert report["_POLICY_FINDINGS"][0]["policy_id"] == "golden-images@3"
 
 
 def test_config_json_allows_golden_image(chalk: Chalk, random_hex: str):
@@ -640,3 +651,98 @@ def test_config_json_invalid_never_blocks(chalk: Chalk, random_hex: str):
         }
     )
     assert "policy.golden_images.enabled" in report["_POLICY_FINDINGS"][0]["reason"]
+
+
+def test_config_json_multi_audit_violation_does_not_block(chalk: Chalk, random_hex: str):
+    _, result = build_json(
+        chalk,
+        "FROM alpine\nCMD true\n",
+        POLICY_CONFIG_MULTI.read_text(),
+        random_hex,
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_ID=MISSING,
+        _POLICY_MODE="enforce",
+        _POLICY_RESULT="violation",
+    )
+    assert report["_POLICY_RESULTS"] == [
+        {
+            "id": "golden-images@3",
+            "mode": "enforce",
+            "on_error": "allow",
+            "result": "pass",
+        },
+        {
+            "id": "chainguard-only@1",
+            "mode": "audit",
+            "on_error": "block",
+            "result": "violation",
+        },
+    ]
+    assert report.contains(
+        {
+            "_POLICY_FINDINGS": [
+                {
+                    "policy_id": "chainguard-only@1",
+                    "rule": "golden_images",
+                    "kind": "violation",
+                    "image": "alpine",
+                }
+            ]
+        }
+    )
+
+
+def test_config_json_multi_enforced_violation_blocks(chalk: Chalk, random_hex: str):
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        POLICY_CONFIG_MULTI.read_text(),
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_ID=MISSING, _POLICY_RESULT="blocked")
+    assert [(r["id"], r["result"]) for r in report["_POLICY_RESULTS"]] == [
+        ("golden-images@3", "blocked"),
+        ("chainguard-only@1", "violation"),
+    ]
+    assert [(f["policy_id"], f["kind"]) for f in report["_POLICY_FINDINGS"]] == [
+        ("golden-images@3", "violation"),
+        ("chainguard-only@1", "violation"),
+    ]
+
+
+def test_config_json_multi_invalid_entry_is_isolated(chalk: Chalk, random_hex: str):
+    config = json.loads(POLICY_CONFIG_MULTI.read_text())
+    config["policies"][1]["golden_images"]["enabled"] = "yes"
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        json.dumps(config),
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
+    )
+    # the valid policy still blocks
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert [(r["id"], r["result"]) for r in report["_POLICY_RESULTS"]] == [
+        ("golden-images@3", "blocked"),
+        ("chainguard-only@1", "error"),
+    ]
+    assert report.contains(
+        {
+            "_POLICY_FINDINGS": [
+                {"policy_id": "golden-images@3", "kind": "violation"},
+                {"policy_id": "chainguard-only@1", "rule": "config", "kind": "error"},
+            ]
+        }
+    )

@@ -3,8 +3,9 @@
 
 ## Policy settings shared by all rules. Rule-specific settings are read by
 ## each rule (see policy/rules/) via the `policy*Setting` accessors, which
-## read `policy.config_json` when it is set and the con4m section otherwise.
-import std/[json]
+## read the selected `policy.config_json` policy when it is set and the
+## con4m section otherwise.
+import std/[json, tables]
 import ".."/[config, types]
 
 type
@@ -12,9 +13,11 @@ type
     id*:      string
     mode*:    string
     onError*: string
-    ## set when `policy.config_json` cannot be used; evaluation then only
+    ## set when the policy cannot be used; evaluation then only
     ## reports this error and never blocks
     configError*: string
+    ## the policy's object in `policy.config_json`, nil for con4m
+    json*: JsonNode
 
   PolicyJsonField = object
     name:    string
@@ -60,41 +63,104 @@ proc validateFields(node: JsonNode, fields: openArray[PolicyJsonField], path: st
     if not found:
       raise newException(ValueError, "unknown field " & path & key)
 
-proc parsePolicyJson*(text: string): JsonNode =
-  ## Parses and validates `policy.config_json`. Raises `ValueError` with a
-  ## user-facing reason when it cannot be used.
-  try:
-    result = parseJson(text)
-  except CatchableError:
-    raise newException(ValueError, "policy.config_json is not valid JSON: " &
-                                   getCurrentExceptionMsg())
-  if result.kind != JObject:
-    raise newException(ValueError, "policy.config_json must be a JSON object")
-  result.validateFields(policyJsonFields, "policy.")
-  if result.hasKey("golden_images"):
-    let golden = result["golden_images"]
-    golden.validateFields(goldenImagesJsonFields, "policy.golden_images.")
+proc validatePolicy(node: JsonNode, path: string) =
+  ## `path` is the field prefix used in errors, e.g. `policy.`
+  if node.kind != JObject:
+    raise newException(ValueError, path[0 .. ^2] & " must be a JSON object, got " &
+                                   jsonKindName(node.kind))
+  node.validateFields(policyJsonFields, path)
+  if node.hasKey("golden_images"):
+    let golden = node["golden_images"]
+    golden.validateFields(goldenImagesJsonFields, path & "golden_images.")
     for entry in golden{"allowed"}.getElems():
       if entry.kind != JArray or len(entry) != 2 or
          entry[0].kind != JString or entry[1].kind != JString:
         raise newException(ValueError,
-                           "policy.golden_images.allowed entries must be [kind, value] string pairs")
+                           path & "golden_images.allowed entries must be [kind, value] string pairs")
+
+proc invalidPolicy(id, reason: string): PolicyConfig =
+  # a configuration that cannot be read cannot be trusted to block either
+  PolicyConfig(id: id, mode: "audit", onError: "allow", configError: reason)
+
+proc toPolicyConfig(node: JsonNode): PolicyConfig =
+  PolicyConfig(
+    id:      node{"id"}.getStr(),
+    mode:    node{"mode"}.getStr("off"),
+    onError: node{"on_error"}.getStr("allow"),
+    json:    node,
+  )
+
+proc isPolicyList(doc: JsonNode): bool =
+  doc.kind == JObject and doc.hasKey("policies")
+
+proc parsePolicyJson*(text: string): seq[PolicyConfig] =
+  ## Parses and validates `policy.config_json`: one policy object, or
+  ## `{"policies": [<policy object>, ...]}`. Raises `ValueError` with a
+  ## user-facing reason when the document as a whole cannot be used. An
+  ## unusable `policies` entry is returned with `configError` set instead, so
+  ## that one broken policy does not disable the others.
+  var doc: JsonNode
+  try:
+    doc = parseJson(text)
+  except CatchableError:
+    raise newException(ValueError, "policy.config_json is not valid JSON: " &
+                                   getCurrentExceptionMsg())
+  if doc.kind != JObject:
+    raise newException(ValueError, "policy.config_json must be a JSON object")
+  if not doc.isPolicyList():
+    doc.validatePolicy("policy.")
+    return @[doc.toPolicyConfig()]
+  if len(doc) != 1:
+    raise newException(ValueError, "policy.policies cannot be combined with other fields")
+  let entries = doc["policies"]
+  if entries.kind != JArray:
+    raise newException(ValueError, "policy.policies must be an array, got " &
+                                   jsonKindName(entries.kind))
+  var counts = initCountTable[string]()
+  for entry in entries:
+    if entry.kind == JObject and entry{"id"} != nil and entry{"id"}.kind == JString:
+      counts.inc(entry{"id"}.getStr())
+  for i, entry in entries.getElems():
+    let
+      path = "policy.policies[" & $i & "]."
+      id   = if entry.kind == JObject: entry{"id"}.getStr() else: ""
+    try:
+      entry.validatePolicy(path)
+    except ValueError:
+      result.add(invalidPolicy(id, getCurrentExceptionMsg()))
+      continue
+    # results and findings are attributed to policies by id, so with several
+    # policies an id that is missing or shared would make them ambiguous
+    if len(entries) > 1 and id == "":
+      result.add(invalidPolicy(id, path & "id must be set when there are several policies"))
+    elif counts[id] > 1:
+      result.add(invalidPolicy(id, path & "id " & escapeJson(id) & " is not unique"))
+    else:
+      result.add(entry.toPolicyConfig())
 
 var
   policyJsonLoaded = false
-  policyJson:      JsonNode = nil
+  policyJsonSet    = false
+  policyJsonList   = false
   policyJsonError  = ""
+  policyJsonConfigs: seq[PolicyConfig]
+  # policy whose settings the rules read, see selectPolicy
+  selectedPolicyJson: JsonNode = nil
 
 proc setPolicyJson*(text: string) =
   ## Uses `text` as `policy.config_json`; an empty string disables it.
   ## chalk reads the attribute lazily, this is exposed for unit tests.
-  policyJsonLoaded = true
-  policyJson       = nil
-  policyJsonError  = ""
+  policyJsonLoaded   = true
+  policyJsonSet      = text != ""
+  policyJsonList     = false
+  policyJsonError    = ""
+  policyJsonConfigs  = @[]
+  selectedPolicyJson = nil
   if text == "":
     return
   try:
-    policyJson = parsePolicyJson(text)
+    policyJsonConfigs = parsePolicyJson(text)
+    policyJsonList    = parseJson(text).isPolicyList()
   except ValueError:
     policyJsonError = getCurrentExceptionMsg()
 
@@ -104,10 +170,19 @@ proc ensurePolicyJson() =
 
 proc policyJsonInUse(): bool =
   ensurePolicyJson()
-  policyJson != nil or policyJsonError != ""
+  policyJsonSet
+
+proc policyJsonIsList*(): bool =
+  ## `policy.config_json` uses the `{"policies": [...]}` form
+  ensurePolicyJson()
+  policyJsonList
+
+proc selectPolicy*(policy: PolicyConfig) =
+  ## Rules read their settings from `policy` until another one is selected.
+  selectedPolicyJson = policy.json
 
 proc jsonSetting(path: openArray[string]): JsonNode =
-  result = policyJson
+  result = selectedPolicyJson
   for part in path:
     if result == nil:
       return nil
@@ -144,24 +219,29 @@ proc policyPairsSetting*(path: openArray[string]): seq[(string, string)] =
       raise newException(ValueError, attrPath(path) & " entries must be (kind, value) tuples")
     result.add((unpack[string](parts[0]), unpack[string](parts[1])))
 
-proc policyMode*(): string =
+proc policyConfigs*(): seq[PolicyConfig] =
+  ## Every configured policy, including those in mode `off`. A
+  ## `policy.config_json` that cannot be read at all is a single policy that
+  ## only reports why.
   ensurePolicyJson()
   if policyJsonError != "":
-    # evaluate only to report the broken configuration
-    return "audit"
-  policyStringSetting(["mode"], "off")
+    return @[invalidPolicy("", policyJsonError)]
+  if policyJsonSet:
+    return policyJsonConfigs
+  return @[PolicyConfig(
+    id:      attrGetOpt[string]("policy.id").get(""),
+    mode:    attrGetOpt[string]("policy.mode").get("off"),
+    onError: attrGetOpt[string]("policy.on_error").get("allow"),
+  )]
+
+proc isEvaluated*(policy: PolicyConfig): bool =
+  policy.mode in ["audit", "enforce"]
 
 proc policyEnabled*(): bool =
-  policyMode() in ["audit", "enforce"]
+  for policy in policyConfigs():
+    if policy.isEvaluated():
+      return true
+  return false
 
 proc policyReportTemplate*(): string =
   getReportTemplate("policy", default = "policy_report")
-
-proc policyControls*(): PolicyConfig =
-  result.mode = policyMode()
-  if policyJsonError != "":
-    result.onError     = "allow"
-    result.configError = policyJsonError
-    return
-  result.id      = policyStringSetting(["id"], "")
-  result.onError = policyStringSetting(["on_error"], "allow")

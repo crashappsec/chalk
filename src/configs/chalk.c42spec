@@ -2565,8 +2565,9 @@ is reported.
     shortdoc: "Policy identifier"
     doc: """
 Identifier of the policy configuration, e.g. a name and version assigned
-by whatever system authored it. Reported as `_POLICY_ID` so policy
-reports can be traced back to the policy that produced them.
+by whatever system authored it. Reported in `_POLICY_RESULTS`, as
+`policy_id` of each finding and, when it is the only policy, as `_POLICY_ID`,
+so policy reports can be traced back to the policy that produced them.
 """
   }
 
@@ -2595,9 +2596,17 @@ con4m, with tuples written as JSON arrays:
 }
 ```
 
+Several independent policies can be given as
+`{"policies": [<policy>, ...]}`, each with the fields above and a unique,
+non-empty `id`. Each policy is evaluated with its own `mode` and
+`on_error`; the build is blocked when any of them blocks it. With a
+`policies` list, `custom_check` is not evaluated.
+
 Missing fields take their defaults. A value that is not valid JSON, or that
 has unknown fields or wrongly typed values, is reported as a policy
-evaluation error and never blocks the build.
+evaluation error and never blocks the build. An invalid entry of a
+`policies` list (including a missing or duplicate `id`) is reported the
+same way, while the other entries are still evaluated.
 """
   }
 

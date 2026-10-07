@@ -106,7 +106,7 @@ policy {
 | -------------------------------------- | ------------------------------------------------- | ----------------- |
 | `policy.mode`                          | `string`, one of `off`, `audit`, `enforce`        | `"off"`           |
 | `policy.id`                            | `string`                                          | `""`              |
-| `policy.config_json`                   | `string` (JSON object)                            | `""`              |
+| `policy.config_json`                   | `string` (JSON object, see below)                 | `""`              |
 | `policy.on_error`                      | `string`, one of `allow`, `block`                 | `"allow"`         |
 | `policy.report_template`               | `string`                                          | `"policy_report"` |
 | `policy.custom_check`                  | `func (string, string, string, string) -> string` | unset             |
@@ -118,8 +118,9 @@ policy {
 With `golden_images.enabled` and an empty `allowed` list, every external
 image is a violation.
 
-`policy.id` identifies the policy (e.g. `name@version`) and is reported as
-`_POLICY_ID`.
+`policy.id` identifies the policy (e.g. `name@version`). It is reported in
+`_POLICY_RESULTS`, as `policy_id` of every finding, and as `_POLICY_ID` when
+it is the only policy evaluated.
 
 ### JSON configuration
 
@@ -153,6 +154,59 @@ whatever `mode` or `on_error` the document asks for, since a document that
 cannot be read cannot be trusted either. Only policy settings can be expressed,
 so a JSON document can neither change other chalk configuration nor provide
 callbacks.
+
+### Several policies
+
+Policies authored and versioned independently (for example several policies
+that apply to the same workspace) are passed as a list, each entry with the
+same fields as the single-policy document above:
+
+```json
+{
+  "policies": [
+    {
+      "id": "golden-images@3",
+      "mode": "enforce",
+      "golden_images": {
+        "enabled": true,
+        "allowed": [["glob", "docker.io/library/alpine:*"]]
+      }
+    },
+    {
+      "id": "chainguard-only@1",
+      "mode": "audit",
+      "on_error": "block",
+      "golden_images": {
+        "enabled": true,
+        "check_copy_from": false,
+        "allowed": [["glob", "cgr.dev/chainguard/*"]]
+      }
+    }
+  ]
+}
+```
+
+- Policies are never merged. Each one is evaluated on its own, with its own
+  `mode` and `on_error`, against the same images (collected once).
+- The command is blocked when any policy blocks it: an `enforce` policy with a
+  violation, or with an evaluation error and `on_error = "block"`. `audit`
+  policies never block, whatever their `on_error`.
+- With more than one entry, every entry needs a non-empty `id` that no other
+  entry uses, since results and findings are attributed by `id`.
+- An entry that is invalid (not an object, unknown fields, wrong types,
+  invalid choices, missing or duplicate `id`) is reported as a `config`
+  evaluation error of that entry (`policy_id` is its `id`, when it has a
+  string one) and never blocks. The other entries are still evaluated. An entry
+  with a duplicate `id` invalidates every entry using that `id`.
+- `policies` cannot be combined with other top-level fields; such a document,
+  or one whose `policies` is not an array, is invalid as a whole.
+- `{"policies": []}` configures no policy, as does a list where every entry is
+  in mode `off`.
+- `custom_check` is not evaluated with a `policies` list, as a con4m callback
+  belongs to none of its entries; chalk logs a warning when one is set.
+
+The single-object form remains supported and behaves as a one-entry list
+whose `id` may be empty.
 
 ### Matcher kinds
 
@@ -207,13 +261,44 @@ subscribe("policy", "policy_webhook")
 
 The `policy_report` template includes:
 
-| Key                | Type                         | Notes                                                                       |
-| ------------------ | ---------------------------- | --------------------------------------------------------------------------- |
-| `_POLICY_MODE`     | `string`                     | `audit` or `enforce`                                                        |
-| `_POLICY_ID`       | `string`                     | `policy.id`, when set                                                       |
-| `_POLICY_RESULT`   | `string`                     | `violation` (audit), `blocked` (enforce), `error`                           |
-| `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason` |
-| `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                |
+| Key                | Type                         | Notes                                                                                     |
+| ------------------ | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy enforces, else `audit`                                  |
+| `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                    |
+| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`          |
+| `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result` (`pass`, `violation`, `blocked`, `error`) |
+| `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`  |
+| `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                              |
+
+`_POLICY_RESULTS` lists every evaluated policy (mode `audit` or `enforce`) in
+configuration order, including those that passed; policies in mode `off` are
+omitted. A policy's `result` is `blocked` only for `enforce` policies,
+`violation` for a non-blocking violation and `error` when it only produced
+non-blocking evaluation errors. Every finding carries the `policy_id` of the
+policy that produced it (empty when that policy has no id), so a consumer
+storing one row per finding joins it to `_POLICY_RESULTS` by id. The same
+image violating two policies yields two findings. For example, with the two
+policies above and `FROM busybox`:
+
+```json
+{
+  "_POLICY_MODE": "enforce",
+  "_POLICY_RESULT": "blocked",
+  "_POLICY_RESULTS": [
+    {"id": "golden-images@3",   "mode": "enforce", "on_error": "allow", "result": "blocked"},
+    {"id": "chainguard-only@1", "mode": "audit",   "on_error": "block", "result": "violation"}
+  ],
+  "_POLICY_FINDINGS": [
+    {"policy_id": "golden-images@3",   "rule": "golden_images", "kind": "violation",
+     "image": "busybox", "digest": "sha256:...", "stage": "", "source": "from",
+     "reason": "image is not in the list of allowed golden images"},
+    {"policy_id": "chainguard-only@1", "rule": "golden_images", "kind": "violation",
+     "image": "busybox", "digest": "sha256:...", "stage": "", "source": "from",
+     "reason": "image is not in the list of allowed golden images"}
+  ],
+  "_POLICY_BUILD": {"command": "build", "tags": ["app:latest"]}
+}
+```
 
 plus host-level operation and CI keys (`_OPERATION`, `_ACTION_ID`,
 `_OP_CHALKER_VERSION`, `_OP_EXIT_CODE`, `_OP_ERRORS`, `BUILD_*`).
@@ -247,7 +332,8 @@ parameter and assign it to `policy.config_json`, so the system that generates
 policies and the one that distributes the component do not need to know each
 other's formats.
 
-Policy configuration is read once per evaluation. Subject collection,
+Policy configuration is read once per evaluation, and each policy's rules
+are loaded and checked before the next policy's. Subject collection,
 metadata decoding and rule evaluation use the same `on_error` setting;
 errors in these steps cannot silently bypass `on_error = "block"`.
 Subject collection errors (for example pushing an unchalked image) are

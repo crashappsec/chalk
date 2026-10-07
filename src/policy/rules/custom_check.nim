@@ -11,13 +11,25 @@ import "../.."/[
   config,
   types,
 ]
-import ".."/api
+import ".."/[
+  api,
+  configuration,
+]
 
-var callback: CallbackObj
+var
+  callback: CallbackObj
+  warnedIgnored = false
 
 proc loadCustomCheck(): bool =
   let cb = attrGetOpt[CallbackObj]("policy.custom_check")
   if cb.isNone():
+    return false
+  # a con4m callback belongs to no particular entry of a policies list, and
+  # running it under each of them would report its findings once per policy
+  if policyJsonIsList():
+    if not warnedIgnored:
+      warnedIgnored = true
+      warn("policy: policy.custom_check is ignored when policy.config_json lists policies")
     return false
   callback = cb.get()
   return true

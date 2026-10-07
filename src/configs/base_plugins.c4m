@@ -96,8 +96,8 @@ such as the overall chalk run time.
 
 plugin policy {
     ~enabled:        true
-    post_run_keys:   ["_POLICY_MODE", "_POLICY_ID", "_POLICY_RESULT", "_POLICY_FINDINGS",
-                      "_POLICY_BUILD"]
+    post_run_keys:   ["_POLICY_MODE", "_POLICY_ID", "_POLICY_RESULT", "_POLICY_RESULTS",
+                      "_POLICY_FINDINGS", "_POLICY_BUILD"]
     doc: """
 Reports build policy findings. See the `policy` configuration section.
 """
