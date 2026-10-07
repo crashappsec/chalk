@@ -21,7 +21,7 @@ type
     image*:    string
     digest*:   string
     stage*:    string
-    source*:   string # "from" or "copy_from"
+    source*:   string # "from", "copy_from" or "mount_from"
     reason*:   string
 
   PolicyResult* = object

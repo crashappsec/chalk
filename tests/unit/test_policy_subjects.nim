@@ -83,6 +83,7 @@ proc testOnlyBuiltStagesAreChecked() =
   # a mount that cannot be evaluated could reference any stage
   let unknown = invocation("FROM busybox AS tools\nFROM alpine\nRUN --mount=from=${UNSET} true\n")
   doAssert unknown.buildSubjects().repos() == @["from:busybox", "from:alpine"]
+  doAssert unknown.buildSubjects().errors.len == 1
   # a stage replaced by a context builds none of its own dependencies
   let replaced = invocation("FROM busybox AS tools\nFROM alpine AS base\nCOPY --from=tools /a /a\n" &
                             "FROM base\n", {"base": "docker-image://alpine:3"})
@@ -110,6 +111,17 @@ proc testUnresolvedContextsDoNotRaise() =
   doAssert local.buildSubjects().errors.len == 0
   doAssert local.formatCopyImages().len == 0
 
+proc testMountedImages() =
+  # an external image mounted by RUN is pulled like COPY --from
+  let ctx = invocation("FROM alpine\nRUN --mount=type=bind,from=evil/tools,target=/t true\n" &
+                       "RUN --mount=from=external true\nRUN --mount=from=files true\n",
+                       {"external": "docker-image://busybox:1", "files": "/tmp/files"})
+  doAssert ctx.buildSubjects().repos() == @["from:alpine", "mount_from:evil/tools",
+                                            "mount_from:busybox"], $ctx.buildSubjects().repos()
+  let copies = unpack[seq[ChalkDict]](ctx.formatCopyImages()[""])
+  doAssert copies.len == 2
+  doAssert unpack[bool](copies[0]["mount"]) and "src" notin copies[0]
+
 proc extracted(data: string): ChalkObj =
   ChalkObj(extract: unpack[ChalkDict](parseJson(data).nimJsonToBox()))
 
@@ -133,6 +145,14 @@ proc testPushMatchesBuild() =
   let input = ctx.mark().pushInput("test")
   doAssert input.errors.len == 0, $input.errors
   doAssert input.repos() == @["from:allowed", "from:alpine", "copy_from:nginx"], $input.repos()
+
+proc testPushChecksMountedImages() =
+  let ctx = invocation("FROM busybox AS tools\nFROM alpine\n" &
+                       "RUN --mount=from=tools --mount=from=nginx true\n")
+  doAssert ctx.buildSubjects().repos() == @["from:busybox", "from:alpine", "mount_from:nginx"]
+  let input = ctx.mark().pushInput("test")
+  doAssert input.errors.len == 0, $input.errors
+  doAssert input.repos() == @["from:busybox", "from:alpine", "mount_from:nginx"], $input.repos()
 
 proc testPushSkipsUnbuiltStages() =
   let ctx = invocation("FROM busybox AS debug\nCOPY --from=nginx /a /a\nFROM alpine AS prod\n")
@@ -184,7 +204,9 @@ testForwardStageNameIsExternal()
 testOnlyBuiltStagesAreChecked()
 testStageOverriddenByContext()
 testUnresolvedContextsDoNotRaise()
+testMountedImages()
 testPushMatchesBuild()
+testPushChecksMountedImages()
 testPushSkipsUnbuiltStages()
 testPushUnresolvedContext()
 testPushMetadata()

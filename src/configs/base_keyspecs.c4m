@@ -2729,6 +2729,8 @@ All `COPY` statements are grouped by the Dockerfile target/section.
 * `digest` - only the digest of the image (if `@sha256:<digest>` is provided)
 * `src` - what COPY copies from image
 * `dest` - where COPY copies to in the target/section
+* `mount` - `true` for a `RUN --mount=from=<image>` source, which has no `src`
+  or `dest`
 
 Special cases:
 
@@ -5735,7 +5737,7 @@ fields:
 * `image` - image as referenced in the Dockerfile
 * `digest` - resolved image digest, if known
 * `stage` - Dockerfile stage alias
-* `source` - `from` or `copy_from`
+* `source` - `from`, `copy_from` or `mount_from`
 * `reason` - human-readable explanation
 """
 }

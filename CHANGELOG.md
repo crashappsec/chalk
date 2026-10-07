@@ -7,7 +7,7 @@
 - Opt-in build policies for `chalk docker build` and `chalk docker push`,
   disabled by default (`policy.mode = "off"`) with no change in behavior
   unless enabled. The new `policy` configuration section restricts base images (and `COPY --from`
-  images) to an allowlist of golden images via glob or digest entries, and
+  and `RUN --mount=from` images) to an allowlist of golden images via glob or digest entries, and
   supports a `custom_check` con4m callback. Policies can also be provided as a
   single JSON document via `policy.config_json`, e.g. from a component
   parameter, either as one policy object or as `{"policies": [...]}` listing
@@ -19,6 +19,8 @@
   so the image is neither built nor pushed. Only stages the build uses are
   checked (reached from the target through `FROM`, `COPY --from` or
   `RUN --mount=from`); `DOCKER_BASE_IMAGES` records this per stage as `built`.
+  `DOCKER_COPY_IMAGES` now also lists `RUN --mount=from` sources, with
+  `mount` set to `true`, so push checks them too.
   Unlike other failures, a policy block never falls back to running docker
   without chalk, and a failure before policies run is handled by
   `policy.on_error` instead of silently rerunning docker. Violations and

@@ -53,11 +53,11 @@ command, `allow` falls back to running docker without chalk as before.
 
 - `chalk docker build`: every external image referenced by a `FROM` in a
   stage the build uses (stages built on other stages are resolved to their
-  external base), and every image referenced by `COPY --from=<image>` in those
-  stages. As in BuildKit, a stage is used when the target reaches it through
+  external base), and every image referenced by `COPY --from=<image>` or
+  `RUN --mount=from=<image>` in those stages. As in BuildKit, a stage is used when the target reaches it through
   `FROM`, `COPY --from` or `RUN --mount=from`; other stages are never pulled
   and are not checked. A `RUN --mount` chalk cannot evaluate makes every stage
-  count as used. Without buildx (legacy builder) every stage is checked. Named contexts with
+  count as used and is an evaluation error, as its source could be any image. Without buildx (legacy builder) every stage is checked. Named contexts with
   `docker-image://` sources are checked too, including overrides of `FROM`
   images, `COPY --from` references and whole stages. Context names are
   matched the way BuildKit does (familiar reference without `:latest`), so
@@ -70,7 +70,8 @@ command, `allow` falls back to running docker without chalk as before.
   Policies are evaluated after chalk resolves base image digests and before
   chalk modifies anything (including chalking context files with
   `chalk_contained_items`) or invokes docker, including `--push` builds.
-- `chalk docker push`: the base and `COPY --from` images recorded in the
+- `chalk docker push`: the base, `COPY --from` and `RUN --mount=from` images
+  recorded in the
   image's chalk mark (`DOCKER_BASE_IMAGES`, `DOCKER_COPY_IMAGES`), skipping
   stages recorded with `built` set to `false`. If the image
   is not chalked its base images are unknown, which is an evaluation error
@@ -229,7 +230,7 @@ so configurations written for newer chalk versions fail safe on older ones.
 1. the image reference (for named image contexts, the context's image reference);
 2. the resolved image digest (empty when unknown);
 3. the Dockerfile stage alias;
-4. the source of the reference, `from` or `copy_from`.
+4. the source of the reference, `from`, `copy_from` or `mount_from`.
 
 Return an empty string to pass or a reason to report a violation:
 
@@ -261,14 +262,14 @@ subscribe("policy", "policy_webhook")
 
 The `policy_report` template includes:
 
-| Key                | Type                         | Notes                                                                                     |
-| ------------------ | ---------------------------- | ----------------------------------------------------------------------------------------- |
-| `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy enforces, else `audit`                                  |
-| `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                    |
-| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`          |
+| Key                | Type                         | Notes                                                                                              |
+| ------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy enforces, else `audit`                                           |
+| `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                             |
+| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`                   |
 | `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result` (`pass`, `violation`, `blocked`, `error`) |
-| `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`  |
-| `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                              |
+| `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`           |
+| `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                       |
 
 `_POLICY_RESULTS` lists every evaluated policy (mode `audit` or `enforce`) in
 configuration order, including those that passed; policies in mode `off` are
@@ -285,18 +286,42 @@ policies above and `FROM busybox`:
   "_POLICY_MODE": "enforce",
   "_POLICY_RESULT": "blocked",
   "_POLICY_RESULTS": [
-    {"id": "golden-images@3",   "mode": "enforce", "on_error": "allow", "result": "blocked"},
-    {"id": "chainguard-only@1", "mode": "audit",   "on_error": "block", "result": "violation"}
+    {
+      "id": "golden-images@3",
+      "mode": "enforce",
+      "on_error": "allow",
+      "result": "blocked"
+    },
+    {
+      "id": "chainguard-only@1",
+      "mode": "audit",
+      "on_error": "block",
+      "result": "violation"
+    }
   ],
   "_POLICY_FINDINGS": [
-    {"policy_id": "golden-images@3",   "rule": "golden_images", "kind": "violation",
-     "image": "busybox", "digest": "sha256:...", "stage": "", "source": "from",
-     "reason": "image is not in the list of allowed golden images"},
-    {"policy_id": "chainguard-only@1", "rule": "golden_images", "kind": "violation",
-     "image": "busybox", "digest": "sha256:...", "stage": "", "source": "from",
-     "reason": "image is not in the list of allowed golden images"}
+    {
+      "policy_id": "golden-images@3",
+      "rule": "golden_images",
+      "kind": "violation",
+      "image": "busybox",
+      "digest": "sha256:...",
+      "stage": "",
+      "source": "from",
+      "reason": "image is not in the list of allowed golden images"
+    },
+    {
+      "policy_id": "chainguard-only@1",
+      "rule": "golden_images",
+      "kind": "violation",
+      "image": "busybox",
+      "digest": "sha256:...",
+      "stage": "",
+      "source": "from",
+      "reason": "image is not in the list of allowed golden images"
+    }
   ],
-  "_POLICY_BUILD": {"command": "build", "tags": ["app:latest"]}
+  "_POLICY_BUILD": { "command": "build", "tags": ["app:latest"] }
 }
 ```
 
@@ -361,8 +386,9 @@ of images could let a disallowed one through.
   `on_error` determines whether to allow the push. Rebuilding with this
   version of chalk records the image context references for subsequent push
   checks, whether or not policies are enabled.
-- Images mounted with `RUN --mount=from=<image>` are not checked; the flag is
-  only used to find the stages a build uses.
+- Marks recorded before `RUN --mount=from` images were added to
+  `DOCKER_COPY_IMAGES` (with `mount` set) do not list them, so push cannot
+  check mounted images of such marks.
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.

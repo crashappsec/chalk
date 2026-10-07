@@ -64,4 +64,11 @@ proc main() =
   # empty allowlist denies everything external
   assertEq(check("alpine", @[]), mrDenied)
 
+  # check_copy_from also covers images mounted by RUN
+  var subjects: seq[PolicySubject]
+  for source in ["from", "copy_from", "mount_from"]:
+    subjects.add(PolicySubject(image: parseImage("busybox"), raw: "busybox", source: source))
+  assertEq(GoldenImagesConfig(checkCopyFrom: true).check(subjects).len, 3)
+  assertEq(GoldenImagesConfig(checkCopyFrom: false).check(subjects).len, 1)
+
 main()

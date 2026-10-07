@@ -370,6 +370,53 @@ def test_enforce_blocks_stage_used_by_run_mount(chalk: Chalk, random_hex: str):
     )
 
 
+def test_enforce_blocks_image_used_by_run_mount(chalk: Chalk, random_hex: str):
+    _, result = build(
+        chalk,
+        "FROM alpine\nRUN --mount=type=bind,from=busybox,target=/tools true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_FINDINGS=Contains(
+            [{"image": "busybox", "source": "mount_from", "kind": "violation"}]
+        )
+    )
+
+
+def test_mounted_image_is_checked_again_on_push(chalk: Chalk, random_hex: str):
+    tag = f"{REGISTRY}/{random_hex}"
+    build(
+        chalk,
+        "FROM alpine\nRUN --mount=from=busybox:latest,target=/tools true\n",
+        "audit",
+        random_hex,
+        tag=random_hex,
+    )
+    subprocess.run(["docker", "tag", random_hex, tag], check=True)
+    # Keep only the push report for this assertion.
+    report_file(random_hex).write_text("")
+    result = chalk.run(
+        params=["docker", "push", tag],
+        config=CONFIGS / "policy.c4m",
+        env=policy_env("enforce", random_hex),
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert registry_tags(random_hex) == []
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_FINDINGS=Contains(
+            [{"image": "busybox:latest", "source": "mount_from", "kind": "violation"}]
+        ),
+    )
+
+
 @pytest.mark.parametrize(
     "mode,on_error,result_kind",
     [
@@ -653,7 +700,9 @@ def test_config_json_invalid_never_blocks(chalk: Chalk, random_hex: str):
     assert "policy.golden_images.enabled" in report["_POLICY_FINDINGS"][0]["reason"]
 
 
-def test_config_json_multi_audit_violation_does_not_block(chalk: Chalk, random_hex: str):
+def test_config_json_multi_audit_violation_does_not_block(
+    chalk: Chalk, random_hex: str
+):
     _, result = build_json(
         chalk,
         "FROM alpine\nCMD true\n",

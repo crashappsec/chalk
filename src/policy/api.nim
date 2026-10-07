@@ -23,7 +23,7 @@ type
     raw*:     string      # as referenced, used for reporting
     digests*: seq[string] # all known digests of the image
     stage*:   string
-    source*:  string      # "from" or "copy_from"
+    source*:  string      # "from", "copy_from" or "mount_from"
 
   PolicyInput* = object
     subjects*: seq[PolicySubject]

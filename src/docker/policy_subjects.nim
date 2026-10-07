@@ -3,7 +3,7 @@
 
 ## Pure subject collection from parsed Dockerfiles and extracted chalk marks.
 ## Docker I/O lives in policy.nim so metadata decoding can be tested directly.
-import std/[strutils]
+import std/[sequtils, strutils]
 import ".."/[policy/engine, types]
 import "."/[dockerfile, ids]
 
@@ -45,18 +45,22 @@ proc buildSubjects*(ctx: DockerInvocation, allStages = false): PolicyInput =
     result.subjects.add(PolicySubject(image: original, raw: $original, digests: digests,
                                       stage: section.alias, source: "from"))
   for section in sections:
-    for copy in section.copies:
-      if copy.frm == "" or ctx.copyStage(copy.frm) != nil:
+    if section.unknownMount:
+      result.errors.add(collectionError("cannot determine the source of a RUN --mount in stage: " &
+                                        section.alias))
+    for (frm, source) in section.copies.mapIt((it.frm, "copy_from")) &
+                         section.mounts.mapIt((it, "mount_from")):
+      if frm == "" or ctx.copyStage(frm) != nil:
         continue # stages are checked through their own FROM
-      let context = ctx.namedContext(copy.frm)
+      let context = ctx.namedContext(frm)
       if context.isSome():
-        result.addContext(context.get(), section.alias, "copy_from")
+        result.addContext(context.get(), section.alias, source)
         continue
-      let image = parseImage(copy.frm, defaultTag = "")
+      let image = parseImage(frm, defaultTag = "")
       var digests: seq[string]
       digests.addDigest(image.digest)
       result.subjects.add(PolicySubject(image: image, raw: $image, digests: digests,
-                                        stage: section.alias, source: "copy_from"))
+                                        stage: section.alias, source: source))
 
 proc metadataTable(value: Box): OrderedTableRef[string, Box] =
   if value.isNil() or value.kind != MkTable:
@@ -140,8 +144,11 @@ proc pushSubjects*(chalk: ChalkObj): PolicyInput =
         let image = parseImage(uri, defaultTag = "")
         var digests: seq[string]
         digests.addDigest(image.digest)
+        let source =
+          if metadataBool(fields.getOrDefault("mount", pack(false))): "mount_from"
+          else: "copy_from"
         result.subjects.add(PolicySubject(image: image, raw: uri, digests: digests,
-                                          stage: alias, source: "copy_from"))
+                                          stage: alias, source: source))
 
 proc pushInput*(chalk: ChalkObj, name: string): PolicyInput =
   let known = chalk != nil and chalk.extract != nil and "DOCKER_BASE_IMAGES" in chalk.extract

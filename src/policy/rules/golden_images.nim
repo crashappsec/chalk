@@ -116,7 +116,7 @@ type
 
 proc check*(settings: GoldenImagesConfig, subjects: seq[PolicySubject]): seq[PolicyFinding] =
   for subject in subjects:
-    if subject.source == "copy_from" and not settings.checkCopyFrom:
+    if subject.source in ["copy_from", "mount_from"] and not settings.checkCopyFrom:
       continue
     let (res, reason) = subject.image.checkImage(subject.digests, settings.allowed)
     case res

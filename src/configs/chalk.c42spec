@@ -2626,12 +2626,12 @@ Report template used for reports published to the `policy` topic.
     shortdoc: "Custom policy callback"
     doc: """
 Optional callback invoked once for every external image referenced by
-the build (`FROM` and `COPY --from`). It receives:
+the build (`FROM`, `COPY --from` and `RUN --mount=from`). It receives:
 
 1. the image as referenced in the Dockerfile
 2. the resolved image digest (empty when unknown)
 3. the Dockerfile stage alias the image belongs to
-4. the source of the reference, either `from` or `copy_from`
+4. the source of the reference, one of `from`, `copy_from` or `mount_from`
 
 Return an empty string to pass or a reason string to report a violation.
 """
@@ -2641,7 +2641,8 @@ Return an empty string to pass or a reason string to report a violation.
 singleton golden_images {
   user_def_ok:   false
   doc: """
-Restricts base images (and optionally `COPY --from` images) to an
+Restricts base images (and optionally `COPY --from` and
+`RUN --mount=from` images) to an
 allowlist of approved "golden" images.
 """
 
@@ -2658,9 +2659,10 @@ violation.
   field check_copy_from {
     type:     bool
     default:  true
-    shortdoc: "Also check COPY --from images"
+    shortdoc: "Also check COPY --from and RUN --mount=from images"
     doc: """
-Whether images referenced via `COPY --from=<image>` must also be allowed.
+Whether images referenced via `COPY --from=<image>` or
+`RUN --mount=from=<image>` must also be allowed.
 """
   }
 

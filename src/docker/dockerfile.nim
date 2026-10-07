@@ -1270,39 +1270,51 @@ proc formatBaseImages*(ctx: DockerInvocation, allStages = false): ChalkDict =
   for section in ctx.dfSections:
     result[section.alias] = pack(ctx.formatBaseImage(section, section in built))
 
-proc formatCopyImage(ctx: DockerInvocation, copy: CopyInfo): ChalkDict =
+proc formatCopyImage(ctx: DockerInvocation, frm: string): ChalkDict =
   var fields = newTable[string, string]()
-  let stage = ctx.copyStage(copy.frm)
+  let stage = ctx.copyStage(frm)
   if stage != nil:
     let info = ctx.baseImageInfo(stage)
     fields.addImageFields(info.image, info.context)
   else:
-    let context = ctx.namedContext(copy.frm)
+    let context = ctx.namedContext(frm)
     let image =
       if context.isSome(): (if context.get().kind == nckImage: context.get().image else: ("", "", ""))
-      else: parseImage(copy.frm, defaultTag = "")
+      else: parseImage(frm, defaultTag = "")
     fields.addImageFields(image, context)
   result = ChalkDict()
-  result["from"] = pack(copy.frm)
+  result["from"] = pack(frm)
   if stage != nil:
     result["from_stage"] = pack(true)
   for k, v in fields:
     result[k] = pack(v)
-  result["src"]      = pack(copy.rawSrc)
-  result["dest"]     = pack(copy.rawDst)
+
+proc copiesFromImage(ctx: DockerInvocation, frm: string): bool =
+  ## false for local directory contexts, which are not images
+  if frm == "":
+    return false
+  if ctx.copyStage(frm) != nil:
+    return true
+  let context = ctx.namedContext(frm)
+  return context.isNone() or context.get().kind != nckLocal
 
 proc formatCopyImages*(ctx: DockerInvocation): ChalkDict =
+  ## RUN --mount=from= sources are recorded too, as push checks them like COPY --from
   result = ChalkDict()
   for section in ctx.dfSections:
     var copies: seq[ChalkDict] = @[]
     for copy in section.copies:
-      if copy.frm == "":
+      if not ctx.copiesFromImage(copy.frm):
         continue
-      # copying from a local directory context, not another image
-      if ctx.copyStage(copy.frm) == nil:
-        let context = ctx.namedContext(copy.frm)
-        if context.isSome() and context.get().kind == nckLocal:
-          continue
-      copies.add(ctx.formatCopyImage(copy))
+      let item = ctx.formatCopyImage(copy.frm)
+      item["src"]  = pack(copy.rawSrc)
+      item["dest"] = pack(copy.rawDst)
+      copies.add(item)
+    for frm in section.mounts:
+      if not ctx.copiesFromImage(frm):
+        continue
+      let item = ctx.formatCopyImage(frm)
+      item["mount"] = pack(true)
+      copies.add(item)
     if len(copies) > 0:
       result[section.alias] = pack(copies)
