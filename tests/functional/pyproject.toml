@@ -36,7 +36,7 @@ mypy = {version = "^1.14.1", optional = true}
 neovim = {version = "^0.3.1", optional = true}
 
 [tool.poetry.group.dev.dependencies]
-black = "^26.5.1"
+black = "^26.10.0"
 flake8 = "^7.3.0"
 flake8-bugbear = "^25.11.29"
 flake8-comprehensions = "^3.17.0"
