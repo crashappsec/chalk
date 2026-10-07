@@ -3,7 +3,7 @@
 
 ## Collect images before a build or push, inside the policy error boundary.
 import ".."/[policy/engine, types]
-import "."/[ids, inspect, policy_subjects, scan]
+import "."/[exe, ids, inspect, policy_subjects, scan]
 
 export engine
 
@@ -18,19 +18,22 @@ proc buildInfo(ctx: DockerInvocation): ChalkDict =
   result["tags"] = pack(ctx.foundTags.asRepoTag())
   result["platforms"] = pack(platforms)
 
+proc pushInfo(ctx: DockerInvocation): ChalkDict =
+  result = ChalkDict()
+  result["command"] = pack("push")
+  result["tags"] = pack(@[ctx.foundImage])
+
 proc evaluateBuildPolicies*(ctx: DockerInvocation) =
   if not policyEnabled():
     return
   evaluatePolicies(ctx.buildInfo(), proc(): PolicyInput =
-    ctx.buildSubjects()
+    ctx.buildSubjects(allStages = not hasBuildX())
   )
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
   if not policyEnabled():
     return
-  let build = ChalkDict()
-  build["command"] = pack("push")
-  build["tags"] = pack(@[ctx.foundImage])
+  let build = ctx.pushInfo()
   evaluatePolicies(build, proc(): PolicyInput =
     if not ctx.foundAllTags:
       return pushInput(chalk, ctx.foundImage)
@@ -44,3 +47,24 @@ proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
       except CatchableError:
         result.errors.add(collectionError("could not inspect image: " & getCurrentExceptionMsg(), tag))
   )
+
+proc evaluateFailedPolicies(ctx: DockerInvocation, reason: string) =
+  ## The command failed before its policies ran, e.g. on a FROM chalk cannot
+  ## evaluate. Report that as a collection error so policy.on_error decides
+  ## instead of the failsafe rerunning docker unchecked.
+  if not policyEnabled() or policyEvaluated:
+    return
+  let build = if ctx.cmd == DockerCmd.push: ctx.pushInfo() else: ctx.buildInfo()
+  evaluatePolicies(build, proc(): PolicyInput =
+    raise newException(ValueError, reason)
+  )
+
+template withPolicyOnError*(ctx: DockerInvocation, code: untyped) =
+  try:
+    code
+  except PolicyViolation:
+    raise
+  except CatchableError:
+    let e = getCurrentException()
+    ctx.evaluateFailedPolicies(e.msg)
+    raise e

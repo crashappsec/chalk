@@ -2623,6 +2623,9 @@ Each base image will break it into its individual components of:
 * `tag` - only the tag of the image (if `:<tag>` is provided)
 * `digest` - only the digest of the image (if `@sha256:<digest>` is provided)
 * `config_digest` - digest of the image config
+* `built` - `"true"` if the build uses the section (the target reaches it via
+  `FROM`, `COPY --from` or `RUN --mount=from`, or the legacy builder is used),
+  `"false"` if BuildKit skips it
 
 Some special cases:
 

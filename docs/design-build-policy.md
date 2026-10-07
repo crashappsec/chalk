@@ -44,13 +44,20 @@ Evaluation errors are always reported.
 
 In `enforce` mode a blocked command exits with code 1 before docker runs, so
 the image is neither built nor pushed. Unlike other chalk failures, a policy
-block never falls back to running docker without chalk.
+block never falls back to running docker without chalk. If chalk fails before
+policies are evaluated (for example a `FROM` it cannot evaluate), the failure
+is reported as an evaluation error and `on_error` decides: `block` stops the
+command, `allow` falls back to running docker without chalk as before.
 
 ## What is checked
 
-- `chalk docker build`: every external image referenced by a `FROM` in any
-  stage (stages built on other stages are resolved to their external base),
-  and every image referenced by `COPY --from=<image>`. Named contexts with
+- `chalk docker build`: every external image referenced by a `FROM` in a
+  stage the build uses (stages built on other stages are resolved to their
+  external base), and every image referenced by `COPY --from=<image>` in those
+  stages. As in BuildKit, a stage is used when the target reaches it through
+  `FROM`, `COPY --from` or `RUN --mount=from`; other stages are never pulled
+  and are not checked. A `RUN --mount` chalk cannot evaluate makes every stage
+  count as used. Without buildx (legacy builder) every stage is checked. Named contexts with
   `docker-image://` sources are checked too, including overrides of `FROM`
   images, `COPY --from` references and whole stages. Context names are
   matched the way BuildKit does (familiar reference without `:latest`), so
@@ -61,9 +68,11 @@ block never falls back to running docker without chalk.
   determined produce an evaluation error. `FROM scratch` and
   references to other stages of the same Dockerfile are always allowed.
   Policies are evaluated after chalk resolves base image digests and before
-  chalk modifies anything or invokes docker, including `--push` builds.
+  chalk modifies anything (including chalking context files with
+  `chalk_contained_items`) or invokes docker, including `--push` builds.
 - `chalk docker push`: the base and `COPY --from` images recorded in the
-  image's chalk mark (`DOCKER_BASE_IMAGES`, `DOCKER_COPY_IMAGES`). If the image
+  image's chalk mark (`DOCKER_BASE_IMAGES`, `DOCKER_COPY_IMAGES`), skipping
+  stages recorded with `built` set to `false`. If the image
   is not chalked its base images are unknown, which is an evaluation error
   handled by `on_error`. With `--all-tags`, every local tag in the requested
   repository is checked before any tag is pushed. Findings are combined into
@@ -266,6 +275,8 @@ of images could let a disallowed one through.
   `on_error` determines whether to allow the push. Rebuilding with this
   version of chalk records the image context references for subsequent push
   checks, whether or not policies are enabled.
+- Images mounted with `RUN --mount=from=<image>` are not checked; the flag is
+  only used to find the stages a build uses.
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.

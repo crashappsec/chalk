@@ -12,8 +12,12 @@
   single JSON document via `policy.config_json`, e.g. from a component
   parameter. In `audit` mode violations are
   reported; in `enforce` mode chalk also exits non-zero before running docker,
-  so the image is neither built nor pushed. Unlike other failures, a policy
-  block never falls back to running docker without chalk. Violations and
+  so the image is neither built nor pushed. Only stages the build uses are
+  checked (reached from the target through `FROM`, `COPY --from` or
+  `RUN --mount=from`); `DOCKER_BASE_IMAGES` records this per stage as `built`.
+  Unlike other failures, a policy block never falls back to running docker
+  without chalk, and a failure before policies run is handled by
+  `policy.on_error` instead of silently rerunning docker. Violations and
   evaluation errors are published to the new `policy` topic with the
   `policy_report` template and the new `_POLICY_MODE`, `_POLICY_ID`, `_POLICY_RESULT`,
   `_POLICY_FINDINGS` and `_POLICY_BUILD` keys. Each policy report carries its

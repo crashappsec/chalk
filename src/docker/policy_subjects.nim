@@ -24,8 +24,10 @@ proc addContext(input: var PolicyInput, context: NamedContext, stage, source: st
     input.subjects.add(PolicySubject(image: context.image, raw: $context.image,
                                      digests: digests, stage: stage, source: source))
 
-proc buildSubjects*(ctx: DockerInvocation): PolicyInput =
-  for section in ctx.dfSections:
+proc buildSubjects*(ctx: DockerInvocation, allStages = false): PolicyInput =
+  ## stages the build never reaches pull nothing, so they are not checked
+  let sections = ctx.builtDockerSections(allStages)
+  for section in sections:
     let context = ctx.stageContext(section)
     if context.isSome():
       result.addContext(context.get(), section.alias, "from")
@@ -42,7 +44,7 @@ proc buildSubjects*(ctx: DockerInvocation): PolicyInput =
     digests.addDigest(original.digest)
     result.subjects.add(PolicySubject(image: original, raw: $original, digests: digests,
                                       stage: section.alias, source: "from"))
-  for section in ctx.dfSections:
+  for section in sections:
     for copy in section.copies:
       if copy.frm == "" or ctx.copyStage(copy.frm) != nil:
         continue # stages are checked through their own FROM
@@ -86,10 +88,14 @@ proc pushSubjects*(chalk: ChalkObj): PolicyInput =
   let bases = metadataTable(chalk.extract["DOCKER_BASE_IMAGES"])
   if bases.len == 0:
     raise newException(ValueError, "base image metadata is empty")
-  var baseAliases, baseUris: seq[string]
+  var baseAliases, baseUris, unbuilt: seq[string]
   for alias, info in bases:
     baseAliases.add(alias)
     let fields = metadataTable(info)
+    # marks predating "built" are checked in full
+    if metadataString(fields.getOrDefault("built", pack("true"))) == "false":
+      unbuilt.add(alias)
+      continue
     let uri = metadataString(fields.getOrDefault("uri", pack("")))
     let unresolved = fields.unresolvedContext(uri)
     if unresolved != "":
@@ -110,6 +116,8 @@ proc pushSubjects*(chalk: ChalkObj): PolicyInput =
   if "DOCKER_COPY_IMAGES" in chalk.extract:
     let copies = metadataTable(chalk.extract["DOCKER_COPY_IMAGES"])
     for alias, items in copies:
+      if alias in unbuilt:
+        continue
       for item in metadataList(items):
         let fields = metadataTable(item)
         let frm = metadataString(fields.getOrDefault("from", pack("")))

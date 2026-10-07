@@ -52,7 +52,7 @@ proc testContextKeysAreNormalized() =
 proc testForwardStageNameIsExternal() =
   # Docker resolves FROM only against earlier stages
   let ctx = invocation("FROM evil\nRUN true\nFROM alpine AS evil\n")
-  doAssert ctx.buildSubjects().repos() == @["from:evil", "from:alpine"]
+  doAssert ctx.buildSubjects(allStages = true).repos() == @["from:evil", "from:alpine"]
   doAssert ctx.dfSections[0].parent == nil
   let chained = invocation("FROM alpine AS Base\nFROM base\n")
   doAssert chained.dfSections[1].parent == chained.dfSections[0]
@@ -63,6 +63,30 @@ proc testForwardStageNameIsExternal() =
   # used to loop forever following aliases
   let cyclic = invocation("FROM b AS a\nFROM a AS b\n")
   doAssert cyclic.getBaseDockerSection().image.repo == "b"
+
+proc testOnlyBuiltStagesAreChecked() =
+  let unused = invocation("FROM busybox AS debug\nFROM alpine AS prod\n")
+  doAssert unused.buildSubjects().repos() == @["from:alpine"]
+  # the legacy builder builds every stage
+  doAssert unused.buildSubjects(allStages = true).repos() == @["from:busybox", "from:alpine"]
+  unused.foundTarget = "debug"
+  doAssert unused.buildSubjects().repos() == @["from:busybox"]
+  # stages reached through COPY --from, by name or index, and RUN --mount=from
+  for line in ["COPY --from=tools /a /a", "COPY --from=0 /a /a",
+               "RUN --mount=type=bind,from=tools,target=/t true",
+               "RUN --network=none --mount=from=tools true",
+               "RUN --mount=type=cache,target=/c --mount=from=\"tools\" true",
+               "RUN --mount=from=${TOOLS} true"]:
+    let ctx = invocation("ARG TOOLS=tools\nFROM busybox AS tools\nFROM alpine AS unused\n" &
+                         "FROM alpine\n" & line & "\n")
+    doAssert ctx.buildSubjects().repos() == @["from:busybox", "from:alpine"], line
+  # a mount that cannot be evaluated could reference any stage
+  let unknown = invocation("FROM busybox AS tools\nFROM alpine\nRUN --mount=from=${UNSET} true\n")
+  doAssert unknown.buildSubjects().repos() == @["from:busybox", "from:alpine"]
+  # a stage replaced by a context builds none of its own dependencies
+  let replaced = invocation("FROM busybox AS tools\nFROM alpine AS base\nCOPY --from=tools /a /a\n" &
+                            "FROM base\n", {"base": "docker-image://alpine:3"})
+  doAssert replaced.buildSubjects().repos() == @["from:alpine"]
 
 proc testStageOverriddenByContext() =
   let ctx = invocation("FROM alpine AS base\nFROM base\nCOPY --from=base /a /a\n",
@@ -110,6 +134,16 @@ proc testPushMatchesBuild() =
   doAssert input.errors.len == 0, $input.errors
   doAssert input.repos() == @["from:allowed", "from:alpine", "copy_from:nginx"], $input.repos()
 
+proc testPushSkipsUnbuiltStages() =
+  let ctx = invocation("FROM busybox AS debug\nCOPY --from=nginx /a /a\nFROM alpine AS prod\n")
+  let input = ctx.mark().pushInput("test")
+  doAssert input.errors.len == 0, $input.errors
+  doAssert input.repos() == @["from:alpine"], $input.repos()
+  # marks recorded by the legacy builder list every stage as built
+  let data = ChalkDict()
+  data["DOCKER_BASE_IMAGES"] = pack(ctx.formatBaseImages(allStages = true))
+  doAssert extracted(pack(data).boxToJson()).pushInput("test").repos() == @["from:busybox", "from:alpine"]
+
 proc testPushUnresolvedContext() =
   let ctx = invocation("FROM x\n", {"x": "oci-layout:///tmp/oci"})
   let input = ctx.mark().pushInput("test")
@@ -147,8 +181,10 @@ proc testPushMetadata() =
 testStageIndex()
 testContextKeysAreNormalized()
 testForwardStageNameIsExternal()
+testOnlyBuiltStagesAreChecked()
 testStageOverriddenByContext()
 testUnresolvedContextsDoNotRaise()
 testPushMatchesBuild()
+testPushSkipsUnbuiltStages()
 testPushUnresolvedContext()
 testPushMetadata()

@@ -524,6 +524,34 @@ proc parseAddOrCopy[T: InfoBase](ctx: DockerParse, t: DockerCommand): T =
   if len(errs) != 0:
     result.error = errs.join("\n")
 
+proc parseRun(ctx: DockerParse, t: DockerCommand): RunInfo =
+  ## only --mount flags are kept as they can depend on other stages;
+  ## the shell command after them is not lexed
+  result = RunInfo(startLine: t.startLine, endLine: t.endLine)
+  for word in strutils.splitWhitespace(t.rawArg):
+    if not word.startsWith("--"):
+      break
+    if not word.startsWith("--mount="):
+      continue
+    try:
+      let toks = ctx.lexSubableLine(t, word)
+      var i    = 0
+      let flag = ctx.parseOneFlag(toks, i)
+      if flag.isNone() or i != len(toks):
+        result.error = "could not parse " & word
+      else:
+        result.mounts.add(flag.get())
+    except:
+      result.error = "could not parse " & word & ": " & getCurrentExceptionMsg()
+
+proc mountSource(mount: string): string =
+  ## https://docs.docker.com/reference/dockerfile/#run---mount
+  for field in mount.split(','):
+    let parts = field.split('=', maxsplit = 1)
+    if len(parts) == 2 and strutils.strip(parts[0]).toLowerAscii() == "from":
+      return strutils.strip(strutils.strip(parts[1]), chars = {'"', '\''})
+  return ""
+
 proc parseFrom(ctx: DockerParse, t: DockerCommand): FromInfo =
   let toks = ctx.lexSubableLine(t, t.rawArg)
   var i    = 0
@@ -819,6 +847,7 @@ proc parseAndEval(s:      Stream,
     case cmd.name
     of "RUN":
       firstFromCheck()
+      res.add(parse.parseRun(cmd))
     of "ARG":
       parse.parseArg(cmd)
     of "ENV":
@@ -936,6 +965,17 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
       if "--from" in copy.flags:
         copy.frm = parse.evalFlag(copy.flags["--from"], errors)
       section.copies.add(copy)
+    elif obj of RunInfo:
+      let run = RunInfo(obj)
+      if run.error != "":
+        section.unknownMount = true
+      for flag in run.mounts:
+        let before = len(errors)
+        let source = mountSource(parse.evalFlag(flag, errors))
+        if len(errors) != before:
+          section.unknownMount = true
+        elif source != "":
+          section.mounts.add(source)
 
     # TODO: when we support CopyInfo, we need to add a case for it here
     # to save the source location as a hint for where to look for git info
@@ -1128,6 +1168,43 @@ proc stageContext*(ctx: DockerInvocation, section: DockerFileSection): Option[Na
   if section.parent == nil:
     return ctx.namedContext($section.foundImage)
 
+proc copyStage*(ctx: DockerInvocation, frm: string): DockerFileSection =
+  ## COPY --from resolves stage names and indexes before named contexts
+  result = ctx.stageByName(frm)
+  if result == nil and isDockerStageIndex(frm, len(ctx.dfSections)):
+    result = ctx.dfSections[parseInt(frm)]
+
+proc stageDependencies(ctx: DockerInvocation, section: DockerFileSection): seq[DockerFileSection] =
+  if section.alias != "" and ctx.namedContext(section.alias).isSome():
+    return # the context replaces the whole stage
+  if section.parent != nil:
+    result.add(section.parent)
+  for frm in section.copies.mapIt(it.frm) & section.mounts:
+    if frm != "":
+      let stage = ctx.copyStage(frm)
+      if stage != nil:
+        result.add(stage)
+
+proc builtDockerSections*(ctx: DockerInvocation, allStages = false): seq[DockerFileSection] =
+  ## Stages BuildKit builds for the target, in Dockerfile order: those reachable
+  ## through FROM, COPY --from and RUN --mount=from. The legacy builder
+  ## (allStages) builds every stage.
+  ## https://docs.docker.com/build/building/multi-stage/#differences-between-legacy-builder-and-buildkit
+  if allStages:
+    return ctx.dfSections
+  var
+    seen:    seq[DockerFileSection]
+    pending = @[ctx.getTargetDockerSection()]
+  while len(pending) > 0:
+    let s = pending.pop()
+    if s in seen:
+      continue
+    if s.unknownMount:
+      return ctx.dfSections # cannot tell what else it uses
+    seen.add(s)
+    pending.add(ctx.stageDependencies(s))
+  return ctx.dfSections.filterIt(it in seen)
+
 type BaseImageInfo = object
   image:   DockerImage
   context: Option[NamedContext]
@@ -1168,13 +1245,14 @@ proc addImageFields[T](result: var T, image: DockerImage, context: Option[NamedC
   if image.digest != "":
     result["digest"] = image.digest
 
-proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection): TableRef[string, string] =
+proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection, built: bool): TableRef[string, string] =
   let
     base = ctx.getBaseDockerSection(section)
     info = ctx.baseImageInfo(section)
   result = newTable[string, string]()
   # lets consumers tell these marks apart from ones that predate named context metadata
   result["named_contexts"] = "resolved"
+  result["built"]          = $built
   result["from"]     = $section.image
   result.addImageFields(info.image, info.context)
   if base.chalk != nil:
@@ -1186,16 +1264,11 @@ proc formatBaseImage(ctx: DockerInvocation, section: DockerFileSection): TableRe
     if metadata != "":
       result["metadata_id"]   = metadata
 
-proc formatBaseImages*(ctx: DockerInvocation): ChalkDict =
+proc formatBaseImages*(ctx: DockerInvocation, allStages = false): ChalkDict =
   result = ChalkDict()
+  let built = ctx.builtDockerSections(allStages)
   for section in ctx.dfSections:
-    result[section.alias] = pack(ctx.formatBaseImage(section))
-
-proc copyStage*(ctx: DockerInvocation, frm: string): DockerFileSection =
-  ## COPY --from resolves stage names and indexes before named contexts
-  result = ctx.stageByName(frm)
-  if result == nil and isDockerStageIndex(frm, len(ctx.dfSections)):
-    result = ctx.dfSections[parseInt(frm)]
+    result[section.alias] = pack(ctx.formatBaseImage(section, section in built))
 
 proc formatCopyImage(ctx: DockerInvocation, copy: CopyInfo): ChalkDict =
   var fields = newTable[string, string]()

@@ -104,6 +104,7 @@ proc evaluatePolicies*(settings: PolicyConfig,
 proc evaluatePolicies*(build: ChalkDict, collect: PolicyCollector) =
   ## Rule loading and subject collection belong to evaluation: failures here
   ## must never reach docker's generic failsafe without honoring policy.on_error.
+  policyEvaluated = true
   let settings = policyControls()
   if settings.mode notin ["audit", "enforce"]:
     return

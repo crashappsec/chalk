@@ -37,6 +37,8 @@ type
     ## docker without chalk.
 
 var policyOutcome*: PolicyOutcome = nil
+# set once policies run so a later failure is left to the docker failsafe
+var policyEvaluated* = false
 
 proc asDict(self: PolicyFinding): TableRef[string, string] =
   result = newTable[string, string]()

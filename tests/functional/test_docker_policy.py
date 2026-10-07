@@ -337,6 +337,99 @@ def test_enforce_blocks_forward_stage_name(chalk: Chalk, random_hex: str):
     )
 
 
+def test_unbuilt_stage_is_not_checked(chalk: Chalk, random_hex: str):
+    # BuildKit never pulls a stage the target does not depend on
+    _, result = build(
+        chalk,
+        "FROM busybox AS debug\nFROM alpine\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    assert policy_reports(random_hex) == []
+
+
+def test_enforce_blocks_stage_used_by_run_mount(chalk: Chalk, random_hex: str):
+    _, result = build(
+        chalk,
+        "FROM busybox AS tools\nFROM alpine\n"
+        "RUN --mount=type=bind,from=tools,target=/tools true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_FINDINGS=Contains(
+            [{"image": "busybox", "source": "from", "kind": "violation"}]
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "mode,on_error,result_kind",
+    [
+        ("enforce", "block", "blocked"),
+        ("enforce", "allow", "error"),
+        ("audit", "block", "error"),
+    ],
+)
+def test_failure_before_evaluation_honors_on_error(
+    chalk: Chalk, random_hex: str, mode: str, on_error: str, result_kind: str
+):
+    # chalk cannot evaluate FROM, which used to rerun docker unchecked
+    _, result = build(
+        chalk,
+        "ARG BASE\nFROM ${BASE}\nCMD true\n",
+        mode,
+        random_hex,
+        tag=random_hex,
+        env={"POLICY_ON_ERROR": on_error},
+        expected_success=False,
+    )
+    assert result.exit_code != 0
+    if result_kind == "blocked":
+        assert result.exit_code == 1
+        assert "retrying without chalk" not in result.logs
+    else:
+        assert "retrying without chalk" in result.logs
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_RESULT=result_kind,
+        _POLICY_FINDINGS=Contains(
+            [{"rule": "golden_images", "kind": "error", "reason": ANY}]
+        ),
+    )
+
+
+def test_blocked_build_does_not_chalk_context(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    # policies run before chalk_contained_items marks the context
+    (tmp_data_dir / "Dockerfile").write_text("FROM busybox\nCMD true\n")
+    script = tmp_data_dir / "script.sh"
+    script.write_text("#!/bin/sh\necho hello\n")
+    config = tmp_data_dir / "subchalk.c4m"
+    config.write_text(
+        (CONFIGS / "policy.c4m").read_text() + "\nchalk_contained_items = true\n"
+    )
+    _, result = chalk.docker_build(
+        dockerfile=tmp_data_dir / "Dockerfile",
+        context=tmp_data_dir,
+        tag=random_hex,
+        config=config,
+        env=policy_env("enforce", random_hex),
+        run_docker=False,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert "CHALK_ID" not in script.read_text()
+
+
 def test_large_numeric_copy_reference_is_checked(chalk: Chalk, random_hex: str):
     image = "999999999999999999999999999999"
     _, result = build(
