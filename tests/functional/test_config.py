@@ -3,6 +3,7 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import itertools
+import json
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
@@ -620,3 +621,87 @@ def test_custom_keys(chalk: Chalk, copy_files: list[Path]):
         X_MARK_CMD="mars",
         X_MARK_FUNC="hello world",
     )
+
+
+def _load_component_params(chalk: Chalk, tmp_path: Path, *params: list[Any], **kwargs):
+    component_dir = CONFIGS / "component_params"
+    profile = tmp_path / "profile.c4m"
+    profile.write_text(f'use params from "{component_dir}"\n')
+    return chalk.load(
+        profile,
+        component_params=[[False, f"{component_dir}/params", *p] for p in params],
+        **kwargs,
+    )
+
+
+@pytest.mark.parametrize("minutes", [2, 2.0])
+def test_load_component_var_params(
+    chalk_copy: Chalk, tmp_path: Path, random_hex: str, minutes: Any
+):
+    """
+    `parameter var` values passed to `chalk load --params` (as setup-chalk-action
+    does) must replace the parameters' defaults when the component runs.
+    JSON whole numbers must work for float parameters.
+    """
+    report_file = tmp_path / f"{random_hex}.jsonl"
+    _load_component_params(
+        chalk_copy,
+        tmp_path,
+        ["report_file", "string", str(report_file)],
+        ["minutes", "float", minutes],
+    )
+    chalk_copy.run(command="env", expecting_report=False)
+    reports = [
+        r
+        for line in Path(f"{report_file}.120").read_text().splitlines()
+        if line.strip()
+        for r in json.loads(line)
+    ]
+    assert reports and reports[0]["_OPERATION"] == "env"
+
+
+def test_load_component_var_params_validated(chalk_copy: Chalk, tmp_path: Path):
+    result = _load_component_params(
+        chalk_copy,
+        tmp_path,
+        ["minutes", "float", 0.0],
+        expected_success=False,
+        ignore_errors=True,
+    )
+    assert result.exit_code != 0
+    assert "minutes: must be positive" in result.logs
+
+
+def test_load_component_params_invalid_saved_value(
+    chalk_copy: Chalk, tmp_path: Path, random_hex: str
+):
+    """
+    Older chalk versions embedded saved parameter values unchecked. A value
+    con4m now rejects must not abort startup: that parameter keeps its default
+    while the other saved values still apply.
+    """
+    report_file = tmp_path / f"{random_hex}.jsonl"
+    _load_component_params(
+        chalk_copy,
+        tmp_path,
+        ["report_file", "string", str(report_file)],
+        ["minutes", "float", 2],
+    )
+    dump = chalk_copy.run(command="dump", params=["all"], expecting_report=False).json()
+    for row in dump["$CHALK_SAVED_COMPONENT_PARAMETERS"]:
+        if row[2] == "minutes":
+            row[4] = None
+    dump_file = tmp_path / "dump.json"
+    dump_file.write_text(json.dumps(dump))
+    # --no-validation embeds the rows as-is, like a chalk without the check did
+    chalk_copy.run(
+        command="load",
+        params=[str(dump_file), "--all", "--no-validation"],
+        replace=True,
+        expecting_report=False,
+    )
+    result = chalk_copy.run(command="env", expecting_report=False, ignore_errors=True)
+    assert any(
+        "minutes: ignoring saved parameter value" in e for e in result.errors
+    ), result.errors
+    assert Path(f"{report_file}.1800").exists()

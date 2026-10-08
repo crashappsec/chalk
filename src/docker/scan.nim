@@ -70,6 +70,12 @@ proc scanImage*(name:          string | DockerImage,
                        platform = platform)
   return chalk.scanImage(name, image)
 
+proc scanLocalPolicyImage*(name: string): Option[ChalkObj] =
+  ## Policy discovery must inspect the local images that Docker will push.
+  let image = parseImage(name, defaultTag = "")
+  let chalk = newChalk(name = name, codec = getPluginByName("docker"))
+  return chalk.scanImage(name, image, fromManifest = false)
+
 proc scanImageOrContainer*(name: string): Option[ChalkObj] =
   var
     chalk        = newChalk(name    = name,

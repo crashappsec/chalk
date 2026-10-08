@@ -400,6 +400,7 @@ discard registerTopic("fail")      # This gets aborted reports that we
                                    # don't send by default, but might be
                                    # good telemetry for some people.
 discard registerTopic("chalk_usage_stats")
+discard registerTopic("policy")    # Build policy violations.
 
 when not defined(release):
   discard subscribe("debug", defaultDebugHook)

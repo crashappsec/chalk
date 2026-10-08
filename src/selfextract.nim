@@ -254,19 +254,35 @@ proc loadCachedComponents*(runtime: ConfigState, cache: OrderedTableRef[string, 
     component.cacheComponent(src)
     trace("Loaded cached version of: " & url & ".c4m")
 
-proc loadComponentParams*(runtime: ConfigState, params: seq[Box]) =
+proc loadComponentParams*(runtime: ConfigState,
+                          params:  seq[Box],
+                          strict = true) =
+  ## con4m rejects saved values that do not match the parameter's type.
+  ## Older chalk versions embedded such values unchecked (and ignored them
+  ## for variable parameters), so restoring the embedded configuration must
+  ## not abort startup on one: the row is skipped and the parameter keeps
+  ## its default. `chalk load` validates with strict = true.
   for item in params:
-    let
-      row     = unpack[seq[Box]](item)
-      attr    = unpack[bool](row[0])
-      url     = unpack[string](row[1])
-      sym     = unpack[string](row[2])
-      c4mType = toCon4mType(unpack[string](row[3]))
-      value   = row[4]
-    if attr:
-      runtime.setAttributeParamValue(url, sym, value, c4mType)
-    else:
-      runtime.setVariableParamValue(url, sym, value, c4mType)
+    var name = "component parameter"
+    try:
+      let
+        row     = unpack[seq[Box]](item)
+        attr    = unpack[bool](row[0])
+        url     = unpack[string](row[1])
+        sym     = unpack[string](row[2])
+      name = url & ": " & sym
+      let
+        c4mType = toCon4mType(unpack[string](row[3]))
+        value   = row[4]
+      if attr:
+        runtime.setAttributeParamValue(url, sym, value, c4mType)
+      else:
+        runtime.setVariableParamValue(url, sym, value, c4mType)
+    except:
+      if strict:
+        raise
+      error(name & ": ignoring saved parameter value, using its default: " &
+            getCurrentExceptionMsg())
 
 proc testConfigFile(newCon4m: string,
                     params:   seq[Box],
@@ -379,10 +395,6 @@ proc handleConfigLoadAll*(inpath: string): bool =
       currentCache   = getCache()
       currentMemoize = getMemoize()
 
-    echo(config, currentConfig)
-    echo(params, currentParams)
-    echo(cache, currentCache)
-    echo(memoize, currentMemoize)
     if (
       config  == currentConfig and
       params  == currentParams and
@@ -496,6 +508,17 @@ proc handleConfigLoad*(inpath: string): bool =
           runtime.setAttributeParamValue(url, sym, value, c4mType)
         else:
           runtime.setVariableParamValue(url, sym, value, c4mType)
+          # interactive configuration validates every value; validate the
+          # variable values supplied here too, now that con4m applies them.
+          # Only at load time: saved values are not revalidated on every run
+          # and attribute values keep their behavior (crashoverride2's token
+          # validator rejects expired JWTs)
+          let param = runtime.getComponentReference(url).varParams[sym]
+          if param.validator.isSome():
+            let err = unpack[string](runtime.sCall(param.validator.get(),
+                                                   @[param.value.get()]).get())
+            if err != "":
+              raise newException(ValueError, sym & ": " & err)
     except:
       error("Invalid json parameters via stdin: " & getCurrentExceptionMsg())
       dumpExOnDebug()

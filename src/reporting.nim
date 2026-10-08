@@ -12,6 +12,8 @@ import "."/[
   collect,
   config,
   object_store/api,
+  policy/configuration,
+  policy/state,
   reportcache,
   run_management,
   sinks,
@@ -179,6 +181,21 @@ proc doCustomReporting() =
       if report != "":
         safePublish(topic, report)
 
+proc doPolicyReporting() =
+  # published at most once per run, alongside whichever report
+  # ("report" or "fail") ends the docker command
+  if policyOutcome == nil or policyOutcome.published:
+    return
+  policyOutcome.published = true
+  trace("policy: generating policy report")
+  # _ACTION_ID is unique per report (see its keyspec), so the policy report
+  # gets its own instead of reusing the docker command's. The two reports are
+  # correlated via BUILD_URI and _POLICY_BUILD.
+  withActionId(newActionId()):
+    let report = buildHostReport(policyReportTemplate())
+    if report != "":
+      safePublish("policy", report)
+
 proc doReporting*(
     topic      = "report",
     clearState = false,
@@ -200,6 +217,7 @@ proc doReporting*(
       doCommandReport(topic)
     if not skipCustom:
       doCustomReporting()
+    doPolicyReporting()
     if writeCache:
       writeReportCache()
     else:

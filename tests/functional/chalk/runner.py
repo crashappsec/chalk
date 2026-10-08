@@ -624,11 +624,17 @@ class Chalk:
         ignore_errors: bool = False,
         log_level: ChalkLogLevel = "trace",
         stdin: Optional[bytes] = None,
+        # [is_attribute, component url, name, type, value] as setup-chalk-action passes them
+        component_params: Optional[list[list[Any]]] = None,
     ) -> ChalkProgram:
         hash = sha256(self.binary)
+        params = [str(config)]
+        if component_params is not None:
+            params.append("--params")
+            stdin = json.dumps(component_params).encode()
         result = self.run(
             command="load",
-            params=[str(config)],
+            params=params,
             log_level=log_level,
             replace=replace,
             use_embedded=use_embedded,
@@ -843,18 +849,21 @@ class Chalk:
         digests: Optional[DockerDigests] = None,
         config: Optional[Path] = None,
         ignore_errors: bool = False,
-    ) -> tuple[DockerDigests, ChalkProgram]:
+        expected_success: bool = True,
+    ) -> tuple[Optional[DockerDigests], ChalkProgram]:
         push = self.run(
             params=["docker", "push", image],
             config=config,
             ignore_errors=ignore_errors,
+            expected_success=expected_success,
             env={
                 **Docker.build_env(buildkit=buildkit),
                 **(env or {}),
             },
         )
+        # failed push leaves nothing in the registry for crane to inspect
         return (
-            Docker.crane_digests(image, digests),
+            Docker.crane_digests(image, digests) if expected_success else None,
             push,
         )
 

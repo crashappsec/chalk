@@ -2276,6 +2276,39 @@ report_template usage {
   ~key._OP_PLATFORM.use                       = true
 }
 
+report_template policy_report {
+  shortdoc: "Report for build policy violations"
+  doc: """
+Published to the `policy` topic when build policies produce a violation
+or an evaluation error.
+"""
+  key._POLICY_MODE.use                        = true
+  key._POLICY_ID.use                          = true
+  key._POLICY_RESULT.use                      = true
+  key._POLICY_RESULTS.use                     = true
+  key._POLICY_FINDINGS.use                    = true
+  key._POLICY_BUILD.use                       = true
+  key._OPERATION.use                          = true
+  key._ACTION_ID.use                          = true
+  key._TIMESTAMP.use                          = true
+  key._DATETIME.use                           = true
+  key._OP_CHALKER_VERSION.use                 = true
+  key._OP_PLATFORM.use                        = true
+  key._OP_HOSTNAME.use                        = true
+  key._OP_EXIT_CODE.use                       = true
+  key._OP_CMD_FLAGS.use                       = true
+  key._OP_ERRORS.use                          = true
+  key.BUILD_ID.use                            = true
+  key.BUILD_URI.use                           = true
+  key.BUILD_API_URI.use                       = true
+  key.BUILD_TRIGGER.use                       = true
+  key.BUILD_CONTACT.use                       = true
+  key.BUILD_ORIGIN_ID.use                     = true
+  key.BUILD_ORIGIN_KEY.use                    = true
+  key.BUILD_ORIGIN_OWNER_ID.use               = true
+  key.BUILD_ORIGIN_URI.use                    = true
+}
+
 report_template heartbeat {
   shortdoc: "Small report for periodic heartbeats"
   doc: """

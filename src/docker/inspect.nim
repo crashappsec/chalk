@@ -124,3 +124,19 @@ iterator allImageIDs*(): string =
 iterator allContainerIDs*(): string =
   for id in allIDs("containers", "ps"):
     yield id
+
+proc repositoryImageTags*(repository: string): seq[string] =
+  ## Enumerate exactly the local tags docker push --all-tags will upload.
+  ## Compare normalized repositories rather than glob filters, whose wildcard
+  ## syntax can match other repositories.
+  let wanted = parseImage(repository, defaultTag = "").normalize().repo
+  let output = runDockerGetEverything(@["image", "ls", "--format", "{{.Repository}}:{{.Tag}}"])
+  if output.getExit() != 0:
+    raise newException(ValueError, "could not enumerate repository tags: " & output.stderr)
+  for tag in output.stdout.splitLines():
+    if tag == "" or "<none>" in tag:
+      continue
+    if parseImage(tag).normalize().repo == wanted and tag notin result:
+      result.add(tag)
+  if result.len == 0:
+    raise newException(ValueError, "no local image tags found for repository: " & repository)

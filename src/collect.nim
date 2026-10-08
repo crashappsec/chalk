@@ -11,6 +11,7 @@ import std/[
 import "."/[
   config,
   docker/scan,
+  policy/configuration,
   plugin_api,
   run_management,
   types,
@@ -149,6 +150,9 @@ proc initCollection*(collectHost = true) =
       if (getBaseCommandName() notin useWhen and "*" notin useWhen):
         continue
     registerKeys(getReportTemplate(report))
+
+  if policyEnabled():
+    registerKeys(policyReportTemplate())
 
   if isChalkingOp() and collectHost:
       collectChalkTimeHostInfo()

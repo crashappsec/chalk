@@ -49,6 +49,12 @@ This is mostly a copy of insert template however all keys are immutable.
   ~key._ENV.use                                       = true
   ~key._OPERATION.use                                 = true
   ~key._OP_EXIT_CODE.use                              = true
+  ~key._POLICY_MODE.use                               = true
+  ~key._POLICY_ID.use                                 = true
+  ~key._POLICY_RESULT.use                             = true
+  ~key._POLICY_RESULTS.use                            = true
+  ~key._POLICY_FINDINGS.use                           = true
+  ~key._POLICY_BUILD.use                              = true
   ~key._TIMESTAMP.use                                 = true
   ~key._MONOTIME.use                                  = true
   ~key._DATE.use                                      = false # Go with _DATETIME

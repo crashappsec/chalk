@@ -346,11 +346,25 @@ type
     rawSrc*: seq[string]
     rawDst*: string
 
+  RunInfo* = ref object of InfoBase
+    mounts*: seq[DfFlag]
+
   UserInfo* = ref object of InfoBase
     str*: string
 
   LabelInfo* = ref object of InfoBase
     labels*: OrderedTable[string, string]
+
+  NamedContextKind* = enum
+    nckImage      # docker-image:// with a usable reference
+    nckLocal      # directories, Git and HTTP sources are not container images
+    nckUnresolved # oci-layout:// or malformed docker-image://, identity unknown
+
+  NamedContext* = object
+    name*:  string # key as passed to --build-context
+    value*: string
+    kind*:  NamedContextKind
+    image*: DockerImage
 
   DockerFileSection* = ref object
     startLine*:   int
@@ -360,7 +374,13 @@ type
     image*:       DockerImage
     foundImage*:  DockerImage
     alias*:       string
+    # earlier stage this FROM builds on; Docker never resolves a FROM to a later stage
+    parent*:      DockerFileSection
     copies*:      seq[CopyInfo]
+    # RUN --mount=from= sources, which can be other stages
+    mounts*:      seq[string]
+    # a RUN --mount could not be evaluated, so its source is unknown
+    unknownMount*: bool
     entrypoint*:  EntryPointInfo
     cmd*:         CmdInfo
     shell*:       ShellInfo

@@ -34,6 +34,8 @@ import ".."/[
   attestation_api,
   commands/cmd_help,
   config,
+  docker/policy,
+  policy/state,
   reporting,
   types,
   utils/exec,
@@ -54,15 +56,17 @@ proc runCmdDocker*(args: seq[string]) =
   ctx.withDockerFailsafe():
     case ctx.extractDockerCommand()
     of DockerCmd.build:
-      loadAttestation(forceLoad = true, withPrivateKey = true)
-      info("Running docker build.")
-      setFullCommandName("build")
-      exitCode = ctx.dockerBuild()
+      ctx.withPolicyOnError():
+        loadAttestation(forceLoad = true, withPrivateKey = true)
+        info("Running docker build.")
+        setFullCommandName("build")
+        exitCode = ctx.dockerBuild()
     of DockerCmd.push:
-      loadAttestation(forceLoad = true, withPrivateKey = true)
-      info("Running docker push.")
-      setFullCommandName("push")
-      exitCode = ctx.dockerPush()
+      ctx.withPolicyOnError():
+        loadAttestation(forceLoad = true, withPrivateKey = true)
+        info("Running docker push.")
+        setFullCommandName("push")
+        exitCode = ctx.dockerPush()
     of DockerCmd.pull:
       info("Running docker pull.")
       setFullCommandName("pull")
@@ -73,6 +77,8 @@ proc runCmdDocker*(args: seq[string]) =
   try:
     if exitCode == 0:
       reporting.doReporting("report")
+    elif policyOutcome != nil:
+      reporting.doReporting("fail")
     showConfigValues()
   except:
     # ignore any errors reporting/etc as we need to ensure

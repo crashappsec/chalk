@@ -10,6 +10,7 @@
 
 import ".."/[
   commands/cmd_help,
+  policy/state,
   reporting,
   types,
   utils/exec,
@@ -42,9 +43,25 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
   finally:
     quitChalk(exitCode)
 
+proc dockerPolicyBlocked*(ctx: DockerInvocation) {.noreturn.} =
+  # unlike other failures, docker must not be re-run without chalk
+  var exitCode = 1
+  try:
+    error("docker: " & getCurrentExceptionMsg())
+    setExitCode(exitCode)
+    doReporting("fail")
+    showConfigValues()
+  except:
+    error("docker: could not report blocked build: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
+  finally:
+    quitChalk(exitCode)
+
 template withDockerFailsafe*(ctx: DockerInvocation, code: untyped) =
   try:
     code
+  except PolicyViolation:
+    ctx.dockerPolicyBlocked()
   except:
     error("docker: retrying without chalk due to: " & getCurrentExceptionMsg())
     dumpExOnDebug()

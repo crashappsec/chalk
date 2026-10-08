@@ -36,6 +36,7 @@ import "."/[
   login,
   manifest,
   platform,
+  policy,
   registry,
   scan,
   util,
@@ -147,7 +148,12 @@ proc processPlatforms(self: DockerInvocation) =
   self.platforms = self.foundPlatforms
   if len(self.platforms) == 0:
     trace("docker: no --platform is provided")
-    self.platforms.add(self.findBaseImagePlatform())
+    let base = self.getBaseDockerSection()
+    if self.stageContext(base).isSome():
+      # Docker resolves the context, not the registry image named in FROM
+      self.platforms.add(if base.platform != nil: base.platform else: findDockerPlatform())
+    else:
+      self.platforms.add(self.findBaseImagePlatform())
 
 proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
   if len(ctx.platforms) == 0:
@@ -158,6 +164,8 @@ proc pinBuildSectionBaseImages*(ctx: DockerInvocation) =
       continue
     if s.image.isPinned():
       continue
+    if ctx.stageContext(s).isSome():
+      continue # Docker resolves this context; pinning the name changes its meaning.
     try:
       let
         platforms = s.platformsOrDefault(ctx.platforms)
@@ -510,7 +518,7 @@ proc collectBeforeChalkTime(chalk: ChalkObj, ctx: DockerInvocation) =
   dict.setIfNeeded("DOCKER_BASE_IMAGE_NAME",            baseSection.image.name)
   dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG",             baseSection.image.tag)
   dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST",          baseSection.image.digest)
-  dict.setIfNeeded("DOCKER_BASE_IMAGES",                ctx.formatBaseImages())
+  dict.setIfNeeded("DOCKER_BASE_IMAGES",                ctx.formatBaseImages(allStages = not hasBuildX()))
   dict.setIfNeeded("DOCKER_COPY_IMAGES",                ctx.formatCopyImages())
   # note this key is expected to be empty string for alias-less targets
   # hence setIfSubscribed vs setIfNeeded which doesnt allow to set empty strings
@@ -658,6 +666,12 @@ proc dockerBuild*(ctx: DockerInvocation): int =
 
   trace("docker: collecting pre-build metadata")
   initCollection()
+  ctx.processPlatforms()
+  ctx.pinBuildSectionBaseImages()
+  # before context subchalking and any build mutations
+  # so a blocked build leaves nothing to clean up
+  ctx.evaluateBuildPolicies()
+
   if dockerSubchalk:
     try:
       info("docker: starting chalking of context directories.")
@@ -681,9 +695,6 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     except:
       error("docker: could not subchalk due to: " & getCurrentExceptionMsg())
       dumpExOnDebug()
-
-  ctx.processPlatforms()
-  ctx.pinBuildSectionBaseImages()
 
   cleanBuildContextCache()
   # Upload context blobs / create local tarballs on baseChalk before

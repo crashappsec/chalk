@@ -61,7 +61,7 @@ proc getEmbeddedConfig(): string =
       # which will attempt to fetch the component from source (e.g. url)
       let runtime = getChalkRuntime()
       runtime.loadCachedComponents(getCache())
-      runtime.loadComponentParams(getParams())
+      runtime.loadComponentParams(getParams(), strict = false)
   else:
     trace("Since this binary can't be marked, using the default config.")
 

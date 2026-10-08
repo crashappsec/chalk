@@ -4,6 +4,34 @@
 
 ### New Features
 
+- Opt-in build policies for `chalk docker build` and `chalk docker push`,
+  disabled by default (`policy.mode = "off"`) with no change in behavior
+  unless enabled. The new `policy` configuration section restricts base images (and `COPY --from`
+  and `RUN --mount=from` images) to an allowlist of golden images via glob or digest entries, and
+  supports a `custom_check` con4m callback. Policies can also be provided as a
+  single JSON document via `policy.config_json`, e.g. from a component
+  parameter, either as one policy object or as `{"policies": [...]}` listing
+  several independent policies. Each listed policy is evaluated separately with
+  its own `mode` and `on_error`, the command is blocked when any of them
+  blocks it, and an invalid entry is reported without disabling the others.
+  In `audit` mode violations are
+  reported; in `enforce` mode chalk also exits non-zero before running docker,
+  so the image is neither built nor pushed. Only stages the build uses are
+  checked (reached from the target through `FROM`, `COPY --from` or
+  `RUN --mount=from`); `DOCKER_BASE_IMAGES` records this per stage as `built`.
+  `DOCKER_COPY_IMAGES` now also lists `RUN --mount=from` sources, with
+  `mount` set to `true`, so push checks them too.
+  Unlike other failures, a policy block never falls back to running docker
+  without chalk, and a failure before policies run is handled by
+  `policy.on_error` instead of silently rerunning docker. Violations and
+  evaluation errors are published to the new `policy` topic with the
+  `policy_report` template and the new `_POLICY_MODE`, `_POLICY_ID`, `_POLICY_RESULT`,
+  `_POLICY_RESULTS` (outcome of each policy), `_POLICY_FINDINGS` (each with
+  the `policy_id` that produced it) and `_POLICY_BUILD` keys. Each policy report carries its
+  own `_ACTION_ID`, like every chalk report; correlate it with the build or
+  push report via `BUILD_URI` and `_POLICY_BUILD`. See
+  `docs/design-build-policy.md`.
+
 - New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`
   chalk-time host key, which records AI coding agent involvement in a build as
   newline-separated `field=value` records: `build_agent=` (the agent harness
@@ -25,6 +53,23 @@
 
 ### Bug Fixes
 
+- Component variable parameters (`parameter var`) now use configured values,
+  including values supplied via `chalk load --params`. Previously parameters
+  with defaults always used them (e.g. a custom heartbeat interval from
+  `use_heartbeats.c4m` stayed at 30 minutes) and configured parameters without
+  defaults failed with "Component not configured". Whole-number JSON values
+  for float parameters are converted, and values supplied via `--params` are
+  checked by the parameter's validator at load time. Generated Crash Override
+  profiles keep their existing behavior: their scanner parameters match the
+  defaults and profile metadata is written directly into the configuration.
+  Saved values that do not match the parameter's type are rejected by
+  `chalk load`; if a binary already embeds one, it is skipped with an error
+  and the parameter keeps its default instead of chalk failing to start.
+  ([con4m#137](https://github.com/crashappsec/con4m/pull/137))
+- `chalk load --replace --all` no longer prints the loaded and current
+  configuration, saved component parameters (including sensitive values such
+  as tokens) and component cache to stdout. Leftover debug output from
+  [#286](https://github.com/crashappsec/chalk/pull/286).
 - Fixed a segfault in the certs codec that aborted chalked Docker builds. The
   `prep_postexec` step subscans `/` with the certs codec, which feeds every
   candidate file to `d2i_X509_bio` after the PEM read fails. On arbitrary binary

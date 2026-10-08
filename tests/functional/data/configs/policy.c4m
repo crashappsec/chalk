@@ -1,0 +1,28 @@
+func deny_by_env(image: string, digest: string, stage: string, source: string) {
+  if env_exists("POLICY_CUSTOM_DENY") and contains(image, env("POLICY_CUSTOM_DENY")) {
+    return "denied by custom check"
+  }
+  return ""
+}
+
+policy {
+  mode: env("POLICY_MODE")
+  golden_images {
+    enabled: true
+    allowed: [("glob", "docker.io/library/alpine:*"), ("glob", "cgr.dev/chainguard/*")]
+    message: "Use an approved golden image"
+  }
+  custom_check: func deny_by_env
+}
+
+sink_config policy_file {
+  enabled:  true
+  sink:     "file"
+  filename: env("POLICY_REPORT_FILE")
+}
+
+subscribe("policy", "policy_file")
+
+if env_exists("POLICY_ON_ERROR") {
+  policy.on_error = env("POLICY_ON_ERROR")
+}

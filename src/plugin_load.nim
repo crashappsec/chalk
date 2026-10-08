@@ -66,6 +66,7 @@ loadPlugins([
   "network",
   "ownerAuthors",
   "ownerGithub",
+  "policy",
   "procfs",
   "system",
   "vctlGit",

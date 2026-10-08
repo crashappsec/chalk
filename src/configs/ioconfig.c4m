@@ -69,6 +69,7 @@ cmd := command_name()
 
 subscribe("report",   "default_out")
 subscribe("audit",    "default_out")
+subscribe("policy",   "default_out")
 subscribe("version",  "console_out")
 subscribe("virtual",  "virtual_chalk_log")
 subscribe("help",     "console_out")
