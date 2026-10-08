@@ -77,7 +77,9 @@
   instances that disagree on the profile's components during a rollout. The
   missing parameters now use their defaults (a warning names each one), so a
   profile using the `policy` component without its parameters loads with
-  build policies off.
+  build policies off. Conversely, `--params` for a component the loaded config
+  does not use now log a warning: they are saved but have no effect, which
+  previously left e.g. build policies silently off.
 - `chalk load --replace --all` no longer prints the loaded and current
   configuration, saved component parameters (including sensitive values such
   as tokens) and component cache to stdout. Leftover debug output from

@@ -1013,3 +1013,67 @@ def test_enforce_repos_invalid_never_blocks(
         {"_POLICY_FINDINGS": [{"rule": "config", "kind": "error", "reason": ANY}]}
     )
     assert "policy.enforce_repos" in report["_POLICY_FINDINGS"][0]["reason"]
+
+
+# the golden-images policy chalkapi serves to the test workspace
+GOLDEN_AUDIT = {
+    "id": "golden-images@1",
+    "mode": "audit",
+    "on_error": "allow",
+    "golden_images": {
+        "enabled": True,
+        "check_copy_from": True,
+        "allowed": [
+            ["glob", "docker.io/library/alpine:*"],
+            ["glob", "cgr.dev/chainguard/*"],
+        ],
+    },
+}
+
+
+@pytest.mark.parametrize("buildx", [False, True])
+@pytest.mark.parametrize(
+    "content, violations",
+    [
+        ("FROM nginx:1.27", ["nginx:1.27"]),
+        ("FROM nginx:1.27\n", ["nginx:1.27"]),
+        ("FROM alpine:3.20", []),
+        ("FROM cgr.dev/chainguard/static:latest", []),
+        (
+            "FROM nginx:1.27 AS web\nFROM alpine:3.20\nCOPY --from=web /etc/nginx /etc/nginx\n",
+            ["nginx:1.27"],
+        ),
+        ("FROM alpine:3.20 AS base\nFROM base\n", []),
+    ],
+)
+def test_config_json_audit_from_only(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    buildx: bool,
+    content: str,
+    violations: list[str],
+):
+    dockerfile = tmp_data_dir / "Dockerfile"
+    dockerfile.write_text(content)
+    _, result = chalk.docker_build(
+        dockerfile=dockerfile,
+        context=tmp_data_dir,
+        tag=random_hex,
+        config=CONFIGS / "policy_json.c4m",
+        env={
+            "POLICY_CONFIG_JSON": json.dumps(GOLDEN_AUDIT),
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+        },
+        buildx=buildx,
+        run_docker=False,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    reports = policy_reports(random_hex)
+    if not violations:
+        assert reports == []
+        return
+    (report,) = reports
+    assert report.has(_POLICY_RESULT="violation", _POLICY_MODE="audit")
+    assert [f["image"] for f in report["_POLICY_FINDINGS"]] == violations

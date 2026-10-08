@@ -735,9 +735,7 @@ def test_load_policy_params_omitted(chalk_copy: Chalk, tmp_path: Path):
     """
     co = REPO / "configs" / "co"
     profile = tmp_path / "profile.c4m"
-    profile.write_text(
-        f'use crashoverride2 from "{co}"\nuse policy from "{co}"\n'
-    )
+    profile.write_text(f'use crashoverride2 from "{co}"\nuse policy from "{co}"\n')
     result = chalk_copy.load(
         profile,
         component_params=[
@@ -759,3 +757,24 @@ def test_load_policy_params_omitted(chalk_copy: Chalk, tmp_path: Path):
     assert "sink_config.crashoverride_build.uri" in names
     assert "policy.config_json" not in names
 
+
+def test_load_params_for_unused_component(chalk_copy: Chalk, tmp_path: Path):
+    """
+    `--params` for a component the loaded profile does not use (e.g. a
+    profile and parameters from mismatched chalkapi responses) have no effect,
+    so the policy stays off; chalk warns about them instead of silently
+    accepting them.
+    """
+    co = REPO / "configs" / "co"
+    profile = tmp_path / "profile.c4m"
+    profile.write_text(f'use crashoverride2 from "{co}"\n')
+    result = chalk_copy.load(
+        profile,
+        component_params=[
+            [True, f"{co}/policy", "policy.config_json", "string", '{"mode":"audit"}'],
+        ],
+    )
+    assert (
+        "policy.config_json: component is not used by the loaded configuration"
+        in result.logs
+    )

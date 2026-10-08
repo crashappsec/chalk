@@ -501,6 +501,7 @@ proc handleConfigLoad*(inpath: string): bool =
 
       if chalkJsonTree.kind != JArray:
         raise newException(IOError, "")
+      let used = newComponents & runtime.programRoot.getUsedComponents()
       for row in chalkJsonTree:
         if row.kind != JArray or row.len() != 5:
           raise newException(IOError, "")
@@ -510,6 +511,11 @@ proc handleConfigLoad*(inpath: string): bool =
           sym     = row[2].getStr()
           c4mType = row[3].getStr().toCon4mType()
           value   = row[4].nimJsonToBox()
+        # e.g. the profile and its parameters came from mismatched chalkapi
+        # responses: the value is saved but nothing reads it
+        if runtime.getComponentReference(url) notin used:
+          warn(url & ": " & sym & ": component is not used by the loaded " &
+               "configuration, so this --params value has no effect")
         if attr:
           runtime.setAttributeParamValue(url, sym, value, c4mType)
         else:
