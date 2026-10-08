@@ -271,7 +271,9 @@ same identity. Chalk determines it before docker runs, in this order:
    origin of the git repository containing the context directory, resolved
    as for `ORIGIN_URI` (the current branch's upstream remote, else `origin`,
    else the first remote). For `docker push`, which has no context, the
-   repository containing the working directory;
+   repository containing the working directory. An origin that is a local
+   path, including a relative one such as `mirrors/acme/app.git`, identifies
+   no repository;
 2. otherwise the repository of the CI job: `GITHUB_SERVER_URL` and
    `GITHUB_REPOSITORY` (GitHub Actions, `GITHUB_SERVER_URL` defaulting to
    `https://github.com`), else `CI_PROJECT_URL` (GitLab CI).

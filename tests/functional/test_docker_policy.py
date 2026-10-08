@@ -932,16 +932,19 @@ def test_enforce_repos_unknown_repo_never_enforces(
     }
 
 
+# a relative origin is a local path to git and identifies no repository
+@pytest.mark.parametrize("origin", [None, "mirrors/crashappsec/chalk.git"])
 def test_enforce_repos_falls_back_to_ci_repo(
-    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, origin: str | None
 ):
+    context = git_context(tmp_data_dir, origin) if origin else tmp_data_dir
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
         as_form(rollout_policy(), "single"),
         random_hex,
         tag=random_hex,
-        context=tmp_data_dir,
+        context=context,
         env={
             **NO_CI_REPO,
             "GITHUB_SERVER_URL": "https://github.com",

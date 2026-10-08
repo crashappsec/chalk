@@ -18,7 +18,6 @@ proc testNormalizeRepo() =
     "https://github.com:443/CrashAppSec/Chalk.git",
     "HTTPS://GitHub.com/crashappsec/chalk",
     "git://github.com/crashappsec/chalk.git",
-    "github.com/crashappsec/chalk",
     # docker git context with ref and subdirectory
     "https://github.com/crashappsec/chalk.git#main:docker",
     "git@github.com:crashappsec/chalk.git#v1",
@@ -32,7 +31,9 @@ proc testNormalizeRepo() =
   # not a remote repository
   for url in ["", "local", "/srv/git/repo.git", "./repo", "../repo", "~/repo",
               "file:///srv/git/repo.git", "https://github.com/", "https://github.com/org",
-              "github.com", "git@github.com:repo.git", "s3://bucket/a/b"]:
+              "github.com", "git@github.com:repo.git", "s3://bucket/a/b",
+              # relative paths are local to git, whatever they look like
+              "mirrors/acme/app.git", "mirrors/acme/app", "github.com/crashappsec/chalk"]:
     doAssert normalizeRepo(url) == "", url & " -> " & normalizeRepo(url)
 
 proc withEnv(vars: openArray[(string, string)], body: proc()) =
@@ -71,6 +72,17 @@ proc testMatchesRepo() =
   doAssert not entries.matchesRepo("")
   doAssert @[("glob", "*")].matchesRepo("gitlab.com/a/b")
   doAssert @[("glob", "github.com/*")].matchesRepo("github.com/a/b")
+
+proc testLocalOriginFallsBackToCiRepo() =
+  # a local origin is no repository, so the CI job's applies
+  doAssert normalizeRepo("mirrors/acme/app.git") == ""
+  doAssert normalizeRepoPattern("github.com/crashappsec/chalk") == "github.com/crashappsec/chalk"
+  withEnv([("GITHUB_REPOSITORY", "acme/app")], proc() =
+    var repo = normalizeRepo("mirrors/acme/app.git")
+    if repo == "":
+      repo = repoFromEnv()
+    doAssert repo == "github.com/acme/app"
+    doAssert @[("glob", "github.com/acme/app")].matchesRepo(repo))
 
 proc testMatchesRepoKeepsGlobs() =
   doAssert normalizeRepoPattern("https://GitHub.com/Acme/App?.git") == "github.com/acme/app?"
@@ -259,6 +271,7 @@ testNormalizeRepo()
 testRepoFromEnv()
 testMatchesRepo()
 testMatchesRepoKeepsGlobs()
+testLocalOriginFallsBackToCiRepo()
 testResolveMode()
 testJsonValidation()
 testEnforcedInListedRepo()

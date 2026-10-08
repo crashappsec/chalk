@@ -60,7 +60,10 @@ proc normalize(url: string, pattern: bool): string =
       host = s[0 ..< colon]
       host = host[host.rfind('@') + 1 .. ^1]
       path = s[colon + 1 .. ^1]
-    elif slash > 0 and s[0] != '.' and s[0] != '~':
+    elif pattern and slash > 0 and s[0] != '.' and s[0] != '~':
+      # git reads a remote without scheme or `host:` as a local path, e.g. a
+      # relative `mirrors/acme/app.git`, which must not pass for a repository
+      # and hide the CI job's; patterns are written `host/path` though
       host = s[0 ..< slash]
       path = s[slash + 1 .. ^1]
     else:
@@ -77,7 +80,8 @@ proc normalizeRepo*(url: string): string =
   ## `host/path` of a git remote, lowercased, without scheme, credentials,
   ## port, query or `.git`, e.g. `git@github.com:Org/Repo.git` is
   ## `github.com/org/repo`. Empty when `url` names no remote repository,
-  ## e.g. a local path or chalk's `local` origin.
+  ## e.g. a local path (relative ones included, as git reads them) or
+  ## chalk's `local` origin.
   normalize(url, pattern = false)
 
 proc normalizeRepoPattern*(pattern: string): string =
