@@ -3,6 +3,7 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -1077,3 +1078,154 @@ def test_config_json_audit_from_only(
     (report,) = reports
     assert report.has(_POLICY_RESULT="violation", _POLICY_MODE="audit")
     assert [f["image"] for f in report["_POLICY_FINDINGS"]] == violations
+
+
+def summary_env(mode: str, random_hex: str, summary: Path) -> dict[str, str]:
+    return {**policy_env(mode, random_hex), "GITHUB_STEP_SUMMARY": str(summary)}
+
+
+def test_step_summary_audit_violation(chalk: Chalk, random_hex: str, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    summary.write_text("previous step output\n")
+    for _ in range(2):
+        _, result = build(
+            chalk,
+            "FROM busybox\nCMD true\n",
+            "audit",
+            random_hex,
+            tag=random_hex,
+            env=summary_env("audit", random_hex, summary),
+        )
+        assert result.exit_code == 0
+    text = summary.read_text()
+    # appended, never truncated: one section per chalk invocation
+    assert text.startswith("previous step output\n")
+    assert (
+        text.count(f"#### Chalk build policy · docker build · `{random_hex}:latest`")
+        == 2
+    )
+    assert text.count("> [!WARNING]") == 2
+    assert (
+        "> **Would be blocked under enforce** — 1 image is not an approved golden "
+        "image. The policy is in audit mode, so the build continued." in text
+    )
+    assert "| Image | Used as | Policy | Why |" in text
+    # the digest is shown when chalk could resolve it
+    assert re.search(
+        r"\| `busybox(@sha256:[0-9a-f]{12}…)?` \| FROM \| \(unnamed\) \| "
+        r"Use an approved golden image \|",
+        text,
+    )
+    assert (
+        "**How to fix:** Use an approved golden image. Allowed: "
+        "`docker.io/library/alpine:*`, `cgr.dev/chainguard/*`" in text
+    )
+    assert "<details><summary>Policy details</summary>" in text
+    assert "| (unnamed) | audit | default mode | violation | 1 |" in text
+    assert "- Chalk version: `" in text
+    assert "[!CAUTION]" not in text
+
+
+def test_step_summary_enforce_blocked(chalk: Chalk, random_hex: str, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env=summary_env("enforce", random_hex, summary),
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    text = summary.read_text()
+    assert (
+        "> [!CAUTION]\n> **Blocked** — `docker build` stopped before building: "
+        "1 image is not an approved golden image (enforce)." in text
+    )
+    assert "| (unnamed) | enforce | default mode | blocked | 1 |" in text
+
+
+def test_step_summary_pass(chalk: Chalk, random_hex: str, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    _, result = build(
+        chalk,
+        "FROM alpine\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env=summary_env("enforce", random_hex, summary),
+    )
+    assert result.exit_code == 0
+    # nothing is published to the policy topic when all policies pass
+    assert policy_reports(random_hex) == []
+    text = summary.read_text()
+    assert (
+        "> [!TIP]\n> All base images are approved golden images (1 policy checked)."
+        in text
+    )
+    assert "| Image |" not in text
+    assert "| (unnamed) | enforce | default mode | pass | 0 |" in text
+
+
+def test_step_summary_disabled(chalk: Chalk, random_hex: str, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    summary.write_text("untouched\n")
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env={
+            **summary_env("enforce", random_hex, summary),
+            "POLICY_NO_STEP_SUMMARY": "1",
+        },
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert summary.read_text() == "untouched\n"
+
+
+@pytest.mark.parametrize("mode, expected_exit", [("audit", 0), ("enforce", 1)])
+def test_step_summary_unwritable_does_not_affect_command(
+    chalk: Chalk, random_hex: str, tmp_path: Path, mode: str, expected_exit: int
+):
+    summary = tmp_path / "missing-dir" / "summary.md"
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        mode,
+        random_hex,
+        tag=random_hex,
+        env=summary_env(mode, random_hex, summary),
+        expected_success=expected_exit == 0,
+    )
+    assert result.exit_code == expected_exit
+    assert image_exists(random_hex) == (expected_exit == 0)
+    assert not summary.exists()
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_MODE=mode)
+
+
+def test_step_summary_includes_presigned_report_location(
+    chalk: Chalk, random_hex: str, tmp_path: Path, server_http: str
+):
+    summary = tmp_path / "summary.md"
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "audit",
+        random_hex,
+        tag=random_hex,
+        env={
+            **summary_env("audit", random_hex, summary),
+            "POLICY_PRESIGN_URL": f"{server_http}/report/presign",
+        },
+    )
+    assert result.exit_code == 0
+    text = summary.read_text()
+    assert f"- Policy report: `{server_http}/report/presign/accept`" in text
+    # the presigned query string is a credential
+    assert "X-Amz-Signature" not in text
+    assert "presign-test" not in text

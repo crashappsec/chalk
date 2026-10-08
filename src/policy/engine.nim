@@ -17,9 +17,10 @@ import "."/[
   configuration,
   repo,
   rules,
+  summary,
 ]
 
-export api, configuration, repo
+export api, configuration, repo, summary
 
 type
   PolicyCollector* = proc(): PolicyInput {.closure.}
@@ -40,11 +41,17 @@ proc evaluatePolicy*(settings: PolicyConfig,
     effectiveMode: mode,
     modeSource:    (if settings.modeSource != "": settings.modeSource else: "default"),
     repo:          settings.repo,
+    hasEnforceRepos: len(settings.enforceRepos) > 0,
   )
   var
     findings   = findings
     attributed = false
   for rule in rules:
+    if rule.hint != nil:
+      try:
+        result.hints.add(rule.hint())
+      except CatchableError:
+        trace("policy: no step summary hint for " & rule.name & ": " & getCurrentExceptionMsg())
     if rule.requiresAllSubjects:
       attributed = true
       for e in input.errors:
@@ -94,6 +101,8 @@ proc recordPolicyResults*(results: seq[PolicyResult], build: ChalkDict) =
     failures   = 0
     mode       = "audit"
     anyViolation = false
+  # queued before raising so a blocked command still gets its summary
+  recordPolicySummary(results, build)
   for r in results:
     findings.add(r.findings)
     if r.effectiveMode == "enforce":

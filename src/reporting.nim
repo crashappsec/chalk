@@ -14,10 +14,12 @@ import "."/[
   object_store/api,
   policy/configuration,
   policy/state,
+  policy/summary,
   reportcache,
   run_management,
   sinks,
   types,
+  utils/sink_impls,
 ]
 
 proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
@@ -196,6 +198,12 @@ proc doPolicyReporting() =
     if report != "":
       safePublish("policy", report)
 
+proc doPolicySummary() =
+  try:
+    writePolicySummary(presignedUploadLocations("policy"))
+  except CatchableError:
+    warn("policy: could not write the GitHub step summary: " & getCurrentExceptionMsg())
+
 proc doReporting*(
     topic      = "report",
     clearState = false,
@@ -218,6 +226,7 @@ proc doReporting*(
     if not skipCustom:
       doCustomReporting()
     doPolicyReporting()
+    doPolicySummary()
     if writeCache:
       writeReportCache()
     else:

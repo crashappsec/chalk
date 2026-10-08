@@ -97,7 +97,8 @@ async def presign_report_url(
 ):
     await _check_chalk_core_headers(request)
     redirect = RedirectResponse(
-        request.url_for("accept_presign_report"),
+        # like S3, the presigned URL carries its credentials in the query
+        f"{request.url_for('accept_presign_report')}?X-Amz-Signature=presign-test",
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
     redirect.headers["x-forward-headers"] = "x-presign-test"

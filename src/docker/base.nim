@@ -11,6 +11,7 @@
 import ".."/[
   commands/cmd_help,
   policy/state,
+  policy/summary,
   reporting,
   types,
   utils/exec,
@@ -41,6 +42,8 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
     doReporting("fail")
     showConfigValues()
   finally:
+    # no-op unless reporting did not get to write it
+    writePolicySummary()
     quitChalk(exitCode)
 
 proc dockerPolicyBlocked*(ctx: DockerInvocation) {.noreturn.} =
@@ -55,6 +58,8 @@ proc dockerPolicyBlocked*(ctx: DockerInvocation) {.noreturn.} =
     error("docker: could not report blocked build: " & getCurrentExceptionMsg())
     dumpExOnDebug()
   finally:
+    # no-op unless reporting did not get to write it, e.g. skipped reports
+    writePolicySummary()
     quitChalk(exitCode)
 
 template withDockerFailsafe*(ctx: DockerInvocation, code: untyped) =

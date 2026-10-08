@@ -24,6 +24,12 @@ type
     source*:   string # "from", "copy_from" or "mount_from"
     reason*:   string
 
+  PolicyHint* = object
+    ## how a rule explains itself in the GitHub step summary, not reported
+    rule*:    string
+    message*: string      # configured remediation message
+    allowed*: seq[string] # configured allowlist
+
   PolicyResult* = object
     ## outcome of one evaluated policy
     id*:       string
@@ -33,6 +39,8 @@ type
     effectiveMode*: string # "audit" or "enforce", see `enforce_repos`
     modeSource*:    string # "default" or "enforce_repos"
     repo*:          string # repository `enforce_repos` was matched against
+    hasEnforceRepos*: bool
+    hints*:    seq[PolicyHint]
     findings*: seq[PolicyFinding]
 
   PolicyOutcome* = ref object

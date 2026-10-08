@@ -2630,6 +2630,19 @@ same way, while the other entries are still evaluated.
 """
   }
 
+  field github_step_summary {
+    type:     bool
+    default:  true
+    shortdoc: "Write the policy outcome to the GitHub Actions job summary"
+    doc: """
+When chalk runs in GitHub Actions (`GITHUB_STEP_SUMMARY` is set), append a
+short Markdown section with the outcome of every evaluated policy and its
+findings to the job summary, including when the command is blocked. Errors
+writing it are logged as warnings and never affect the command. Not part of
+`config_json`.
+"""
+  }
+
   field report_template {
     type:     string
     default:  "policy_report"

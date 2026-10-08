@@ -436,6 +436,35 @@ violations are logged as warnings (prefixed with
 `docker_log_level` defaults to `error`, lower it to `warn` to see audit
 findings on the console.
 
+### GitHub Actions job summary
+
+When `GITHUB_STEP_SUMMARY` is set (GitHub Actions), every `chalk docker build`
+or `chalk docker push` that evaluates policies appends a short Markdown section
+to the [job summary](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary),
+including when all policies pass and when the command is blocked:
+
+- an alert stating the outcome: `CAUTION` when blocked, `WARNING` for audit
+  violations that `enforce` would block, `NOTE` when policies could only report
+  evaluation errors, `TIP` when all passed;
+- the command and its first image tag;
+- when there are findings, a table of the offending images (digest shortened),
+  how each is used (`FROM`, `COPY --from`, `RUN --mount from` and the stage) and
+  why (the policy's `message`, else the finding's reason), and a "How to fix"
+  line with the `message` and up to 10 allowed patterns;
+- a collapsed "Policy details" block with each evaluated policy's mode, why it
+  has that mode (`enforce_repos` match, default, or unknown repository), result
+  and finding count, the chalk version, the repository used for
+  `enforce_repos`, and the location of the uploaded policy report when the
+  `policy` topic goes to a `presign` sink (without the presigned query string).
+
+Sections are appended, never truncated, so several chalk invocations in one
+step each add theirs. Rows are capped (50 findings, 50 policies) to stay well
+under GitHub's 1 MiB per-step limit. The summary is written by the chalk
+process wrapping docker, and failing to write it (unset or unwritable path,
+size limit) is only a warning: it never changes the command's outcome. Set
+`policy.github_step_summary = false` to turn it off; it is a con4m-only
+setting, not part of `policy.config_json`.
+
 ## Distributing policies
 
 Policies are regular chalk configuration, so they can be distributed like any

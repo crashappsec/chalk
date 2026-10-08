@@ -39,18 +39,22 @@ type
     ## the rule is enabled. Raising reports a configuration error.
     load*:  proc(): bool
     check*: proc(subjects: seq[PolicySubject]): seq[PolicyFinding]
+    ## optional, describes the loaded configuration for the step summary
+    hint*:  proc(): PolicyHint
 
 var registeredRules: seq[PolicyRule]
 
 proc newPolicyRule*(name: string,
                     load: proc(): bool,
                     check: proc(subjects: seq[PolicySubject]): seq[PolicyFinding],
-                    requiresAllSubjects = false) =
+                    requiresAllSubjects = false,
+                    hint: proc(): PolicyHint = nil) =
   for rule in registeredRules:
     if rule.name == name:
       raise newException(ValueError, "policy rule is already registered: " & name)
   registeredRules.add(PolicyRule(name: name, load: load, check: check,
-                                 requiresAllSubjects: requiresAllSubjects))
+                                 requiresAllSubjects: requiresAllSubjects,
+                                 hint: hint))
 
 iterator policyRules*(): PolicyRule =
   for rule in registeredRules:

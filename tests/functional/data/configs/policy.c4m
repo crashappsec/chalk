@@ -26,3 +26,16 @@ subscribe("policy", "policy_file")
 if env_exists("POLICY_ON_ERROR") {
   policy.on_error = env("POLICY_ON_ERROR")
 }
+
+if env_exists("POLICY_NO_STEP_SUMMARY") {
+  policy.github_step_summary = false
+}
+
+if env_exists("POLICY_PRESIGN_URL") {
+  sink_config policy_presign {
+    enabled: true
+    sink:    "presign"
+    uri:     env("POLICY_PRESIGN_URL")
+  }
+  subscribe("policy", "policy_presign")
+}

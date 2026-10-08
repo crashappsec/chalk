@@ -39,6 +39,13 @@
   Glob characters in `enforce_repos` entries are kept when the entry is
   normalized, so `github.com/acme/app?` matches `github.com/acme/app1`
   rather than being cut at the `?` like a URL query.
+  In GitHub Actions (`GITHUB_STEP_SUMMARY` set), the policy outcome is also
+  appended to the job summary as a short Markdown section: an alert with the
+  outcome, the offending images and how to fix them, and collapsed per-policy
+  details including the uploaded policy report location when the `policy`
+  topic uses a `presign` sink. Written even when the command is blocked, never
+  affects the command, and can be turned off with
+  `policy.github_step_summary = false`.
 
 - New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`
   chalk-time host key, which records AI coding agent involvement in a build as
