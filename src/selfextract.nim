@@ -349,6 +349,12 @@ proc toBox(param: ParameterInfo, component: ComponentInfo): Box =
   return pack(arr)
 
 proc addParam(params: var seq[Box], param: ParameterInfo, component: ComponentInfo) =
+  # A parameter has no value when `chalk load --params` omitted it (e.g. the
+  # profile and its parameters came from mismatched chalkapi responses) or
+  # its saved value was skipped as invalid. Nothing is saved for it, so con4m
+  # falls back to the parameter's default when evaluating the component.
+  if param.value.isNone():
+    return
   params.add(param.toBox(component))
 
 proc addParams(params: var seq[Box], component: ComponentInfo) =
@@ -519,6 +525,13 @@ proc handleConfigLoad*(inpath: string): bool =
                                                    @[param.value.get()]).get())
             if err != "":
               raise newException(ValueError, sym & ": " & err)
+      for item in newComponents:
+        for name, param in item.varParams:
+          if param.value.isNone():
+            warn(item.url & ": " & name & ": not in --params, using its default")
+        for name, param in item.attrParams:
+          if param.value.isNone():
+            warn(item.url & ": " & name & ": not in --params, using its default")
     except:
       error("Invalid json parameters via stdin: " & getCurrentExceptionMsg())
       dumpExOnDebug()

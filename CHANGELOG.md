@@ -71,6 +71,13 @@
   `chalk load`; if a binary already embeds one, it is skipped with an error
   and the parameter keeps its default instead of chalk failing to start.
   ([con4m#137](https://github.com/crashappsec/con4m/pull/137))
+- `chalk load --params` no longer crashes with `UnpackDefect` when a component
+  the loaded config uses has parameters missing from `--params`, e.g. when
+  setup-chalk-action fetches a profile and its parameters from chalkapi
+  instances that disagree on the profile's components during a rollout. The
+  missing parameters now use their defaults (a warning names each one), so a
+  profile using the `policy` component without its parameters loads with
+  build policies off.
 - `chalk load --replace --all` no longer prints the loaded and current
   configuration, saved component parameters (including sensitive values such
   as tokens) and component cache to stdout. Leftover debug output from
