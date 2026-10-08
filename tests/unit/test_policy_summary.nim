@@ -153,14 +153,16 @@ proc testEscaping() =
   doAssert mdText("a|b\nc\r\nd") == "a\\|b c d"
   doAssert mdText("<script>&") == "&lt;script&gt;&amp;"
   doAssert mdText("") == "-"
+  doAssert mdText("a\\|b") == "a\\\\\\|b"
+  doAssert mdText("C:\\path\\") == "C:\\\\path\\\\"
   doAssert mdCode("a`b|c") == "`a'b\\|c`"
   var p = policy("x|y", "audit", "violation",
-                 @[finding("x|y", image = "img|`x`", reason = "line1\nline2 | <b>")])
+                 @[finding("x|y", image = "img|`x`", reason = "line1\nline2 | <b> a\\|b")])
   p.hints = @[]
   let md = renderPolicySummary(@[p], build())
   doAssert "| x\\|y | audit | default mode | violation | 1 |" in md
   doAssert "| `img\\|'x'@sha256:6784fb0834aa…` |" in md
-  doAssert "line1 line2 \\| &lt;b&gt; |" in md
+  doAssert "line1 line2 \\| &lt;b&gt; a\\\\\\|b |" in md
   for line in md.splitLines():
     if line.startsWith("|"):
       doAssert line.replace("\\|", "").count('|') in [5, 6]

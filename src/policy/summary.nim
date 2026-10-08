@@ -41,11 +41,14 @@ proc mdText*(value: string, maxLen = maxCellLen): string =
   result = value.truncate(maxLen)
   if result == "":
     return "-"
-  result = result.multiReplace(("&", "&amp;"), ("<", "&lt;"), (">", "&gt;"), ("|", "\\|"))
+  # backslashes first, or `a\|b` would become `a\\|b`, which can end the cell
+  result = result.multiReplace(("\\", "\\\\"), ("&", "&amp;"), ("<", "&lt;"),
+                               (">", "&gt;"), ("|", "\\|"))
 
 proc mdCode*(value: string, maxLen = maxCellLen, inTable = true): string =
-  ## Inline code. Entities are not decoded in code spans, so only what could
-  ## end the span or the table cell is changed.
+  ## Inline code. Entities and backslash escapes are not decoded in code
+  ## spans, so only what could end the span or the table cell is changed;
+  ## GFM strips the `\` of `\|` in table cells, code spans included.
   var text = value.truncate(maxLen).replace("`", "'")
   if inTable:
     text = text.replace("|", "\\|")
