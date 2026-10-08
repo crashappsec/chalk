@@ -250,7 +250,11 @@ repositories while `mode` applies everywhere else:
   exactly. Entries of other kinds (including `digest`) never match and are
   logged as warnings, so they can never enforce a policy by accident. Values
   are normalized like repositories (see below), so
-  `https://github.com/Acme/App.git` and `github.com/acme/app` are equivalent.
+  `https://github.com/Acme/App.git` and `github.com/acme/app` are equivalent,
+  except that glob characters are kept: `github.com/acme/app?` matches
+  `github.com/acme/app1`, not `github.com/acme/app`. Only a numeric port is
+  removed, so a glob in the port position (`github.com:*/acme/app`) never
+  matches.
 - An `enforce_repos` that is not a list of `[kind, value]` string pairs makes
   the policy invalid: it is reported as a `config` evaluation error and never
   blocks, like any other invalid policy.

@@ -22,6 +22,9 @@ proc testNormalizeRepo() =
     # docker git context with ref and subdirectory
     "https://github.com/crashappsec/chalk.git#main:docker",
     "git@github.com:crashappsec/chalk.git#v1",
+    # a query is not part of a remote's identity
+    "https://github.com/crashappsec/chalk.git?ref=main",
+    "https://github.com/crashappsec/chalk?x=1#main",
   ]:
     doAssert normalizeRepo(url) == "github.com/crashappsec/chalk", url & " -> " & normalizeRepo(url)
   doAssert normalizeRepo("https://gitlab.com/group/sub/project.git") == "gitlab.com/group/sub/project"
@@ -68,6 +71,23 @@ proc testMatchesRepo() =
   doAssert not entries.matchesRepo("")
   doAssert @[("glob", "*")].matchesRepo("gitlab.com/a/b")
   doAssert @[("glob", "github.com/*")].matchesRepo("github.com/a/b")
+
+proc testMatchesRepoKeepsGlobs() =
+  doAssert normalizeRepoPattern("https://GitHub.com/Acme/App?.git") == "github.com/acme/app?"
+  doAssert normalizeRepoPattern("git@github.com:acme/[ab]pp.git") == "github.com/acme/[ab]pp"
+  doAssert normalizeRepoPattern("github.com/acme/app#main") == "github.com/acme/app"
+  # only a numeric port is removed, see normalizeRepoPattern
+  doAssert normalizeRepoPattern("https://github.com:443/acme/*") == "github.com/acme/*"
+  doAssert normalizeRepoPattern("https://github.com:*/acme/app") == "github.com:*/acme/app"
+  doAssert not @[("glob", "https://github.com:*/acme/app")].matchesRepo("github.com/acme/app")
+  for pattern in ["github.com/acme/app?", "https://github.com/acme/app?",
+                  "git@github.com:acme/app?.git", "HTTPS://github.com/Acme/App?.git"]:
+    let entries = @[("glob", pattern)]
+    doAssert entries.matchesRepo("github.com/acme/app1"), pattern
+    doAssert not entries.matchesRepo("github.com/acme/app"), pattern
+    doAssert not entries.matchesRepo("github.com/acme/app12"), pattern
+  doAssert @[("glob", "https://github.com/acme/*.git")].matchesRepo("github.com/acme/app")
+  doAssert @[("glob", "github.com/*/app")].matchesRepo("github.com/acme/app")
 
 proc testResolveMode() =
   let repos = @[("glob", "github.com/crashappsec/dummy-deployments")]
@@ -238,6 +258,7 @@ proc testInvalidEnforceReposNeverBlocks() =
 testNormalizeRepo()
 testRepoFromEnv()
 testMatchesRepo()
+testMatchesRepoKeepsGlobs()
 testResolveMode()
 testJsonValidation()
 testEnforcedInListedRepo()

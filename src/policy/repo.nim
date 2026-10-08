@@ -31,14 +31,11 @@ proc stripPort(authority: string): string =
       return authority
   return authority[0 ..< colon]
 
-proc normalizeRepo*(url: string): string =
-  ## `host/path` of a git remote, lowercased, without scheme, credentials,
-  ## port or `.git`, e.g. `git@github.com:Org/Repo.git` is
-  ## `github.com/org/repo`. Empty when `url` names no remote repository,
-  ## e.g. a local path or chalk's `local` origin.
+proc normalize(url: string, pattern: bool): string =
   var s = url.strip()
-  # docker git contexts select a ref and subdirectory after `#`
-  for sep in ['#', '?']:
+  # docker git contexts select a ref and subdirectory after `#`; `?` starts a
+  # query in a remote but is a wildcard in a pattern
+  for sep in (if pattern: @['#'] else: @['#', '?']):
     let i = s.find(sep)
     if i != -1:
       s = s[0 ..< i]
@@ -76,6 +73,21 @@ proc normalizeRepo*(url: string): string =
     return ""
   return (host & "/" & path).toLowerAscii()
 
+proc normalizeRepo*(url: string): string =
+  ## `host/path` of a git remote, lowercased, without scheme, credentials,
+  ## port, query or `.git`, e.g. `git@github.com:Org/Repo.git` is
+  ## `github.com/org/repo`. Empty when `url` names no remote repository,
+  ## e.g. a local path or chalk's `local` origin.
+  normalize(url, pattern = false)
+
+proc normalizeRepoPattern*(pattern: string): string =
+  ## `normalizeRepo` for an `enforce_repos` glob: glob characters (`*`, `?`,
+  ## `[...]`) are kept verbatim, so `https://github.com/Acme/app?.git` is
+  ## `github.com/acme/app?`. Only a numeric port is removed: a glob in the
+  ## port position (`github.com:*`) stays part of the host and, as
+  ## repositories are compared without ports, never matches.
+  normalize(pattern, pattern = true)
+
 proc repoFromEnv*(): string =
   ## the repository of the CI job, when chalk runs in one
   let github = getEnv("GITHUB_REPOSITORY")
@@ -94,7 +106,7 @@ proc matchesRepo*(entries: seq[(string, string)], repo: string): bool =
   for (kind, value) in entries:
     if kind != "glob":
       continue
-    let normalized = normalizeRepo(value)
+    let normalized = normalizeRepoPattern(value)
     let pattern    = if normalized != "": normalized else: value.strip().toLowerAscii()
     if globMatch(pattern, repo):
       return true

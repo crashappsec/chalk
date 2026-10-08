@@ -36,6 +36,9 @@
   git origin, falling back to the CI job's repository), while `mode` applies
   elsewhere; an undeterminable repository never escalates to `enforce`.
   `_POLICY_RESULTS` entries report `effective_mode`, `mode_source` and `repo`.
+  Glob characters in `enforce_repos` entries are kept when the entry is
+  normalized, so `github.com/acme/app?` matches `github.com/acme/app1`
+  rather than being cut at the `?` like a URL query.
 
 - New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`
   chalk-time host key, which records AI coding agent involvement in a build as
