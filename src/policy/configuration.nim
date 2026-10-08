@@ -18,6 +18,12 @@ type
     configError*: string
     ## the policy's object in `policy.config_json`, nil for con4m
     json*: JsonNode
+    ## repositories in which the policy is enforced whatever its `mode`
+    enforceRepos*: seq[(string, string)]
+    ## set by `resolveMode` for policies with `enforceRepos`
+    effectiveMode*: string
+    modeSource*:    string # "default" or "enforce_repos"
+    repo*:          string # normalized repository, empty when unknown
 
   PolicyJsonField = object
     name:    string
@@ -29,6 +35,7 @@ const
     PolicyJsonField(name: "id",            kind: JString),
     PolicyJsonField(name: "mode",          kind: JString, choices: @["off", "audit", "enforce"]),
     PolicyJsonField(name: "on_error",      kind: JString, choices: @["allow", "block"]),
+    PolicyJsonField(name: "enforce_repos", kind: JArray),
     PolicyJsonField(name: "golden_images", kind: JObject),
   ]
   goldenImagesJsonFields = [
@@ -63,31 +70,39 @@ proc validateFields(node: JsonNode, fields: openArray[PolicyJsonField], path: st
     if not found:
       raise newException(ValueError, "unknown field " & path & key)
 
+proc validatePairs(node: JsonNode, path: string) =
+  for entry in node.getElems():
+    if entry.kind != JArray or len(entry) != 2 or
+       entry[0].kind != JString or entry[1].kind != JString:
+      raise newException(ValueError, path & " entries must be [kind, value] string pairs")
+
 proc validatePolicy(node: JsonNode, path: string) =
   ## `path` is the field prefix used in errors, e.g. `policy.`
   if node.kind != JObject:
     raise newException(ValueError, path[0 .. ^2] & " must be a JSON object, got " &
                                    jsonKindName(node.kind))
   node.validateFields(policyJsonFields, path)
+  node{"enforce_repos"}.validatePairs(path & "enforce_repos")
   if node.hasKey("golden_images"):
     let golden = node["golden_images"]
     golden.validateFields(goldenImagesJsonFields, path & "golden_images.")
-    for entry in golden{"allowed"}.getElems():
-      if entry.kind != JArray or len(entry) != 2 or
-         entry[0].kind != JString or entry[1].kind != JString:
-        raise newException(ValueError,
-                           path & "golden_images.allowed entries must be [kind, value] string pairs")
+    golden{"allowed"}.validatePairs(path & "golden_images.allowed")
 
 proc invalidPolicy(id, reason: string): PolicyConfig =
   # a configuration that cannot be read cannot be trusted to block either
   PolicyConfig(id: id, mode: "audit", onError: "allow", configError: reason)
 
+proc jsonPairs(node: JsonNode): seq[(string, string)] =
+  for entry in node.getElems():
+    result.add((entry[0].getStr(), entry[1].getStr()))
+
 proc toPolicyConfig(node: JsonNode): PolicyConfig =
   PolicyConfig(
-    id:      node{"id"}.getStr(),
-    mode:    node{"mode"}.getStr("off"),
-    onError: node{"on_error"}.getStr("allow"),
-    json:    node,
+    id:           node{"id"}.getStr(),
+    mode:         node{"mode"}.getStr("off"),
+    onError:      node{"on_error"}.getStr("allow"),
+    json:         node,
+    enforceRepos: node{"enforce_repos"}.jsonPairs(),
   )
 
 proc isPolicyList(doc: JsonNode): bool =
@@ -205,19 +220,17 @@ proc policyBoolSetting*(path: openArray[string], default: bool): bool =
     return if node == nil: default else: node.getBool()
   attrGetOpt[bool](attrPath(path)).get(default)
 
-proc policyPairsSetting*(path: openArray[string]): seq[(string, string)] =
-  if policyJsonInUse():
-    let node = jsonSetting(path)
-    if node == nil:
-      return
-    for entry in node.getElems():
-      result.add((entry[0].getStr(), entry[1].getStr()))
-    return
-  for entry in attrGetOpt[seq[Box]](attrPath(path)).get(@[]):
+proc attrPairs(attr: string): seq[(string, string)] =
+  for entry in attrGetOpt[seq[Box]](attr).get(@[]):
     let parts = unpack[seq[Box]](entry)
     if len(parts) != 2:
-      raise newException(ValueError, attrPath(path) & " entries must be (kind, value) tuples")
+      raise newException(ValueError, attr & " entries must be (kind, value) tuples")
     result.add((unpack[string](parts[0]), unpack[string](parts[1])))
+
+proc policyPairsSetting*(path: openArray[string]): seq[(string, string)] =
+  if policyJsonInUse():
+    return jsonSetting(path).jsonPairs()
+  attrPairs(attrPath(path))
 
 proc policyConfigs*(): seq[PolicyConfig] =
   ## Every configured policy, including those in mode `off`. A
@@ -228,18 +241,34 @@ proc policyConfigs*(): seq[PolicyConfig] =
     return @[invalidPolicy("", policyJsonError)]
   if policyJsonSet:
     return policyJsonConfigs
+  let id = attrGetOpt[string]("policy.id").get("")
+  var enforceRepos: seq[(string, string)]
+  try:
+    enforceRepos = attrPairs("policy.enforce_repos")
+  except CatchableError:
+    return @[invalidPolicy(id, getCurrentExceptionMsg())]
   return @[PolicyConfig(
-    id:      attrGetOpt[string]("policy.id").get(""),
-    mode:    attrGetOpt[string]("policy.mode").get("off"),
-    onError: attrGetOpt[string]("policy.on_error").get("allow"),
+    id:           id,
+    mode:         attrGetOpt[string]("policy.mode").get("off"),
+    onError:      attrGetOpt[string]("policy.on_error").get("allow"),
+    enforceRepos: enforceRepos,
   )]
 
+proc activeMode*(policy: PolicyConfig): string =
+  ## `mode`, unless `enforce_repos` resolved it for the current repository
+  if policy.effectiveMode != "": policy.effectiveMode else: policy.mode
+
 proc isEvaluated*(policy: PolicyConfig): bool =
-  policy.mode in ["audit", "enforce"]
+  policy.activeMode() in ["audit", "enforce"]
+
+proc mayBeEvaluated*(policy: PolicyConfig): bool =
+  ## whether the policy is evaluated in some repository, as `enforce_repos`
+  ## can turn on a policy whose `mode` is `off`
+  policy.isEvaluated() or (policy.configError == "" and len(policy.enforceRepos) > 0)
 
 proc policyEnabled*(): bool =
   for policy in policyConfigs():
-    if policy.isEvaluated():
+    if policy.mayBeEvaluated():
       return true
   return false
 

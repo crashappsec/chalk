@@ -13,6 +13,7 @@ from .chalk.runner import Chalk
 from .conf import CONFIGS, REGISTRY
 from .utils.docker import Docker
 from .utils.dict import ANY, MISSING, Contains, ContainsDict
+from .utils.git import Git
 
 
 def report_file(random_hex: str) -> Path:
@@ -622,6 +623,7 @@ def build_json(chalk: Chalk, content: str, config_json: str, random_hex: str, **
         env={
             "POLICY_CONFIG_JSON": config_json,
             "POLICY_REPORT_FILE": str(report_file(random_hex)),
+            **kwargs.pop("env", {}),
         },
         run_docker=False,
         **kwargs,
@@ -651,6 +653,9 @@ def test_config_json_enforces(chalk: Chalk, random_hex: str):
             "mode": "enforce",
             "on_error": "allow",
             "result": "blocked",
+            "effective_mode": "enforce",
+            "mode_source": "default",
+            "repo": "",
         }
     ]
     assert report["_POLICY_FINDINGS"][0]["policy_id"] == "golden-images@3"
@@ -724,12 +729,18 @@ def test_config_json_multi_audit_violation_does_not_block(
             "mode": "enforce",
             "on_error": "allow",
             "result": "pass",
+            "effective_mode": "enforce",
+            "mode_source": "default",
+            "repo": "",
         },
         {
             "id": "chainguard-only@1",
             "mode": "audit",
             "on_error": "block",
             "result": "violation",
+            "effective_mode": "audit",
+            "mode_source": "default",
+            "repo": "",
         },
     ]
     assert report.contains(
@@ -795,3 +806,210 @@ def test_config_json_multi_invalid_entry_is_isolated(chalk: Chalk, random_hex: s
             ]
         }
     )
+
+
+ENFORCED_REPO = "github.com/crashappsec/dummy-deployments"
+# the CI job running the tests must not decide which repository is built
+NO_CI_REPO = {"GITHUB_SERVER_URL": "", "GITHUB_REPOSITORY": "", "CI_PROJECT_URL": ""}
+
+
+def rollout_policy(mode: str = "audit", policy_id: str = "golden-images@3") -> dict:
+    config = json.loads(POLICY_CONFIG.read_text())
+    config["id"] = policy_id
+    config["mode"] = mode
+    config["enforce_repos"] = [
+        ["glob", ENFORCED_REPO],
+        ["glob", "github.com/crashappsec/other-*"],
+    ]
+    return config
+
+
+def as_form(config: dict, form: str) -> str:
+    return json.dumps(config if form == "single" else {"policies": [config]})
+
+
+def git_context(path: Path, remote: str) -> Path:
+    Git(path).init(remote=remote).add().commit("init")
+    return path
+
+
+@pytest.mark.parametrize("form", ["single", "list"])
+@pytest.mark.parametrize(
+    "remote",
+    [
+        "git@github.com:crashappsec/dummy-deployments.git",
+        "https://github.com/CrashAppSec/dummy-deployments",
+    ],
+)
+def test_enforce_repos_blocks_listed_repo(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str, remote: str
+):
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(rollout_policy(), form),
+        random_hex,
+        tag=random_hex,
+        context=git_context(tmp_data_dir, remote),
+        env=NO_CI_REPO,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_MODE="enforce", _POLICY_RESULT="blocked")
+    assert report["_POLICY_RESULTS"] == [
+        {
+            "id": "golden-images@3",
+            "mode": "audit",
+            "on_error": "allow",
+            "result": "blocked",
+            "effective_mode": "enforce",
+            "mode_source": "enforce_repos",
+            "repo": ENFORCED_REPO,
+        }
+    ]
+
+
+@pytest.mark.parametrize("form", ["single", "list"])
+def test_enforce_repos_audits_other_repos(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str
+):
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(rollout_policy(), form),
+        random_hex,
+        tag=random_hex,
+        context=git_context(tmp_data_dir, "git@github.com:crashappsec/chalk.git"),
+        env=NO_CI_REPO,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation")
+    assert report["_POLICY_RESULTS"] == [
+        {
+            "id": "golden-images@3",
+            "mode": "audit",
+            "on_error": "allow",
+            "result": "violation",
+            "effective_mode": "audit",
+            "mode_source": "default",
+            "repo": "github.com/crashappsec/chalk",
+        }
+    ]
+
+
+@pytest.mark.parametrize("form", ["single", "list"])
+def test_enforce_repos_unknown_repo_never_enforces(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str
+):
+    # the context is not a git repository and there is no CI repository
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(rollout_policy(), form),
+        random_hex,
+        tag=random_hex,
+        context=tmp_data_dir,
+        env=NO_CI_REPO,
+        ignore_errors=True,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation")
+    assert report["_POLICY_RESULTS"][0] == {
+        "id": "golden-images@3",
+        "mode": "audit",
+        "on_error": "allow",
+        "result": "violation",
+        "effective_mode": "audit",
+        "mode_source": "default",
+        "repo": "",
+    }
+
+
+def test_enforce_repos_falls_back_to_ci_repo(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(rollout_policy(), "single"),
+        random_hex,
+        tag=random_hex,
+        context=tmp_data_dir,
+        env={
+            **NO_CI_REPO,
+            "GITHUB_SERVER_URL": "https://github.com",
+            "GITHUB_REPOSITORY": "crashappsec/dummy-deployments",
+        },
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report["_POLICY_RESULTS"][0]["mode_source"] == "enforce_repos"
+    assert report["_POLICY_RESULTS"][0]["repo"] == ENFORCED_REPO
+
+
+def test_enforce_repos_with_mode_off_only_enforces_listed_repos(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    config = as_form(rollout_policy(mode="off"), "list")
+    other = tmp_data_dir / "other"
+    other.mkdir()
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        config,
+        random_hex,
+        tag=random_hex,
+        context=git_context(other, "git@github.com:crashappsec/chalk.git"),
+        env=NO_CI_REPO,
+    )
+    assert result.exit_code == 0
+    assert policy_reports(random_hex) == []
+
+    listed = tmp_data_dir / "listed"
+    listed.mkdir()
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        config,
+        random_hex,
+        tag=f"{random_hex}-listed",
+        context=git_context(listed, "git@github.com:crashappsec/other-service.git"),
+        env=NO_CI_REPO,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report["_POLICY_RESULTS"][0]["mode"] == "off"
+    assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
+
+
+def test_enforce_repos_invalid_never_blocks(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    config = rollout_policy(mode="enforce")
+    config["on_error"] = "block"
+    config["enforce_repos"] = ENFORCED_REPO
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        json.dumps(config),
+        random_hex,
+        tag=random_hex,
+        context=git_context(tmp_data_dir, f"https://{ENFORCED_REPO}.git"),
+        env=NO_CI_REPO,
+        ignore_errors=True,
+    )
+    assert result.exit_code == 0
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="error")
+    assert report.contains(
+        {"_POLICY_FINDINGS": [{"rule": "config", "kind": "error", "reason": ANY}]}
+    )
+    assert "policy.enforce_repos" in report["_POLICY_FINDINGS"][0]["reason"]

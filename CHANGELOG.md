@@ -31,6 +31,11 @@
   own `_ACTION_ID`, like every chalk report; correlate it with the build or
   push report via `BUILD_URI` and `_POLICY_BUILD`. See
   `docs/design-build-policy.md`.
+  A policy can be enforced in selected repositories only via `enforce_repos`
+  (glob entries over the normalized `host/owner/name` of the build context's
+  git origin, falling back to the CI job's repository), while `mode` applies
+  elsewhere; an undeterminable repository never escalates to `enforce`.
+  `_POLICY_RESULTS` entries report `effective_mode`, `mode_source` and `repo`.
 
 - New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`
   chalk-time host key, which records AI coding agent involvement in a build as

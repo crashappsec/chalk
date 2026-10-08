@@ -27,13 +27,16 @@ type
   PolicyResult* = object
     ## outcome of one evaluated policy
     id*:       string
-    mode*:     string
+    mode*:     string # as configured
     onError*:  string
     result*:   string # "pass", "violation", "blocked" or "error"
+    effectiveMode*: string # "audit" or "enforce", see `enforce_repos`
+    modeSource*:    string # "default" or "enforce_repos"
+    repo*:          string # repository `enforce_repos` was matched against
     findings*: seq[PolicyFinding]
 
   PolicyOutcome* = ref object
-    mode*:      string # "enforce" when any evaluated policy enforces
+    mode*:      string # "enforce" when any evaluated policy is enforced
     result*:    string # "violation", "blocked" or "error", across policies
     findings*:  seq[PolicyFinding] # of every policy
     policies*:  seq[PolicyResult]
@@ -72,6 +75,9 @@ proc asDict(self: PolicyResult): TableRef[string, string] =
   result["mode"]     = self.mode
   result["on_error"] = self.onError
   result["result"]   = self.result
+  result["effective_mode"] = self.effectiveMode
+  result["mode_source"]    = self.modeSource
+  result["repo"]           = self.repo
 
 proc asChalkDict*(self: PolicyOutcome): ChalkDict =
   result = ChalkDict()
