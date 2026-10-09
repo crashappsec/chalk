@@ -341,14 +341,14 @@ subscribe("policy", "policy_webhook")
 
 The `policy_report` template includes:
 
-| Key                | Type                         | Notes                                                                                             |
-| ------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------- |
-| `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy is enforced, else `audit`                                       |
-| `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                            |
-| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`                  |
-| `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `mode_source`, `repo` |
+| Key                | Type                         | Notes                                                                                                                       |
+| ------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy is enforced, else `audit`                                                                 |
+| `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                                                      |
+| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`                                            |
+| `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `mode_source`, `repo`                           |
 | `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`, `subject`, `location`, `severity` |
-| `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                      |
+| `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                                                |
 
 `_POLICY_RESULTS` lists every evaluated policy (effective mode `audit` or
 `enforce`) in configuration order, including those that passed; policies not
