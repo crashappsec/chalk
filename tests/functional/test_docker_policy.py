@@ -1291,11 +1291,14 @@ def test_step_summary_includes_presigned_report_location(
     assert "presign-test" not in text
 
 
-def registries_json(mode: str = "enforce", **registries) -> str:
+def registries_json(
+    mode: str = "enforce", on_error: str = "allow", **registries
+) -> str:
     return json.dumps(
         {
             "id": "registries@1",
             "mode": mode,
+            "on_error": on_error,
             "registries": {"enabled": True, **registries},
         }
     )
@@ -1422,7 +1425,8 @@ def test_registries_blocks_build_push(
 
 @pytest.mark.parametrize("chalked", [True, False])
 def test_registries_blocks_docker_push(chalk: Chalk, random_hex: str, chalked: bool):
-    tag = f"{REGISTRY}/{random_hex}"
+    # a local tag pushes to Docker Hub, where the push would be refused anyway
+    tag = f"{random_hex}:latest"
     if chalked:
         build(chalk, "FROM alpine\nCMD true\n", "off", random_hex, tag=tag)
     else:
@@ -1432,13 +1436,12 @@ def test_registries_blocks_docker_push(chalk: Chalk, random_hex: str, chalked: b
     _, result = push_json(
         chalk,
         tag,
-        registries_json(on_error="block", push_denied=[["glob", REGISTRY]]),
+        registries_json(on_error="block", push_denied=[["glob", "docker.io"]]),
         random_hex,
         ignore_errors=True,
         expected_success=False,
     )
     assert result.exit_code == 1
-    assert registry_tags(random_hex) == []
     (report,) = policy_reports(random_hex)
     assert report.has(
         _POLICY_FINDINGS=[
@@ -1447,6 +1450,7 @@ def test_registries_blocks_docker_push(chalk: Chalk, random_hex: str, chalked: b
                 "kind": "violation",
                 "image": tag,
                 "source": "push",
+                "reason": f"docker.io/library/{random_hex} is in a registry denied for push (docker.io)",
             }
         ],
     )
