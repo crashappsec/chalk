@@ -2,7 +2,7 @@
 ## This file is part of Chalk (see https://crashoverride.com/docs/chalk).
 
 ## Collect images before a build or push, inside the policy error boundary.
-import std/[os]
+import std/[os, strutils]
 import ".."/[policy/engine, types, utils/git]
 import "."/[exe, git as dockerGit, ids, inspect, policy_subjects, scan]
 
@@ -59,11 +59,44 @@ proc commandRepo(ctx: DockerInvocation): string =
 proc repoResolver(ctx: DockerInvocation): PolicyRepoResolver =
   return proc(): string = ctx.commandRepo()
 
+proc localDir(path: string): string =
+  ## `path` when it is a local directory, as opposed to a URL or a stdin context
+  if path in ["", "-"] or "://" in path or path.startsWith("target:") or isGitContext(path):
+    return ""
+  let resolved = path.resolvePath()
+  if resolved.dirExists():
+    return resolved
+  return ""
+
+proc contextDirs(ctx: DockerInvocation): seq[string] =
+  ## local directories the build reads, for rules that scan the build context
+  let main =
+    if ctx.gitContext != nil and ctx.gitContext.tmpWorkTree != "":
+      ctx.gitContext.tmpWorkTree
+    else:
+      ctx.foundContext.localDir()
+  if main != "":
+    result.add(main)
+  if ctx.foundExtraContexts != nil:
+    for _, value in ctx.foundExtraContexts:
+      let dir = value.localDir()
+      if dir != "" and dir notin result:
+        result.add(dir)
+
+proc addCommandInput(input: var PolicyInput, command: string, pushTargets: seq[string],
+                     contextDirs: seq[string] = @[]) =
+  input.command     = command
+  input.pushTargets = pushTargets
+  input.contextDirs = contextDirs
+  input.host        = hostInfo
+
 proc evaluateBuildPolicies*(ctx: DockerInvocation) =
   if not policyEnabled():
     return
   let collect = proc(): PolicyInput =
-    ctx.buildSubjects(allStages = not hasBuildX())
+    result = ctx.buildSubjects(allStages = not hasBuildX())
+    let pushTargets = if ctx.foundPush: ctx.foundTags.asRepoTag() else: @[]
+    result.addCommandInput("build", pushTargets, ctx.contextDirs())
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver())
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
@@ -72,9 +105,12 @@ proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
   let build = ctx.pushInfo()
   let collect = proc(): PolicyInput =
     if not ctx.foundAllTags:
-      return pushInput(chalk, ctx.foundImage)
+      result = pushInput(chalk, ctx.foundImage)
+      result.addCommandInput("push", @[ctx.foundImage])
+      return
     let tags = repositoryImageTags(ctx.foundImage)
     build["tags"] = pack(tags)
+    result.addCommandInput("push", tags)
     for tag in tags:
       try:
         let input = pushInput(scanLocalPolicyImage(tag).get(nil), tag)

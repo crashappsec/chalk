@@ -9,6 +9,8 @@
 ## `policy/rules/` that registers itself with `newPolicyRule` from its
 ## `load*Rule` proc (see `policy/rules.nim`). The engine evaluates every
 ## registered rule against the images a docker command references.
+## Rules that need more than images (the build context, push targets or
+## SBOM/SAST/secret scanner output) register with `newPolicyInputRule`.
 
 import ".."/[
   types,
@@ -28,6 +30,14 @@ type
   PolicyInput* = object
     subjects*: seq[PolicySubject]
     errors*:   seq[PolicyFinding] # subjects that could not be determined
+    command*:  string # "build" or "push"
+    ## local build context directories, empty for push
+    contextDirs*: seq[string]
+    ## image references the command pushes, as given on the command line
+    pushTargets*: seq[string]
+    ## chalk-time host info collected before policies run, e.g. `SBOM`,
+    ## `SAST` and `SECRET_SCANNER` when those tools are enabled
+    host*: ChalkDict
 
   PolicyRule* = ref object
     name*: string
@@ -39,6 +49,8 @@ type
     ## the rule is enabled. Raising reports a configuration error.
     load*:  proc(): bool
     check*: proc(subjects: seq[PolicySubject]): seq[PolicyFinding]
+    ## used instead of `check` when set, see `newPolicyInputRule`
+    checkInput*: proc(input: PolicyInput): seq[PolicyFinding]
     ## optional, describes the loaded configuration for the step summary
     hint*:  proc(): PolicyHint
 
@@ -55,6 +67,15 @@ proc newPolicyRule*(name: string,
   registeredRules.add(PolicyRule(name: name, load: load, check: check,
                                  requiresAllSubjects: requiresAllSubjects,
                                  hint: hint))
+
+proc newPolicyInputRule*(name: string,
+                         load: proc(): bool,
+                         check: proc(input: PolicyInput): seq[PolicyFinding],
+                         requiresAllSubjects = false,
+                         hint: proc(): PolicyHint = nil) =
+  ## A rule that sees the whole `PolicyInput`, not just its image subjects.
+  newPolicyRule(name, load, nil, requiresAllSubjects, hint)
+  registeredRules[^1].checkInput = check
 
 iterator policyRules*(): PolicyRule =
   for rule in registeredRules:
@@ -81,4 +102,16 @@ proc newFinding*(subject: PolicySubject, rule, kind, reason: string): PolicyFind
     stage:  subject.stage,
     source: subject.source,
     reason: reason,
+  )
+
+proc newSubjectFinding*(rule, kind, subject, reason: string,
+                        location = "", severity = ""): PolicyFinding =
+  ## a finding about something other than an image
+  PolicyFinding(
+    rule:     rule,
+    kind:     kind,
+    subject:  subject,
+    location: location,
+    severity: severity,
+    reason:   reason,
   )

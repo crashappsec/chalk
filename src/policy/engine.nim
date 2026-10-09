@@ -59,7 +59,10 @@ proc evaluatePolicy*(settings: PolicyConfig,
         f.rule = rule.name
         findings.add(f)
     try:
-      findings.add(rule.check(input.subjects))
+      if rule.checkInput != nil:
+        findings.add(rule.checkInput(input))
+      else:
+        findings.add(rule.check(input.subjects))
     except CatchableError:
       findings.add(PolicyFinding(rule:   rule.name,
                                  kind:   "error",

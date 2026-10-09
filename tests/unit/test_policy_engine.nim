@@ -71,7 +71,28 @@ proc testModeOff() =
   doAssert not evaluate("off", "block", @[rule("golden_images", true)], input)
   doAssert policyOutcome == nil
 
+proc testInputRule() =
+  var seen: PolicyInput
+  let host = ChalkDict()
+  host["SAST"] = pack("results")
+  let inputRule = PolicyRule(name: "sast", load: proc(): bool = true,
+    checkInput: proc(input: PolicyInput): seq[PolicyFinding] =
+      seen = input
+      @[newSubjectFinding("sast", "violation", "src/app.py", "high severity finding",
+                          location = "src/app.py:3", severity = "high")])
+  let input = PolicyInput(command: "build", contextDirs: @["/ctx"],
+                          pushTargets: @["ghcr.io/acme/app:1"], host: host)
+  doAssert evaluate("enforce", "allow", @[inputRule], input)
+  doAssert seen.contextDirs == @["/ctx"] and seen.pushTargets == @["ghcr.io/acme/app:1"]
+  doAssert "SAST" in seen.host
+  let f = policyOutcome.findings[0]
+  doAssert f.subject == "src/app.py" and f.location == "src/app.py:3" and f.severity == "high"
+  doAssert $f == "sast: src/app.py (src/app.py:3) - high severity finding"
+  let report = unpack[seq[Box]](policyOutcome.asChalkDict()["_POLICY_FINDINGS"])
+  doAssert unpack[TableRef[string, string]](report[0])["severity"] == "high"
+
 testOnError()
+testInputRule()
 testCollectionErrorsOnlyForRulesNeedingAllSubjects()
 testRuleFailureIsAnError()
 testGoldenImagesRule()

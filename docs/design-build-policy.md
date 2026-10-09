@@ -347,7 +347,7 @@ The `policy_report` template includes:
 | `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                            |
 | `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`                  |
 | `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `mode_source`, `repo` |
-| `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`          |
+| `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`, `subject`, `location`, `severity` |
 | `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                      |
 
 `_POLICY_RESULTS` lists every evaluated policy (effective mode `audit` or
@@ -492,6 +492,31 @@ itself with `newPolicyRule` (see `src/policy/api.nim`) and is listed in
 `src/policy/rules.nim`. A rule reads its own configuration in `load`, returns
 findings from `check`, and sets `requiresAllSubjects` when an incomplete list
 of images could let a disallowed one through.
+
+Rules that need more than the referenced images register with
+`newPolicyInputRule` and receive the whole `PolicyInput`:
+
+- `command`: `build` or `push`;
+- `contextDirs`: local build context directories (the cloned checkout for git
+  contexts, plus local named contexts), empty for `push`;
+- `pushTargets`: the image references the command pushes (`build --push` tags,
+  or the `docker push` reference and, with `--all-tags`, every local tag);
+- `host`: chalk-time host info collected before policies run, such as `SBOM`,
+  `SAST` and `SECRET_SCANNER` when those tools are enabled.
+
+Findings about something other than an image (`newSubjectFinding`) set
+`subject` (e.g. a package purl, a file or a registry) and optionally
+`location` (e.g. `path:line`) and `severity` (as reported by the scanner),
+and leave `image` empty. The job summary shows `subject` where it would show
+the image.
+
+A rule with settings in `policy.config_json` registers its section at module
+initialization with `registerPolicyJsonSection(name, validate)`, as
+configurations can be read before rules are loaded. `validate` receives the
+section's JSON object and raises `ValueError` for anything it does not accept,
+usually via `validateFields` and `validatePairs`. Settings are then read with
+the `policy*Setting` accessors, which read the same path from con4m when
+`policy.config_json` is not set.
 
 ## Limitations
 

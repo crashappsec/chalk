@@ -118,6 +118,15 @@ proc imageRef(f: PolicyFinding): string =
     return f.image & "@" & shortDigest(f.digest)
   f.image
 
+proc subjectRef(f: PolicyFinding): string =
+  if f.image != "":
+    return mdCode(f.imageRef())
+  if f.subject == "":
+    return "-"
+  result = mdCode(f.subject)
+  if f.location != "":
+    result &= " " & mdText(f.location)
+
 proc usedAs(f: PolicyFinding): string =
   result =
     case f.source
@@ -296,10 +305,17 @@ proc renderPolicySummary*(policies:        seq[PolicyResult],
     for f in p.findings:
       findings.add((p, f))
   if len(findings) > 0:
-    lines.add("| Image | Used as | Policy | Why |")
+    var onlyImages = true
+    for (_, f) in findings:
+      if f.subject != "":
+        onlyImages = false
+    if onlyImages:
+      lines.add("| Image | Used as | Policy | Why |")
+    else:
+      lines.add("| Subject | Used as | Policy | Why |")
     lines.add("| --- | --- | --- | --- |")
     for (p, f) in findings[0 ..< min(len(findings), maxFindingRows)]:
-      let image = if f.image == "": "-" else: mdCode(f.imageRef())
+      let image = f.subjectRef()
       lines.add("| " & image & " | " & mdText(f.usedAs()) & " | " &
                 mdText(policyName(f.policyId)) & " | " & mdText(p.why(f)) & " |")
     if len(findings) > maxFindingRows:
