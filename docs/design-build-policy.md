@@ -324,6 +324,125 @@ func no_latest(image: string, digest: string, stage: string, source: string) {
 policy.custom_check: func no_latest
 ```
 
+### SAST findings
+
+`policy.sast` blocks builds whose static analysis (SAST) scan of the build
+context reports findings at or above a severity threshold. It reads the
+output of the `sast` external tools (`tool.semgrep` by default) in SARIF,
+chalk's default semgrep format, or semgrep's native JSON
+(`tool.semgrep.semgrep_format: "json"`).
+
+```con4m
+policy {
+  mode: "enforce"
+  sast {
+    enabled:        true
+    min_severity:   "high"
+    min_confidence: "medium"
+    categories:     ["security"]
+    ignore_paths:   ["tests/*", "*_test.go"]
+    include_audit:  false
+    message:        "Fix SAST findings: https://example.com/appsec"
+  }
+}
+```
+
+```json
+{
+  "id": "sast@1",
+  "mode": "enforce",
+  "sast": {
+    "enabled": true,
+    "min_severity": "high",
+    "min_confidence": "medium",
+    "categories": ["security"],
+    "cwes": [],
+    "ignore_rules": ["python.lang.security.audit.*"],
+    "ignore_paths": ["tests/*"],
+    "include_audit": false,
+    "max_findings": 0,
+    "run_tools": true,
+    "message": "Fix SAST findings: https://example.com/appsec"
+  }
+}
+```
+
+| Field                        | Type           | Default  | Meaning                                                                   |
+| ---------------------------- | -------------- | -------- | ------------------------------------------------------------------------- |
+| `policy.sast.enabled`        | `bool`         | `false`  | evaluate SAST results                                                     |
+| `policy.sast.min_severity`   | `string`       | `"high"` | `info`, `low`, `medium`, `high` or `critical`; lower findings are ignored |
+| `policy.sast.min_confidence` | `string`       | `"low"`  | `low`, `medium` or `high`; rules without a confidence count only at `low` |
+| `policy.sast.categories`     | `list[string]` | `[]`     | only rules in one of these categories count (empty: all)                  |
+| `policy.sast.cwes`           | `list[string]` | `[]`     | only rules mapped to a matching CWE id (glob, e.g. `CWE-89`) count        |
+| `policy.sast.ignore_rules`   | `list[string]` | `[]`     | rule id globs to ignore                                                   |
+| `policy.sast.ignore_paths`   | `list[string]` | `[]`     | file globs to ignore, relative to the scanned directory                   |
+| `policy.sast.include_audit`  | `bool`         | `true`   | whether audit rules (code to review, not likely vulnerabilities) count    |
+| `policy.sast.max_findings`   | `int`          | `0`      | violation only when more findings count                                   |
+| `policy.sast.run_tools`      | `bool`         | `true`   | run the tools when `run_sast_tools` did not                               |
+| `policy.sast.message`        | `string`       | `""`     | guidance appended to every violation                                      |
+
+Globs are shell-style, `*` also matching `/`. semgrep prefixes the ids of
+rules from a local config file with the file's path (`tool.semgrep.semgrep_config_profile: "/ci/rules.yaml"`
+reports `ci.rules.<id>`), so match those with `*.<id>`. Each counting finding is
+reported with `subject` the rule id, `location` `path:line` and `severity`
+the normalized severity, most severe first, up to 100 findings plus one
+summarizing the rest. Findings suppressed in source (`# nosemgrep`) never
+count.
+
+**Where results come from.** On `docker build`, per local build context
+directory (including local named contexts and the checkout of a git
+context; at most 8): the results `run_sast_tools` collected before policies
+run when they cover the directory (semgrep scans the git repository of the
+first build context), keeping only results inside the directory with
+paths relative to it. Otherwise, with `run_tools`, the policy runs the
+enabled `sast` tools on the directory, once per directory however many
+policies enable the rule, bounded by `tool.semgrep.semgrep_timeout`.
+Results it collects this way are not added to chalk reports or marks. A
+build with no local context (stdin or a remote tarball), `run_tools: false`
+for a directory `run_sast_tools` did not cover, `run_sast_tools` producing
+no results, or tools that fail or cannot be installed are evaluation errors
+handled by `on_error`.
+
+**On `docker push`** there is no source to scan, so only results recorded
+in the image's chalk mark count (`SAST` is not in the default docker mark
+template; add it with `mark_template.minimal.key.SAST.use: true`). An image
+whose mark has no `SAST` is not applicable and passes; the build was
+already checked by the build policy.
+
+**Severity.** semgrep rule severities are normalized to one scale:
+
+| semgrep JSON `extra.severity` | SARIF                                      | Normalized |
+| ----------------------------- | ------------------------------------------ | ---------- |
+| `CRITICAL`                    | `security-severity` 9.0-10.0               | `critical` |
+| `ERROR`, `HIGH`               | level `error`, `security-severity` 7.0-8.9 | `high`     |
+| `WARNING`, `MEDIUM`           | level `warning` (or no level), 4.0-6.9     | `medium`   |
+| `INFO`, `LOW`                 | level `note`, 0.1-3.9                      | `low`      |
+| `INVENTORY`, `EXPERIMENT`     | level `none`, 0.0                          | `info`     |
+
+`ERROR`, `WARNING` and `INFO` are the legacy names of `HIGH`, `MEDIUM` and
+`LOW` ([semgrep rule metadata](https://semgrep.dev/docs/contributing/contributing-to-semgrep-rules-repository)).
+In SARIF a rule's `properties.security-severity` (a CVSS-like score, bucketed
+as [GitHub code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning#reportingdescriptor-object)
+does) takes precedence over its level.
+
+**SARIF loses detail.** semgrep's SARIF output maps both `CRITICAL` and
+`HIGH` to level `error`, and only emits `security-severity` when a rule's
+metadata defines it (none of the registry rules selected by `--config=auto`
+do). Of the rule metadata it keeps the CWEs, OWASP categories and
+confidence (as tags such as `MEDIUM CONFIDENCE`), plus a `security` tag for
+rules with a CWE; `category`, `subcategory`, `likelihood` and `impact` are
+dropped. With SARIF:
+
+- `min_severity: "critical"` only matches rules with a `security-severity`;
+- `categories` only knows `security` and the rule's own `metadata.tags`;
+- `include_audit: false` approximates audit rules by an `audit` segment in
+  the rule id, the registry convention, which some registry rules do not
+  follow either way.
+
+Set `tool.semgrep.semgrep_format: "json"` for exact `CRITICAL` severities
+and `subcategory`, at the cost of the `SAST` key holding semgrep JSON rather
+than SARIF.
+
 ## Reporting
 
 Findings are published to the `policy` topic, which is subscribed to
@@ -556,6 +675,13 @@ the `policy*Setting` accessors, which read the same path from con4m when
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.
+
+Semgrep JSON `errors` with warning/error severity (including syntax errors on
+successful scanner exit) produce SAST evaluation errors. Valid matches from a
+partial scan still count. Errors scoped to files outside the evaluated build
+context do not count; errors without a path apply to the scan. Informational
+and debug diagnostics do not affect policy decisions. `on_error` controls
+whether incomplete analysis blocks an enforced policy.
 
 SBOM policy parsing retains every package occurrence. A repository scan keeps a
 package in a build context when any recorded location belongs to that context;

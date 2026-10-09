@@ -4,14 +4,16 @@
 # (see https://crashoverride.com/docs/chalk)
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 import pytest
 import requests
 
 from .chalk.runner import Chalk
-from .conf import CONFIGS, REGISTRY
+from .conf import CONFIGS, DATA, REGISTRY
 from .utils.docker import Docker
 from .utils.dict import ANY, MISSING, Contains, ContainsDict
 from .utils.git import Git
@@ -1289,3 +1291,155 @@ def test_step_summary_includes_presigned_report_location(
     # the presigned query string is a credential
     assert "X-Amz-Signature" not in text
     assert "presign-test" not in text
+
+
+SEMGREP_RULES = DATA / "semgrep" / "policy_rules.yaml"
+# shell-true (ERROR -> high) on line 5, eval-used (WARNING -> medium) on line 9.
+# semgrep prefixes the ids of rules from a local config with the file's path.
+SAST_APP = """import subprocess
+
+
+def run(cmd):
+    return subprocess.call(cmd, shell=True)
+
+
+def calc(expr):
+    return eval(expr)
+"""
+
+
+@pytest.fixture(scope="module")
+def semgrep():
+    if shutil.which("semgrep"):
+        return
+    # chalk falls back to the semgrep container
+    for cmd in (
+        ["docker", "image", "inspect", "semgrep/semgrep"],
+        ["docker", "pull", "semgrep/semgrep"],
+    ):
+        if subprocess.run(cmd, capture_output=True).returncode == 0:
+            return
+    pytest.skip("semgrep is not available")
+
+
+def build_sast(
+    chalk: Chalk,
+    context: Path,
+    random_hex: str,
+    sast: dict,
+    mode: str = "enforce",
+    env: Optional[dict[str, str]] = None,
+    **kwargs,
+):
+    (context / "app.py").write_text(SAST_APP)
+    config = {"id": "sast@1", "mode": mode, "sast": {"enabled": True, **sast}}
+    return chalk.docker_build(
+        content=Docker.dockerfile("FROM alpine\nCOPY app.py /app.py\n"),
+        context=context,
+        tag=random_hex,
+        config=CONFIGS / "policy_sast.c4m",
+        env={
+            "POLICY_CONFIG_JSON": json.dumps(config),
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+            "SEMGREP_RULES": str(SEMGREP_RULES),
+            **(env or {}),
+        },
+        run_docker=False,
+        **kwargs,
+    )
+
+
+@pytest.mark.parametrize("run_sast_tools", [False, True])
+def test_sast_enforce_blocks(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, semgrep, run_sast_tools: bool
+):
+    # without run_sast_tools the policy runs semgrep on the context itself
+    _, result = build_sast(
+        chalk,
+        tmp_data_dir,
+        random_hex,
+        {},
+        env={"RUN_SAST_TOOLS": "1"} if run_sast_tools else {},
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    # eval-used is only medium
+    assert report.has(
+        _POLICY_ID="sast@1",
+        _POLICY_RESULT="blocked",
+        _POLICY_FINDINGS=[
+            {
+                "policy_id": "sast@1",
+                "rule": "sast",
+                "kind": "violation",
+                "image": "",
+                "subject": re.compile(r"\.shell-true$"),
+                "location": "app.py:5",
+                "severity": "high",
+                "reason": re.compile(r"^high semgrep finding: subprocess call"),
+            }
+        ],
+    )
+
+
+def test_sast_audit_reports_by_severity(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, semgrep
+):
+    _, result = build_sast(
+        chalk, tmp_data_dir, random_hex, {"min_severity": "medium"}, mode="audit"
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="violation")
+    findings = {
+        (f["subject"].rsplit(".", 1)[-1], f["severity"])
+        for f in report["_POLICY_FINDINGS"]
+    }
+    assert findings == {("shell-true", "high"), ("eval-used", "medium")}
+
+
+@pytest.mark.parametrize(
+    "sast",
+    [
+        {"min_severity": "critical"},
+        {"min_severity": "medium", "max_findings": 2},
+        {"min_confidence": "high", "include_audit": False, "cwes": ["CWE-95"]},
+        {"ignore_paths": ["*.py"]},
+        {"ignore_rules": ["*.shell-true"]},
+    ],
+)
+def test_sast_enforce_passes(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, semgrep, sast: dict
+):
+    _, result = build_sast(chalk, tmp_data_dir, random_hex, sast)
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    assert policy_reports(random_hex) == []
+
+
+def test_sast_without_results_honors_on_error(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    _, result = build_sast(
+        chalk,
+        tmp_data_dir,
+        random_hex,
+        {"run_tools": False},
+        # evaluation errors are logged as errors
+        ignore_errors=True,
+    )
+    assert result.exit_code == 0
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_RESULT="error",
+        _POLICY_FINDINGS=[
+            {
+                "rule": "sast",
+                "kind": "error",
+                "reason": re.compile("SAST results were not collected"),
+            }
+        ],
+    )

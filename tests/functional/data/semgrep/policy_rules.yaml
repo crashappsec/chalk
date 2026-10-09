@@ -1,0 +1,21 @@
+rules:
+  - id: shell-true
+    languages: [python]
+    message: subprocess call with shell=True
+    pattern: subprocess.call(..., shell=True)
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [vuln]
+      confidence: HIGH
+      cwe: ["CWE-78: OS Command Injection"]
+  - id: eval-used
+    languages: [python]
+    message: eval of a dynamic expression
+    pattern: eval(...)
+    severity: WARNING
+    metadata:
+      category: security
+      subcategory: [audit]
+      confidence: LOW
+      cwe: ["CWE-95: Eval Injection"]
