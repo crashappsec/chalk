@@ -510,6 +510,25 @@ Findings about something other than an image (`newSubjectFinding`) set
 and leave `image` empty. The job summary shows `subject` where it would show
 the image.
 
+Rules that read external tool output (`tool.*`, e.g. syft or semgrep) share
+`src/policy/tools.nim` rather than running the tools themselves:
+
+- on build, `contextToolOutputs` gives, per context directory (at most
+  `maxContextDirs`), chalk's own output (`run_*_tools`) when the directory is
+  below the one chalk scanned (`EXTERNAL_TOOL_DURATION` records it), else
+  the output of running the enabled tools of that kind on the directory on
+  demand, once per process. Chalk scans the git repository containing the
+  first context, so rules keep only what is inside each context directory
+  (`contextPath`). Missing output is an evaluation error, so `on_error`
+  decides;
+- on push, `pushedToolOutputs` reads the output recorded in the pushed
+  images' chalk marks;
+- `capFindings` bounds the findings a rule reports.
+
+`src/policy/sbom.nim` builds on it for rules that read SBOMs (CycloneDX, SPDX
+or syft JSON): `policySboms` returns the packages of each build context, or
+of each pushed image.
+
 A rule with settings in `policy.config_json` registers its section at module
 initialization with `registerPolicyJsonSection(name, validate)`, as
 configurations can be read before rules are loaded. `validate` receives the
