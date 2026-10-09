@@ -834,6 +834,23 @@ def git_context(path: Path, remote: str) -> Path:
     return path
 
 
+def test_report_has_commit_id(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
+    # _COMMIT_ID links the policy report to a PR, as it does for builds
+    context = git_context(tmp_data_dir, "git@github.com:crashappsec/chalk.git")
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        context=context,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(_COMMIT_ID=Git(context).latest_commit)
+
+
 @pytest.mark.parametrize("form", ["single", "list"])
 @pytest.mark.parametrize(
     "remote",
