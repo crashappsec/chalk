@@ -3,7 +3,7 @@
 
 ## Pure subject collection from parsed Dockerfiles and extracted chalk marks.
 ## Docker I/O lives in policy.nim so metadata decoding can be tested directly.
-import std/[sequtils, strutils]
+import std/[sequtils, strutils, tables]
 import ".."/[policy/engine, types]
 import "."/[dockerfile, ids]
 
@@ -61,6 +61,28 @@ proc buildSubjects*(ctx: DockerInvocation, allStages = false): PolicyInput =
       digests.addDigest(image.digest)
       result.subjects.add(PolicySubject(image: image, raw: $image, digests: digests,
                                         stage: section.alias, source: source))
+
+proc buildPushTargets*(ctx: DockerInvocation): seq[string] =
+  ## images `docker build` pushes. buildx treats `--push` and
+  ## `--output type=registry` as `type=image,push=true`, and `--tag` replaces
+  ## the `name` of every image exporter:
+  ## https://github.com/docker/buildx/blob/master/build/opt.go
+  if not ctx.foundPush:
+    return
+  if len(ctx.foundTags) > 0:
+    return ctx.foundTags.asRepoTag()
+  for output in ctx.foundOutputs:
+    let kind = output.getOrDefault("type")
+    if kind == "image" and output.getOrDefault("push") != "true" and
+       output.getOrDefault("push-by-digest") != "true":
+      continue
+    if kind notin ["image", "registry"]:
+      continue
+    # several names are comma separated, quoted on the command line
+    for name in output.getOrDefault("name").split(','):
+      let name = name.strip()
+      if name != "" and name notin result:
+        result.add(name)
 
 proc metadataTable(value: Box): OrderedTableRef[string, Box] =
   if value.isNil() or value.kind != MkTable:

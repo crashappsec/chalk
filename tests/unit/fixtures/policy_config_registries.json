@@ -1,0 +1,18 @@
+{
+  "id": "registries@1",
+  "mode": "enforce",
+  "on_error": "allow",
+  "registries": {
+    "enabled": true,
+    "pull_allowed": [
+      ["glob", "docker.io/library/*"],
+      ["glob", "cgr.dev"],
+      ["glob", "ghcr.io/acme/*"]
+    ],
+    "pull_denied": [["glob", "ghcr.io/acme/untrusted/*"]],
+    "push_allowed": [["glob", "ghcr.io/acme/*"], ["glob", "*.dkr.ecr.*.amazonaws.com"]],
+    "push_denied": [["glob", "docker.io"]],
+    "require_digest": false,
+    "message": "Use approved registries: https://example.com/registries"
+  }
+}

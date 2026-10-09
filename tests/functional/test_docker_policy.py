@@ -1289,3 +1289,164 @@ def test_step_summary_includes_presigned_report_location(
     # the presigned query string is a credential
     assert "X-Amz-Signature" not in text
     assert "presign-test" not in text
+
+
+def registries_json(mode: str = "enforce", **registries) -> str:
+    return json.dumps(
+        {
+            "id": "registries@1",
+            "mode": mode,
+            "registries": {"enabled": True, **registries},
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "registries, base, reason",
+    [
+        (
+            {"pull_allowed": [["glob", "cgr.dev"]]},
+            "busybox",
+            "docker.io/library/busybox is not in a registry allowed for pull",
+        ),
+        (
+            {"pull_denied": [["glob", "docker.io/library/*"]]},
+            "busybox",
+            "docker.io/library/busybox is in a registry denied for pull (docker.io/library/*)",
+        ),
+        (
+            {"pull_allowed": [["glob", "docker.io"]], "require_digest": True},
+            "alpine",
+            "image is not pinned by digest",
+        ),
+    ],
+)
+def test_registries_blocks_pull(
+    chalk: Chalk, random_hex: str, registries: dict, base: str, reason: str
+):
+    _, result = build_json(
+        chalk,
+        f"FROM {base}\nCMD true\n",
+        registries_json(**registries),
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_ID="registries@1",
+        _POLICY_RESULT="blocked",
+        _POLICY_FINDINGS=[
+            {
+                "rule": "registries",
+                "kind": "violation",
+                "image": base,
+                "source": "from",
+                "reason": reason,
+            }
+        ],
+    )
+
+
+def test_registries_allows_pull(chalk: Chalk, random_hex: str):
+    _, result = build_json(
+        chalk,
+        "FROM alpine\nCOPY --from=busybox /bin/true /true\n",
+        registries_json(
+            pull_allowed=[["glob", "docker.io/library/*"]],
+            push_denied=[["glob", "docker.io"]],
+        ),
+        random_hex,
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    assert policy_reports(random_hex) == []
+
+
+# the build is blocked before docker runs, so nothing reaches the registry
+@pytest.mark.parametrize(
+    "args, target",
+    [
+        (["--push", "-t", "{repo}"], "{repo}:latest"),
+        (["--output", "type=registry,name={repo}:1"], "{repo}:1"),
+        (["--output", "type=image,name={repo}:1,push=true"], "{repo}:1"),
+        # buildx pushes the tags, not the exporter name
+        (
+            ["--output", "type=registry,name=ghcr.io/acme/x", "-t", "{repo}"],
+            "{repo}:latest",
+        ),
+    ],
+)
+def test_registries_blocks_build_push(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, args: list[str], target: str
+):
+    repo = f"{REGISTRY}/{random_hex}"
+    result = chalk.run(
+        params=[
+            "docker",
+            "buildx",
+            "build",
+            *[a.format(repo=repo) for a in args],
+            "-f",
+            "-",
+            str(tmp_data_dir),
+        ],
+        stdin=b"FROM alpine\nCMD true\n",
+        config=CONFIGS / "policy_json.c4m",
+        env={
+            "POLICY_CONFIG_JSON": registries_json(
+                push_allowed=[["glob", "ghcr.io/acme/*"]]
+            ),
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+        },
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert registry_tags(random_hex) == []
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_FINDINGS=[
+            {
+                "rule": "registries",
+                "kind": "violation",
+                "image": target.format(repo=repo),
+                "source": "push",
+                "reason": f"{repo} is not in a registry allowed for push",
+            }
+        ],
+    )
+
+
+@pytest.mark.parametrize("chalked", [True, False])
+def test_registries_blocks_docker_push(chalk: Chalk, random_hex: str, chalked: bool):
+    tag = f"{REGISTRY}/{random_hex}"
+    if chalked:
+        build(chalk, "FROM alpine\nCMD true\n", "off", random_hex, tag=tag)
+    else:
+        # a push-only policy does not need the base images from a chalk mark
+        subprocess.run(["docker", "pull", "busybox"], check=True, capture_output=True)
+        subprocess.run(["docker", "tag", "busybox", tag], check=True)
+    _, result = push_json(
+        chalk,
+        tag,
+        registries_json(on_error="block", push_denied=[["glob", REGISTRY]]),
+        random_hex,
+        ignore_errors=True,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert registry_tags(random_hex) == []
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_FINDINGS=[
+            {
+                "rule": "registries",
+                "kind": "violation",
+                "image": tag,
+                "source": "push",
+            }
+        ],
+    )
