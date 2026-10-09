@@ -38,6 +38,8 @@ type
     dockerfilePath*: string
     ## image references the command pushes, as given on the command line
     pushTargets*: seq[string]
+    ## chalk marks of the images `push` pushes, for those that are chalked
+    pushMarks*: seq[ChalkDict]
     ## chalk-time host info collected before policies run, e.g. `SBOM`,
     ## `SAST` and `SECRET_SCANNER` when those tools are enabled
     host*: ChalkDict

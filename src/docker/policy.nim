@@ -109,13 +109,18 @@ proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
     if not ctx.foundAllTags:
       result = pushInput(chalk, ctx.foundImage)
       result.addCommandInput("push", @[ctx.foundImage])
+      if chalk != nil and chalk.extract != nil:
+        result.pushMarks.add(chalk.extract)
       return
     let tags = repositoryImageTags(ctx.foundImage)
     build["tags"] = pack(tags)
     result.addCommandInput("push", tags)
     for tag in tags:
       try:
-        let input = pushInput(scanLocalPolicyImage(tag).get(nil), tag)
+        let tagChalk = scanLocalPolicyImage(tag).get(nil)
+        let input = pushInput(tagChalk, tag)
+        if tagChalk != nil and tagChalk.extract != nil:
+          result.pushMarks.add(tagChalk.extract)
         result.subjects.add(input.subjects)
         result.errors.add(input.errors)
       except CatchableError:
