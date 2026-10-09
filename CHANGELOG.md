@@ -31,6 +31,21 @@
   own `_ACTION_ID`, like every chalk report; correlate it with the build or
   push report via `BUILD_URI` and `_POLICY_BUILD`. See
   `docs/design-build-policy.md`.
+  A policy can be enforced in selected repositories only via `enforce_repos`
+  (glob entries over the normalized `host/owner/name` of the build context's
+  git origin, falling back to the CI job's repository), while `mode` applies
+  elsewhere; an undeterminable repository never escalates to `enforce`.
+  `_POLICY_RESULTS` entries report `effective_mode`, `mode_source` and `repo`.
+  Glob characters in `enforce_repos` entries are kept when the entry is
+  normalized, so `github.com/acme/app?` matches `github.com/acme/app1`
+  rather than being cut at the `?` like a URL query.
+  In GitHub Actions (`GITHUB_STEP_SUMMARY` set), the policy outcome is also
+  appended to the job summary as a short Markdown section: an alert with the
+  outcome, the offending images and how to fix them, and collapsed per-policy
+  details including the uploaded policy report location when the `policy`
+  topic uses a `presign` sink. Written even when the command is blocked, never
+  affects the command, and can be turned off with
+  `policy.github_step_summary = false`.
 
 - New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`
   chalk-time host key, which records AI coding agent involvement in a build as
@@ -66,6 +81,15 @@
   `chalk load`; if a binary already embeds one, it is skipped with an error
   and the parameter keeps its default instead of chalk failing to start.
   ([con4m#137](https://github.com/crashappsec/con4m/pull/137))
+- `chalk load --params` no longer crashes with `UnpackDefect` when a component
+  the loaded config uses has parameters missing from `--params`, e.g. when
+  setup-chalk-action fetches a profile and its parameters from chalkapi
+  instances that disagree on the profile's components during a rollout. The
+  missing parameters now use their defaults (a warning names each one), so a
+  profile using the `policy` component without its parameters loads with
+  build policies off. Conversely, `--params` for a component the loaded config
+  does not use now log a warning: they are saved but have no effect, which
+  previously left e.g. build policies silently off.
 - `chalk load --replace --all` no longer prints the loaded and current
   configuration, saved component parameters (including sensitive values such
   as tokens) and component cache to stdout. Leftover debug output from

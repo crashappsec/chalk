@@ -17,7 +17,9 @@ Build policies are disabled by default. With the default configuration
 - `chalk docker` behaves exactly as before, including falling back to running
   docker without chalk when chalk itself fails.
 
-Policies only take effect once `policy.mode` is set to `audit` or `enforce`.
+Policies only take effect once `policy.mode` is set to `audit` or `enforce`,
+or `policy.enforce_repos` lists repositories in which to enforce them (see
+[Per-repository enforcement](#per-repository-enforcement)).
 
 ## Motivation
 
@@ -33,6 +35,9 @@ images", without changing how developers invoke docker.
 | `off`     | no        | no                         | no                |
 | `audit`   | yes       | yes                        | no                |
 | `enforce` | yes       | yes                        | yes (exit 1)      |
+
+`mode` applies to every repository unless `enforce_repos` enforces the policy
+in some of them, see [Per-repository enforcement](#per-repository-enforcement).
 
 A policy report is published only when there is at least one violation or an
 evaluation error. Builds that pass all policies publish nothing extra.
@@ -109,6 +114,7 @@ policy {
 | `policy.id`                            | `string`                                          | `""`              |
 | `policy.config_json`                   | `string` (JSON object, see below)                 | `""`              |
 | `policy.on_error`                      | `string`, one of `allow`, `block`                 | `"allow"`         |
+| `policy.enforce_repos`                 | `list[tuple[string, string]]` (kind, value)       | `[]`              |
 | `policy.report_template`               | `string`                                          | `"policy_report"` |
 | `policy.custom_check`                  | `func (string, string, string, string) -> string` | unset             |
 | `policy.golden_images.enabled`         | `bool`                                            | `false`           |
@@ -136,6 +142,7 @@ names and types match con4m, with tuples written as arrays:
   "id": "golden-images@3",
   "mode": "enforce",
   "on_error": "allow",
+  "enforce_repos": [["glob", "github.com/acme/payments"]],
   "golden_images": {
     "enabled": true,
     "check_copy_from": true,
@@ -209,6 +216,78 @@ same fields as the single-policy document above:
 The single-object form remains supported and behaves as a one-entry list
 whose `id` may be empty.
 
+### Per-repository enforcement
+
+To roll out enforcement gradually, a policy can be enforced in some
+repositories while `mode` applies everywhere else:
+
+```json
+{
+  "id": "golden-images@3",
+  "mode": "audit",
+  "enforce_repos": [
+    ["glob", "github.com/acme/payments"],
+    ["glob", "github.com/acme/platform-*"]
+  ],
+  "golden_images": {
+    "enabled": true,
+    "allowed": [["glob", "cgr.dev/chainguard/*"]]
+  }
+}
+```
+
+`enforce_repos` is available in con4m too (`policy.enforce_repos`, a list of
+`(kind, value)` tuples), in the single-policy document and in every entry of
+`policies`.
+
+- A command whose repository matches any entry is evaluated in `enforce`
+  mode; in every other repository the policy uses `mode`. With `mode: "off"`
+  the policy is enforced in the listed repositories and not evaluated
+  anywhere else. Without `enforce_repos` (or with an empty list) `mode`
+  applies everywhere, as before.
+- Entries use the matcher kinds of `golden_images.allowed`. Only `glob`
+  applies to repositories; a glob without `*` or `?` matches one repository
+  exactly. Entries of other kinds (including `digest`) never match and are
+  logged as warnings, so they can never enforce a policy by accident. Values
+  are normalized like repositories (see below), so
+  `https://github.com/Acme/App.git` and `github.com/acme/app` are equivalent,
+  except that glob characters are kept: `github.com/acme/app?` matches
+  `github.com/acme/app1`, not `github.com/acme/app`. Only a numeric port is
+  removed, so a glob in the port position (`github.com:*/acme/app`) never
+  matches.
+- An `enforce_repos` that is not a list of `[kind, value]` string pairs makes
+  the policy invalid: it is reported as a `config` evaluation error and never
+  blocks, like any other invalid policy.
+
+The repository is identified as `host/path`, lowercase, without scheme,
+credentials, port or `.git` suffix, e.g. `github.com/acme/app` (GitLab
+subgroups keep their full path, `gitlab.com/group/sub/app`). SSH
+(`git@github.com:acme/app.git`, `ssh://git@github.com:22/acme/app.git`) and
+HTTP(S) (`https://token@github.com/acme/app.git`) remotes all normalize to the
+same identity. Chalk determines it before docker runs, in this order:
+
+1. for `docker build`, the git remote of the build context: the URL of a git
+   context (`docker build https://github.com/acme/app.git#main`), or else the
+   origin of the git repository containing the context directory, resolved
+   as for `ORIGIN_URI` (the current branch's upstream remote, else `origin`,
+   else the first remote). For `docker push`, which has no context, the
+   repository containing the working directory. An origin that is a local
+   path, including a relative one such as `mirrors/acme/app.git`, identifies
+   no repository;
+2. otherwise the repository of the CI job: `GITHUB_SERVER_URL` and
+   `GITHUB_REPOSITORY` (GitHub Actions, `GITHUB_SERVER_URL` defaulting to
+   `https://github.com`), else `CI_PROJECT_URL` (GitLab CI).
+
+Chalk only determines the repository when some policy has `enforce_repos`.
+When it cannot be determined (for example a context from stdin or a
+directory outside any git repository, outside CI) the policy is never
+escalated to `enforce`: it uses `mode` and its `_POLICY_RESULTS` entry has an
+empty `repo` and `mode_source` `default`. A warning is logged unless `mode` is
+`off`.
+
+As with every policy, this is a guardrail rather than a security boundary:
+whoever controls the build can also change the git remote or CI variables.
+
 ### Matcher kinds
 
 Image references on both sides are normalized before matching, the same way
@@ -262,18 +341,24 @@ subscribe("policy", "policy_webhook")
 
 The `policy_report` template includes:
 
-| Key                | Type                         | Notes                                                                                              |
-| ------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy enforces, else `audit`                                           |
-| `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                             |
-| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`                   |
-| `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result` (`pass`, `violation`, `blocked`, `error`) |
-| `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`           |
-| `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                       |
+| Key                | Type                         | Notes                                                                                             |
+| ------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy is enforced, else `audit`                                       |
+| `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                            |
+| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`                  |
+| `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `mode_source`, `repo` |
+| `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`          |
+| `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                      |
 
-`_POLICY_RESULTS` lists every evaluated policy (mode `audit` or `enforce`) in
-configuration order, including those that passed; policies in mode `off` are
-omitted. A policy's `result` is `blocked` only for `enforce` policies,
+`_POLICY_RESULTS` lists every evaluated policy (effective mode `audit` or
+`enforce`) in configuration order, including those that passed; policies not
+evaluated (mode `off` and not enforced by `enforce_repos`) are omitted. `mode`
+is the configured mode, `effective_mode` the mode the policy was evaluated
+in, `mode_source` is `enforce_repos` when the repository matched
+`enforce_repos` and `default` otherwise, and `repo` is the repository matched
+against `enforce_repos` (empty when the policy has none or the repository
+could not be determined). `result` is one of `pass`, `violation`, `blocked`
+or `error`. A policy's `result` is `blocked` only for enforced policies,
 `violation` for a non-blocking violation and `error` when it only produced
 non-blocking evaluation errors. Every finding carries the `policy_id` of the
 policy that produced it (empty when that policy has no id), so a consumer
@@ -290,13 +375,19 @@ policies above and `FROM busybox`:
       "id": "golden-images@3",
       "mode": "enforce",
       "on_error": "allow",
-      "result": "blocked"
+      "result": "blocked",
+      "effective_mode": "enforce",
+      "mode_source": "default",
+      "repo": ""
     },
     {
       "id": "chainguard-only@1",
       "mode": "audit",
       "on_error": "block",
-      "result": "violation"
+      "result": "violation",
+      "effective_mode": "audit",
+      "mode_source": "default",
+      "repo": ""
     }
   ],
   "_POLICY_FINDINGS": [
@@ -346,6 +437,35 @@ violations are logged as warnings (prefixed with
 `policy (audit, not enforced):`) so they do not appear in `_OP_ERRORS`. As
 `docker_log_level` defaults to `error`, lower it to `warn` to see audit
 findings on the console.
+
+### GitHub Actions job summary
+
+When `GITHUB_STEP_SUMMARY` is set (GitHub Actions), every `chalk docker build`
+or `chalk docker push` that evaluates policies appends a short Markdown section
+to the [job summary](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary),
+including when all policies pass and when the command is blocked:
+
+- an alert stating the outcome: `CAUTION` when blocked, `WARNING` for audit
+  violations that `enforce` would block, `NOTE` when policies could only report
+  evaluation errors, `TIP` when all passed;
+- the command and its first image tag;
+- when there are findings, a table of the offending images (digest shortened),
+  how each is used (`FROM`, `COPY --from`, `RUN --mount from` and the stage) and
+  why (the policy's `message`, else the finding's reason), and a "How to fix"
+  line with the `message` and up to 10 allowed patterns;
+- a collapsed "Policy details" block with each evaluated policy's mode, why it
+  has that mode (`enforce_repos` match, default, or unknown repository), result
+  and finding count, the chalk version, the repository used for
+  `enforce_repos`, and the location of the uploaded policy report when the
+  `policy` topic goes to a `presign` sink (without the presigned query string).
+
+Sections are appended, never truncated, so several chalk invocations in one
+step each add theirs. Rows are capped (50 findings, 50 policies) to stay well
+under GitHub's 1 MiB per-step limit. The summary is written by the chalk
+process wrapping docker, and failing to write it (unset or unwritable path,
+size limit) is only a warning: it never changes the command's outcome. Set
+`policy.github_step_summary = false` to turn it off; it is a con4m-only
+setting, not part of `policy.config_json`.
 
 ## Distributing policies
 

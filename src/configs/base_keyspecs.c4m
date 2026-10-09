@@ -5656,7 +5656,8 @@ keyspec _POLICY_MODE {
   shortdoc: "Build policy mode"
   doc:      """
 The strictest mode of the evaluated build policies: `enforce` when any
-evaluated policy is in `enforce` mode, `audit` otherwise. See
+evaluated policy is enforced (by `mode` or `enforce_repos`), `audit`
+otherwise. See
 `_POLICY_RESULTS` for the mode of each policy. Only reported when policies
 produced a violation or an evaluation error.
 """
@@ -5704,14 +5705,21 @@ keyspec _POLICY_RESULTS {
   since:    "1.3.0"
   shortdoc: "Outcome of each evaluated build policy"
   doc:      """
-One entry per evaluated build policy (mode `audit` or `enforce`), in
+One entry per evaluated build policy (effective mode `audit` or `enforce`), in
 configuration order, including policies that passed:
 
 * `id` - `policy.id` of the policy, empty when not set
-* `mode` - `audit` or `enforce`
+* `mode` - configured mode, `audit`, `enforce` or, with `enforce_repos`,
+  `off`
 * `on_error` - `allow` or `block`
 * `result` - `pass`, `violation` (not blocking), `blocked` or `error`
   (not blocking)
+* `effective_mode` - mode the policy was evaluated in, `audit` or `enforce`
+* `mode_source` - `enforce_repos` when the repository matched
+  `enforce_repos`, `default` when `mode` applied
+* `repo` - repository (`host/owner/name`) matched against `enforce_repos`,
+  empty when the policy has no `enforce_repos` or the repository could not
+  be determined
 
 Each policy decides independently whether it blocks the build. Only
 reported when policies produced a violation or an evaluation error.

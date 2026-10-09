@@ -3,6 +3,7 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from .chalk.runner import Chalk
 from .conf import CONFIGS, REGISTRY
 from .utils.docker import Docker
 from .utils.dict import ANY, MISSING, Contains, ContainsDict
+from .utils.git import Git
 
 
 def report_file(random_hex: str) -> Path:
@@ -622,6 +624,7 @@ def build_json(chalk: Chalk, content: str, config_json: str, random_hex: str, **
         env={
             "POLICY_CONFIG_JSON": config_json,
             "POLICY_REPORT_FILE": str(report_file(random_hex)),
+            **kwargs.pop("env", {}),
         },
         run_docker=False,
         **kwargs,
@@ -651,6 +654,9 @@ def test_config_json_enforces(chalk: Chalk, random_hex: str):
             "mode": "enforce",
             "on_error": "allow",
             "result": "blocked",
+            "effective_mode": "enforce",
+            "mode_source": "default",
+            "repo": "",
         }
     ]
     assert report["_POLICY_FINDINGS"][0]["policy_id"] == "golden-images@3"
@@ -724,12 +730,18 @@ def test_config_json_multi_audit_violation_does_not_block(
             "mode": "enforce",
             "on_error": "allow",
             "result": "pass",
+            "effective_mode": "enforce",
+            "mode_source": "default",
+            "repo": "",
         },
         {
             "id": "chainguard-only@1",
             "mode": "audit",
             "on_error": "block",
             "result": "violation",
+            "effective_mode": "audit",
+            "mode_source": "default",
+            "repo": "",
         },
     ]
     assert report.contains(
@@ -795,3 +807,428 @@ def test_config_json_multi_invalid_entry_is_isolated(chalk: Chalk, random_hex: s
             ]
         }
     )
+
+
+ENFORCED_REPO = "github.com/crashappsec/dummy-deployments"
+# the CI job running the tests must not decide which repository is built
+NO_CI_REPO = {"GITHUB_SERVER_URL": "", "GITHUB_REPOSITORY": "", "CI_PROJECT_URL": ""}
+
+
+def rollout_policy(mode: str = "audit", policy_id: str = "golden-images@3") -> dict:
+    config = json.loads(POLICY_CONFIG.read_text())
+    config["id"] = policy_id
+    config["mode"] = mode
+    config["enforce_repos"] = [
+        ["glob", ENFORCED_REPO],
+        ["glob", "github.com/crashappsec/other-*"],
+    ]
+    return config
+
+
+def as_form(config: dict, form: str) -> str:
+    return json.dumps(config if form == "single" else {"policies": [config]})
+
+
+def git_context(path: Path, remote: str) -> Path:
+    Git(path).init(remote=remote).add().commit("init")
+    return path
+
+
+@pytest.mark.parametrize("form", ["single", "list"])
+@pytest.mark.parametrize(
+    "remote",
+    [
+        "git@github.com:crashappsec/dummy-deployments.git",
+        "https://github.com/CrashAppSec/dummy-deployments",
+    ],
+)
+def test_enforce_repos_blocks_listed_repo(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str, remote: str
+):
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(rollout_policy(), form),
+        random_hex,
+        tag=random_hex,
+        context=git_context(tmp_data_dir, remote),
+        env=NO_CI_REPO,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_MODE="enforce", _POLICY_RESULT="blocked")
+    assert report["_POLICY_RESULTS"] == [
+        {
+            "id": "golden-images@3",
+            "mode": "audit",
+            "on_error": "allow",
+            "result": "blocked",
+            "effective_mode": "enforce",
+            "mode_source": "enforce_repos",
+            "repo": ENFORCED_REPO,
+        }
+    ]
+
+
+@pytest.mark.parametrize("form", ["single", "list"])
+def test_enforce_repos_audits_other_repos(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str
+):
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(rollout_policy(), form),
+        random_hex,
+        tag=random_hex,
+        context=git_context(tmp_data_dir, "git@github.com:crashappsec/chalk.git"),
+        env=NO_CI_REPO,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation")
+    assert report["_POLICY_RESULTS"] == [
+        {
+            "id": "golden-images@3",
+            "mode": "audit",
+            "on_error": "allow",
+            "result": "violation",
+            "effective_mode": "audit",
+            "mode_source": "default",
+            "repo": "github.com/crashappsec/chalk",
+        }
+    ]
+
+
+@pytest.mark.parametrize("form", ["single", "list"])
+def test_enforce_repos_unknown_repo_never_enforces(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str
+):
+    # the context is not a git repository and there is no CI repository
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(rollout_policy(), form),
+        random_hex,
+        tag=random_hex,
+        context=tmp_data_dir,
+        env=NO_CI_REPO,
+        ignore_errors=True,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation")
+    assert report["_POLICY_RESULTS"][0] == {
+        "id": "golden-images@3",
+        "mode": "audit",
+        "on_error": "allow",
+        "result": "violation",
+        "effective_mode": "audit",
+        "mode_source": "default",
+        "repo": "",
+    }
+
+
+# a relative origin is a local path to git and identifies no repository
+@pytest.mark.parametrize("origin", [None, "mirrors/crashappsec/chalk.git"])
+def test_enforce_repos_falls_back_to_ci_repo(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, origin: str | None
+):
+    context = git_context(tmp_data_dir, origin) if origin else tmp_data_dir
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(rollout_policy(), "single"),
+        random_hex,
+        tag=random_hex,
+        context=context,
+        env={
+            **NO_CI_REPO,
+            "GITHUB_SERVER_URL": "https://github.com",
+            "GITHUB_REPOSITORY": "crashappsec/dummy-deployments",
+        },
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report["_POLICY_RESULTS"][0]["mode_source"] == "enforce_repos"
+    assert report["_POLICY_RESULTS"][0]["repo"] == ENFORCED_REPO
+
+
+def test_enforce_repos_with_mode_off_only_enforces_listed_repos(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    config = as_form(rollout_policy(mode="off"), "list")
+    other = tmp_data_dir / "other"
+    other.mkdir()
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        config,
+        random_hex,
+        tag=random_hex,
+        context=git_context(other, "git@github.com:crashappsec/chalk.git"),
+        env=NO_CI_REPO,
+    )
+    assert result.exit_code == 0
+    assert policy_reports(random_hex) == []
+
+    listed = tmp_data_dir / "listed"
+    listed.mkdir()
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        config,
+        random_hex,
+        tag=f"{random_hex}-listed",
+        context=git_context(listed, "git@github.com:crashappsec/other-service.git"),
+        env=NO_CI_REPO,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report["_POLICY_RESULTS"][0]["mode"] == "off"
+    assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
+
+
+def test_enforce_repos_invalid_never_blocks(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    config = rollout_policy(mode="enforce")
+    config["on_error"] = "block"
+    config["enforce_repos"] = ENFORCED_REPO
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        json.dumps(config),
+        random_hex,
+        tag=random_hex,
+        context=git_context(tmp_data_dir, f"https://{ENFORCED_REPO}.git"),
+        env=NO_CI_REPO,
+        ignore_errors=True,
+    )
+    assert result.exit_code == 0
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="error")
+    assert report.contains(
+        {"_POLICY_FINDINGS": [{"rule": "config", "kind": "error", "reason": ANY}]}
+    )
+    assert "policy.enforce_repos" in report["_POLICY_FINDINGS"][0]["reason"]
+
+
+# the golden-images policy chalkapi serves to the test workspace
+GOLDEN_AUDIT = {
+    "id": "golden-images@1",
+    "mode": "audit",
+    "on_error": "allow",
+    "golden_images": {
+        "enabled": True,
+        "check_copy_from": True,
+        "allowed": [
+            ["glob", "docker.io/library/alpine:*"],
+            ["glob", "cgr.dev/chainguard/*"],
+        ],
+    },
+}
+
+
+@pytest.mark.parametrize("buildx", [False, True])
+@pytest.mark.parametrize(
+    "content, violations",
+    [
+        ("FROM nginx:1.27", ["nginx:1.27"]),
+        ("FROM nginx:1.27\n", ["nginx:1.27"]),
+        ("FROM alpine:3.20", []),
+        ("FROM cgr.dev/chainguard/static:latest", []),
+        (
+            "FROM nginx:1.27 AS web\nFROM alpine:3.20\nCOPY --from=web /etc/nginx /etc/nginx\n",
+            ["nginx:1.27"],
+        ),
+        ("FROM alpine:3.20 AS base\nFROM base\n", []),
+    ],
+)
+def test_config_json_audit_from_only(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    buildx: bool,
+    content: str,
+    violations: list[str],
+):
+    dockerfile = tmp_data_dir / "Dockerfile"
+    dockerfile.write_text(content)
+    _, result = chalk.docker_build(
+        dockerfile=dockerfile,
+        context=tmp_data_dir,
+        tag=random_hex,
+        config=CONFIGS / "policy_json.c4m",
+        env={
+            "POLICY_CONFIG_JSON": json.dumps(GOLDEN_AUDIT),
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+        },
+        buildx=buildx,
+        run_docker=False,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    reports = policy_reports(random_hex)
+    if not violations:
+        assert reports == []
+        return
+    (report,) = reports
+    assert report.has(_POLICY_RESULT="violation", _POLICY_MODE="audit")
+    assert [f["image"] for f in report["_POLICY_FINDINGS"]] == violations
+
+
+def summary_env(mode: str, random_hex: str, summary: Path) -> dict[str, str]:
+    return {**policy_env(mode, random_hex), "GITHUB_STEP_SUMMARY": str(summary)}
+
+
+def test_step_summary_audit_violation(chalk: Chalk, random_hex: str, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    summary.write_text("previous step output\n")
+    for _ in range(2):
+        _, result = build(
+            chalk,
+            "FROM busybox\nCMD true\n",
+            "audit",
+            random_hex,
+            tag=random_hex,
+            env=summary_env("audit", random_hex, summary),
+        )
+        assert result.exit_code == 0
+    text = summary.read_text()
+    # appended, never truncated: one section per chalk invocation
+    assert text.startswith("previous step output\n")
+    assert (
+        text.count(f"#### Chalk build policy · docker build · `{random_hex}:latest`")
+        == 2
+    )
+    assert text.count("> [!WARNING]") == 2
+    assert (
+        "> **Would be blocked under enforce** — 1 image is not an approved golden "
+        "image. The policy is in audit mode, so the build continued." in text
+    )
+    assert "| Image | Used as | Policy | Why |" in text
+    # the digest is shown when chalk could resolve it
+    assert re.search(
+        r"\| `busybox(@sha256:[0-9a-f]{12}…)?` \| FROM \| \(unnamed\) \| "
+        r"Use an approved golden image \|",
+        text,
+    )
+    assert (
+        "**How to fix:** Use an approved golden image. Allowed: "
+        "`docker.io/library/alpine:*`, `cgr.dev/chainguard/*`" in text
+    )
+    assert "<details><summary>Policy details</summary>" in text
+    assert "| (unnamed) | audit | default mode | violation | 1 |" in text
+    assert "- Chalk version: `" in text
+    assert "[!CAUTION]" not in text
+
+
+def test_step_summary_enforce_blocked(chalk: Chalk, random_hex: str, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env=summary_env("enforce", random_hex, summary),
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    text = summary.read_text()
+    assert (
+        "> [!CAUTION]\n> **Blocked** — `docker build` stopped before building: "
+        "1 image is not an approved golden image (enforce)." in text
+    )
+    assert "| (unnamed) | enforce | default mode | blocked | 1 |" in text
+
+
+def test_step_summary_pass(chalk: Chalk, random_hex: str, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    _, result = build(
+        chalk,
+        "FROM alpine\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env=summary_env("enforce", random_hex, summary),
+    )
+    assert result.exit_code == 0
+    # nothing is published to the policy topic when all policies pass
+    assert policy_reports(random_hex) == []
+    text = summary.read_text()
+    assert (
+        "> [!TIP]\n> All base images are approved golden images (1 policy checked)."
+        in text
+    )
+    assert "| Image |" not in text
+    assert "| (unnamed) | enforce | default mode | pass | 0 |" in text
+
+
+def test_step_summary_disabled(chalk: Chalk, random_hex: str, tmp_path: Path):
+    summary = tmp_path / "summary.md"
+    summary.write_text("untouched\n")
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env={
+            **summary_env("enforce", random_hex, summary),
+            "POLICY_NO_STEP_SUMMARY": "1",
+        },
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert summary.read_text() == "untouched\n"
+
+
+@pytest.mark.parametrize("mode, expected_exit", [("audit", 0), ("enforce", 1)])
+def test_step_summary_unwritable_does_not_affect_command(
+    chalk: Chalk, random_hex: str, tmp_path: Path, mode: str, expected_exit: int
+):
+    summary = tmp_path / "missing-dir" / "summary.md"
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        mode,
+        random_hex,
+        tag=random_hex,
+        env=summary_env(mode, random_hex, summary),
+        expected_success=expected_exit == 0,
+    )
+    assert result.exit_code == expected_exit
+    assert image_exists(random_hex) == (expected_exit == 0)
+    assert not summary.exists()
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_MODE=mode)
+
+
+def test_step_summary_includes_presigned_report_location(
+    chalk: Chalk, random_hex: str, tmp_path: Path, server_http: str
+):
+    summary = tmp_path / "summary.md"
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "audit",
+        random_hex,
+        tag=random_hex,
+        env={
+            **summary_env("audit", random_hex, summary),
+            "POLICY_PRESIGN_URL": f"{server_http}/report/presign",
+        },
+    )
+    assert result.exit_code == 0
+    text = summary.read_text()
+    assert f"- Policy report: `{server_http}/report/presign/accept`" in text
+    # the presigned query string is a credential
+    assert "X-Amz-Signature" not in text
+    assert "presign-test" not in text

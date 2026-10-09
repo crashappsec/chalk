@@ -36,6 +36,7 @@ import ".."/[
   config,
   docker/policy,
   policy/state,
+  policy/summary,
   reporting,
   types,
   utils/exec,
@@ -85,4 +86,6 @@ proc runCmdDocker*(args: seq[string]) =
     # exit with appropriate exitCode if docker command passed
     error("docker post-command: " & getCurrentExceptionMsg())
   finally:
+    # no-op unless reporting did not get to write it
+    writePolicySummary()
     quitChalk()

@@ -2559,6 +2559,25 @@ is reported.
 """
   }
 
+  field enforce_repos {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Repositories where the policy is enforced"
+    doc: """
+Repositories in which the policy is evaluated in `enforce` mode whatever
+`mode` says, so enforcement can be rolled out repository by repository
+while `mode` (`audit` or `off`) applies everywhere else. Entries are
+`(kind, value)` tuples like `golden_images.allowed`; the supported kind is
+`glob`, matched against the repository as `host/owner/name` in lowercase,
+e.g. `("glob", "github.com/acme/*")`. Entries of other kinds never match.
+
+The repository is the git origin of the docker build context (of the
+working directory for `docker push`), or else the CI job's repository
+(`GITHUB_SERVER_URL`/`GITHUB_REPOSITORY`, `CI_PROJECT_URL`). When it cannot
+be determined, `mode` applies.
+"""
+  }
+
   field id {
     type:     string
     default:  ""
@@ -2587,6 +2606,7 @@ con4m, with tuples written as JSON arrays:
   "id": "golden-images@3",
   "mode": "enforce",
   "on_error": "allow",
+  "enforce_repos": [["glob", "github.com/acme/app"]],
   "golden_images": {
     "enabled": true,
     "check_copy_from": true,
@@ -2607,6 +2627,19 @@ has unknown fields or wrongly typed values, is reported as a policy
 evaluation error and never blocks the build. An invalid entry of a
 `policies` list (including a missing or duplicate `id`) is reported the
 same way, while the other entries are still evaluated.
+"""
+  }
+
+  field github_step_summary {
+    type:     bool
+    default:  true
+    shortdoc: "Write the policy outcome to the GitHub Actions job summary"
+    doc: """
+When chalk runs in GitHub Actions (`GITHUB_STEP_SUMMARY` is set), append a
+short Markdown section with the outcome of every evaluated policy and its
+findings to the job summary, including when the command is blocked. Errors
+writing it are logged as warnings and never affect the command. Not part of
+`config_json`.
 """
   }
 

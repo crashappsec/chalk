@@ -1,6 +1,6 @@
 # Sends build policy reports (the `policy` topic) to Crash Override.
 # Policies are configured via the `policy.config_json` parameter (a JSON
-# document) and are disabled unless it sets `mode`.
+# document) and are disabled unless it sets `mode` or `enforce_repos`.
 # Requires crashoverride2 for the crashoverride_reporting auth config.
 
 # an attribute parameter so the document is set as-is, without con4m code;

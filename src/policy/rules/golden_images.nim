@@ -152,6 +152,11 @@ proc loadGoldenImages(): bool =
 proc checkGoldenImages(subjects: seq[PolicySubject]): seq[PolicyFinding] =
   loaded.check(subjects)
 
+proc goldenImagesHint(): PolicyHint =
+  result = PolicyHint(rule: "golden_images", message: loaded.message)
+  for entry in loaded.allowed:
+    result.allowed.add(entry.value)
+
 proc loadGoldenImagesRule*() =
   newPolicyRule("golden_images", loadGoldenImages, checkGoldenImages,
-                requiresAllSubjects = true)
+                requiresAllSubjects = true, hint = goldenImagesHint)

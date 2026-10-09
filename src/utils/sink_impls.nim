@@ -461,6 +461,12 @@ proc postSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     dumpExOnDebug()
     onSinkError(cfg, getCurrentException(), hard = false)
 
+# where each topic was uploaded by presign sinks, without the presigned query
+var presignedUploads = initTable[string, seq[string]]()
+
+proc presignedUploadLocations*(topic: string): seq[string] =
+  presignedUploads.getOrDefault(topic)
+
 proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
   let
     params      = cfg.httpParams()
@@ -520,6 +526,12 @@ proc presignSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable
     )
     resetSinkFailures(cfg)
     cfg.iolog(t, "Presign " & response.status)
+    var location = uri
+    location.query    = ""
+    location.anchor   = ""
+    location.username = ""
+    location.password = ""
+    presignedUploads.mgetOrPut(t.name, @[]).add($location)
   except:
     dumpExOnDebug()
     # Upload errors are always soft: the presigned URL itself may be transient.
