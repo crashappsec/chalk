@@ -1,0 +1,22 @@
+{
+  "id": "packages@1",
+  "mode": "enforce",
+  "on_error": "allow",
+  "golden_images": {
+    "enabled": false,
+    "check_copy_from": false,
+    "allowed": [],
+    "message": ""
+  },
+  "packages": {
+    "enabled": true,
+    "denied": [
+      ["purl", "pkg:npm/event-stream@3.3.6"],
+      ["purl", "pkg:pypi/*colourama*"]
+    ],
+    "allowed": [["purl", "pkg:npm/*"]],
+    "allowed_languages": ["go", "javascript"],
+    "denied_languages": ["python"],
+    "message": "Use approved packages"
+  }
+}

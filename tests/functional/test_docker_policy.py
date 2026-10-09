@@ -1289,3 +1289,120 @@ def test_step_summary_includes_presigned_report_location(
     # the presigned query string is a credential
     assert "X-Amz-Signature" not in text
     assert "presign-test" not in text
+
+
+PACKAGE_LOCK = {
+    "name": "web",
+    "version": "1.0.0",
+    "lockfileVersion": 3,
+    "requires": True,
+    "packages": {
+        "": {"name": "web", "version": "1.0.0"},
+        "node_modules/event-stream": {"version": "3.3.6"},
+        "node_modules/lodash": {"version": "4.17.21"},
+    },
+}
+
+
+def packages_context(path: Path) -> Path:
+    (path / "Dockerfile").write_text("FROM alpine\nCMD true\n")
+    (path / "web").mkdir()
+    (path / "web" / "package-lock.json").write_text(json.dumps(PACKAGE_LOCK))
+    (path / "requirements.txt").write_text("requests==2.31.0\ncolourama==0.1.0\n")
+    return path
+
+
+def build_packages(
+    chalk: Chalk, context: Path, policy: dict, random_hex: str, **kwargs
+):
+    return chalk.docker_build(
+        dockerfile=context / "Dockerfile",
+        context=context,
+        config=CONFIGS / "policy_packages.c4m",
+        env={
+            "POLICY_CONFIG_JSON": json.dumps(policy),
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+            **kwargs.pop("env", {}),
+        },
+        run_docker=False,
+        **kwargs,
+    )
+
+
+DENY_PACKAGES = {
+    "id": "packages@1",
+    "mode": "enforce",
+    "packages": {
+        "enabled": True,
+        "denied": [
+            ["purl", "pkg:npm/event-stream@3.3.6"],
+            ["purl", "pkg:pypi/*colourama*"],
+            ["purl", "pkg:npm/lodash@<4.17.21"],
+        ],
+        "message": "Use approved packages",
+    },
+}
+
+
+@pytest.mark.parametrize("collected", [False, True])
+def test_packages_blocks_denied_package(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, collected: bool
+):
+    # with run_sbom_tools the SBOM chalk collected is used, else syft runs on demand
+    env = {"POLICY_RUN_SBOM_TOOLS": "1"} if collected else {}
+    _, result = build_packages(
+        chalk,
+        packages_context(tmp_data_dir),
+        DENY_PACKAGES,
+        random_hex,
+        tag=random_hex,
+        env=env,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="blocked")
+    findings = sorted(report["_POLICY_FINDINGS"], key=lambda f: f["subject"])
+    assert [(f["kind"], f["subject"], f["location"]) for f in findings] == [
+        ("violation", "pkg:npm/event-stream@3.3.6", "web/package-lock.json"),
+        ("violation", "pkg:pypi/colourama@0.1.0", "requirements.txt"),
+    ]
+    assert findings[0] == {
+        **findings[0],
+        "rule": "packages",
+        "image": "",
+        "reason": "package is denied (pkg:npm/event-stream@3.3.6). Use approved packages",
+    }
+
+
+def test_packages_allows_clean_context(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    policy = json.loads(json.dumps(DENY_PACKAGES))
+    policy["packages"]["denied"] = [["purl", "pkg:npm/left-pad"]]
+    _, result = build_packages(
+        chalk, packages_context(tmp_data_dir), policy, random_hex, tag=random_hex
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    assert policy_reports(random_hex) == []
+
+
+def test_packages_audits_languages(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
+    policy = {
+        "id": "languages@1",
+        "mode": "audit",
+        "packages": {"enabled": True, "allowed_languages": ["go", "javascript"]},
+    }
+    _, result = build_packages(
+        chalk, packages_context(tmp_data_dir), policy, random_hex, tag=random_hex
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="violation")
+    (finding,) = report["_POLICY_FINDINGS"]
+    assert finding["subject"] == "python"
+    assert finding["location"] == "requirements.txt"
+    assert finding["reason"].startswith("language is not allowed (2 packages: ")

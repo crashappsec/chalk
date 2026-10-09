@@ -2,8 +2,8 @@
 ## This file is part of Chalk (see https://crashoverride.com/docs/chalk).
 
 ## Collect images before a build or push, inside the policy error boundary.
-import std/[os, strutils]
-import ".."/[policy/engine, types, utils/git]
+import std/[algorithm, os, strutils]
+import ".."/[plugins/externalTool, policy/engine, policy/sbom, types, utils/git]
 import "."/[exe, git as dockerGit, ids, inspect, policy_subjects, scan]
 
 export engine
@@ -89,6 +89,34 @@ proc addCommandInput(input: var PolicyInput, command: string, pushTargets: seq[s
   input.pushTargets = pushTargets
   input.contextDirs = contextDirs
   input.host        = hostInfo
+
+proc scanSbom(dir: string): Box =
+  ## On demand, for rules that need an SBOM chalk did not collect
+  ## (`run_sbom_tools` off, or a build context it does not cover): runs the
+  ## enabled `sbom` tools by priority as `run_sbom_tools` would, stopping at
+  ## the first that produces one.
+  var tools: seq[(int, string)]
+  for name in getChalkSubsections("tool"):
+    let base = "tool." & name
+    if attrGet[bool](base & ".enabled") and attrGet[string](base & ".kind") == "sbom":
+      tools.add((attrGet[int](base & ".priority"), name))
+  if len(tools) == 0:
+    raise newException(ValueError, "no SBOM tool is enabled")
+  tools.sort()
+  var failures: seq[string]
+  for (_, tool) in tools:
+    try:
+      let keys = runTool(tool, dir, force = true)
+      if "SBOM" in keys:
+        let sboms = ChalkDict()
+        sboms[tool] = keys["SBOM"]
+        return pack(sboms)
+      failures.add(tool & " produced no SBOM")
+    except CatchableError:
+      failures.add(tool & ": " & getCurrentExceptionMsg())
+  raise newException(ValueError, failures.join("; ") & " (see logs)")
+
+setPolicySbomScanner(scanSbom)
 
 proc evaluateBuildPolicies*(ctx: DockerInvocation) =
   if not policyEnabled():

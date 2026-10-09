@@ -1,0 +1,15 @@
+policy {
+  config_json: env("POLICY_CONFIG_JSON")
+}
+
+sink_config policy_file {
+  enabled:  true
+  sink:     "file"
+  filename: env("POLICY_REPORT_FILE")
+}
+
+subscribe("policy", "policy_file")
+
+if env_exists("POLICY_RUN_SBOM_TOOLS") {
+  run_sbom_tools: true
+}
