@@ -359,34 +359,37 @@ policy {
     "deny_self_signed": true,
     "allowed_key_types": ["rsa", "ec"],
     "allowed_ec_curves": ["P-256", "P-384"],
-    "allowed_issuers": [["cn", "Acme Issuing CA *"], ["sha256", "5C:1E:8A:...:C9:B5"]],
+    "allowed_issuers": [
+      ["cn", "Acme Issuing CA *"],
+      ["sha256", "5C:1E:8A:...:C9:B5"]
+    ],
     "exclude_paths": ["test", "**/testdata"],
     "message": "Use certificates from the Acme PKI: https://example.com/pki"
   }
 }
 ```
 
-| Field                                     | Type                                        | Default   |
-| ----------------------------------------- | ------------------------------------------- | --------- |
-| `policy.certificates.enabled`             | `bool`                                      | `false`   |
-| `policy.certificates.deny_expired`        | `bool`                                      | `true`    |
-| `policy.certificates.deny_not_yet_valid`  | `bool`                                      | `true`    |
-| `policy.certificates.expires_within_days` | `int` (`0` disables)                        | `0`       |
-| `policy.certificates.deny_self_signed`    | `bool`                                      | `false`   |
-| `policy.certificates.deny_ca`             | `bool`                                      | `false`   |
-| `policy.certificates.deny_weak_signatures`| `bool`                                      | `true`    |
-| `policy.certificates.min_rsa_key_size`    | `int` (bits, `0` disables)                  | `2048`    |
-| `policy.certificates.allowed_key_types`   | `list[string]` (`[]` allows any)            | `[]`      |
-| `policy.certificates.allowed_ec_curves`   | `list[string]` (`[]` allows any)            | `[]`      |
-| `policy.certificates.allowed_issuers`     | `list[tuple[string, string]]` (kind, value) | `[]`      |
-| `policy.certificates.include_paths`       | `list[string]` (`[]` checks every path)     | `[]`      |
-| `policy.certificates.exclude_paths`       | `list[string]`                              | `[]`      |
-| `policy.certificates.extensions`          | `list[string]` (`[]` is the default set)    | `[]`      |
-| `policy.certificates.skip_ca_bundles`     | `bool`                                      | `true`    |
-| `policy.certificates.honor_dockerignore`  | `bool`                                      | `true`    |
-| `policy.certificates.max_files`           | `int` (> 0)                                 | `100000`  |
-| `policy.certificates.max_file_size`       | `int` (bytes, > 0)                          | `1048576` |
-| `policy.certificates.message`             | `string`                                    | `""`      |
+| Field                                      | Type                                        | Default   |
+| ------------------------------------------ | ------------------------------------------- | --------- |
+| `policy.certificates.enabled`              | `bool`                                      | `false`   |
+| `policy.certificates.deny_expired`         | `bool`                                      | `true`    |
+| `policy.certificates.deny_not_yet_valid`   | `bool`                                      | `true`    |
+| `policy.certificates.expires_within_days`  | `int` (`0` disables)                        | `0`       |
+| `policy.certificates.deny_self_signed`     | `bool`                                      | `false`   |
+| `policy.certificates.deny_ca`              | `bool`                                      | `false`   |
+| `policy.certificates.deny_weak_signatures` | `bool`                                      | `true`    |
+| `policy.certificates.min_rsa_key_size`     | `int` (bits, `0` disables)                  | `2048`    |
+| `policy.certificates.allowed_key_types`    | `list[string]` (`[]` allows any)            | `[]`      |
+| `policy.certificates.allowed_ec_curves`    | `list[string]` (`[]` allows any)            | `[]`      |
+| `policy.certificates.allowed_issuers`      | `list[tuple[string, string]]` (kind, value) | `[]`      |
+| `policy.certificates.include_paths`        | `list[string]` (`[]` checks every path)     | `[]`      |
+| `policy.certificates.exclude_paths`        | `list[string]`                              | `[]`      |
+| `policy.certificates.extensions`           | `list[string]` (`[]` is the default set)    | `[]`      |
+| `policy.certificates.skip_ca_bundles`      | `bool`                                      | `true`    |
+| `policy.certificates.honor_dockerignore`   | `bool`                                      | `true`    |
+| `policy.certificates.max_files`            | `int` (> 0)                                 | `100000`  |
+| `policy.certificates.max_file_size`        | `int` (bytes, > 0)                          | `1048576` |
+| `policy.certificates.message`              | `string`                                    | `""`      |
 
 What is checked, for every certificate (PEM, including bundles and chains,
 or DER) found:
