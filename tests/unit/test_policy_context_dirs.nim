@@ -24,9 +24,10 @@ try:
   let sha = git(repo, "rev-parse", "HEAD")
   let bare = root / "objects.git"
   discard git(root, "clone", "--bare", repo, bare)
+  let url = "https://example.invalid/repo.git#" & sha & ":service"
   let ctx = DockerInvocation(cmd: DockerCmd.build,
-    foundContext: "https://example.invalid/repo.git#" & sha & ":service",
-    gitContext: DockerGitContext(tmpGitDir: bare, subdir: "service",
+    foundContext: url, newCmdLine: @["buildx", "build", url],
+    gitContext: DockerGitContext(context: url, tmpGitDir: bare, subdir: "service",
       head: GitHead(gitRef: sha)),
     foundExtraContexts: newOrderedTable[string, string]())
   # Modern Buildx has fetched Git objects but has not checked them out.
@@ -35,6 +36,12 @@ try:
   doAssert dirs == @[ctx.gitContext.tmpWorkTree / "service"]
   doAssert fileExists(dirs[0] / "included.pem")
   doAssert not fileExists(dirs[0] / "outside.pem")
+  doAssert ctx.newCmdLine == @["buildx", "build", dirs[0]]
+  doAssert ctx.policyDockerfilePath() == dirs[0] / "Dockerfile"
+  ctx.foundFileArg = "Dockerfile.prod"
+  doAssert ctx.policyDockerfilePath() == dirs[0] / "Dockerfile.prod"
+  ctx.dockerFileLoc = stdinIndicator
+  doAssert ctx.policyDockerfilePath() == ""
   # An existing checkout is reused with its selected subdirectory intact.
   let checkout = ctx.gitContext.tmpWorkTree
   doAssert ctx.policyContextDirs() == dirs

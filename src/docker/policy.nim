@@ -80,12 +80,25 @@ proc policyContextDirs*(ctx: DockerInvocation): seq[string] =
   if main != "":
     if not main.dirExists():
       raise newException(ValueError, "build context directory does not exist: " & main)
+    if ctx.gitContext != nil:
+      # Command-line processing precedes this checkout. Build the worktree
+      # we inspected rather than fetching the mutable Git reference again.
+      ctx.newCmdLine = ctx.gitContext.replaceContextArg(ctx.newCmdLine)
     result.add(main)
   if ctx.foundExtraContexts != nil:
     for _, value in ctx.foundExtraContexts:
       let dir = value.localDir()
       if dir != "" and dir notin result:
         result.add(dir)
+
+proc policyDockerfilePath*(ctx: DockerInvocation): string =
+  if ctx.dockerFileLoc == stdinIndicator:
+    return ""
+  if ctx.gitContext != nil:
+    let name = if ctx.foundFileArg == "": "Dockerfile" else: ctx.foundFileArg
+    return (ctx.gitContext.contextPath() / name).resolvePath()
+  if ctx.dockerFileLoc != "":
+    return ctx.dockerFileLoc.resolvePath()
 
 proc addCommandInput(input: var PolicyInput, command: string, pushTargets: seq[string],
                      contextDirs: seq[string] = @[]) =
@@ -101,8 +114,7 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
     result = ctx.buildSubjects(allStages = not hasBuildX())
     let pushTargets = if ctx.foundPush: ctx.foundTags.asRepoTag() else: @[]
     result.addCommandInput("build", pushTargets, ctx.policyContextDirs())
-    if ctx.dockerFileLoc notin ["", stdinIndicator]:
-      result.dockerfilePath = ctx.dockerFileLoc.resolvePath()
+    result.dockerfilePath = ctx.policyDockerfilePath()
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver())
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
