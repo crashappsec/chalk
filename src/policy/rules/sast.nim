@@ -311,6 +311,41 @@ proc location(r: SastResult): string =
     return r.path & ":" & $r.line
   r.path
 
+proc semgrepScanErrors(source: SastSource): seq[PolicyFinding] =
+  # Scan failures are independent of matches. Keep valid matches while
+  # allowing on_error to decide whether incomplete analysis blocks.
+  if (source.doc{"runs"} != nil and source.doc{"runs"}.kind == JArray) or
+     source.doc{"results"} == nil:
+    return
+  let errors = source.doc{"errors"}
+  if errors == nil:
+    return
+  var incomplete = false
+  var location = ""
+  if errors.kind != JArray:
+    incomplete = true
+  else:
+    for error in errors.getElems():
+      if error.kind != JObject:
+        incomplete = true
+        continue
+      # Semgrep scan errors use warn/error. Ignore informational diagnostics.
+      if error{"level"}.getStr().toLowerAscii() in ["info", "debug"]:
+        continue
+      let path = error{"path"}.getStr()
+      if path != "":
+        let relative = source.resultPath(path)
+        if relative.isNone():
+          continue
+        if location == "":
+          location = relative.get()
+      incomplete = true
+  if incomplete:
+    var reason = source.tool & " reported scan errors; SAST analysis is incomplete"
+    if source.image != "":
+      reason &= " (mark of " & source.image & ")"
+    result.add(newSubjectFinding(ruleName, "error", source.tool, reason, location = location))
+
 proc check*(settings: SastConfig, sources: seq[SastSource]): seq[PolicyFinding] =
   var counted: seq[(SastSource, SastResult)]
   for source in sources:
@@ -323,6 +358,7 @@ proc check*(settings: SastConfig, sources: seq[SastSource]): seq[PolicyFinding] 
         reason &= " (mark of " & source.image & ")"
       result.add(newSubjectFinding(ruleName, "error", source.tool, reason))
       continue
+    result.add(source.semgrepScanErrors())
     for r in results:
       if settings.counts(r):
         counted.add((source, r))

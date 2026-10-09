@@ -321,6 +321,41 @@ proc testConfig() =
   doAssert loadSastConfig().isNone()
   setPolicyJson("")
 
+proc testSemgrepScanErrors() =
+  let error = %*{"code": 3, "level": "warn", "type": "Syntax error", "path": "/src/app.py"}
+  var source = SastSource(tool: "semgrep", roots: @["/src"], dir: "/src",
+                          doc: %*{"results": [], "errors": [error]})
+  let failures = defaults().check(@[source])
+  assertEq(failures.len, 1)
+  assertEq(failures[0].kind, "error")
+  assertEq(failures[0].location, "app.py")
+  for onError in ["allow", "block"]:
+    let evaluated = evaluatePolicy(PolicyConfig(mode: "enforce", onError: onError),
+                                    @[], PolicyInput(), failures)
+    assertEq(evaluated.result, (if onError == "block": "blocked" else: "error"))
+  # A partial scan must preserve valid findings alongside its error.
+  source.doc["results"] = %*[{"check_id": "valid", "path": "/src/valid.py",
+                             "extra": {"severity": "ERROR", "message": "valid finding"}}]
+  let partial = defaults().check(@[source])
+  assertEq(partial.len, 2)
+  assertEq(partial[0].kind, "error")
+  assertEq(partial[1].kind, "violation")
+  assertEq(partial[1].subject, "valid")
+  # Thresholds and suppressions affect matches, never scan failures.
+  var config = defaults()
+  config.maxFindings = 5
+  config.ignorePaths = @["*"]
+  assertEq(config.check(@[source]).len, 1)
+  source.doc["results"] = newJArray()
+  source.doc["errors"] = %*[{"level": "info", "type": "notice"}]
+  assertEq(defaults().check(@[source]).len, 0)
+  source.doc["errors"] = %*[{"level": "warn", "path": "/sibling/app.py"}]
+  assertEq(defaults().check(@[source]).len, 0)
+  source.doc["errors"] = %*[{"level": "error", "type": "global scan error"}]
+  assertEq(defaults().check(@[source])[0].kind, "error")
+  source.doc["errors"] = %*{"malformed": true}
+  assertEq(defaults().check(@[source])[0].kind, "error")
+
 testSeverityMapping()
 testParseSarif()
 testParseJson()
@@ -330,3 +365,5 @@ testOrderingAndCap()
 testBadOutput()
 testCollectSources()
 testConfig()
+
+testSemgrepScanErrors()

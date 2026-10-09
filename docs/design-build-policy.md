@@ -675,3 +675,10 @@ the `policy*Setting` accessors, which read the same path from con4m when
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.
+
+Semgrep JSON `errors` with warning/error severity (including syntax errors on
+successful scanner exit) produce SAST evaluation errors. Valid matches from a
+partial scan still count. Errors scoped to files outside the evaluated build
+context do not count; errors without a path apply to the scan. Informational
+and debug diagnostics do not affect policy decisions. `on_error` controls
+whether incomplete analysis blocks an enforced policy.
