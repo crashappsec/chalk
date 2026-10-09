@@ -163,6 +163,31 @@ proc testBuildPushTargets() =
                       push = true).buildPushTargets(), @["ghcr.io/x/y"])
   assertEq(invocation(["type=image;name=ghcr.io/x/y;push-by-digest=true"],
                       push = true).buildPushTargets(), @["ghcr.io/x/y"])
+  for value in ["", "1", "t", "T", "true", "TRUE", "True"]:
+    let ctx = invocation(["type=image;name=denied.example/app;push=" & value])
+    assertEq(ctx.buildPushTargets(), @["denied.example/app"])
+    assertEq(invocation(["type=image;name=ignored.example/app;push=" & value],
+      @["ghcr.io/acme/app:1"]).buildPushTargets(), @["ghcr.io/acme/app:1"])
+  for value in ["0", "f", "F", "false", "FALSE", "False"]:
+    assertEq(invocation(["type=image;name=denied.example/app;push=" & value])
+      .buildPushTargets(), newSeq[string]())
+  assertEq(invocation(["type=image;name=ghcr.io/acme/app:1;push=true;" &
+    "dangling-name-prefix=denied.example/app"]).buildPushTargets(),
+    @["ghcr.io/acme/app:1", "denied.example/app"])
+  assertEq(invocation(["type=registry;name=ignored.example/app;" &
+    "dangling-name-prefix=denied.example/app"], @["ghcr.io/acme/app:1"], push = true)
+    .buildPushTargets(), @["ghcr.io/acme/app:1", "denied.example/app"])
+  assertEq(invocation(["type=registry;name=ghcr.io/acme/app:1;" &
+    "dangling-name-prefix=denied.example/app;dangling-name-only=true"])
+    .buildPushTargets(), @["ghcr.io/acme/app:1"])
+  assertEq(invocation(["type=registry;dangling-name-prefix=denied.example/app;" &
+    "dangling-name-only=true"]).buildPushTargets(), @["denied.example/app"])
+  assertEq(invocation(["type=image;name=local/app;push=false;" &
+    "dangling-name-prefix=denied.example/app"]).buildPushTargets(), newSeq[string]())
+  assertEq(invocation(["type=image;name=local/app;push-by-digest=true"])
+    .buildPushTargets(), newSeq[string]())
+  doAssertRaises(ValueError):
+    discard invocation(["type=image;name=denied.example/app;push=invalid"]).buildPushTargets()
 
 proc testJson() =
   setPolicyJson(readFile(fixture))

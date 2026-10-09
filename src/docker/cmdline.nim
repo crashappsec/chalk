@@ -20,6 +20,7 @@ import ".."/[
 ]
 import "."/[
   ids,
+  util,
 ]
 
 proc extractBuildx(ctx: DockerInvocation) =
@@ -180,8 +181,8 @@ proc extractOutputs(ctx: DockerInvocation) =
             trace("docker: found --push equivalent with --output=" & i)
             ctx.foundPush = true
           of "image":
-            let pushByDigest = kv.getOrDefault("push-by-digest") == "true"
-            if kv.getOrDefault("push") == "true" or pushByDigest:
+            let pushByDigest = kv.exporterBool("push-by-digest")
+            if kv.exporterBool("push"):
               trace("docker: found --push equivalent with --output=" & i)
               ctx.foundPush = true
             if kv.getOrDefault("name") != "":

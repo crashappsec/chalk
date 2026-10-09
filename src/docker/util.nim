@@ -17,6 +17,17 @@ import ".."/[
   utils/substitutions,
 ]
 
+proc exporterBool*(output: OrderedTableRef[string, string], key: string): bool =
+  ## BuildKit treats present empty boolean attributes as true and otherwise
+  ## uses Go's strconv.ParseBool spellings.
+  if key notin output:
+    return false
+  case output[key]
+  of "", "1", "t", "T", "true", "TRUE", "True": true
+  of "0", "f", "F", "false", "FALSE", "False": false
+  else:
+    raise newException(ValueError, "invalid image exporter boolean: " & key)
+
 proc isCI*(): bool =
   ## Return true when running inside a known CI environment.
   const ciEnvVars = [

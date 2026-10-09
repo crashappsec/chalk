@@ -5,7 +5,7 @@
 ## Docker I/O lives in policy.nim so metadata decoding can be tested directly.
 import std/[sequtils, strutils, tables]
 import ".."/[policy/engine, types]
-import "."/[dockerfile, ids]
+import "."/[dockerfile, ids, util]
 
 proc addDigest(digests: var seq[string], digest: string) =
   if digest != "" and digest notin digests:
@@ -67,22 +67,33 @@ proc buildPushTargets*(ctx: DockerInvocation): seq[string] =
   ## `--output type=registry` as `type=image,push=true`, and `--tag` replaces
   ## the `name` of every image exporter:
   ## https://github.com/docker/buildx/blob/master/build/opt.go
-  if not ctx.foundPush:
-    return
-  if len(ctx.foundTags) > 0:
-    return ctx.foundTags.asRepoTag()
+  if ctx.foundPush:
+    result = ctx.foundTags.asRepoTag()
   for output in ctx.foundOutputs:
     let kind = output.getOrDefault("type")
-    if kind == "image" and output.getOrDefault("push") != "true" and
-       output.getOrDefault("push-by-digest") != "true":
-      continue
     if kind notin ["image", "registry"]:
       continue
+    if kind == "image" and not output.exporterBool("push") and
+       not (ctx.foundPush and output.exporterBool("push-by-digest")):
+      continue
+    var named = len(ctx.foundTags) > 0
+    for tag in ctx.foundTags.asRepoTag():
+      if tag notin result:
+        result.add(tag)
     # several names are comma separated, quoted on the command line
-    for name in output.getOrDefault("name").split(','):
-      let name = name.strip()
-      if name != "" and name notin result:
-        result.add(name)
+    if len(ctx.foundTags) == 0:
+      for name in output.getOrDefault("name").split(','):
+        let name = name.strip()
+        if name != "":
+          named = true
+          if name notin result:
+            result.add(name)
+    let prefix = output.getOrDefault("dangling-name-prefix")
+    if prefix != "" and (not output.exporterBool("dangling-name-only") or not named) and
+       prefix notin result:
+      # Its digest is only known after the build; registry matching needs
+      # the destination repository, which is already supplied here.
+      result.add(prefix)
 
 proc metadataTable(value: Box): OrderedTableRef[string, Box] =
   if value.isNil() or value.kind != MkTable:
