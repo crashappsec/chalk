@@ -152,7 +152,9 @@ proc hintFor(p: PolicyResult, rule: string): PolicyHint =
 
 proc why(p: PolicyResult, f: PolicyFinding): string =
   let message = p.hintFor(f.rule).message
-  if f.kind == "violation" and message != "":
+  # non-image rules explain each finding in its reason (e.g. which check a
+  # certificate failed), which the generic message would hide
+  if f.kind == "violation" and message != "" and f.subject == "":
     return message
   f.reason
 
@@ -160,11 +162,17 @@ proc violationPhrase(findings: seq[PolicyFinding]): string =
   var
     n      = distinctImages(findings)
     golden = true
+    images = true
   for f in findings:
     if f.rule != "golden_images":
       golden = false
+    if f.image == "":
+      images = false
   if n == 0:
     n = len(findings)
+  if not images:
+    let total = len(findings)
+    return if total == 1: "1 build policy violation" else: $total & " build policy violations"
   if golden:
     if n == 1: "1 image is not an approved golden image"
     else: $n & " images are not approved golden images"

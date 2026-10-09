@@ -217,7 +217,20 @@ proc testNothingPendingLeavesFileUntouched() =
   doAssert readFile(path) == "existing\n"
   removeFile(path)
 
+proc testSubjectFindings() =
+  let cert = PolicyFinding(policyId: "certs@1", rule: "certificates", kind: "violation",
+                           subject: "certs/server.pem (example.com)", location: "certs/server.pem",
+                           reason: "certificate expired")
+  var p = policy("certs@1", "enforce", "blocked", @[cert])
+  p.hints = @[PolicyHint(rule: "certificates", message: "Rotate certificates")]
+  let md = renderPolicySummary(@[p], build())
+  doAssert "1 build policy violation" in md, md
+  doAssert "| Subject |" in md and "`certs/server.pem (example.com)` certs/server.pem" in md, md
+  # the per-finding reason is kept, the rule message goes to how-to-fix
+  doAssert "certificate expired" in md, md
+
 testAuditViolation()
+testSubjectFindings()
 testBlocked()
 testErrorOnly()
 testPass()

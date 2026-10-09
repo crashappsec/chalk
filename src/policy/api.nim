@@ -33,6 +33,9 @@ type
     command*:  string # "build" or "push"
     ## local build context directories, empty for push
     contextDirs*: seq[string]
+    ## Dockerfile of a build, so rules can honor `<Dockerfile>.dockerignore`;
+    ## empty for push or when read from stdin
+    dockerfilePath*: string
     ## image references the command pushes, as given on the command line
     pushTargets*: seq[string]
     ## chalk-time host info collected before policies run, e.g. `SBOM`,

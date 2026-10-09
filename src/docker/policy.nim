@@ -97,6 +97,8 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
     result = ctx.buildSubjects(allStages = not hasBuildX())
     let pushTargets = if ctx.foundPush: ctx.foundTags.asRepoTag() else: @[]
     result.addCommandInput("build", pushTargets, ctx.contextDirs())
+    if ctx.dockerFileLoc notin ["", stdinIndicator]:
+      result.dockerfilePath = ctx.dockerFileLoc.resolvePath()
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver())
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
