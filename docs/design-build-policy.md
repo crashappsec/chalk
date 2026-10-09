@@ -672,3 +672,12 @@ the `policy*Setting` accessors, which read the same path from con4m when
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.
+
+Secrets policy scans enable TruffleHog `--fail-on-scan-errors` and also inspect
+stderr for filesystem traversal/chunk failures that the scanner logs without
+failing its exit status. Such scans produce an evaluation error governed by
+`on_error` and are not cached as completed scans. Diagnostic values are never
+included in findings or logs. Verification failures retain their existing
+`verified_only` behavior, and native `trufflehog:ignore` suppressions remain
+respected. The Git exclusion matches the complete `.git` path component;
+ordinary directories such as `app.git` remain scanned.

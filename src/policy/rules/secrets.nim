@@ -48,6 +48,7 @@ const
   trufflehogFoundExit = 183
   # exit codes of `timeout`, see `with_timeout` in base_callbacks.c4m
   timeoutExits = [124, 137]
+  trufflehogGitExclude* = "(^|/)[.]git(/|$)"
 
 type
   SecretsConfig* = object
@@ -171,6 +172,45 @@ proc parseTrufflehogOutput*(output: string): seq[SecretResult] =
     let r = node.toSecretResult()
     if r.isSome():
       result.add(r.get())
+
+proc hasScanDiagnostics(diagnostics: string): bool =
+  # --json selects JSON diagnostics on stderr as well. Filesystem traversal
+  # sometimes logs failures without propagating them to the exit code.
+  # Never copy diagnostic messages, paths or error values into findings.
+  const messages = ["unable to get file info", "error scanning filesystem",
+                    "error scanning file", "error scanning directory",
+                    "error scanning symlink", "encountered errors during scan"]
+  for line in diagnostics.splitLines():
+    let text = line.strip()
+    if not text.startsWith("{"):
+      # Wrappers may emit ordinary non-JSON messages, but known filesystem
+      # failures still mean the scan is incomplete.
+      for message in messages:
+        if message in text.toLowerAscii():
+          return true
+      continue
+    var node: JsonNode
+    try:
+      node = parseJson(text)
+    except CatchableError:
+      return true # uninterpretable diagnostics cannot establish a clean scan
+    if node.kind != JObject:
+      return true
+    let message = node{"msg"}.getStr(node{"message"}.getStr()).toLowerAscii()
+    if message in messages:
+      return true
+    # A verification failure is represented on each result and is handled
+    # by verified_only; it is not a filesystem scan failure.
+  false
+
+proc checkedTrufflehogOutput*(code: int, output, diagnostics: string): seq[SecretResult] =
+  ## The same validation used before caching an actual filesystem scan.
+  ## Failure messages are fixed text; either stream may contain a secret.
+  if code != 0 and code != trufflehogFoundExit:
+    raise newException(ValueError, "trufflehog exited with code " & $code)
+  if diagnostics.hasScanDiagnostics():
+    raise newException(ValueError, "trufflehog reported scan errors; filesystem analysis is incomplete")
+  parseTrufflehogOutput(output)
 
 proc markSecretResults*(mark: ChalkDict): seq[SecretResult] =
   ## trufflehog results recorded in a chalk mark's `SECRET_SCANNER`
@@ -306,6 +346,18 @@ proc toolCallback[T](name: string, dir: string): T =
     raise newException(ValueError, "missing implementation of tool.trufflehog." & name)
   return unpack[T](value.get())
 
+proc trufflehogArguments*(dir: string, verify: bool, exclude, config = ""): seq[string] =
+  ## Arguments are shell-quoted because the configured executable may be a
+  ## timeout or container wrapper. Keep scan-error signaling independent of
+  ## secret verification and retain the scanner's native ignore-tag behavior.
+  result = @["filesystem", "--json", "--no-update", "--fail-on-scan-errors",
+             "-x", exclude.quoteShell()]
+  if not verify:
+    result.add("--no-verification")
+  if config != "":
+    result.add("--config=" & config.quoteShell())
+  result.add(dir.quoteShell())
+
 proc trufflehogCommand(dir: string, verify: bool): string =
   ## Reuses the trufflehog tool configuration (docker or local binary,
   ## installer, timeout, `trufflehog_config`) but always in filesystem mode.
@@ -319,15 +371,9 @@ proc trufflehogCommand(dir: string, verify: bool): string =
   if exe == "":
     raise newException(ValueError, "trufflehog is not available")
   # .git holds history, not files docker uses; regexes per trufflehog -x
-  let exclude = writeNewTempFile("[.]git(/|$)\n", suffix = ".txt")
-  var args = @["filesystem", "--json", "--no-update",
-               "-x", exclude.quoteShell()]
-  if not verify:
-    args.add("--no-verification")
+  let exclude = writeNewTempFile(trufflehogGitExclude & "\n", suffix = ".txt")
   let config = attrGetOpt[string]("tool.trufflehog.trufflehog_config").get("")
-  if config != "":
-    args.add("--config=" & config.quoteShell())
-  args.add(dir.quoteShell())
+  let args = trufflehogArguments(dir, verify, exclude, config)
   return exe & " " & args.join(" ")
 
 var scanned = initTable[string, seq[SecretResult]]()
@@ -348,9 +394,7 @@ proc scanDir(dir: string, verify: bool): seq[SecretResult] =
                        attrGetOpt[string]("tool.trufflehog.trufflehog_timeout").get("") &
                        "s (tool.trufflehog.trufflehog_timeout)")
   # stdout holds the secrets, so neither output is logged
-  if code != 0 and code != trufflehogFoundExit:
-    raise newException(ValueError, "trufflehog exited with code " & $code)
-  result = parseTrufflehogOutput(output.getStdout())
+  result = checkedTrufflehogOutput(code, output.getStdout(), output.stderr)
   scanned[key] = result
 
 var loaded: SecretsConfig

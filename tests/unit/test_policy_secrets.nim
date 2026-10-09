@@ -1,4 +1,4 @@
-import std/[json, os, strutils]
+import std/[json, os, re, strutils]
 import ../../src/types
 import ../../src/chalkjson
 import ../../src/policy/engine
@@ -219,6 +219,59 @@ proc testRule() =
   selectPolicy(policyConfigs()[0])
   doAssert not rule.load()
 
+proc testScanErrorsAndPrivacy() =
+  let stdout = readFile(fixture)
+  let notice = """{"level":"info-0","msg":"finished scanning"}"""
+  assertEq(checkedTrufflehogOutput(0, "", notice).len, 0)
+  assertEq(checkedTrufflehogOutput(0, stdout, notice).len, 8)
+  assertEq(checkedTrufflehogOutput(183, stdout, notice).len, 8)
+  # Verifier errors retain their existing per-result/verified_only semantics.
+  let verification = $(%*{"level": "error", "msg": "error verifying result", "error": rawValue})
+  assertEq(checkedTrufflehogOutput(0, stdout, verification).len, 8)
+  for message in ["unable to get file info", "error scanning filesystem", "error scanning file",
+                  "error scanning directory", "error scanning symlink", "encountered errors during scan"]:
+    let stderr = $(%*{"level": "error", "msg": message, "error": rawValue, "path": rawValue})
+    for output in ["", stdout]:
+      try:
+        discard checkedTrufflehogOutput(0, output, stderr)
+        doAssert false, "accepted incomplete scan"
+      except ValueError:
+        doAssert rawValue notin getCurrentExceptionMsg()
+        doAssert "scan errors" in getCurrentExceptionMsg()
+    let scanRule = PolicyRule(name: "secrets", checkInput: proc(input: PolicyInput): seq[PolicyFinding] =
+      discard checkedTrufflehogOutput(0, "", stderr)
+      @[])
+    for onError in ["allow", "block"]:
+      let evaluated = evaluatePolicy(PolicyConfig(mode: "enforce", onError: onError),
+                                     @[scanRule], PolicyInput())
+      assertEq(evaluated.result, (if onError == "block": "blocked" else: "error"))
+      evaluated.findings.assertNoSecret()
+  for code in [1, 124, 137]:
+    try:
+      discard checkedTrufflehogOutput(code, rawValue, rawValue)
+      doAssert false, "accepted failed scan"
+    except ValueError:
+      doAssert rawValue notin getCurrentExceptionMsg()
+  doAssertRaises(ValueError):
+    discard checkedTrufflehogOutput(0, "", "{invalid " & rawValue)
+
+proc testFilesystemArgumentsAndGitBoundary() =
+  for verify in [false, true]:
+    let args = trufflehogArguments("/work/app.git/context", verify, "/tmp/exclude")
+    doAssert "--fail-on-scan-errors" in args
+    doAssert "--json" in args
+    doAssert "--no-ignore-tag" notin args
+    doAssert ("--no-verification" in args) == not verify
+  let pattern = re(trufflehogGitExclude)
+  for excluded in [".git", ".git/config", "/ctx/.git/config", "/ctx/.git"]:
+    doAssert excluded.contains(pattern), excluded
+  for included in ["/ctx/app.git/token.env", "/work/app.git/context/token.env", "/ctx/.github/token.env"]:
+    doAssert not included.contains(pattern), included
+  let ordinary = SecretResult(detector: "Github", file: "/work/app.git/context/token.env", line: 1, verified: true)
+  let findings = SecretsConfig(verifiedOnly: true).check(@[ordinary], "/work/app.git/context", @[])
+  assertEq(findings.len, 1)
+  assertEq(findings[0].location, "token.env:1")
+
 proc main() =
   testParse()
   testValidation()
@@ -229,5 +282,7 @@ proc main() =
   testDockerignore()
   testMark()
   testRule()
+  testScanErrorsAndPrivacy()
+  testFilesystemArgumentsAndGitBoundary()
 
 main()
