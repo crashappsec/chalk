@@ -35,13 +35,14 @@ type
     language*: string # e.g. javascript, python, go
     ## where the package was found: relative to the build context on build,
     ## to the directory chalk scanned when it built the image on push
-    location*: string
+    location*: string # first occurrence, or the first in the evaluated context
+    locations*: seq[string] # every recorded occurrence
     licenses*: seq[string] # SPDX ids, names or expressions as listed; each applies (AND)
 
   Sbom* = object
     source*:    string # what the SBOM describes, e.g. the scanned directory or image
     packages*:  seq[SbomPackage]
-    truncated*: bool   # more than `maxSbomPackages` packages
+    truncated*: bool   # package count or component depth omitted content
 
   PolicySboms* = object
     sboms*:  seq[Sbom]
@@ -94,11 +95,40 @@ proc add(sbom: var Sbom, pkg: SbomPackage): bool =
   pkg.purlType = pkg.purl.purlType()
   if pkg.language == "":
     pkg.language = languageOf(pkg.purlType)
+  if pkg.locations.len == 0 and pkg.location != "":
+    pkg.locations.add(pkg.location)
+  if pkg.locations.len > 0:
+    pkg.location = pkg.locations[0]
   pkg.language = pkg.language.toLowerAscii()
   sbom.packages.add(pkg)
   return true
 
+proc packageArray(node: JsonNode, field: string): seq[JsonNode] =
+  # An omitted optional array denotes an empty SBOM; a present malformed
+  # array or entry must reach the policy's on_error handling.
+  if node == nil:
+    return @[]
+  if node.kind != JArray:
+    raise newException(ValueError, field & " must be an array")
+  for item in node.getElems():
+    if item.kind != JObject:
+      raise newException(ValueError, field & " entries must be objects")
+    if item{"name"} == nil or item{"name"}.kind != JString or item{"name"}.getStr() == "":
+      raise newException(ValueError, field & " entries must have a package name")
+    for key in ["purl", "version", "versionInfo", "type"]:
+      if item.hasKey(key) and item[key].kind != JString:
+        raise newException(ValueError, field & " entry " & key & " must be a string")
+    result.add(item)
+
 # CycloneDX
+
+proc cyclonedxLocations(component: JsonNode): seq[string] =
+  for p in component{"properties"}.getElems():
+    let name = p{"name"}.getStr()
+    if name.startsWith("syft:location:") and name.endsWith(":path"):
+      let path = p{"value"}.getStr()
+      if path != "" and path notin result:
+        result.add(path)
 
 proc property(component: JsonNode, name: string): string =
   for p in component{"properties"}.getElems():
@@ -122,11 +152,12 @@ proc cyclonedxLicenses(component: JsonNode): seq[string] =
       result.add(license{"name"}.getStr())
 
 proc addComponents(sbom: var Sbom, components: JsonNode, depth: int) =
+  let entries = packageArray(components, "components")
   if depth > maxComponentDepth:
+    if entries.len > 0:
+      sbom.truncated = true
     return
-  for component in components.getElems():
-    if component.kind != JObject:
-      continue
+  for component in entries:
     let purl = component{"purl"}.getStr()
     # files and the scanned source itself are components too
     if purl != "" or component{"type"}.getStr() notin ["file", ""]:
@@ -136,7 +167,7 @@ proc addComponents(sbom: var Sbom, components: JsonNode, depth: int) =
         purl:     purl,
         pkgType:  component.property("syft:package:type"),
         language: component.property("syft:package:language"),
-        location: component.property("syft:location:0:path"),
+        locations: component.cyclonedxLocations(),
         licenses: component.cyclonedxLicenses(),
       ))
       if not added:
@@ -156,24 +187,42 @@ proc spdxPurl(pkg: JsonNode): string =
     if reference{"referenceType"}.getStr() == "purl":
       return reference{"referenceLocator"}.getStr()
 
-proc spdxLocation(pkg: JsonNode): string =
+proc spdxLocations(pkg: JsonNode): seq[string] =
   # syft writes "acquired package info from <cataloger>: <path>[, <path>]"
   let info = pkg{"sourceInfo"}.getStr()
   let i = info.rfind(": /")
   if i >= 0:
-    return info[i + 2 .. ^1].split(", ")[0]
+    return info[i + 2 .. ^1].split(", ")
+
+proc spdxSourceIds(doc: JsonNode): seq[string] =
+  # Explicit source identity, never the absence of optional version/purl.
+  for id in doc{"documentDescribes"}.getElems():
+    result.add(id.getStr())
+  let documentId = doc{"SPDXID"}.getStr()
+  for rel in doc{"relationships"}.getElems():
+    if rel{"relationshipType"}.getStr() == "DESCRIBES" and
+       rel{"spdxElementId"}.getStr() == documentId and documentId != "":
+      result.add(rel{"relatedSpdxElement"}.getStr())
+    elif rel{"relationshipType"}.getStr() == "DESCRIBED_BY" and
+         rel{"relatedSpdxElement"}.getStr() == documentId and documentId != "":
+      result.add(rel{"spdxElementId"}.getStr())
 
 proc parseSpdx(doc: JsonNode): Sbom =
-  for item in doc{"packages"}.getElems():
+  let sourceIds = doc.spdxSourceIds()
+  for item in packageArray(doc{"packages"}, "packages"):
     let purl = item.spdxPurl()
-    # the described directory or image itself, not a package
-    if purl == "" and item{"versionInfo"}.getStr() == "":
+    # Only an explicitly described source file/container row is omitted.
+    # A described application/library is still a dependency to check, even
+    # when its optional version and purl metadata are absent.
+    if item{"SPDXID"}.getStr() != "" and item{"SPDXID"}.getStr() in sourceIds and
+       item{"primaryPackagePurpose"}.getStr() in ["FILE", "CONTAINER"] and
+       purl == "" and item{"versionInfo"}.getStr() == "":
       continue
     var pkg = SbomPackage(
       name:     item{"name"}.getStr(),
       version:  item{"versionInfo"}.getStr(),
       purl:     purl,
-      location: item.spdxLocation(),
+      locations: item.spdxLocations(),
     )
     # https://spdx.github.io/spdx-spec/v2.3/package-information/#713-concluded-license-field
     let concluded = item{"licenseConcluded"}.getStr()
@@ -188,7 +237,7 @@ proc parseSpdx(doc: JsonNode): Sbom =
 # syft JSON
 
 proc parseSyftJson(doc: JsonNode): Sbom =
-  for artifact in doc{"artifacts"}.getElems():
+  for artifact in packageArray(doc{"artifacts"}, "artifacts"):
     var pkg = SbomPackage(
       name:     artifact{"name"}.getStr(),
       version:  artifact{"version"}.getStr(),
@@ -196,9 +245,16 @@ proc parseSyftJson(doc: JsonNode): Sbom =
       pkgType:  artifact{"type"}.getStr(),
       language: artifact{"language"}.getStr(),
     )
-    let locations = artifact{"locations"}.getElems()
-    if len(locations) > 0:
-      pkg.location = locations[0]{"path"}.getStr()
+    let locations = artifact{"locations"}
+    if locations != nil:
+      if locations.kind != JArray:
+        raise newException(ValueError, "artifact locations must be an array")
+      for location in locations.getElems():
+        if location.kind != JObject or location{"path"} == nil or location{"path"}.kind != JString:
+          raise newException(ValueError, "artifact locations must have a string path")
+        let path = location{"path"}.getStr()
+        if path != "" and path notin pkg.locations:
+          pkg.locations.add(path)
     for license in artifact{"licenses"}.getElems():
       let expression = license{"spdxExpression"}.getStr()
       pkg.licenses.add(if expression != "": expression else: license{"value"}.getStr())
@@ -237,11 +293,16 @@ proc forContext*(sbom: Sbom, root, dir: string): Sbom =
   ## be anywhere.
   result = Sbom(source: dir, truncated: sbom.truncated)
   for pkg in sbom.packages:
-    let location = pkg.location.contextPath(root, dir)
-    if location.isNone():
-      continue
     var p = pkg
-    p.location = location.get()
+    p.locations = @[]
+    let locations = if pkg.locations.len > 0: pkg.locations else: @[pkg.location]
+    for occurrence in locations:
+      let location = occurrence.contextPath(root, dir)
+      if location.isSome() and location.get() notin p.locations:
+        p.locations.add(location.get())
+    if p.locations.len == 0:
+      continue
+    p.location = p.locations[0]
     result.packages.add(p)
 
 proc addOutput(result: var PolicySboms, rule: string, output: ToolOutput,
@@ -253,9 +314,11 @@ proc addOutput(result: var PolicySboms, rule: string, output: ToolOutput,
     else:
       for p in sbom.packages.mitems():
         p.location = p.location.strip(trailing = false, chars = {'/'})
+        for location in p.locations.mitems():
+          location = location.strip(trailing = false, chars = {'/'})
     if sbom.truncated:
       result.errors.add(newSubjectFinding(rule, "error", sbom.source,
-        "the SBOM lists more than " & $maxSbomPackages & " packages; only the first were checked"))
+        "the SBOM exceeds the package count or component nesting limit; some packages were not checked"))
     result.sboms.add(sbom)
   except CatchableError:
     let where = if output.image != "": " in the chalk mark of " & output.image
