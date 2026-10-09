@@ -2532,6 +2532,7 @@ See `docs/design-build-policy.md` in the chalk repository for details.
 """
 
   allow golden_images
+  allow registries
 
   field mode {
     type:     string
@@ -2724,6 +2725,105 @@ Unknown kinds are reported as evaluation errors.
     doc: """
 Additional guidance shown to the user and included in the report when an
 image is not allowed, e.g. a link to the list of golden images.
+"""
+  }
+}
+
+singleton registries {
+  user_def_ok:   false
+  doc: """
+Restricts the registries a build pulls images from (`FROM`,
+`COPY --from`, `RUN --mount=from` and image named contexts) and the
+registries `docker build --push` and `docker push` push to. Unlike
+`golden_images`, which allowlists exact images, this works at the level of
+registry hosts and repository namespaces; both can be enabled together.
+
+Entries are `(kind, value)` tuples. The supported kind is `glob`:
+
+* a value without `/` is a glob over the registry host, e.g. `docker.io`,
+  `ghcr.io`, `*.dkr.ecr.*.amazonaws.com` or `localhost:5000`;
+* a value with `/` is a glob over `registry/repository`, e.g.
+  `ghcr.io/acme/*`. `*` also matches `/`. A first component without `.`
+  or `:` that is not `localhost` and has no glob character is a Docker Hub
+  namespace, as in docker (`acme/*` is `docker.io/acme/*`).
+
+Images are normalized like docker does, so `alpine` is
+`docker.io/library/alpine` and `docker.io`, `index.docker.io` and
+`registry-1.docker.io` are the same registry. Tags and digests in values
+are ignored. Unknown kinds are reported as evaluation errors.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable the registries policy"
+    doc: """
+Enables the checks configured below. With every list empty and
+`require_digest` off nothing is checked.
+"""
+  }
+
+  field pull_allowed {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Registries images may be pulled from"
+    doc: """
+When not empty, every image the build pulls must match an entry.
+An empty list allows any registry not listed in `pull_denied`.
+"""
+  }
+
+  field pull_denied {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Registries images may not be pulled from"
+    doc: """
+Images matching an entry are violations, even if they match
+`pull_allowed`.
+"""
+  }
+
+  field push_allowed {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Registries images may be pushed to"
+    doc: """
+When not empty, every image `docker build --push` (including
+`--output type=registry` and `type=image,push=true`) or `docker push`
+pushes must match an entry. An empty list allows any registry not listed
+in `push_denied`.
+"""
+  }
+
+  field push_denied {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Registries images may not be pushed to"
+    doc: """
+Push targets matching an entry are violations, even if they match
+`push_allowed`.
+"""
+  }
+
+  field require_digest {
+    type:     bool
+    default:  false
+    shortdoc: "Require pulled images to be pinned by digest"
+    doc: """
+Every image the build pulls must be referenced by digest
+(`image@sha256:...`). On `docker push` the references recorded in the
+image's chalk mark are checked, which include base image digests chalk
+pinned during the build.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance shown to the user and included in the report on a
+violation, e.g. a link to the list of approved registries.
 """
   }
 }

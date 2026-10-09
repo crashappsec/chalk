@@ -111,9 +111,14 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
   if not policyEnabled():
     return
   let collect = proc(): PolicyInput =
-    result = ctx.buildSubjects(allStages = not hasBuildX())
-    let pushTargets = if ctx.foundPush: ctx.foundTags.asRepoTag() else: @[]
-    result.addCommandInput("build", pushTargets, ctx.policyContextDirs())
+    # push targets are known from the command line even when images are not
+    try:
+      result = ctx.buildSubjects(allStages = not hasBuildX())
+    except CatchableError:
+      result = PolicyInput()
+      result.errors.add(collectionError("could not collect policy subjects: " &
+                                        getCurrentExceptionMsg()))
+    result.addCommandInput("build", ctx.buildPushTargets(), ctx.policyContextDirs())
     result.dockerfilePath = ctx.policyDockerfilePath()
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver())
 

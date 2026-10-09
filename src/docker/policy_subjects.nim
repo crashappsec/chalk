@@ -3,9 +3,9 @@
 
 ## Pure subject collection from parsed Dockerfiles and extracted chalk marks.
 ## Docker I/O lives in policy.nim so metadata decoding can be tested directly.
-import std/[sequtils, strutils]
+import std/[sequtils, strutils, tables]
 import ".."/[policy/engine, types]
-import "."/[dockerfile, ids]
+import "."/[dockerfile, ids, util]
 
 proc addDigest(digests: var seq[string], digest: string) =
   if digest != "" and digest notin digests:
@@ -61,6 +61,38 @@ proc buildSubjects*(ctx: DockerInvocation, allStages = false): PolicyInput =
       digests.addDigest(image.digest)
       result.subjects.add(PolicySubject(image: image, raw: $image, digests: digests,
                                         stage: section.alias, source: source))
+
+proc buildPushTargets*(ctx: DockerInvocation): seq[string] =
+  ## images `docker build` pushes. buildx treats `--push` and
+  ## `--output type=registry` as `type=image,push=true`, and `--tag` replaces
+  ## the `name` of every image exporter:
+  ## https://github.com/docker/buildx/blob/master/build/opt.go
+  if ctx.foundPush:
+    result = ctx.foundTags.asRepoTag()
+  for output in ctx.foundOutputs:
+    let kind = output.getOrDefault("type")
+    if kind notin ["image", "registry"]:
+      continue
+    if kind == "image" and not output.exporterBool("push"):
+      continue
+    var named = len(ctx.foundTags) > 0
+    for tag in ctx.foundTags.asRepoTag():
+      if tag notin result:
+        result.add(tag)
+    # several names are comma separated, quoted on the command line
+    if len(ctx.foundTags) == 0:
+      for name in output.getOrDefault("name").split(','):
+        let name = name.strip()
+        if name != "":
+          named = true
+          if name notin result:
+            result.add(name)
+    let prefix = output.getOrDefault("dangling-name-prefix")
+    if prefix != "" and (not output.exporterBool("dangling-name-only") or not named) and
+       prefix notin result:
+      # Its digest is only known after the build; registry matching needs
+      # the destination repository, which is already supplied here.
+      result.add(prefix)
 
 proc metadataTable(value: Box): OrderedTableRef[string, Box] =
   if value.isNil() or value.kind != MkTable:
