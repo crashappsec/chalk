@@ -160,8 +160,113 @@ proc testPolicySboms() =
   assertEq(len(sboms.sboms[0].packages), 10)
   clearPolicyToolCache()
 
+proc testAllLocations() =
+  let docs = @[
+    %*{"bomFormat": "CycloneDX", "components": [{"type": "library", "name": "denied",
+      "purl": "pkg:npm/denied@1", "properties": [
+        {"name": "syft:location:0:path", "value": "/sibling/package-lock.json"},
+        {"name": "syft:location:1:path", "value": "/service/package-lock.json"}]}]},
+    %*{"artifacts": [{"name": "denied", "purl": "pkg:npm/denied@1", "locations": [
+      {"path": "/sibling/package-lock.json"}, {"path": "/service/package-lock.json"}]}]},
+    %*{"spdxVersion": "SPDX-2.3", "packages": [{"name": "denied", "versionInfo": "1",
+      "sourceInfo": "acquired package info from npm: /sibling/package-lock.json, /service/package-lock.json"}]},
+  ]
+  for doc in docs:
+    let sbom = parseSbom(doc)
+    assertEq(sbom.packages[0].locations.len, 2)
+    let context = sbom.forContext("/repo", "/repo/service")
+    assertEq(context.packages.len, 1)
+    assertEq(context.packages[0].location, "package-lock.json")
+    assertEq(context.packages[0].locations, @["package-lock.json"])
+    assertEq(sbom.forContext("/repo", "/repo/other").packages.len, 0)
+
+proc testSpdxOptionalMetadata() =
+  for sourceKey in ["documentDescribes", "relationships"]:
+    var doc = %*{"spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "packages": [
+      {"SPDXID": "SPDXRef-source", "name": "/repo", "primaryPackagePurpose": "FILE"},
+      {"SPDXID": "SPDXRef-gpl-library", "name": "gpl-library", "filesAnalyzed": false,
+       "downloadLocation": "NOASSERTION", "licenseDeclared": "GPL-3.0-only"}]}
+    if sourceKey == "documentDescribes":
+      doc[sourceKey] = %*["SPDXRef-source"]
+    else:
+      doc[sourceKey] = %*[{"spdxElementId": "SPDXRef-DOCUMENT", "relatedSpdxElement": "SPDXRef-source",
+                          "relationshipType": "DESCRIBES"}]
+    let sbom = parseSbom(doc)
+    assertEq(sbom.names(), @["gpl-library"])
+    assertEq(sbom.packages[0].licenses, @["GPL-3.0-only"])
+  # SPDX documents can describe an actual package, not just a scanned source.
+  # Described package metadata and licenses must remain eligible for checks.
+  for purpose in ["LIBRARY", "APPLICATION", "CONTAINER"]:
+    let described = parseSbom(%*{"spdxVersion": "SPDX-2.3", "documentDescribes": ["SPDXRef-package"],
+      "packages": [{"SPDXID": "SPDXRef-package", "name": "gpl-package", "primaryPackagePurpose": purpose,
+        "versionInfo": "1", "licenseDeclared": "GPL-3.0-only", "externalRefs": [
+          {"referenceType": "purl", "referenceLocator": "pkg:npm/gpl-package@1"}]}]})
+    assertEq(described.names(), @["gpl-package"])
+    assertEq(described.packages[0].purl, "pkg:npm/gpl-package@1")
+    assertEq(described.packages[0].licenses, @["GPL-3.0-only"])
+  for metadata in ["versionInfo", "externalRefs"]:
+    var item = %*{"SPDXID": "SPDXRef-package", "name": "gpl-package", "primaryPackagePurpose": "CONTAINER",
+                  "licenseDeclared": "GPL-3.0-only"}
+    if metadata == "versionInfo":
+      item[metadata] = %"1"
+    else:
+      item[metadata] = %*[{"referenceType": "purl", "referenceLocator": "pkg:npm/gpl-package@1"}]
+    assertEq(parseSbom(%*{"spdxVersion": "SPDX-2.3", "documentDescribes": ["SPDXRef-package"],
+                          "packages": [item]}).names(), @["gpl-package"])
+  for purpose in ["LIBRARY", "APPLICATION"]:
+    let unversioned = parseSbom(%*{"spdxVersion": "SPDX-2.3", "documentDescribes": ["SPDXRef-package"],
+      "packages": [{"SPDXID": "SPDXRef-package", "name": "gpl-package", "primaryPackagePurpose": purpose,
+                    "licenseDeclared": "GPL-3.0-only"}]})
+    assertEq(unversioned.names(), @["gpl-package"])
+    assertEq(unversioned.packages[0].licenses, @["GPL-3.0-only"])
+  # No source identity means even an unversioned package must be retained.
+  assertEq(parseSbom(%*{"spdxVersion": "SPDX-2.3", "packages": [{"name": "library"}]}).names(), @["library"])
+
+proc testDepthAndMalformedOutput() =
+  var children = %*[{"type": "library", "name": "denied", "purl": "pkg:npm/denied@1"}]
+  for i in 0 .. 8:
+    children = %*[{"type": "library", "name": "parent", "components": children}]
+  let deep = %*{"bomFormat": "CycloneDX", "components": children}
+  doAssert parseSbom(deep).truncated
+  let mark = ChalkDict()
+  mark["SBOM"] = sbomKey(deep)
+  let result = PolicyInput(command: "push", pushMarks: @[mark]).policySboms("r")
+  assertEq(result.errors.len, 1)
+  assertEq(result.errors[0].rule, "r")
+  doAssert "not checked" in result.errors[0].reason
+  # Empty children beyond the depth bound do not imply omitted packages.
+  children = newJArray()
+  for i in 0 .. 8:
+    children = %*[{"type": "library", "name": "parent", "components": children}]
+  doAssert not parseSbom(%*{"bomFormat": "CycloneDX", "components": children}).truncated
+
+  for field in ["components", "packages", "artifacts"]:
+    var doc = newJObject()
+    if field == "components": doc["bomFormat"] = %"CycloneDX"
+    if field == "packages": doc["spdxVersion"] = %"SPDX-2.3"
+    for malformed in @[%*{"name": "denied"}, %*["denied"], %*[{"purl": "pkg:npm/denied@1"}], %*[{"name": "denied", "purl": 42}], newJNull()]:
+      doc[field] = malformed
+      doAssertRaises(ValueError):
+        discard parseSbom(doc)
+      mark["SBOM"] = sbomKey(doc)
+      let invalid = PolicyInput(command: "push", pushMarks: @[mark]).policySboms("r")
+      assertEq(invalid.sboms.len, 0)
+      assertEq(invalid.errors.len, 1)
+    doc[field] = newJArray()
+    assertEq(parseSbom(doc).packages.len, 0)
+  # Both standard formats allow package arrays to be omitted.
+  assertEq(parseSbom(%*{"bomFormat": "CycloneDX"}).packages.len, 0)
+  assertEq(parseSbom(%*{"spdxVersion": "SPDX-2.3"}).packages.len, 0)
+  doAssertRaises(ValueError):
+    discard parseSbom(%*{"bomFormat": "CycloneDX", "components": [
+      {"type": "library", "name": "parent", "components": {"name": "denied"}}]})
+
 testPurls()
 testCycloneDx()
 testFormats()
 testTruncated()
 testPolicySboms()
+
+testAllLocations()
+testSpdxOptionalMetadata()
+testDepthAndMalformedOutput()

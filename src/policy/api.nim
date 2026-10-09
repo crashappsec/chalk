@@ -30,6 +30,8 @@ type
   PolicyInput* = object
     subjects*: seq[PolicySubject]
     errors*:   seq[PolicyFinding] # subjects that could not be determined
+    ## The collector failed before it could supply command/context data.
+    collectionFailed*: bool
     command*:  string # "build" or "push"
     ## local build context directories, empty for push
     contextDirs*: seq[string]
