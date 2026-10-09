@@ -932,6 +932,63 @@ def test_enforce_repos_unknown_repo_never_enforces(
     }
 
 
+def push_json(chalk: Chalk, image: str, config_json: str, random_hex: str, **kwargs):
+    return chalk.docker_push(
+        image,
+        config=CONFIGS / "policy_json.c4m",
+        env={
+            "POLICY_CONFIG_JSON": config_json,
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+            **kwargs.pop("env", {}),
+        },
+        **kwargs,
+    )
+
+
+# https://github.com/crashappsec/chalk/issues/776: push has no build context,
+# so the repository comes from the working directory
+@pytest.mark.parametrize(
+    "base, remote, expected_exit, effective_mode",
+    [
+        ("busybox", f"https://{ENFORCED_REPO}.git", 1, "enforce"),
+        ("busybox", "https://github.com/crashappsec/chalk.git", 0, "audit"),
+        # passes every policy: no policy report
+        ("alpine", f"https://{ENFORCED_REPO}.git", 0, None),
+    ],
+)
+def test_enforce_repos_docker_push(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    base: str,
+    remote: str,
+    expected_exit: int,
+    effective_mode: str | None,
+):
+    tag = f"{REGISTRY}/{random_hex}"
+    build(chalk, f"FROM {base}\nCMD true\n", "off", random_hex, tag=tag)
+    _, result = push_json(
+        chalk,
+        tag,
+        as_form(rollout_policy(), "single"),
+        random_hex,
+        cwd=git_context(tmp_data_dir, remote),
+        env=NO_CI_REPO,
+        ignore_errors=True,
+        expected_success=expected_exit == 0,
+    )
+    assert result.exit_code == expected_exit
+    assert (registry_tags(random_hex) != []) == (expected_exit == 0)
+    if effective_mode is None:
+        assert policy_reports(random_hex) == []
+        return
+    (report,) = policy_reports(random_hex)
+    assert report["_POLICY_RESULTS"][0]["effective_mode"] == effective_mode
+    assert report["_POLICY_RESULTS"][0]["repo"] == remote.removeprefix(
+        "https://"
+    ).removesuffix(".git")
+
+
 # a relative origin is a local path to git and identifies no repository
 @pytest.mark.parametrize("origin", [None, "mirrors/crashappsec/chalk.git"])
 def test_enforce_repos_falls_back_to_ci_repo(
