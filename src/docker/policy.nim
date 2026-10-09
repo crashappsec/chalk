@@ -68,20 +68,37 @@ proc localDir(path: string): string =
     return resolved
   return ""
 
-proc contextDirs(ctx: DockerInvocation): seq[string] =
+proc policyContextDirs*(ctx: DockerInvocation): seq[string] =
   ## local directories the build reads, for rules that scan the build context
   let main =
-    if ctx.gitContext != nil and ctx.gitContext.tmpWorkTree != "":
-      ctx.gitContext.tmpWorkTree
+    if ctx.gitContext != nil:
+      if not ctx.gitContext.isCheckedOut():
+        discard ctx.gitContext.checkout()
+      ctx.gitContext.contextPath()
     else:
       ctx.foundContext.localDir()
   if main != "":
+    if not main.dirExists():
+      raise newException(ValueError, "build context directory does not exist: " & main)
+    if ctx.gitContext != nil:
+      # Command-line processing precedes this checkout. Build the worktree
+      # we inspected rather than fetching the mutable Git reference again.
+      ctx.newCmdLine = ctx.gitContext.replaceContextArg(ctx.newCmdLine)
     result.add(main)
   if ctx.foundExtraContexts != nil:
     for _, value in ctx.foundExtraContexts:
       let dir = value.localDir()
       if dir != "" and dir notin result:
         result.add(dir)
+
+proc policyDockerfilePath*(ctx: DockerInvocation): string =
+  if ctx.dockerFileLoc == stdinIndicator:
+    return ""
+  if ctx.gitContext != nil:
+    let name = if ctx.foundFileArg == "": "Dockerfile" else: ctx.foundFileArg
+    return (ctx.gitContext.contextPath() / name).resolvePath()
+  if ctx.dockerFileLoc != "":
+    return ctx.dockerFileLoc.resolvePath()
 
 proc addCommandInput(input: var PolicyInput, command: string, pushTargets: seq[string],
                      contextDirs: seq[string] = @[]) =
@@ -101,9 +118,8 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
       result = PolicyInput()
       result.errors.add(collectionError("could not collect policy subjects: " &
                                         getCurrentExceptionMsg()))
-    result.addCommandInput("build", ctx.buildPushTargets(), ctx.contextDirs())
-    if ctx.dockerFileLoc notin ["", stdinIndicator]:
-      result.dockerfilePath = ctx.dockerFileLoc.resolvePath()
+    result.addCommandInput("build", ctx.buildPushTargets(), ctx.policyContextDirs())
+    result.dockerfilePath = ctx.policyDockerfilePath()
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver())
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
