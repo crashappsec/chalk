@@ -17,47 +17,8 @@ import ".."/[
   utils/base64,
   utils/files,
   utils/strings,
+  utils/x509,
 ]
-
-{.compile:"../utils/certs.c".}
-
-type
-  CertBIO  = pointer
-  Cert     = ptr object
-    key_value:     cstringArray
-    subject:       cstringArray
-    subject_short: cstringArray
-    issuer:        cstringArray
-    issuer_short:  cstringArray
-    version:       cint
-    key_size:      cint
-  X509Cert = ref object of RootRef
-    keyValue:     TableRef[string, string]
-    subject:      TableRef[string, string]
-    subjectShort: TableRef[string, string]
-    issuer:       TableRef[string, string]
-    issuerShort:  TableRef[string, string]
-    version:      int
-    keySize:      int
-
-proc open_cert(fd: FileHandle): CertBIO {.importc.}
-proc read_cert(data: cstring, c: cint): CertBIO {.importc.}
-proc close_cert(c: CertBIO) {.importc.}
-proc extract_cert_data(c: CertBIO): Cert {.importc.}
-proc cleanup_cert_info(cert: Cert) {.importc.}
-
-proc toTable(t: cstringArray): TableRef[string, string] =
-  result = newTable[string, string]()
-  # cstringArrayToSeq walks a[0] without a nil check, so guard the C side
-  # handing back nil under allocation failure.
-  if t == nil:
-    return
-  let kv = cstringArrayToSeq(t)
-  for i in 0..<int(len(kv)/2):
-    let
-      key   = kv[i*2]
-      value = kv[i*2+1]
-    result[key] = $value
 
 iterator findCerts(self:       Plugin,
                    bio:        CertBIO,
@@ -65,46 +26,31 @@ iterator findCerts(self:       Plugin,
                    fsRef:      string = "",
                    envVarName: string = "",
                   ): ChalkObj =
-  while true:
-    let output = extract_cert_data(bio)
-    if output == nil:
-      break
-    try:
-      let
-        cache    = X509Cert(
-          version:      int(output.version),
-          keyValue:     output.key_value.toTable(),
-          subject:      output.subject.toTable(),
-          subjectShort: output.subject_short.toTable(),
-          issuer:       output.issuer.toTable(),
-          issuerShort:  output.issuer_short.toTable(),
-          keySize:      int(output.key_size),
-        )
-        data     = ChalkDict()
-        chalk    = newChalk(
-          name          = name,
-          fsRef         = fsRef,
-          envVarName    = envVarName,
-          codec         = self,
-          marked        = true, # allows to "extract"
-          resourceType  = {ResourceCert},
-          cache         = cache,
-          collectedData = data,
-          extract       = data,
-        )
-      # cert is already a key-value store and so we will not be chalking
-      # a cert file but we still want chalk to collect metadata about it
-      # therefore we "fake" chalkmark to be able to collect/report metadata
-      # about it as if was chalked
-      data.setIfNotEmpty("MAGIC",         magicUTF8)
-      data.setIfNotEmpty("ARTIFACT_TYPE", artX509Cert)
-      data.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
-      data.setIfNotEmpty("CHALK_ID",      chalk.callGetChalkId())
-      data.merge(chalk.computeMetadataHashAndId(onlyCollected = true))
-      discard chalk.getChalkMarkAsStr(onlyCollected = true) # cache chalkmark for future validation
-      yield chalk
-    finally:
-      cleanup_cert_info(output)
+  for cache in bio.x509Certs():
+    let
+      data     = ChalkDict()
+      chalk    = newChalk(
+        name          = name,
+        fsRef         = fsRef,
+        envVarName    = envVarName,
+        codec         = self,
+        marked        = true, # allows to "extract"
+        resourceType  = {ResourceCert},
+        cache         = cache,
+        collectedData = data,
+        extract       = data,
+      )
+    # cert is already a key-value store and so we will not be chalking
+    # a cert file but we still want chalk to collect metadata about it
+    # therefore we "fake" chalkmark to be able to collect/report metadata
+    # about it as if was chalked
+    data.setIfNotEmpty("MAGIC",         magicUTF8)
+    data.setIfNotEmpty("ARTIFACT_TYPE", artX509Cert)
+    data.setIfNotEmpty("CHALK_VERSION", getChalkExeVersion())
+    data.setIfNotEmpty("CHALK_ID",      chalk.callGetChalkId())
+    data.merge(chalk.computeMetadataHashAndId(onlyCollected = true))
+    discard chalk.getChalkMarkAsStr(onlyCollected = true) # cache chalkmark for future validation
+    yield chalk
 
 proc certsPathSearch(self: Plugin,
                      path: string,

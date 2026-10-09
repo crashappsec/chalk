@@ -179,7 +179,7 @@ BIO_all(BIO *bio)
     return result;
 }
 
-#define FIXED_LEN 15
+#define FIXED_LEN 19
 
 typedef struct {
     char **key_value;
@@ -304,6 +304,27 @@ extract_cert_data(BIO *fdb)
     if (sig) {
         key_value[ix++] = strdup("Signature");
         key_value[ix++] = convert_ASN1STRING(sig);
+    }
+    // used by the certificates build policy, not reported by the codec
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int  md_len = 0;
+    if (X509_digest(cert, EVP_sha256(), md, &md_len) == 1 && md_len > 0) {
+        ASN1_OCTET_STRING *fp = ASN1_OCTET_STRING_new();
+        if (fp != NULL && ASN1_OCTET_STRING_set(fp, md, (int)md_len) == 1) {
+            char *hex = convert_ASN1STRING(fp);
+            if (hex != NULL) {
+                key_value[ix++] = strdup("SHA256 Fingerprint");
+                key_value[ix++] = hex;
+            }
+        }
+        ASN1_OCTET_STRING_free(fp);
+    }
+    char group[80];
+    size_t group_len = 0;
+    if (keynid == EVP_PKEY_EC &&
+        EVP_PKEY_get_group_name(pub, group, sizeof(group), &group_len) == 1) {
+        key_value[ix++] = strdup("Key Group");
+        key_value[ix++] = strdup(group);
     }
 
     for (int i = 0; i < num_exts; i++) {

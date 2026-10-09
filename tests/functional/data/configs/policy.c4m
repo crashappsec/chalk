@@ -27,6 +27,12 @@ if env_exists("POLICY_ON_ERROR") {
   policy.on_error = env("POLICY_ON_ERROR")
 }
 
+if env_exists("POLICY_CERTIFICATES") {
+  policy.certificates.enabled          = true
+  policy.certificates.deny_self_signed = true
+  policy.certificates.allowed_issuers  = [("cn", "Chalk Test Root CA")]
+}
+
 if env_exists("POLICY_NO_STEP_SUMMARY") {
   policy.github_step_summary = false
 }

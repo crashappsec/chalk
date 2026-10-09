@@ -1289,3 +1289,130 @@ def test_step_summary_includes_presigned_report_location(
     # the presigned query string is a credential
     assert "X-Amz-Signature" not in text
     assert "presign-test" not in text
+
+
+CERT_FIXTURES = Path(__file__).parents[1] / "unit" / "fixtures" / "certs"
+
+
+def cert_context(path: Path, files: dict[str, str]) -> Path:
+    """files maps a context path to a fixture name, or to content after `=`"""
+    for name, source in files.items():
+        target = path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source.startswith("="):
+            target.write_text(source[1:])
+        else:
+            target.write_bytes((CERT_FIXTURES / source).read_bytes())
+    return path
+
+
+def certificates_policy(mode: str = "enforce", **settings) -> str:
+    return json.dumps(
+        {
+            "id": "certificates@1",
+            "mode": mode,
+            "certificates": {"enabled": True, **settings},
+        }
+    )
+
+
+def test_cert_policy_enforce_blocks_expired_cert(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    cert_context(
+        tmp_data_dir,
+        {
+            "certs/expired.pem": "expired.pem",
+            "certs/leaf.pem": "leaf.pem",
+            "certs/chain.pem": "chain.pem",
+        },
+    )
+    _, result = build_json(
+        chalk,
+        "FROM alpine\nCOPY certs /certs\n",
+        certificates_policy(),
+        random_hex,
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_ID="certificates@1", _POLICY_RESULT="blocked")
+    assert report["_POLICY_FINDINGS"] == [
+        {
+            "policy_id": "certificates@1",
+            "rule": "certificates",
+            "kind": "violation",
+            "image": "",
+            "digest": "",
+            "stage": "",
+            "source": "",
+            "reason": "certificate expired on 2020-01-01",
+            "subject": "certs/expired.pem (expired.example.com)",
+            "location": "certs/expired.pem",
+            "severity": "",
+        }
+    ]
+
+
+def test_cert_policy_skips_ignored_files_and_ca_bundles(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    cert_context(
+        tmp_data_dir,
+        {
+            "certs/leaf.pem": "leaf.pem",
+            "certs/ca.pem": "ca.pem",
+            "certs/ca-certificates.crt": "expired.pem",
+            "testdata/expired.pem": "expired.pem",
+            "vendor/sha1.pem": "sha1.pem",
+            ".dockerignore": "=testdata\n",
+        },
+    )
+    _, result = build_json(
+        chalk,
+        "FROM alpine\nCOPY certs /certs\n",
+        certificates_policy(exclude_paths=["vendor"]),
+        random_hex,
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    assert policy_reports(random_hex) == []
+
+
+def test_cert_policy_con4m_audit(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
+    cert_context(
+        tmp_data_dir,
+        {
+            "certs/leaf.pem": "leaf.pem",
+            "certs/self.pem": "self-signed.pem",
+        },
+    )
+    _, result = build(
+        chalk,
+        "FROM alpine\nCOPY certs /certs\n",
+        "audit",
+        random_hex,
+        tag=random_hex,
+        env={"POLICY_CERTIFICATES": "1"},
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert len(report["_POLICY_FINDINGS"]) == 1
+    assert report.has(
+        _POLICY_RESULT="violation",
+        _POLICY_FINDINGS=Contains(
+            [
+                {
+                    "rule": "certificates",
+                    "kind": "violation",
+                    "subject": "certs/self.pem (self.example.com)",
+                    "location": "certs/self.pem",
+                    "reason": "certificate self-signed; issuer CN=self.example.com is not allowed",
+                }
+            ]
+        ),
+    )
