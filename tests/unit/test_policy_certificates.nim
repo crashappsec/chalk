@@ -258,6 +258,23 @@ proc testScanning() =
   doAssert "certificate scan is incomplete" in truncated[0].reason
   assertEq(truncated[0].subject, ctx)
 
+  # <Dockerfile>.dockerignore takes precedence over the context's, main context only
+  let dfDir = newContext({
+    "Dockerfile": "=FROM scratch\n",
+    # would hide the other context's expired.pem if it applied there
+    "Dockerfile.dockerignore": "=a\nexpired.pem\n",
+  })
+  defer: removeDir(dfDir)
+  settings = defaultCertificatesConfig()
+  let withDockerfile = PolicyInput(command: "build", contextDirs: @[ctx, outside],
+                                   dockerfilePath: dfDir / "Dockerfile")
+  let dfFound = settings.check(withDockerfile, now).locations()
+  assertEq(dfFound, @[outside / "expired.pem", "excluded/expired.pem",
+                      "ignored/expired.pem", "ignored/keep.pem"])
+  let noSpecific = PolicyInput(command: "build", contextDirs: @[ctx],
+                               dockerfilePath: ctx / "Dockerfile")
+  assertEq(settings.check(noSpecific, now).locations(), @["a/expired.pem", "excluded/expired.pem", "ignored/keep.pem"])
+
   # push has no build context
   assertEq(settings.check(PolicyInput(command: "push", pushTargets: @["app:1"]), now).len, 0)
 
@@ -335,6 +352,10 @@ proc testJson() =
     if rule.name == "certificates":
       rules.add(rule)
   doAssert rules[0].load()
+  let hint = rules[0].hint()
+  assertEq(hint.rule, "certificates")
+  assertEq(hint.message, "Use the Acme PKI")
+  assertEq(hint.allowed, @["cn:Acme *", "sha256:" & caSha256])
   let res = evaluatePolicy(policy, rules, PolicyInput(command: "build", contextDirs: @[ctx]))
   assertEq(res.result, "blocked")
   assertEq(res.findings.locations(), @["expired.pem"])

@@ -2910,9 +2910,9 @@ Skip system and library CA bundles such as `ca-certificates.crt`,
     default:  true
     shortdoc: "Skip files excluded by .dockerignore"
     doc: """
-Skip files excluded by the build context's `.dockerignore`, as they never
-reach the image. A Dockerfile-specific `<Dockerfile>.dockerignore` is not
-considered.
+Skip files excluded by `.dockerignore`, as they never reach the image. As
+in BuildKit, a `<Dockerfile>.dockerignore` next to the Dockerfile takes
+precedence over the build context's `.dockerignore`.
 """
   }
 

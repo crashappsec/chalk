@@ -426,9 +426,10 @@ Which files are read:
   `cert`, `der` and `ca-bundle`; `*` reads every file) that contain a PEM
   certificate or start like a DER one;
 - `include_paths` and `exclude_paths` use `.dockerignore` syntax, relative
-  to the context; files excluded by the context's `.dockerignore` are
-  skipped (`honor_dockerignore`), as they never reach the image. A
-  Dockerfile-specific `<Dockerfile>.dockerignore` is not considered;
+  to the context; files excluded by `.dockerignore` are skipped
+  (`honor_dockerignore`), as they never reach the image. As in BuildKit, a
+  `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
+  the context's `.dockerignore` (main context only);
 - symlinks are never followed: docker sends them as links, so a target
   inside the context is checked on its own and one outside never reaches
   the image. `.git` directories are skipped;
@@ -440,6 +441,10 @@ Which files are read:
   1000 certificates are read per file, and a context with more than
   `max_files` entries stops the scan with an evaluation error (`on_error`
   decides).
+
+In the job summary, each offending certificate is listed with its reasons,
+and "How to fix" shows `message` (or a generic hint) and the
+`allowed_issuers` entries.
 
 `chalk docker push` has no build context, so the rule does not apply to it
 and reports nothing. Certificates added to an image by `RUN` steps or base

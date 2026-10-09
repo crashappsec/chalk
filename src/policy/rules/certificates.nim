@@ -250,12 +250,22 @@ proc hasCertExtension(name: string, extensions: seq[string]): bool =
       return true
   false
 
-proc readDockerignore(dir: string): seq[string] =
-  ## Only `<context>/.dockerignore`: rules do not know the Dockerfile, so a
-  ## `<Dockerfile>.dockerignore` is not considered.
-  ## https://docs.docker.com/build/concepts/context/#dockerignore-files
-  let path = dir / ".dockerignore"
-  if not fileExists(path):
+proc dockerignorePath(dir, dockerfilePath: string): string =
+  ## `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
+  ## `<context>/.dockerignore`
+  ## https://docs.docker.com/build/concepts/context/#filename-and-location
+  if dockerfilePath != "":
+    let specific = dockerfilePath & ".dockerignore"
+    if fileExists(specific):
+      return specific
+  let root = dir / ".dockerignore"
+  if fileExists(root):
+    return root
+  ""
+
+proc readDockerignore(dir: string, dockerfilePath = ""): seq[string] =
+  let path = dir.dockerignorePath(dockerfilePath)
+  if path == "":
     return
   for line in readFile(path).splitLines():
     let p = line.strip()
@@ -278,16 +288,18 @@ proc byLocation(a, b: CertInfo): int =
   if result == 0:
     result = cmp(a.index, b.index)
 
-proc scanContexts*(dirs: seq[string], settings: CertificatesConfig): CertScan =
+proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
+                   dockerfilePath = ""): CertScan =
   ## Certificates in the build context directories. Paths are relative to
   ## the first (main) context; certificates of other (named) contexts are
-  ## reported with absolute paths.
+  ## reported with absolute paths. `dockerfilePath` only selects the
+  ## ignore file of the main context, as BuildKit does.
   var visited = 0
   for n, dir in dirs:
     let ignore =
       if settings.honorDockerignore:
         try:
-          readDockerignore(dir)
+          readDockerignore(dir, if n == 0: dockerfilePath else: "")
         except CatchableError:
           result.errors.add(newSubjectFinding(ruleName, "error", dir,
                             "could not read .dockerignore: " & getCurrentExceptionMsg()))
@@ -447,7 +459,7 @@ proc check*(settings: CertificatesConfig, input: PolicyInput, now = getTime()): 
   if len(input.contextDirs) == 0:
     trace("policy: certificates: no local build context to check (" & input.command & ")")
     return
-  let scan = input.contextDirs.scanContexts(settings)
+  let scan = input.contextDirs.scanContexts(settings, input.dockerfilePath)
   result.add(scan.errors)
   result.add(settings.check(scan.certs.sorted(byLocation), now))
 
@@ -545,5 +557,14 @@ proc loadCertificates(): bool =
 proc checkCertificates(input: PolicyInput): seq[PolicyFinding] =
   loaded.check(input)
 
+proc certificatesHint(): PolicyHint =
+  result = PolicyHint(
+    rule:    ruleName,
+    message: (if loaded.message != "": loaded.message
+              else: "Replace or remove the reported certificates."),
+  )
+  for (kind, value) in loaded.allowedIssuers:
+    result.allowed.add(kind & ":" & value)
+
 proc loadCertificatesRule*() =
-  newPolicyInputRule(ruleName, loadCertificates, checkCertificates)
+  newPolicyInputRule(ruleName, loadCertificates, checkCertificates, hint = certificatesHint)
