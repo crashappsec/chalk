@@ -12,16 +12,17 @@
 import std/[
   algorithm,
   json,
+  os,
   strutils,
   tables,
 ]
 import "../.."/[
-  plugins/externalTool,
   types,
 ]
 import ".."/[
   api,
   configuration,
+  tools,
 ]
 import "."/[
   golden_images,
@@ -39,7 +40,7 @@ type
   SastResult* = object
     tool*:          string
     ruleId*:        string
-    path*:          string # relative to the scanned directory when known
+    path*:          string # relative to the build context (push: the scanned directory) when known
     line*:          int
     severity*:      string # one of `severities`
     confidence*:    string # one of `confidences`, empty when unknown
@@ -54,6 +55,9 @@ type
     doc*:   JsonNode
     roots*: seq[string] # directories the tool scanned
     image*: string      # pushed image whose mark recorded it, empty on build
+    ## build context directory: results outside it are dropped and paths are
+    ## relative to it; empty on push
+    dir*:   string
 
   SastConfig* = object
     minSeverity*:   string
@@ -130,12 +134,25 @@ proc cweId(value: string): string =
 
 proc relativeTo(path: string, roots: seq[string]): string =
   result = path
-  if result.startsWith("file://"):
-    result = result[len("file://") .. ^1]
   for root in roots:
     let prefix = root.strip(leading = false, chars = {'/'}) & "/"
     if result.startsWith(prefix):
       return result[len(prefix) .. ^1]
+
+proc resultPath(source: SastSource, path: string): Option[string] =
+  ## On build, relative to the context directory, `none` outside it, as
+  ## chalk scans the whole repository of a monorepo; on push, relative to
+  ## the directory scanned when the image was built.
+  var path = path
+  if path.startsWith("file://"):
+    path = path[len("file://") .. ^1]
+  if source.dir == "":
+    return some(path.relativeTo(source.roots))
+  let root =
+    if path.isAbsolute(): "/"
+    elif len(source.roots) > 0: source.roots[0]
+    else: ""
+  path.contextPath(root, source.dir)
 
 proc truncate(s: string): string =
   let flat = s.strip().replace('\n', ' ')
@@ -168,10 +185,13 @@ proc parseSarif(source: SastSource): seq[SastResult] =
         rule     = rules.getOrDefault(ruleId, newJObject())
         location = item{"locations"}.getElems()
         physical = if len(location) > 0: location[0]{"physicalLocation"} else: nil
+      let path = source.resultPath(physical{"artifactLocation", "uri"}.getStr())
+      if path.isNone():
+        continue
       var r = SastResult(
         tool:    source.tool,
         ruleId:  ruleId,
-        path:    physical{"artifactLocation", "uri"}.getStr().relativeTo(source.roots),
+        path:    path.get(),
         line:    physical{"region", "startLine"}.getInt(),
         message: item{"message", "text"}.getStr(),
       )
@@ -205,11 +225,14 @@ proc parseSemgrepJson(source: SastSource): seq[SastResult] =
     let extra = item{"extra"}
     if extra{"is_ignored"}.getBool(false):
       continue
+    let path = source.resultPath(item{"path"}.getStr())
+    if path.isNone():
+      continue
     let metadata = extra{"metadata"}
     var r = SastResult(
       tool:       source.tool,
       ruleId:     item{"check_id"}.getStr(),
-      path:       item{"path"}.getStr().relativeTo(source.roots),
+      path:       path.get(),
       line:       item{"start", "line"}.getInt(),
       severity:   semgrepSeverity(extra{"severity"}.getStr()),
       confidence: metadata{"confidence"}.getStr().toLowerAscii(),
@@ -307,7 +330,8 @@ proc check*(settings: SastConfig, sources: seq[SastSource]): seq[PolicyFinding] 
     return
   counted.sort(proc(a, b: (SastSource, SastResult)): int =
     -cmp(severities.rank(a[1].severity), severities.rank(b[1].severity)))
-  for (source, r) in counted[0 ..< min(len(counted), maxReportedFindings)]:
+  var violations: seq[PolicyFinding]
+  for (source, r) in counted:
     var reason = r.severity & " " & r.tool & " finding"
     if r.message != "":
       reason &= ": " & r.message.truncate()
@@ -315,120 +339,46 @@ proc check*(settings: SastConfig, sources: seq[SastSource]): seq[PolicyFinding] 
       reason &= " (in " & source.image & ")"
     if settings.message != "":
       reason &= ". " & settings.message
-    result.add(newSubjectFinding(ruleName, "violation", r.ruleId, reason,
-                                 location = r.location(), severity = r.severity))
-  if len(counted) > maxReportedFindings:
-    result.add(newSubjectFinding(
-      ruleName, "violation", "sast",
-      $(len(counted) - maxReportedFindings) & " more SAST findings not listed, see the SAST results",
-    ))
+    violations.add(newSubjectFinding(ruleName, "violation", r.ruleId, reason,
+                                     location = r.location(), severity = r.severity))
+  result.add(violations.capFindings(ruleName, maxReportedFindings, "SAST findings"))
 
-proc scannedRoots(dict: ChalkDict, tool: string): seq[string] =
-  ## directories `tool` scanned, as recorded by the external tool plugin
-  ## in `EXTERNAL_TOOL_DURATION: {<tool>: {<path>: ms}}`
-  if "EXTERNAL_TOOL_DURATION" notin dict:
-    return
-  try:
-    let paths = parseJson(boxToJson(dict["EXTERNAL_TOOL_DURATION"])){tool}
-    if paths != nil:
-      for path, _ in paths.pairs():
-        result.add(path)
-  except CatchableError:
-    discard
-
-proc sourcesFrom*(dict: ChalkDict, image = "", roots: seq[string] = @[]): seq[SastSource] =
-  ## `SAST: {<tool>: <output>}` as collected by the external tool plugin
-  if "SAST" notin dict:
-    return
-  let tools = parseJson(boxToJson(dict["SAST"]))
-  if tools.kind != JObject:
-    raise newException(ValueError, "SAST is not an object of tool outputs")
-  for tool, doc in tools.pairs():
-    var source = SastSource(tool: tool, doc: doc, image: image, roots: roots)
-    if len(source.roots) == 0:
-      source.roots = dict.scannedRoots(tool)
+proc sources(outputs: seq[ToolOutput], dir = ""): seq[SastSource] =
+  for output in outputs:
+    var source = SastSource(tool: output.tool, doc: output.value, image: output.image, dir: dir)
+    if output.root != "":
+      source.roots = @[output.root]
     result.add(source)
-
-type SastRunner* = proc(dir: string): ChalkDict
-
-proc runSastTools(dir: string): ChalkDict =
-  ## runs the enabled `sast` tools on `dir` in priority order, as
-  ## `run_sast_tools` would; empty when none produced output
-  var tools: seq[(int, string)]
-  for name in getChalkSubsections("tool"):
-    let section = "tool." & name
-    if attrGet[string](section & ".kind") == "sast" and attrGet[bool](section & ".enabled"):
-      tools.add((attrGet[int](section & ".priority"), name))
-  result = ChalkDict()
-  let sast = ChalkDict()
-  for (_, tool) in tools.sorted():
-    try:
-      let data = runTool(tool, dir, force = true)
-      if "SAST" notin data:
-        continue
-      sast[tool] = data["SAST"]
-      if attrGet[bool]("tool." & tool & ".stop_on_success"):
-        break
-    except CatchableError:
-      error("policy: " & tool & ": " & getCurrentExceptionMsg())
-  if len(sast) > 0:
-    result["SAST"] = pack(sast)
-
-var
-  sastRunner*: SastRunner = runSastTools
-  # several policies may enable the rule; scan each directory once
-  scanned = initTable[string, ChalkDict]()
 
 proc collectSources*(input: PolicyInput, runTools, toolsRan: bool): tuple[sources: seq[SastSource], errors: seq[PolicyFinding]] =
   ## `toolsRan`: `run_sast_tools` already ran the tools before policies
   if input.command == "push":
-    # nothing to scan, so only results recorded in the image's mark count;
-    # marks are only attributable to an image when one is pushed
-    let image = if len(input.pushTargets) == 1: input.pushTargets[0] else: ""
-    for mark in input.pushMarks:
-      try:
-        result.sources.add(mark.sourcesFrom(image))
-      except CatchableError:
-        result.errors.add(newSubjectFinding(ruleName, "error", if image != "": image else: "sast",
-                                            "could not read SAST results from the chalk mark: " &
-                                            getCurrentExceptionMsg()))
+    # nothing to scan, so only results recorded in the image's mark count
+    let pushed = input.pushedToolOutputs(ruleName, "SAST")
+    return (pushed.outputs.sources(), pushed.errors)
+  var host: seq[ToolOutput]
+  try:
+    host = input.host.toolOutputs("SAST")
+  except CatchableError:
+    result.errors.add(newSubjectFinding(ruleName, "error", "sast",
+                                        "could not read SAST results: " & getCurrentExceptionMsg()))
     return
-  if "SAST" in input.host:
-    try:
-      result.sources = input.host.sourcesFrom()
-    except CatchableError:
-      result.errors.add(newSubjectFinding(ruleName, "error", "sast",
-                                          "could not read SAST results: " & getCurrentExceptionMsg()))
-    return
-  if toolsRan:
+  if len(host) == 0 and toolsRan:
     result.errors.add(newSubjectFinding(ruleName, "error", "sast",
                                         "SAST tools produced no results, see the chalk logs"))
     return
-  if not runTools:
-    result.errors.add(newSubjectFinding(ruleName, "error", "sast",
-                                        "SAST results were not collected; enable run_sast_tools or policy.sast.run_tools"))
-    return
-  if len(input.contextDirs) == 0:
-    result.errors.add(newSubjectFinding(ruleName, "error", "sast",
-                                        "the build has no local context directory to scan"))
-    return
-  for dir in input.contextDirs:
-    if dir notin scanned:
-      try:
-        scanned[dir] = sastRunner(dir)
-      except CatchableError:
-        error("policy: sast: " & getCurrentExceptionMsg())
-        scanned[dir] = ChalkDict()
-    let data = scanned[dir]
-    if "SAST" notin data:
-      result.errors.add(newSubjectFinding(ruleName, "error", dir,
-                                          "no SAST tool could scan the build context, see the chalk logs"))
-      continue
-    try:
-      result.sources.add(data.sourcesFrom(roots = @[dir]))
-    except CatchableError:
-      result.errors.add(newSubjectFinding(ruleName, "error", dir,
-                                          "could not read SAST results: " & getCurrentExceptionMsg()))
+  let request = ToolRequest(
+    rule:         ruleName,
+    kind:         "sast",
+    key:          "SAST",
+    what:         "SAST results",
+    runTools:     runTools,
+    notCollected: "SAST results were not collected; enable run_sast_tools or policy.sast.run_tools",
+  )
+  let outputs = input.contextToolOutputs(request, host)
+  result.errors = outputs.errors
+  for context in outputs.contexts:
+    result.sources.add(context.outputs.sources(context.dir))
 
 proc loadSastConfig*(): Option[SastConfig] =
   if not policyBoolSetting([ruleName, "enabled"], false):

@@ -2735,8 +2735,9 @@ singleton sast {
 Blocks builds whose SAST scan reports findings at or above a severity
 threshold. Results come from the `sast` external tools (semgrep by
 default) in SARIF or semgrep JSON format: those collected by
-`run_sast_tools`, else the tools are run on the build context when the
-policy is evaluated (see `run_tools`).
+`run_sast_tools` for the build context directories they cover (only
+results inside each directory count), else the tools are run on the
+directory when the policy is evaluated (see `run_tools`).
 
 `docker push` only checks SAST results recorded in the image's chalk
 mark (not recorded by default), as there is no source code to scan.
@@ -2847,8 +2848,8 @@ The policy is violated when more findings count than this.
     default:  true
     shortdoc: "Run SAST tools when results were not collected"
     doc: """
-When `run_sast_tools` is off, run the enabled `sast` tools on the build
-context directories while evaluating the policy. When false, or when the
+Run the enabled `sast` tools on the build context directories
+`run_sast_tools` did not scan while evaluating the policy. When false, or when the
 tools cannot run, the policy reports an evaluation error and `on_error`
 decides.
 """

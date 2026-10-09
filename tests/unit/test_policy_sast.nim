@@ -2,6 +2,7 @@ import std/[json, os, strutils, tables]
 import ../../src/types
 import ../../src/chalkjson
 import ../../src/policy/engine
+import ../../src/policy/tools
 import ../../src/policy/rules/sast
 
 template assertEq(a, b: untyped) =
@@ -209,21 +210,33 @@ proc testCollectSources() =
   assertEq(pushed[0].location, "src/app.py:8")
   doAssert pushed[0].reason.endsWith("(in app:2)"), pushed[0].reason
 
-  # build: results collected by run_sast_tools
-  input = PolicyInput(command: "build", contextDirs: @["/ctx"], host: sastDict(jsonFile, scanned = "/src"))
+  # build: results run_sast_tools collected for the repository containing
+  # the context, limited to the context directory
+  input = PolicyInput(command: "build", contextDirs: @["/src"], host: sastDict(jsonFile, scanned = "/src"))
   (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
   assertEq(len(sources), 1)
   assertEq(len(errors), 0)
   assertEq(sources[0].tool, "semgrep")
+  assertEq(sources[0].dir, "/src")
+  assertEq(defaults().check(sources)[0].location, "src/app.py:8")
+  input.contextDirs = @["/src/src"]
+  (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
+  assertEq(defaults().check(sources)[0].location, "app.py:8")
+  input.contextDirs = @["/src/web"]
+  (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
+  assertEq(len(sources), 1)
+  assertEq(len(defaults().check(sources)), 0)
 
+  clearPolicyToolCache()
   var calls: seq[string]
-  sastRunner = proc(dir: string): ChalkDict =
+  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+    assertEq(request.kind, "sast")
     calls.add(dir)
-    if dir == "/ctx":
-      return sastDict(sarifFile)
-    return ChalkDict()
+    if dir != "/src":
+      raise newException(ValueError, "semgrep produced no SAST")
+    @[ToolOutput(tool: "semgrep", root: dir, value: parseFile(sarifFile))]
 
-  input = PolicyInput(command: "build", contextDirs: @["/ctx", "/other"], host: ChalkDict())
+  input = PolicyInput(command: "build", contextDirs: @["/src", "/other"], host: ChalkDict())
   (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
   assertEq(len(sources), 0)
   doAssert "produced no results" in errors[0].reason
@@ -232,9 +245,9 @@ proc testCollectSources() =
   assertEq(len(calls), 0)
 
   (sources, errors) = input.collectSources(runTools = true, toolsRan = false)
-  assertEq(calls, @["/ctx", "/other"])
+  assertEq(calls, @["/src", "/other"])
   assertEq(len(sources), 1)
-  assertEq(sources[0].roots, @["/ctx"])
+  assertEq(sources[0].roots, @["/src"])
   assertEq(len(errors), 1)
   assertEq(errors[0].kind, "error")
   assertEq(errors[0].subject, "/other")
@@ -242,9 +255,18 @@ proc testCollectSources() =
   discard input.collectSources(runTools = true, toolsRan = false)
   assertEq(len(calls), 2)
 
+  # contexts run_sast_tools did not cover are scanned too
+  input = PolicyInput(command: "build", contextDirs: @["/repo", "/src"],
+                      host: sastDict(jsonFile, scanned = "/repo"))
+  (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
+  assertEq(len(errors), 0)
+  assertEq(len(sources), 2)
+  assertEq(len(calls), 2)
+
   input = PolicyInput(command: "build", host: ChalkDict())
   (sources, errors) = input.collectSources(runTools = true, toolsRan = false)
-  doAssert "no local context" in errors[0].reason
+  doAssert "no local build context" in errors[0].reason
+  clearPolicyToolCache()
 
 proc rejects(text, reason: string) =
   try:

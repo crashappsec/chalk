@@ -389,16 +389,19 @@ the normalized severity, most severe first, up to 100 findings plus one
 summarizing the rest. Findings suppressed in source (`# nosemgrep`) never
 count.
 
-**Where results come from.** On `docker build`, the results `run_sast_tools`
-collected before policies run (semgrep scans the git repository of the
-first build context). Otherwise, with `run_tools`, the policy runs the
-enabled `sast` tools on every local build context directory (including
-local named contexts and the checkout of a git context), once per
-directory however many policies enable the rule, bounded by
-`tool.semgrep.semgrep_timeout`. Results it collects this way are not added
-to chalk reports or marks. A build with no local context (stdin or a
-remote tarball), `run_tools: false` without `run_sast_tools`, or tools that
-fail or cannot be installed are evaluation errors handled by `on_error`.
+**Where results come from.** On `docker build`, per local build context
+directory (including local named contexts and the checkout of a git
+context; at most 8): the results `run_sast_tools` collected before policies
+run when they cover the directory (semgrep scans the git repository of the
+first build context), keeping only results inside the directory with
+paths relative to it. Otherwise, with `run_tools`, the policy runs the
+enabled `sast` tools on the directory, once per directory however many
+policies enable the rule, bounded by `tool.semgrep.semgrep_timeout`.
+Results it collects this way are not added to chalk reports or marks. A
+build with no local context (stdin or a remote tarball), `run_tools: false`
+for a directory `run_sast_tools` did not cover, `run_sast_tools` producing
+no results, or tools that fail or cannot be installed are evaluation errors
+handled by `on_error`.
 
 **On `docker push`** there is no source to scan, so only results recorded
 in the image's chalk mark count (`SAST` is not in the default docker mark
