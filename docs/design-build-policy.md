@@ -682,3 +682,15 @@ partial scan still count. Errors scoped to files outside the evaluated build
 context do not count; errors without a path apply to the scan. Informational
 and debug diagnostics do not affect policy decisions. `on_error` controls
 whether incomplete analysis blocks an enforced policy.
+
+SBOM policy parsing retains every package occurrence. A repository scan keeps a
+package in a build context when any recorded location belongs to that context;
+findings use an in-context location. Packages without locations remain eligible.
+SPDX dependencies do not need optional version or purl metadata. An unversioned
+row without a purl is excluded only when it is explicitly identified as the
+document source by `documentDescribes`, `DESCRIBES` or `DESCRIBED_BY` and has
+`primaryPackagePurpose` of `FILE` or `CONTAINER`. Described applications and
+libraries, and described packages with a version or purl, remain checked. Optional omitted package arrays and empty arrays
+are valid; present arrays must contain package objects with nonempty names.
+Malformed arrays/entries and content omitted by package-count or nesting limits
+produce evaluation errors governed by `on_error`.
