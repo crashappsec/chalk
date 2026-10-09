@@ -324,6 +324,137 @@ func no_latest(image: string, digest: string, stage: string, source: string) {
 policy.custom_check: func no_latest
 ```
 
+### Certificates
+
+`policy.certificates` checks the X.509 certificates in the local build
+context directories of `chalk docker build` (the context, a cloned git
+context and local named contexts), before docker runs:
+
+```con4m
+policy {
+  mode: "enforce"
+  certificates {
+    enabled:             true
+    expires_within_days: 30
+    deny_self_signed:    true
+    allowed_key_types:   ["rsa", "ec"]
+    allowed_ec_curves:   ["P-256", "P-384"]
+    allowed_issuers: [
+      ("cn",     "Acme Issuing CA *"),
+      ("sha256", "5C:1E:8A:...:C9:B5")
+    ]
+    exclude_paths: ["test", "**/testdata"]
+    message:       "Use certificates from the Acme PKI: https://example.com/pki"
+  }
+}
+```
+
+```json
+{
+  "id": "certificates@1",
+  "mode": "enforce",
+  "certificates": {
+    "enabled": true,
+    "expires_within_days": 30,
+    "deny_self_signed": true,
+    "allowed_key_types": ["rsa", "ec"],
+    "allowed_ec_curves": ["P-256", "P-384"],
+    "allowed_issuers": [
+      ["cn", "Acme Issuing CA *"],
+      ["sha256", "5C:1E:8A:...:C9:B5"]
+    ],
+    "exclude_paths": ["test", "**/testdata"],
+    "message": "Use certificates from the Acme PKI: https://example.com/pki"
+  }
+}
+```
+
+| Field                                      | Type                                        | Default   |
+| ------------------------------------------ | ------------------------------------------- | --------- |
+| `policy.certificates.enabled`              | `bool`                                      | `false`   |
+| `policy.certificates.deny_expired`         | `bool`                                      | `true`    |
+| `policy.certificates.deny_not_yet_valid`   | `bool`                                      | `true`    |
+| `policy.certificates.expires_within_days`  | `int` (`0` disables)                        | `0`       |
+| `policy.certificates.deny_self_signed`     | `bool`                                      | `false`   |
+| `policy.certificates.deny_ca`              | `bool`                                      | `false`   |
+| `policy.certificates.deny_weak_signatures` | `bool`                                      | `true`    |
+| `policy.certificates.min_rsa_key_size`     | `int` (bits, `0` disables)                  | `2048`    |
+| `policy.certificates.allowed_key_types`    | `list[string]` (`[]` allows any)            | `[]`      |
+| `policy.certificates.allowed_ec_curves`    | `list[string]` (`[]` allows any)            | `[]`      |
+| `policy.certificates.allowed_issuers`      | `list[tuple[string, string]]` (kind, value) | `[]`      |
+| `policy.certificates.include_paths`        | `list[string]` (`[]` checks every path)     | `[]`      |
+| `policy.certificates.exclude_paths`        | `list[string]`                              | `[]`      |
+| `policy.certificates.extensions`           | `list[string]` (`[]` is the default set)    | `[]`      |
+| `policy.certificates.skip_ca_bundles`      | `bool`                                      | `true`    |
+| `policy.certificates.honor_dockerignore`   | `bool`                                      | `true`    |
+| `policy.certificates.max_files`            | `int` (> 0)                                 | `100000`  |
+| `policy.certificates.max_file_size`        | `int` (bytes, > 0)                          | `1048576` |
+| `policy.certificates.message`              | `string`                                    | `""`      |
+
+What is checked, for every certificate (PEM, including bundles and chains,
+or DER) found:
+
+- validity: expired (`deny_expired`), not yet valid (`deny_not_yet_valid`)
+  or expiring within `expires_within_days`, compared with the time of the
+  build;
+- `deny_self_signed`: self-issued certificates (subject equals issuer and the
+  authority key identifier, when present, equals the subject key
+  identifier), root CAs included, unless pinned by a `sha256` entry of
+  `allowed_issuers`. Signatures are not verified;
+- `deny_ca`: certificates with `CA:TRUE` basic constraints;
+- `deny_weak_signatures`: MD2, MD4, MD5, SHA-0 and SHA-1 signatures;
+- keys: `min_rsa_key_size`, `allowed_key_types` (`rsa`, `ec`, `ed25519`,
+  `ed448`, `dsa`) and `allowed_ec_curves` (`P-256`, `prime256v1` and
+  `secp256r1` are equivalent, likewise for P-384 and P-521);
+- `allowed_issuers`, when not empty: the issuer must match one entry.
+  `cn` and `dn` are globs (`*`, `?`) over the issuer's common name and RFC
+  4514 distinguished name (most specific attribute first, e.g.
+  `CN=Acme Root CA,O=Acme,C=US`). `sha256` is the fingerprint (hex, colons
+  and case ignored) of the issuing certificate, which must itself be in the
+  build context; a self-signed certificate is its own issuer. Names are not
+  authenticated, so only `sha256` pins a CA. Unknown kinds are evaluation
+  errors unless another entry matches.
+
+A certificate with several problems is one finding whose `reason` lists
+them, e.g. `certificate expired on 2020-01-01; weak signature algorithm
+sha1WithRSAEncryption`, followed by `message`. `subject` is the path
+relative to the build context and the certificate's common name
+(`certs/server.pem (api.example.com)`), `location` the path, with `#<n>` for
+the n-th certificate of a bundle (`certs/chain.pem#2`). Certificates in
+named contexts other than the main one are reported with absolute paths.
+
+Which files are read:
+
+- files with the extensions in `extensions` (by default `pem`, `crt`, `cer`,
+  `cert`, `der` and `ca-bundle`; `*` reads every file) that contain a PEM
+  certificate or start like a DER one;
+- `include_paths` and `exclude_paths` use `.dockerignore` syntax, relative
+  to the context; files excluded by `.dockerignore` are skipped
+  (`honor_dockerignore`), as they never reach the image. As in BuildKit, a
+  `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
+  the context's `.dockerignore` (main context only);
+- symlinks are never followed: docker sends them as links, so a target
+  inside the context is checked on its own and one outside never reaches
+  the image. `.git` directories are skipped;
+- `skip_ca_bundles` skips system and library CA bundles that would otherwise
+  flood findings (`ca-certificates.crt`, `ca-bundle.crt`, `cacert.pem`,
+  `tls-ca-bundle.pem`, `roots.pem`, ... and `etc/ssl/certs/`,
+  `etc/pki/ca-trust/`, `usr/share/ca-certificates/`);
+- work is bounded: files larger than `max_file_size` are skipped, at most
+  1000 certificates are read per file, and a context with more than
+  `max_files` entries stops the scan with an evaluation error (`on_error`
+  decides).
+
+In the job summary, each offending certificate is listed with its reasons,
+and "How to fix" shows `message` (or a generic hint) and the
+`allowed_issuers` entries.
+
+`chalk docker push` has no build context, so the rule does not apply to it
+and reports nothing. Certificates added to an image by `RUN` steps or base
+images are not checked, as the image does not exist yet when policies run.
+Private keys in the context are not reported by this rule; they belong to
+secret scanning.
+
 ## Reporting
 
 Findings are published to the `policy` topic, which is subscribed to

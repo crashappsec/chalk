@@ -2532,6 +2532,7 @@ See `docs/design-build-policy.md` in the chalk repository for details.
 """
 
   allow golden_images
+  allow certificates
 
   field mode {
     type:     string
@@ -2724,6 +2725,222 @@ Unknown kinds are reported as evaluation errors.
     doc: """
 Additional guidance shown to the user and included in the report when an
 image is not allowed, e.g. a link to the list of golden images.
+"""
+  }
+}
+
+singleton certificates {
+  user_def_ok:   false
+  doc: """
+Checks X.509 certificates (PEM or DER, including bundles) in the local
+build context directories of `chalk docker build`: expired or not yet valid
+certificates, weak keys and signatures, self-signed or CA certificates and
+untrusted issuers.
+
+The build context is scanned before docker runs, skipping symlinks, `.git`
+directories, files excluded by the context's `.dockerignore` and
+well-known CA bundles. `chalk docker push` has no build context, so the rule
+does not apply to it. Private keys are not reported by this rule.
+
+Each offending certificate is one finding whose `subject` is the
+context-relative path and common name, and whose `location` is the path
+(with `#<n>` for the n-th certificate of a bundle).
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable the certificates policy"
+    doc: """
+Turns the rule on. With only `enabled` set, expired, not yet valid,
+SHA-1/MD5-signed and RSA < 2048 bit certificates are violations.
+"""
+  }
+
+  field deny_expired {
+    type:     bool
+    default:  true
+    shortdoc: "Deny expired certificates"
+    doc: """
+Report certificates whose `notAfter` is in the past.
+"""
+  }
+
+  field deny_not_yet_valid {
+    type:     bool
+    default:  true
+    shortdoc: "Deny certificates that are not valid yet"
+    doc: """
+Report certificates whose `notBefore` is in the future.
+"""
+  }
+
+  field expires_within_days {
+    type:     int
+    default:  0
+    shortdoc: "Deny certificates expiring soon"
+    doc: """
+Report certificates that expire within this many days. `0` disables the
+check.
+"""
+  }
+
+  field deny_self_signed {
+    type:     bool
+    default:  false
+    shortdoc: "Deny self-signed certificates"
+    doc: """
+Report self-issued certificates (subject equals issuer and the authority
+key identifier, when present, equals the subject key identifier),
+including root CAs, unless their SHA-256 fingerprint is listed in
+`allowed_issuers`.
+"""
+  }
+
+  field deny_ca {
+    type:     bool
+    default:  false
+    shortdoc: "Deny CA certificates"
+    doc: """
+Report certificates with `CA:TRUE` basic constraints.
+"""
+  }
+
+  field deny_weak_signatures {
+    type:     bool
+    default:  true
+    shortdoc: "Deny MD2/MD4/MD5/SHA-1 signatures"
+    doc: """
+Report certificates signed with MD2, MD4, MD5, SHA-0 or SHA-1.
+"""
+  }
+
+  field min_rsa_key_size {
+    type:     int
+    default:  2048
+    shortdoc: "Minimum RSA key size in bits"
+    doc: """
+Report RSA keys smaller than this many bits. `0` disables the check.
+"""
+  }
+
+  field allowed_key_types {
+    type:     list[string]
+    default:  []
+    shortdoc: "Allowed public key types"
+    doc: """
+When not empty, only these key types are allowed: `rsa`, `ec`, `ed25519`,
+`ed448` or `dsa`.
+"""
+  }
+
+  field allowed_ec_curves {
+    type:     list[string]
+    default:  []
+    shortdoc: "Allowed EC curves"
+    doc: """
+When not empty, EC keys must use one of these curves. NIST and OpenSSL
+names are equivalent, e.g. `P-256`, `prime256v1` and `secp256r1`.
+"""
+  }
+
+  field allowed_issuers {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Allowed issuers as (kind, value) tuples"
+    doc: """
+When not empty, every certificate's issuer must match an entry:
+
+* `cn` - glob (`*`, `?`) over the issuer's common name, e.g.
+  `("cn", "Acme Issuing CA *")`
+* `dn` - glob over the issuer's RFC 4514 distinguished name, most
+  specific attribute first, e.g. `("dn", "CN=Acme Root CA,O=Acme,C=US")`
+* `sha256` - SHA-256 fingerprint (hex, colons optional) of the issuing
+  certificate, which must be in the build context too. A self-signed
+  certificate is its own issuer, so this also pins trusted roots.
+
+Names are not authenticated, so `cn` and `dn` only guard against mistakes;
+use `sha256` to pin a CA. Unknown kinds are reported as evaluation errors.
+"""
+  }
+
+  field include_paths {
+    type:     list[string]
+    default:  []
+    shortdoc: "Only check these paths"
+    doc: """
+When not empty, only files matching one of these `.dockerignore`-style
+patterns (relative to the build context) are checked, e.g. `["deploy"]`
+or `["**/*.crt"]`.
+"""
+  }
+
+  field exclude_paths {
+    type:     list[string]
+    default:  []
+    shortdoc: "Skip these paths"
+    doc: """
+`.dockerignore`-style patterns (relative to the build context) of files
+and directories not to check, e.g. `["test", "**/testdata"]`.
+"""
+  }
+
+  field extensions {
+    type:     list[string]
+    default:  []
+    shortdoc: "File extensions to check"
+    doc: """
+Extensions of the files checked. Empty means `pem`, `crt`, `cer`, `cert`,
+`der` and `ca-bundle`; `*` checks every file.
+"""
+  }
+
+  field skip_ca_bundles {
+    type:     bool
+    default:  true
+    shortdoc: "Skip well-known CA bundles"
+    doc: """
+Skip system and library CA bundles such as `ca-certificates.crt`,
+`cacert.pem` and `etc/ssl/certs/`, which would otherwise flood findings.
+"""
+  }
+
+  field honor_dockerignore {
+    type:     bool
+    default:  true
+    shortdoc: "Skip files excluded by .dockerignore"
+    doc: """
+Skip files excluded by `.dockerignore`, as they never reach the image. As
+in BuildKit, a `<Dockerfile>.dockerignore` next to the Dockerfile takes
+precedence over the build context's `.dockerignore`.
+"""
+  }
+
+  field max_files {
+    type:     int
+    default:  100000
+    shortdoc: "Maximum context entries scanned"
+    doc: """
+Upper bound on files and directories visited. When a context is larger the
+scan stops and an evaluation error is reported, so `on_error` decides.
+"""
+  }
+
+  field max_file_size {
+    type:     int
+    default:  1048576
+    shortdoc: "Maximum size of a checked file in bytes"
+    doc: """
+Larger files are skipped.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance appended to the reason of every violation.
 """
   }
 }

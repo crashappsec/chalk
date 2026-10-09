@@ -1,0 +1,36 @@
+{
+  "id": "certificates@2",
+  "mode": "enforce",
+  "on_error": "allow",
+  "golden_images": {
+    "enabled": false,
+    "check_copy_from": false,
+    "allowed": [],
+    "message": ""
+  },
+  "certificates": {
+    "enabled": true,
+    "deny_expired": true,
+    "deny_not_yet_valid": false,
+    "expires_within_days": 30,
+    "deny_self_signed": true,
+    "deny_ca": true,
+    "deny_weak_signatures": true,
+    "min_rsa_key_size": 3072,
+    "allowed_key_types": ["rsa", "ec"],
+    "allowed_ec_curves": ["P-256", "P-384"],
+    "allowed_issuers": [
+      ["cn", "Acme Issuing CA *"],
+      ["dn", "CN=Acme Root CA,O=Acme,C=US"],
+      ["sha256", "B9:54:33:E9:6A:CB:55:E5:51:08:97:A2:F8:FC:B3:2A:5C:36:98:21:53:14:59:3F:92:4A:39:B8:B7:18:9F:72"]
+    ],
+    "include_paths": ["deploy"],
+    "exclude_paths": ["test", "**/testdata"],
+    "extensions": ["pem", "crt"],
+    "skip_ca_bundles": false,
+    "honor_dockerignore": true,
+    "max_files": 50000,
+    "max_file_size": 262144,
+    "message": "Use certificates from the Acme PKI"
+  }
+}
