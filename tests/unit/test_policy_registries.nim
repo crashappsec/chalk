@@ -1,6 +1,7 @@
 import std/[os, strutils, tables]
 import ../../src/types
 import ../../src/docker/ids
+import ../../src/docker/util
 import ../../src/docker/policy_subjects
 import ../../src/policy/engine
 import ../../src/policy/rules
@@ -146,6 +147,9 @@ proc invocation(outputs: openArray[string], tags: seq[string] = @[],
     for field in spec.split(";"):
       let parts = field.split("=", maxsplit = 1)
       kv[parts[0]] = parts[1]
+    kv.normalizeExporterPush(push)
+    if kv.getOrDefault("type") in ["image", "registry"] and kv.exporterBool("push"):
+      result.foundPush = true
     result.foundOutputs.add(kv)
 
 proc testBuildPushTargets() =
@@ -159,10 +163,24 @@ proc testBuildPushTargets() =
                       push = true).buildPushTargets(), @["ghcr.io/x/y", "quay.io/x/y:2"])
   assertEq(invocation(["type=image;name=ghcr.io/x/y;push=true",
                        "type=image;name=local/only",
-                       "type=local;dest=out"],
-                      push = true).buildPushTargets(), @["ghcr.io/x/y"])
+                       "type=local;dest=out"]).buildPushTargets(), @["ghcr.io/x/y"])
   assertEq(invocation(["type=image;name=ghcr.io/x/y;push-by-digest=true"],
                       push = true).buildPushTargets(), @["ghcr.io/x/y"])
+  # --push overrides an explicit exporter push=false, including with no tags.
+  let overridden = invocation(["type=image;name=denied.example/app;push=false"], push = true)
+  assertEq(overridden.foundOutputs[0]["push"], "true")
+  assertEq(overridden.buildPushTargets(), @["denied.example/app"])
+  # A pushing exporter must not make a separate local exporter push.
+  for outputs in [
+    @["type=image;name=denied.example/local;push=false;push-by-digest=true",
+      "type=registry;name=ghcr.io/acme/app"],
+    @["type=registry;name=ghcr.io/acme/app",
+      "type=image;name=denied.example/local;push=false;push-by-digest=true"],
+  ]:
+    assertEq(invocation(outputs).buildPushTargets(), @["ghcr.io/acme/app"])
+  for value in ["", "1", "t", "T", "true", "TRUE", "True"]:
+    let ctx = invocation(["type=image;name=ghcr.io/acme/app;push=true;push-by-digest=" & value])
+    doAssert ctx.foundOutputs[0].exporterBool("push-by-digest")
   for value in ["", "1", "t", "T", "true", "TRUE", "True"]:
     let ctx = invocation(["type=image;name=denied.example/app;push=" & value])
     assertEq(ctx.buildPushTargets(), @["denied.example/app"])
@@ -259,6 +277,12 @@ proc testEngine() =
       {"enabled":true,"push_allowed":[["glob","ghcr.io/acme/*"]]}}""",
       PolicyInput(command: "build", pushTargets: targets))
     doAssert policyOutcome.findings[0].kind == "violation"
+  let overrideTargets = invocation(["type=image;name=denied.example/app;push=false"],
+                                   push = true).buildPushTargets()
+  doAssert evaluateJson("""{"mode":"enforce","on_error":"block","registries":
+    {"enabled":true,"push_allowed":[["glob","ghcr.io/acme/*"]]}}""",
+    PolicyInput(command: "build", pushTargets: overrideTargets))
+  doAssert policyOutcome.findings[0].kind == "violation"
   # pull checks do, and on_error decides
   doAssert evaluateJson("""{"mode": "enforce", "on_error": "block", "registries":
     {"enabled": true, "pull_allowed": [["glob", "docker.io"]]}}""", unchalked)

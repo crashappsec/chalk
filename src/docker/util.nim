@@ -28,6 +28,13 @@ proc exporterBool*(output: OrderedTableRef[string, string], key: string): bool =
   else:
     raise newException(ValueError, "invalid image exporter boolean: " & key)
 
+proc normalizeExporterPush*(output: OrderedTableRef[string, string], explicitPush: bool) =
+  ## Buildx applies the CLI --push override to every image exporter, even
+  ## when that exporter explicitly supplied push=false.
+  let kind = output.getOrDefault("type")
+  if kind == "registry" or (kind == "image" and explicitPush):
+    output["push"] = "true"
+
 proc isCI*(): bool =
   ## Return true when running inside a known CI environment.
   const ciEnvVars = [

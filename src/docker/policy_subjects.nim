@@ -73,8 +73,7 @@ proc buildPushTargets*(ctx: DockerInvocation): seq[string] =
     let kind = output.getOrDefault("type")
     if kind notin ["image", "registry"]:
       continue
-    if kind == "image" and not output.exporterBool("push") and
-       not (ctx.foundPush and output.exporterBool("push-by-digest")):
+    if kind == "image" and not output.exporterBool("push"):
       continue
     var named = len(ctx.foundTags) > 0
     for tag in ctx.foundTags.asRepoTag():

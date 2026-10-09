@@ -163,6 +163,7 @@ proc extractLoad(ctx: DockerInvocation) =
     ctx.foundLoad = target
 
 proc extractOutputs(ctx: DockerInvocation) =
+  let explicitPush = ctx.foundPush
   if "output" in ctx.processedFlags:
     for i in unpack[seq[string]](ctx.processedFlags["output"].getValue()):
       var
@@ -175,6 +176,7 @@ proc extractOutputs(ctx: DockerInvocation) =
           for field in p.row:
             let (k, v) = field.splitBy("=")
             kv[k] = v
+          kv.normalizeExporterPush(explicitPush)
           ctx.foundOutputs.add(kv)
           case kv.getOrDefault("type")
           of "registry":
