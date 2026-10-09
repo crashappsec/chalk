@@ -2,6 +2,11 @@ import std/[os, osproc, strutils, tables, tempfiles]
 import ../../src/types
 import ../../src/docker/policy
 
+# docker/policy reaches subscan, whose commands only the chalk binary defines
+proc runCmdInsert(path: seq[string]) {.exportc.} = discard
+proc runCmdExtract(path: seq[string]) {.exportc.} = discard
+proc runCmdDelete(path: seq[string]) {.exportc.} = discard
+
 proc git(dir: string, args: varargs[string]): string =
   var command = "git -C " & dir.quoteShell()
   for arg in args:
