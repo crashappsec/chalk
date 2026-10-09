@@ -37,17 +37,22 @@ proc gitOriginRepo(path: string): string =
 proc commandRepo(ctx: DockerInvocation): string =
   ## Repository of the build context, or of the working directory for push,
   ## falling back to the CI job's repository.
-  # gitContext is a build-only case field: reading it on push raises
-  # FieldDefect (https://github.com/crashappsec/chalk/issues/776)
-  if ctx.cmd == DockerCmd.push:
+  # build fields are case fields: reading them on push raises FieldDefect,
+  # which the resolver's CatchableError handler does not catch
+  # (https://github.com/crashappsec/chalk/issues/776)
+  case ctx.cmd
+  of DockerCmd.build:
+    if ctx.gitContext != nil:
+      result = normalizeRepo(ctx.gitContext.remoteUrl)
+    elif isGitContext(ctx.foundContext):
+      # a failure before the git context was processed
+      result = normalizeRepo(ctx.foundContext)
+    elif ctx.foundContext notin ["", "-"] and "://" notin ctx.foundContext:
+      result = gitOriginRepo(ctx.foundContext.resolvePath())
+  of DockerCmd.push:
     result = gitOriginRepo(getCurrentDir())
-  elif ctx.gitContext != nil:
-    result = normalizeRepo(ctx.gitContext.remoteUrl)
-  elif isGitContext(ctx.foundContext):
-    # a failure before the git context was processed
-    result = normalizeRepo(ctx.foundContext)
-  elif ctx.foundContext notin ["", "-"] and "://" notin ctx.foundContext:
-    result = gitOriginRepo(ctx.foundContext.resolvePath())
+  else:
+    discard
   if result == "":
     result = repoFromEnv()
 
@@ -85,7 +90,11 @@ proc evaluateFailedPolicies(ctx: DockerInvocation, reason: string) =
   ## instead of the failsafe rerunning docker unchecked.
   if not policyEnabled() or policyEvaluated:
     return
-  let build = if ctx.cmd == DockerCmd.push: ctx.pushInfo() else: ctx.buildInfo()
+  let build =
+    case ctx.cmd
+    of DockerCmd.build: ctx.buildInfo()
+    of DockerCmd.push:  ctx.pushInfo()
+    else: return
   let collect = proc(): PolicyInput =
     raise newException(ValueError, reason)
   evaluatePolicies(build, collect, ctx.repoResolver())

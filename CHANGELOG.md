@@ -32,8 +32,9 @@
   push report via `BUILD_URI` and `_POLICY_BUILD`. See
   `docs/design-build-policy.md`.
   A policy can be enforced in selected repositories only via `enforce_repos`
-  (glob entries over the normalized `host/owner/name` of the build context's
-  git origin, falling back to the CI job's repository), while `mode` applies
+  (glob entries over the normalized `host/owner/name` of the git origin of the
+  build context, or of the working directory for `docker push`, falling back
+  to the CI job's repository), while `mode` applies
   elsewhere; an undeterminable repository never escalates to `enforce`.
   `_POLICY_RESULTS` entries report `effective_mode`, `mode_source` and `repo`.
   Glob characters in `enforce_repos` entries are kept when the entry is
@@ -68,10 +69,6 @@
 
 ### Bug Fixes
 
-- `chalk docker push` no longer crashes with `FieldDefect` (field
-  `gitContext` not accessible) when a policy has `enforce_repos`; the push
-  failed even when every policy passed.
-  ([#776](https://github.com/crashappsec/chalk/issues/776))
 - Component variable parameters (`parameter var`) now use configured values,
   including values supplied via `chalk load --params`. Previously parameters
   with defaults always used them (e.g. a custom heartbeat interval from
