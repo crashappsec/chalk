@@ -52,12 +52,14 @@ proc evaluatePolicy*(settings: PolicyConfig,
         result.hints.add(rule.hint())
       except CatchableError:
         trace("policy: no step summary hint for " & rule.name & ": " & getCurrentExceptionMsg())
-    if rule.requiresAllSubjects:
+    if rule.requiresAllSubjects or (input.collectionFailed and rule.checkInput != nil):
       attributed = true
       for e in input.errors:
         var f = e
         f.rule = rule.name
         findings.add(f)
+      if input.collectionFailed:
+        continue
     try:
       if rule.checkInput != nil:
         findings.add(rule.checkInput(input))
@@ -229,6 +231,7 @@ proc evaluatePolicies*(build:   ChalkDict,
       try:
         input = collect()
       except CatchableError:
+        input.collectionFailed = true
         input.errors.add(collectionError("could not collect policy subjects: " &
                                          getCurrentExceptionMsg()))
     results.add(evaluatePolicy(settings, enabled, input, findings))

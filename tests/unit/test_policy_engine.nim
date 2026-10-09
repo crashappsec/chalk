@@ -91,9 +91,53 @@ proc testInputRule() =
   let report = unpack[seq[Box]](policyOutcome.asChalkDict()["_POLICY_FINDINGS"])
   doAssert unpack[TableRef[string, string]](report[0])["severity"] == "high"
 
+proc testInputCollectionFailure() =
+  var checks = 0
+  let fileRule = PolicyRule(name: "certificates", load: proc(): bool = true,
+    checkInput: proc(input: PolicyInput): seq[PolicyFinding] =
+      inc(checks))
+  let input = PolicyInput(collectionFailed: true,
+    errors: @[collectionError("could not check out Git context")])
+  doAssert evaluate("enforce", "block", @[fileRule], input)
+  doAssert checks == 0
+  doAssert policyOutcome.findings.len == 1
+  doAssert policyOutcome.findings[0].rule == "certificates"
+  doAssert not evaluate("enforce", "allow", @[fileRule], input)
+  doAssert policyOutcome.result == "error"
+  # An individual unresolved image still does not prevent file rules running.
+  doAssert not evaluate("enforce", "block", @[fileRule],
+    PolicyInput(errors: @[collectionError("unresolved image")]))
+  doAssert checks == 1
+
+proc testCollectorFailureForMultiplePolicies() =
+  setPolicyJson("""{"policies":[
+    {"id":"blocked","mode":"enforce","on_error":"block"},
+    {"id":"audited","mode":"audit","on_error":"block"}
+  ]}""")
+  policyOutcome = nil
+  var collections, checks = 0
+  let collect = proc(): PolicyInput =
+    inc(collections)
+    raise newException(ValueError, "Git checkout failed")
+  let fileRule = PolicyRule(name: "certificates", load: proc(): bool = true,
+    checkInput: proc(input: PolicyInput): seq[PolicyFinding] =
+      inc(checks))
+  let build = ChalkDict()
+  build["command"] = pack("build")
+  doAssertRaises(PolicyViolation):
+    evaluatePolicies(build, collect, @[fileRule])
+  doAssert collections == 1 and checks == 0
+  doAssert policyOutcome.policies.len == 2
+  doAssert policyOutcome.policies[0].result == "blocked"
+  doAssert policyOutcome.policies[1].result == "error"
+  doAssert policyOutcome.findings.len == 2
+  setPolicyJson("")
+
 testOnError()
 testInputRule()
+testInputCollectionFailure()
 testCollectionErrorsOnlyForRulesNeedingAllSubjects()
 testRuleFailureIsAnError()
 testGoldenImagesRule()
 testModeOff()
+testCollectorFailureForMultiplePolicies()
