@@ -2532,6 +2532,7 @@ See `docs/design-build-policy.md` in the chalk repository for details.
 """
 
   allow golden_images
+  allow sast
 
   field mode {
     type:     string
@@ -2724,6 +2725,141 @@ Unknown kinds are reported as evaluation errors.
     doc: """
 Additional guidance shown to the user and included in the report when an
 image is not allowed, e.g. a link to the list of golden images.
+"""
+  }
+}
+
+singleton sast {
+  user_def_ok:   false
+  doc: """
+Blocks builds whose SAST scan reports findings at or above a severity
+threshold. Results come from the `sast` external tools (semgrep by
+default) in SARIF or semgrep JSON format: those collected by
+`run_sast_tools`, else the tools are run on the build context when the
+policy is evaluated (see `run_tools`).
+
+`docker push` only checks SAST results recorded in the image's chalk
+mark (not recorded by default), as there is no source code to scan.
+
+See `docs/design-build-policy.md` in the chalk repository for details.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable SAST policy"
+    doc: """
+Evaluate SAST results of the build context.
+"""
+  }
+
+  field min_severity {
+    type:     string
+    default:  "high"
+    choices:  ["info", "low", "medium", "high", "critical"]
+    shortdoc: "Lowest severity that is a violation"
+    doc: """
+Findings below this severity are ignored. semgrep severities are
+normalized: `CRITICAL` is `critical`, `ERROR`/`HIGH` are `high`,
+`WARNING`/`MEDIUM` are `medium`, `INFO`/`LOW` are `low`. In SARIF a
+`security-severity` score takes precedence (9.0+ `critical`, 7.0+ `high`,
+4.0+ `medium`, else `low`), else the level (`error` is `high`, `warning`
+is `medium`, `note` is `low`). semgrep's SARIF output maps `CRITICAL` to
+`error`, so `critical` needs semgrep JSON output or `security-severity`.
+"""
+  }
+
+  field min_confidence {
+    type:     string
+    default:  "low"
+    choices:  ["low", "medium", "high"]
+    shortdoc: "Lowest rule confidence that is a violation"
+    doc: """
+Ignores findings of rules whose `metadata.confidence` is lower. Rules
+without a confidence are ignored unless this is `low`.
+"""
+  }
+
+  field categories {
+    type:     list[string]
+    default:  []
+    shortdoc: "Rule categories that count, empty for all"
+    doc: """
+Only findings of rules in one of these categories count, e.g.
+`["security"]`. In SARIF only `security` (set by semgrep for rules with a
+CWE) and the rule's own tags are known.
+"""
+  }
+
+  field cwes {
+    type:     list[string]
+    default:  []
+    shortdoc: "CWE ids (globs) that count, empty for all"
+    doc: """
+Only findings of rules mapped to a matching CWE count, e.g. `["CWE-78",
+"CWE-89"]`. Shell-style globs are supported.
+"""
+  }
+
+  field ignore_rules {
+    type:     list[string]
+    default:  []
+    shortdoc: "Rule ids (globs) to ignore"
+    doc: """
+Findings of rules whose id matches one of these globs are ignored, e.g.
+`python.lang.security.audit.*`. semgrep prefixes the ids of rules from a
+local config file with the file's path, so match those with `*.<id>`.
+"""
+  }
+
+  field ignore_paths {
+    type:     list[string]
+    default:  []
+    shortdoc: "File paths (globs) to ignore"
+    doc: """
+Findings in files matching one of these globs are ignored. Paths are
+relative to the scanned directory, `*` matches across `/`, e.g. `tests/*`.
+"""
+  }
+
+  field include_audit {
+    type:     bool
+    default:  true
+    shortdoc: "Count audit rules"
+    doc: """
+When false, ignores audit rules (`metadata.subcategory: audit`, or an
+`audit` segment in the rule id as in the semgrep registry), which flag
+code for review rather than likely vulnerabilities.
+"""
+  }
+
+  field max_findings {
+    type:     int
+    default:  0
+    shortdoc: "Number of findings tolerated"
+    doc: """
+The policy is violated when more findings count than this.
+"""
+  }
+
+  field run_tools {
+    type:     bool
+    default:  true
+    shortdoc: "Run SAST tools when results were not collected"
+    doc: """
+When `run_sast_tools` is off, run the enabled `sast` tools on the build
+context directories while evaluating the policy. When false, or when the
+tools cannot run, the policy reports an evaluation error and `on_error`
+decides.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance shown to the user and included in the report.
 """
   }
 }
