@@ -3,6 +3,7 @@ import ../../src/types
 import ../../src/chalkjson
 import ../../src/policy/engine
 import ../../src/policy/rules
+import ../../src/policy/helpers
 import ../../src/policy/rules/secrets
 
 const
@@ -134,13 +135,14 @@ proc testCap() =
   for i in 0 ..< 105:
     findings.add(newSubjectFinding("secrets", (if i < 3: "error" else: "violation"),
                                    "Github", "x", location = "f:" & $i))
-  let capped = findings.capFindings()
+  let capped = findings.capFindings("secrets", 100, "secrets")
   assertEq(len(capped), 101)
   assertEq(capped[0].kind, "violation")
   # 2 of the 5 left out are violations
   assertEq(capped[^1].kind, "violation")
-  assertEq(capped[^1].reason, "5 more secret(s) in the build context not listed")
-  assertEq(findings[0 ..< 10].capFindings().len, 10)
+  assertEq(capped[^1].subject, "secrets")
+  assertEq(capped[^1].reason, "5 more secrets not listed")
+  assertEq(findings[0 ..< 10].capFindings("secrets", 100, "secrets").len, 10)
 
 proc testDockerignore() =
   let dir = getTempDir() / "chalk-test-policy-secrets"

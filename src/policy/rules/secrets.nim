@@ -13,13 +13,15 @@
 ## git repository containing the first context, in `git` mode when it can,
 ## which reads committed history (secrets since removed) and skips untracked
 ## or ignored files (e.g. a `.env`) that are sent to docker, and a failed
-## scan is indistinguishable from a clean one there.
+## scan is indistinguishable from a clean one there. For the same reasons it
+## does not run the tool through policy/tools.nim (`runTool` uses the tool's
+## own arguments and `produce_keys`), only reusing its install and location
+## callbacks.
 ##
 ## Secret values never leave this module: only the detector, file, line and
 ## verification status of each result are kept.
 
 import std/[
-  algorithm,
   json,
   os,
   sets,
@@ -35,6 +37,7 @@ from "../.."/docker/tar import isExcluded, isValidPattern
 import ".."/[
   api,
   configuration,
+  helpers,
 ]
 
 const
@@ -272,9 +275,10 @@ proc check*(settings:  SecretsConfig,
     # filesystem mode paths are absolute
     if kind == "" or not r.file.isAbsolute():
       continue
-    let rel = relativePath(r.file, dir)
-    if rel.startsWith("..") or rel.isAbsolute():
+    let inContext = r.file.contextPath("/", dir)
+    if inContext.isNone():
       continue
+    let rel = inContext.get()
     # docker never sends ignored files, so their secrets cannot reach the image
     if rel.isExcluded(dockerignore) or rel.isExcluded(settings.excludePaths):
       continue
@@ -295,26 +299,6 @@ proc checkMark*(settings: SecretsConfig, results: seq[SecretResult]): seq[Policy
       continue
     result.addFinding(seen, settings, r, kind, r.file & ":" & $r.line,
                       "recorded in the image's chalk mark")
-
-proc capFindings*(findings: seq[PolicyFinding]): seq[PolicyFinding] =
-  ## keeps reports bounded, violations first
-  if len(findings) <= maxFindings:
-    return findings
-  let sorted = findings.sorted(proc(a, b: PolicyFinding): int =
-    cmp(a.kind != "violation", b.kind != "violation"))
-  result = sorted[0 ..< maxFindings]
-  var
-    rest       = sorted[maxFindings .. ^1]
-    violations = 0
-  for f in rest:
-    if f.kind == "violation":
-      inc(violations)
-  result.add(newSubjectFinding(
-    ruleName,
-    (if violations > 0: "violation" else: "error"),
-    "secrets",
-    $len(rest) & " more secret(s) in the build context not listed",
-  ))
 
 proc toolCallback[T](name: string, dir: string): T =
   let value = runCallback(attrGet[CallbackObj]("tool.trufflehog." & name), @[pack(dir)])
@@ -390,7 +374,7 @@ proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
         findings.add(newSubjectFinding(ruleName, "error", "SECRET_SCANNER",
                                        "could not read secret scanner results: " &
                                        getCurrentExceptionMsg()))
-    return findings.capFindings()
+    return findings.capFindings(ruleName, maxFindings, "secrets")
   if len(input.contextDirs) == 0:
     return @[newSubjectFinding(ruleName, "error", "build context",
                                "the build context is not a local directory and cannot be scanned for secrets")]
@@ -404,7 +388,7 @@ proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
     except CatchableError:
       findings.add(newSubjectFinding(ruleName, "error", dir,
                                      "could not scan for secrets: " & getCurrentExceptionMsg()))
-  return findings.capFindings()
+  return findings.capFindings(ruleName, maxFindings, "secrets")
 
 proc secretsHint(): PolicyHint =
   # without a message the summary has no generic "how to fix" for secrets
