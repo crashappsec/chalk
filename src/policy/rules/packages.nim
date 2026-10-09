@@ -77,7 +77,21 @@ proc normalizePypiName(name: string): string =
       result.add(c)
       lastSep = false
 
-proc purlParts*(purl: string): tuple[name, version: string] =
+proc qualifierString(value: string): bool =
+  # In a policy glob, '?' is a wildcard unless it begins purl qualifiers.
+  # Keys use the purl ASCII key alphabet; values must be nonempty.
+  if value == "":
+    return false
+  for entry in value.split('&'):
+    let equals = entry.find('=')
+    if equals <= 0 or equals == entry.high:
+      return false
+    for c in entry[0 ..< equals]:
+      if c notin Letters + Digits + {'_', '.', '-'}:
+        return false
+  true
+
+proc purlParts*(purl: string, pattern = false): tuple[name, version: string] =
   ## `pkg:type/namespace/name@version?qualifiers#subpath` as a lowercase,
   ## percent-decoded `type/namespace/name` and the decoded version.
   ## https://github.com/package-url/purl-spec/blob/main/PURL-SPECIFICATION.rst
@@ -88,8 +102,8 @@ proc purlParts*(purl: string): tuple[name, version: string] =
   let hash = s.find('#')
   if hash >= 0:
     s = s[0 ..< hash]
-  let query = s.find('?')
-  if query >= 0:
+  let query = if pattern: s.rfind('?') else: s.find('?')
+  if query >= 0 and (not pattern or qualifierString(s[query + 1 .. ^1])):
     s = s[0 ..< query]
   # the version follows the last `@` that does not start a path segment, so
   # npm scopes written unencoded (`pkg:npm/@angular/core`) are not versions
@@ -119,7 +133,7 @@ proc parsePackagePattern*(value: string): PackagePattern =
   ## version range.
   if not value.strip().toLowerAscii().startsWith("pkg:"):
     raise newException(ValueError, "must start with pkg:")
-  let (name, version) = value.purlParts()
+  let (name, version) = value.purlParts(pattern = true)
   if '/' notin name or name.startsWith("/") or name.endsWith("/"):
     raise newException(ValueError, "must be pkg:<type>/<name>")
   result = PackagePattern(raw: value, name: name)

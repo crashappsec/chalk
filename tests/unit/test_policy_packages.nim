@@ -54,6 +54,26 @@ proc testPatterns() =
   assertEq(matches("pkg:npm/lodash@<4.17.21", "pkg:npm/lodash"), pmUnknown)
   assertEq(matches("pkg:npm/lodash", ""), pmNoMatch)
 
+proc testQuestionGlobsAndQualifiers() =
+  assertEq(matches("pkg:npm/lib?", "pkg:npm/libx@1.0.0"), pmMatch)
+  assertEq(matches("pkg:npm/lib?", "pkg:npm/lib@1.0.0"), pmNoMatch)
+  assertEq(matches("pkg:npm/x@1.?", "pkg:npm/x@1.2"), pmMatch)
+  assertEq(matches("pkg:npm/x@1.?", "pkg:npm/x@1.22"), pmNoMatch)
+  assertEq(matches("pkg:npm/lib??@1.?", "pkg:npm/libxy@1.2"), pmMatch)
+  assertEq(matches("pkg:npm/lib%3F@1.%3F", "pkg:npm/libx@1.2"), pmMatch)
+  assertEq(matches("pkg:npm/lib?@1.?arch=amd64&os=linux", "pkg:npm/libx@1."), pmMatch)
+  assertEq(matches("pkg:npm/lib?@1.??arch=amd64", "pkg:npm/libx@1.2?arch=arm64"), pmMatch)
+  assertEq(matches("pkg:npm/x@1.2?arch=amd64#sub", "pkg:npm/x@1.2?arch=arm64"), pmMatch)
+  # Percent-encoded @ belongs to the name; + is not a space.
+  assertEq(matches("pkg:generic/a%40b@1+meta", "pkg:generic/a%40b@1+meta"), pmMatch)
+  let sbom = PolicySboms(sboms: @[Sbom(packages: @[
+    SbomPackage(name: "libx", purl: "pkg:npm/libx@1.0.0")])])
+  let denied = PackagesConfig(denied: @[("purl", "pkg:npm/lib?")]).checkPackages(sbom)
+  assertEq(denied.len, 1)
+  assertEq(denied[0].kind, "violation")
+  let allowed = PackagesConfig(allowed: @[("purl", "pkg:npm/lib?")]).checkPackages(sbom)
+  assertEq(allowed.len, 0)
+
 proc fixtureSboms(): PolicySboms =
   PolicySboms(sboms: @[parseSbom(parseJson(readFile(fixture)))])
 
@@ -197,6 +217,7 @@ proc testEngine() =
 proc main() =
   testPurls()
   testPatterns()
+  testQuestionGlobsAndQualifiers()
   testCheck()
   testConfig()
   testEngine()

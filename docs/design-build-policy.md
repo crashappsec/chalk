@@ -677,3 +677,11 @@ the `policy*Setting` accessors, which read the same path from con4m when
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.
+
+Package policy name and version globs support `?` for one character. A final
+raw `?` begins ignored purl qualifiers only when its suffix is a nonempty
+`key=value` list separated by `&`, with ASCII letters, digits, `_`, `.`, or `-`
+in each key and nonempty values. Earlier `?` characters remain wildcards.
+Structural separators are recognized before percent decoding, so encoded `?`
+can express a wildcard and encoded `@` can occur within a package name.
+Qualifiers on concrete SBOM purls remain ignored as before.
