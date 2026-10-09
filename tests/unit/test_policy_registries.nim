@@ -250,6 +250,15 @@ proc testEngine() =
   doAssert not evaluateJson("""{"mode": "enforce", "on_error": "block", "registries":
     {"enabled": true, "push_allowed": [["glob", "ghcr.io/acme/*"]]}}""", unchalked)
   doAssert policyOutcome == nil
+
+  for output in ["type=image;name=denied.example/app;push=1",
+                 "type=image;name=ghcr.io/acme/app:1;push=true;" &
+                 "dangling-name-prefix=denied.example/app"]:
+    let targets = invocation([output]).buildPushTargets()
+    doAssert evaluateJson("""{"mode":"enforce","on_error":"block","registries":
+      {"enabled":true,"push_allowed":[["glob","ghcr.io/acme/*"]]}}""",
+      PolicyInput(command: "build", pushTargets: targets))
+    doAssert policyOutcome.findings[0].kind == "violation"
   # pull checks do, and on_error decides
   doAssert evaluateJson("""{"mode": "enforce", "on_error": "block", "registries":
     {"enabled": true, "pull_allowed": [["glob", "docker.io"]]}}""", unchalked)
