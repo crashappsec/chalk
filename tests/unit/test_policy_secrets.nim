@@ -7,6 +7,8 @@ import ../../src/policy/rules/secrets
 
 const
   fixture = currentSourcePath().parentDir() / "fixtures" / "trufflehog_filesystem.jsonl"
+  # also compiled by campaigns, keep in sync
+  configFixture = currentSourcePath().parentDir() / "fixtures" / "policy_config_secrets.json"
   # stands in for every secret value in the fixture
   rawValue = "FAKE-RAW-VALUE"
 
@@ -62,6 +64,14 @@ proc testValidation() =
   rejects("""{"secrets": {"check_push": 1}}""", "policy.secrets.check_push must be a boolean")
   setPolicyJson("""{"secrets": {"verify": false, "verified_only": false}}""")
   assertEq(policyConfigs()[0].configError, "")
+
+proc testConfigFixture() =
+  let s = settings(readFile(configFixture))
+  doAssert not s.verify and not s.verifiedOnly and s.checkPush
+  assertEq(s.detectors, @["github", "aws"])
+  assertEq(s.ignoreDetectors, @["uri"])
+  assertEq(s.excludePaths, @["tests", "**/fixtures"])
+  assertEq(s.message, "Move secrets to the vault")
 
 proc testDefaults() =
   setPolicyJson("""{"mode": "audit"}""")
@@ -210,6 +220,7 @@ proc testRule() =
 proc main() =
   testParse()
   testValidation()
+  testConfigFixture()
   testDefaults()
   testCheck()
   testCap()
