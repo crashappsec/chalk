@@ -2733,10 +2733,10 @@ singleton packages {
   user_def_ok:   false
   doc: """
 Restricts the languages and packages a `docker build` depends on, as
-listed by a CycloneDX SBOM of each local build context (the one chalk
-collects with `run_sbom_tools`, else one produced on demand by the
-enabled `sbom` tools, `tool.syft` by default). `docker push` checks the SBOM recorded in the image's chalk
-mark, when the mark template includes `SBOM`; otherwise nothing is
+listed by the SBOM of each local build context (the one chalk collects
+with `run_sbom_tools`, else one produced on demand by the enabled `sbom`
+tools, `tool.syft` by default). `docker push` checks the SBOM recorded in
+the image's chalk mark, when the mark template includes `SBOM`; otherwise nothing is
 checked on push.
 
 Packages are identified by their package URL (purl), e.g.

@@ -22,6 +22,7 @@ import "../.."/[
 import ".."/[
   api,
   configuration,
+  helpers,
   sbom,
 ]
 import ./golden_images
@@ -238,24 +239,20 @@ proc checkPackages*(settings: PackagesConfig, sboms: PolicySboms): seq[PolicyFin
   let
     denied  = settings.denied.compile("denied")
     allowed = settings.allowed.compile("allowed")
-  for e in denied.errors & allowed.errors & sboms.errors:
+  for e in denied.errors & allowed.errors:
     result.add(newSubjectFinding(ruleName, "error", "", e))
+  result.add(sboms.errors)
   var
     allowedLanguages, deniedLanguages: seq[string]
     languages: seq[LanguageViolation]
     seen       = initHashSet[string]()
     packages:  seq[PolicyFinding]
-    dropped    = 0
   for lang in settings.allowedLanguages:
     allowedLanguages.add(lang.strip().toLowerAscii())
   for lang in settings.deniedLanguages:
     deniedLanguages.add(lang.strip().toLowerAscii())
 
   for sbom in sboms.sboms:
-    if sbom.truncated:
-      result.add(newSubjectFinding(ruleName, "error", "",
-        "the SBOM of " & sbom.source & " lists more than " & $maxSbomPackages &
-        " packages; only the first were checked"))
     for pkg in sbom.packages:
       # without a purl a package can be neither identified nor matched
       if pkg.purl == "" or seen.containsOrIncl(pkg.purl):
@@ -283,20 +280,12 @@ proc checkPackages*(settings: PackagesConfig, sboms: PolicySboms): seq[PolicyFin
         elif allowedMatch == pmUnknown:
           finding = newSubjectFinding(ruleName, "error", pkg.purl, allowedReason,
                                       location = pkg.location)
-      if finding.kind == "":
-        continue
-      if len(packages) >= maxPackageFindings:
-        inc(dropped)
-      else:
+      if finding.kind != "":
         packages.add(finding)
 
   for v in languages:
     result.add(v.languageFinding(settings.message))
-  result.add(packages)
-  if dropped > 0:
-    result.add(newSubjectFinding(ruleName, "violation", "",
-      $dropped & " more packages violate the policy; only the first " &
-      $maxPackageFindings & " are reported"))
+  result.add(packages.capFindings(ruleName, maxPackageFindings, "packages"))
 
 proc hasChecks*(settings: PackagesConfig): bool =
   len(settings.denied) > 0 or len(settings.allowed) > 0 or
@@ -342,7 +331,7 @@ proc checkPackagesInput(input: PolicyInput): seq[PolicyFinding] =
   # producing an SBOM can take minutes, so not without anything to check
   if not loaded.hasChecks():
     return
-  loaded.checkPackages(input.policySboms())
+  loaded.checkPackages(input.policySboms(ruleName))
 
 proc packagesHint(): PolicyHint =
   result = PolicyHint(rule: ruleName, message: loaded.message)

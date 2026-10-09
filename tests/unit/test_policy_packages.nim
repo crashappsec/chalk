@@ -2,6 +2,7 @@ import std/[json, os, strutils]
 import ../../src/types
 import ../../src/policy/engine
 import ../../src/policy/sbom
+import ../../src/policy/tools
 import ../../src/policy/rules/packages
 
 const
@@ -10,27 +11,6 @@ const
 
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
-
-proc toBox(node: JsonNode): Box =
-  case node.kind
-  of JString: pack(node.getStr())
-  of JInt:    pack(node.getInt())
-  of JFloat:  pack(node.getFloat())
-  of JBool:   pack(node.getBool())
-  of JNull:   pack("")
-  of JArray:
-    var items: seq[Box]
-    for item in node:
-      items.add(item.toBox())
-    pack(items)
-  of JObject:
-    let dict = ChalkDict()
-    for k, v in node.pairs():
-      dict[k] = v.toBox()
-    pack(dict)
-
-proc sbomKey(): Box =
-  (%*{"syft": parseJson(readFile(fixture))}).toBox()
 
 proc matches(pattern, purl: string): PackageMatch =
   parsePackagePattern(pattern).matches(purl).result
@@ -74,97 +54,8 @@ proc testPatterns() =
   assertEq(matches("pkg:npm/lodash@<4.17.21", "pkg:npm/lodash"), pmUnknown)
   assertEq(matches("pkg:npm/lodash", ""), pmNoMatch)
 
-proc testCycloneDx() =
-  let doc = parseCycloneDx(parseJson(readFile(fixture)))
-  assertEq(doc.source, "/src")
-  # file components and the scanned directory are not packages
-  assertEq(len(doc.packages), 10)
-  let deb = doc.packages[0]
-  assertEq(deb.purlType, "deb")
-  assertEq(deb.language, "")
-  assertEq(deb.licenses, @["LGPL-2.1"])
-  for pkg in doc.packages:
-    if pkg.name == "requests":
-      assertEq(pkg.language, "python")
-      assertEq(pkg.purlType, "pypi")
-      assertEq(pkg.location, "/py/requirements.txt")
-    if pkg.name == "left-pad":
-      assertEq(pkg.licenses, @["MIT OR Apache-2.0"])
-  try:
-    discard parseCycloneDx(%*{"spdxVersion": "SPDX-2.3"})
-    doAssert false
-  except ValueError:
-    doAssert "CycloneDX" in getCurrentExceptionMsg()
-
-  # SBOMs without syft properties get the language of well-known purl types
-  let plain = parseCycloneDx(%*{"bomFormat": "CycloneDX", "components": [
-    {"type": "library", "name": "x", "purl": "pkg:cargo/x@1.0.0"},
-    {"type": "library", "name": "y", "purl": "pkg:generic/y@1.0.0"},
-    {"type": "library", "name": "z", "components": [
-      {"type": "library", "name": "n", "purl": "pkg:gem/n@1.0.0"},
-    ]},
-  ]})
-  assertEq(len(plain.packages), 4)
-  assertEq(plain.packages[0].language, "rust")
-  assertEq(plain.packages[1].language, "")
-  assertEq(plain.packages[3].language, "ruby")
-
-  let web = doc.forContext("/src", "/src/web")
-  var names: seq[string]
-  for pkg in web.packages:
-    names.add(pkg.name)
-    if pkg.name == "lodash":
-      assertEq(pkg.location, "package-lock.json")
-  assertEq(names, @["@angular/core", "event-stream", "lodash", "web"])
-
-proc input(dirs: seq[string], host = ChalkDict()): PolicyInput =
-  PolicyInput(command: "build", contextDirs: dirs, host: host)
-
-proc testPolicySboms() =
-  clearPolicySbomCache()
-  let host = ChalkDict()
-  host["SBOM"] = sbomKey()
-  # chalk's SBOM covers the context
-  var sboms = input(@["/src/py"], host).policySboms()
-  assertEq(len(sboms.errors), 0)
-  assertEq(len(sboms.sboms), 1)
-  assertEq(len(sboms.sboms[0].packages), 3)
-
-  # other contexts are scanned on demand, once per process
-  var scanned: seq[string]
-  setPolicySbomScanner(proc(dir: string): Box =
-    scanned.add(dir)
-    if dir == "/broken":
-      raise newException(ValueError, "syft failed")
-    let doc = parseJson(readFile(fixture))
-    doc["metadata"]["component"]["name"] = %dir
-    return (%*{"syft": doc}).toBox())
-  sboms = input(@["/src/web", "/elsewhere", "/broken"], host).policySboms()
-  assertEq(scanned, @["/elsewhere", "/broken"])
-  assertEq(len(sboms.sboms), 2)
-  assertEq(len(sboms.sboms[1].packages), 10)
-  assertEq(len(sboms.errors), 1)
-  doAssert "syft failed" in sboms.errors[0]
-  discard input(@["/elsewhere"]).policySboms()
-  assertEq(scanned, @["/elsewhere", "/broken"])
-
-  sboms = input(@[]).policySboms()
-  doAssert "no local build context" in sboms.errors[0]
-
-  # push reads the chalk mark, when it has an SBOM
-  let mark = ChalkDict()
-  mark["SBOM"] = sbomKey()
-  mark["CHALK_ID"] = pack("CHALK1")
-  sboms = PolicyInput(command: "push", pushMarks: @[mark, ChalkDict()]).policySboms()
-  assertEq(len(sboms.errors), 0)
-  assertEq(len(sboms.sboms), 1)
-  assertEq(sboms.sboms[0].source, "CHALK1")
-  assertEq(sboms.sboms[0].packages[0].location, "var/lib/dpkg/status")
-  setPolicySbomScanner(nil)
-  clearPolicySbomCache()
-
 proc fixtureSboms(): PolicySboms =
-  PolicySboms(sboms: @[parseCycloneDx(parseJson(readFile(fixture)))])
+  PolicySboms(sboms: @[parseSbom(parseJson(readFile(fixture)))])
 
 proc subjects(findings: seq[PolicyFinding], kind = "violation"): seq[string] =
   for f in findings:
@@ -227,9 +118,10 @@ proc testCheck() =
   settings = PackagesConfig(denied: @[("purl", "pkg:npm/*")])
   findings = settings.checkPackages(PolicySboms(sboms: @[many]))
   assertEq(len(findings), maxPackageFindings + 1)
-  doAssert findings[^1].reason.startsWith("5 more packages")
+  doAssert findings[^1].reason == "5 more packages not listed"
 
-  findings = PackagesConfig().checkPackages(PolicySboms(errors: @["no SBOM"]))
+  findings = PackagesConfig().checkPackages(
+    PolicySboms(errors: @[newSubjectFinding("packages", "error", "", "no SBOM")]))
   assertEq(findings.subjects("error"), @[""])
   doAssert not PackagesConfig(message: "x").hasChecks()
 
@@ -266,11 +158,11 @@ proc testConfig() =
 
 proc testEngine() =
   # the rule only produces an SBOM when it has something to check
-  clearPolicySbomCache()
+  clearPolicyToolCache()
   var scans = 0
-  setPolicySbomScanner(proc(dir: string): Box =
+  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
     inc(scans)
-    (%*{"syft": parseJson(readFile(fixture))}).toBox())
+    @[ToolOutput(tool: "syft", root: dir, value: parseJson(readFile(fixture)))]
   setPolicyJson("""{"policies": [
     {"id": "noop", "mode": "audit", "packages": {"enabled": true}},
     {"id": "deny", "mode": "enforce", "packages": {"enabled": true, "denied": [["purl", "pkg:npm/lodash"]]}},
@@ -286,7 +178,8 @@ proc testEngine() =
   build["command"] = pack("build")
   var blocked = false
   try:
-    evaluatePolicies(build, proc(): PolicyInput = input(@["/src"]), rules)
+    evaluatePolicies(build, proc(): PolicyInput =
+      PolicyInput(command: "build", contextDirs: @["/src"], host: ChalkDict()), rules)
   except PolicyViolation:
     blocked = true
   doAssert blocked
@@ -299,14 +192,11 @@ proc testEngine() =
   assertEq(policyOutcome.findings[0].location, "web/package-lock.json")
   assertEq(policyOutcome.findings[1].subject, "javascript")
   setPolicyJson("")
-  setPolicySbomScanner(nil)
-  clearPolicySbomCache()
+  clearPolicyToolCache()
 
 proc main() =
   testPurls()
   testPatterns()
-  testCycloneDx()
-  testPolicySboms()
   testCheck()
   testConfig()
   testEngine()

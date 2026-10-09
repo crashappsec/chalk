@@ -327,8 +327,8 @@ policy.custom_check: func no_latest
 ## Packages and languages
 
 `policy.packages` restricts the languages and packages a build depends on,
-as listed by a [CycloneDX](https://cyclonedx.org/docs/1.6/json/) SBOM of its
-build context.
+as listed by the SBOM of its build context
+([CycloneDX](https://cyclonedx.org/docs/1.6/json/), SPDX or syft JSON).
 
 ```con4m
 policy {
@@ -427,7 +427,8 @@ Where the SBOM comes from:
   `syft_prefer_docker`. If no SBOM tool is enabled, none can be found or
   installed, they fail, or the build has no local context (a remote or
   stdin context), it is an evaluation error. Nothing is scanned when no
-  check is configured. SBOMs must be CycloneDX JSON (syft's default here).
+  check is configured. SBOMs are read as CycloneDX (syft's default here),
+  SPDX or syft JSON.
 - `chalk docker push`: the `SBOM` recorded in the chalk mark of each pushed
   image. The default mark templates do not include `SBOM` (enable it with
   `mark_template.<template>.key.SBOM.use` and `run_sbom_tools`), and
@@ -441,8 +442,8 @@ fetched during the build without a lock file are not seen. Vulnerability
 (CVE) checks are not supported; they need a vulnerability scanner such as
 grype or OSV.
 
-The SBOM parsing is shared by rules in `src/policy/sbom.nim`
-(`policySboms(input)`), which also exposes each package's licenses.
+The SBOM comes from `policySboms` in `src/policy/sbom.nim`, shared with the
+other rules that read SBOMs (see "Adding rules").
 
 ## Reporting
 
