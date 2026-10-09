@@ -2532,6 +2532,7 @@ See `docs/design-build-policy.md` in the chalk repository for details.
 """
 
   allow golden_images
+  allow packages
 
   field mode {
     type:     string
@@ -2724,6 +2725,100 @@ Unknown kinds are reported as evaluation errors.
     doc: """
 Additional guidance shown to the user and included in the report when an
 image is not allowed, e.g. a link to the list of golden images.
+"""
+  }
+}
+
+singleton packages {
+  user_def_ok:   false
+  doc: """
+Restricts the languages and packages a `docker build` depends on, as
+listed by the SBOM of each local build context (the one chalk collects
+with `run_sbom_tools`, else one produced on demand by the enabled `sbom`
+tools, `tool.syft` by default). `docker push` checks the SBOM recorded in
+the image's chalk mark, when the mark template includes `SBOM`; otherwise nothing is
+checked on push.
+
+Packages are identified by their package URL (purl), e.g.
+`pkg:npm/lodash@4.17.21`, and languages as syft reports them, e.g.
+`go`, `javascript`, `python`, `java`, `rust`.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable the packages policy"
+    doc: """
+When enabled without any of `denied`, `allowed`, `allowed_languages` or
+`denied_languages`, nothing is checked and no SBOM is produced.
+"""
+  }
+
+  field denied {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Denied packages as (kind, value) tuples"
+    doc: """
+Packages the build must not depend on. Each entry is a `(kind, value)`
+tuple. The supported kind is `purl`: a package URL whose
+`type/namespace/name` is a shell-style glob, optionally followed by
+`@<version>`, where the version is a glob (`3.3.6`, `1.*`) or a
+comma-separated range (`<4.17.21`, `>=1.0,<1.2`). Without a version any
+version matches. Matching ignores case, qualifiers and subpaths, and
+normalizes PyPI names (`Django_Rest` is `django-rest`). Ranges compare
+`MAJOR[.MINOR[.PATCH]][-suffix]` versions; a package whose version cannot
+be compared is an evaluation error.
+
+```
+denied: [
+  ("purl", "pkg:npm/event-stream@3.3.6"),
+  ("purl", "pkg:pypi/*colourama*"),
+  ("purl", "pkg:npm/lodash@<4.17.21"),
+]
+```
+
+Unknown kinds and invalid patterns are reported as evaluation errors.
+"""
+  }
+
+  field allowed {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Allowed packages as (kind, value) tuples"
+    doc: """
+When not empty, every package must match one of these entries (same
+format as `denied`), e.g. `("purl", "pkg:golang/github.com/acme/*")`.
+"""
+  }
+
+  field allowed_languages {
+    type:     list[string]
+    default:  []
+    shortdoc: "Languages packages may be written in"
+    doc: """
+When not empty, a package of any other language is a violation, reported
+once per language. Packages without a language (e.g. OS packages or
+GitHub Actions) are not checked.
+"""
+  }
+
+  field denied_languages {
+    type:     list[string]
+    default:  []
+    shortdoc: "Languages packages must not be written in"
+    doc: """
+A package of one of these languages is a violation, reported once per
+language.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance shown to the user and included in the report when a
+package or language is not allowed.
 """
   }
 }
