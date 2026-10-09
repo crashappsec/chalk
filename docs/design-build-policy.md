@@ -357,7 +357,10 @@ policy {
       ["purl", "pkg:pypi/*colourama*"],
       ["purl", "pkg:npm/lodash@<4.17.21"]
     ],
-    "allowed": [["purl", "pkg:npm/*"], ["purl", "pkg:golang/*"]],
+    "allowed": [
+      ["purl", "pkg:npm/*"],
+      ["purl", "pkg:golang/*"]
+    ],
     "allowed_languages": ["go", "javascript"],
     "denied_languages": ["python"],
     "message": "See https://example.com/approved-packages"
@@ -365,14 +368,14 @@ policy {
 }
 ```
 
-| Field                                | Type                                        | Default |
-| ------------------------------------ | ------------------------------------------- | ------- |
-| `policy.packages.enabled`            | `bool`                                      | `false` |
-| `policy.packages.denied`             | `list[tuple[string, string]]` (kind, value) | `[]`    |
-| `policy.packages.allowed`            | `list[tuple[string, string]]` (kind, value) | `[]`    |
-| `policy.packages.allowed_languages`  | `list[string]`                              | `[]`    |
-| `policy.packages.denied_languages`   | `list[string]`                              | `[]`    |
-| `policy.packages.message`            | `string`                                    | `""`    |
+| Field                               | Type                                        | Default |
+| ----------------------------------- | ------------------------------------------- | ------- |
+| `policy.packages.enabled`           | `bool`                                      | `false` |
+| `policy.packages.denied`            | `list[tuple[string, string]]` (kind, value) | `[]`    |
+| `policy.packages.allowed`           | `list[tuple[string, string]]` (kind, value) | `[]`    |
+| `policy.packages.allowed_languages` | `list[string]`                              | `[]`    |
+| `policy.packages.denied_languages`  | `list[string]`                              | `[]`    |
+| `policy.packages.message`           | `string`                                    | `""`    |
 
 What is checked, for every package of the SBOM that has a
 [package URL](https://github.com/package-url/purl-spec) (purl):
