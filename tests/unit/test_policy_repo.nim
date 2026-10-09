@@ -87,6 +87,11 @@ proc testLocalOriginFallsBackToCiRepo() =
 proc testMatchesRepoKeepsGlobs() =
   doAssert normalizeRepoPattern("https://GitHub.com/Acme/App?.git") == "github.com/acme/app?"
   doAssert normalizeRepoPattern("git@github.com:acme/[ab]pp.git") == "github.com/acme/[ab]pp"
+  # `[...]` is not a glob: it matches literally and resolveMode warns
+  doAssert not @[("glob", "github.com/acme/app[12]")].matchesRepo("github.com/acme/app1")
+  doAssert "github.com/acme/app[12]".hasCharClass()
+  doAssert not "https://[::1]/acme/app".hasCharClass()
+  doAssert not "github.com/acme/*".hasCharClass()
   doAssert normalizeRepoPattern("github.com/acme/app#main") == "github.com/acme/app"
   # only a numeric port is removed, see normalizeRepoPattern
   doAssert normalizeRepoPattern("https://github.com:443/acme/*") == "github.com/acme/*"

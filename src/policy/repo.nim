@@ -85,8 +85,8 @@ proc normalizeRepo*(url: string): string =
   normalize(url, pattern = false)
 
 proc normalizeRepoPattern*(pattern: string): string =
-  ## `normalizeRepo` for an `enforce_repos` glob: glob characters (`*`, `?`,
-  ## `[...]`) are kept verbatim, so `https://github.com/Acme/app?.git` is
+  ## `normalizeRepo` for an `enforce_repos` glob: glob characters (`*`, `?`)
+  ## are kept verbatim, so `https://github.com/Acme/app?.git` is
   ## `github.com/acme/app?`. Only a numeric port is removed: a glob in the
   ## port position (`github.com:*`) stays part of the host and, as
   ## repositories are compared without ports, never matches.
@@ -101,6 +101,13 @@ proc repoFromEnv*(): string =
       server = "https://github.com"
     return normalizeRepo(server.strip(leading = false, chars = {'/'}) & "/" & github)
   return normalizeRepo(getEnv("CI_PROJECT_URL"))
+
+proc hasCharClass*(pattern: string): bool =
+  # `[` in a host is an IPv6 literal, which matches as written
+  let
+    normalized = normalizeRepoPattern(pattern)
+    slash      = normalized.find('/')
+  return slash != -1 and '[' in normalized[slash + 1 .. ^1]
 
 proc matchesRepo*(entries: seq[(string, string)], repo: string): bool =
   ## `glob` entries as in `golden_images.allowed`, matched against the
@@ -126,9 +133,12 @@ proc resolveMode*(policy: PolicyConfig, repo: string): PolicyConfig =
   if policy.configError != "" or len(policy.enforceRepos) == 0:
     return
   let prefix = if policy.id != "": "policy: " & policy.id & ": " else: "policy: "
-  for (kind, _) in policy.enforceRepos:
+  for (kind, value) in policy.enforceRepos:
     if kind != "glob":
       warn(prefix & "ignoring enforce_repos entry of unsupported kind " & kind)
+    elif value.hasCharClass():
+      warn(prefix & "enforce_repos entry " & value & " uses `[...]`, which " &
+           "globs do not support; `[` only matches itself")
   if repo == "":
     let message = prefix & "repository could not be determined, " &
                   "enforce_repos not applied, using mode " & policy.mode
