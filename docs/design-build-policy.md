@@ -510,6 +510,25 @@ Findings about something other than an image (`newSubjectFinding`) set
 and leave `image` empty. The job summary shows `subject` where it would show
 the image.
 
+Rules that read external tool output (`tool.*`, e.g. syft or semgrep) share
+`src/policy/tools.nim` rather than running the tools themselves:
+
+- on build, `contextToolOutputs` gives, per context directory (at most
+  `maxContextDirs`), chalk's own output (`run_*_tools`) when the directory is
+  below the one chalk scanned (`EXTERNAL_TOOL_DURATION` records it), else
+  the output of running the enabled tools of that kind on the directory on
+  demand, once per process. Chalk scans the git repository containing the
+  first context, so rules keep only what is inside each context directory
+  (`contextPath`). Missing output is an evaluation error, so `on_error`
+  decides;
+- on push, `pushedToolOutputs` reads the output recorded in the pushed
+  images' chalk marks;
+- `capFindings` bounds the findings a rule reports.
+
+`src/policy/sbom.nim` builds on it for rules that read SBOMs (CycloneDX, SPDX
+or syft JSON): `policySboms` returns the packages of each build context, or
+of each pushed image.
+
 A rule with settings in `policy.config_json` registers its section at module
 initialization with `registerPolicyJsonSection(name, validate)`, as
 configurations can be read before rules are loaded. `validate` receives the
@@ -537,3 +556,15 @@ the `policy*Setting` accessors, which read the same path from con4m when
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.
+
+SBOM policy parsing retains every package occurrence. A repository scan keeps a
+package in a build context when any recorded location belongs to that context;
+findings use an in-context location. Packages without locations remain eligible.
+SPDX dependencies do not need optional version or purl metadata. An unversioned
+row without a purl is excluded only when it is explicitly identified as the
+document source by `documentDescribes`, `DESCRIBES` or `DESCRIBED_BY` and has
+`primaryPackagePurpose` of `FILE` or `CONTAINER`. Described applications and
+libraries, and described packages with a version or purl, remain checked. Optional omitted package arrays and empty arrays
+are valid; present arrays must contain package objects with nonempty names.
+Malformed arrays/entries and content omitted by package-count or nesting limits
+produce evaluation errors governed by `on_error`.
