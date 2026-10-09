@@ -3,6 +3,7 @@ import ../../src/types
 import ../../src/policy/engine
 import ../../src/policy/rules
 import ../../src/policy/rules/certificates
+import ../../src/utils/x509
 
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
@@ -53,6 +54,7 @@ proc testParsing() =
   assertEq(ca.keyType, "rsa")
   assertEq(ca.keySize, 2048)
   assertEq(ca.signature, "sha256WithRSAEncryption")
+  assertEq(ca.signatureDigest, "SHA256")
   assertEq(ca.sha256, caSha256.normalizeHex())
   assertEq(ca.notBefore.get(), dateTime(2020, mJan, 1, zone = utc()).toTime())
   assertEq(ca.notAfter.get(), dateTime(2120, mJan, 1, zone = utc()).toTime())
@@ -68,6 +70,10 @@ proc testParsing() =
   let der = fixture("leaf.der").parseCertInfos("leaf.der")
   assertEq(len(der), 1)
   assertEq(der[0].sha256, leaf.sha256)
+  assertEq(der[0].der, leaf.der)
+  doAssert leaf.der.signedBy(ca.der)
+  doAssert not leaf.der.signedBy("")
+  doAssert not "not DER".signedBy(ca.der)
 
   let chain = fixture("chain.pem").parseCertInfos("chain.pem")
   assertEq(len(chain), 2)
@@ -206,6 +212,48 @@ proc testKeys() =
   assertEq(settings.findings(@[ctx]).len, 0)
   settings.minRsaKeySize = 4096
   assertEq(settings.findings(@[ctx]).locations(), @["ca.pem"])
+
+proc testSignatureSecurity() =
+  let weak = info("sha1-pss.pem")
+  let strong = info("sha256-pss.pem")
+  assertEq(weak.signature, "rsassaPss")
+  assertEq(strong.signature, weak.signature)
+  assertEq(weak.signatureDigest, "SHA1")
+  assertEq(strong.signatureDigest, "SHA256")
+  doAssert weak.signature.isWeakSignature(weak.signatureDigest)
+  doAssert not strong.signature.isWeakSignature(strong.signatureDigest)
+  var settings = defaultCertificatesConfig()
+  let pss = newContext({"weak.pem": "sha1-pss.pem", "strong.pem": "sha256-pss.pem"})
+  defer: removeDir(pss)
+  assertEq(settings.findings(@[pss]).locations(), @["weak.pem"])
+  assertEq(settings.findings(@[pss]).reasonOf("weak.pem"),
+           "certificate weak signature algorithm rsassaPss (SHA1)")
+  settings.denyWeakSignatures = false
+  assertEq(settings.findings(@[pss]).len, 0)
+
+  let trusted = info("ca.pem")
+  let spoofed = info("spoofed-ca.pem")
+  let leaf = info("spoofed-issuer.pem")
+  assertEq(spoofed.subjectDn, trusted.subjectDn)
+  assertEq(spoofed.ski, trusted.ski)
+  assertEq(leaf.issuerDn, trusted.subjectDn)
+  assertEq(leaf.aki, trusted.ski)
+  doAssert leaf.der.signedBy(spoofed.der)
+  doAssert not leaf.der.signedBy(trusted.der)
+  settings = defaultCertificatesConfig()
+  settings.allowedIssuers = @[("sha256", caSha256)]
+  let ctx = newContext({"ca.pem": "ca.pem", "leaf.pem": "spoofed-issuer.pem"})
+  defer: removeDir(ctx)
+  assertEq(settings.findings(@[ctx]).locations(), @["leaf.pem"])
+  settings.denySelfSigned = true
+  assertEq(settings.findings(@[ctx]).locations(), @["leaf.pem"])
+  # If several issuers share a DN/SKI, only the actual signer can satisfy a pin.
+  settings.allowedIssuers = @[("sha256", spoofed.sha256)]
+  assertEq(settings.check(@[trusted, spoofed, leaf], now).locations(), @["ca.pem"])
+  # Name allowlists retain their documented, unauthenticated semantics.
+  settings.denySelfSigned = false
+  settings.allowedIssuers = @[("cn", "Chalk Test Root CA")]
+  assertEq(settings.findings(@[ctx]).len, 0)
 
 proc testScanning() =
   let ctx = newContext({
@@ -369,6 +417,7 @@ proc main() =
   testSelfSignedAndCa()
   testAllowedIssuers()
   testKeys()
+  testSignatureSecurity()
   testScanning()
   testJson()
 

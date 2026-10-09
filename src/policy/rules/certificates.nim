@@ -93,6 +93,8 @@ type
     keySize*:    int
     curve*:      string
     signature*:  string
+    signatureDigest*: string
+    der*:        string # copied certificate for issuer pin verification
     sha256*:     string # lowercase hex without separators
     notBefore*:  Option[Time]
     notAfter*:   Option[Time]
@@ -171,8 +173,8 @@ proc normalizeCurve*(name: string): string =
   of "secp521r1", "p-521", "p521": "P-521"
   else: name
 
-proc isWeakSignature*(signature: string): bool =
-  let s = signature.toLowerAscii()
+proc isWeakSignature*(signature: string, digest = ""): bool =
+  let s = (signature & " " & digest).toLowerAscii()
   # `shaWithRSAEncryption` is SHA-0
   if "shawith" in s:
     return true
@@ -222,6 +224,8 @@ proc toCertInfo*(cert: X509Cert, path = "", index = 1, count = 1): CertInfo =
     keySize:   cert.keySize,
     curve:     kv.getOrDefault("Key Group").normalizeCurve(),
     signature: kv.getOrDefault("Signature Type"),
+    signatureDigest: cert.signatureDigest,
+    der:       cert.der,
     sha256:    kv.getOrDefault("SHA256 Fingerprint").normalizeHex(),
     notBefore: kv.getOrDefault("Not Before").parseCertTime(),
     notAfter:  kv.getOrDefault("Not After").parseCertTime(),
@@ -359,9 +363,11 @@ proc unknownIssuerKinds(settings: CertificatesConfig): seq[string] =
       result.add(kind)
 
 proc issuerCerts(cert: CertInfo, all: seq[CertInfo]): seq[CertInfo] =
-  ## the issuing certificates found in the context; itself when self-signed
+  ## Candidate names and identifiers are untrusted; verify the issuing key
+  ## before using the candidate's fingerprint as an issuer pin.
   for other in all:
-    if other.subjectDn == cert.issuerDn and (cert.aki == "" or cert.aki == other.ski):
+    if other.subjectDn == cert.issuerDn and (cert.aki == "" or cert.aki == other.ski) and
+       cert.der.signedBy(other.der):
       result.add(other)
 
 proc pinned(certs: seq[CertInfo], settings: CertificatesConfig): bool =
@@ -406,8 +412,9 @@ proc violations*(cert: CertInfo, all: seq[CertInfo], settings: CertificatesConfi
     result.add("self-signed")
   if settings.denyCa and cert.isCa:
     result.add("CA certificate")
-  if settings.denyWeakSignatures and cert.signature.isWeakSignature():
-    result.add("weak signature algorithm " & cert.signature)
+  if settings.denyWeakSignatures and cert.signature.isWeakSignature(cert.signatureDigest):
+    let details = if cert.signature.isWeakSignature(): "" else: " (" & cert.signatureDigest & ")"
+    result.add("weak signature algorithm " & cert.signature & details)
   if len(settings.allowedKeyTypes) > 0:
     var allowed = false
     for t in settings.allowedKeyTypes:

@@ -5,7 +5,7 @@
 // (see https://crashoverride.com/docs/chalk)
 //
 
-#include <crypto/x509.h>
+#include <openssl/x509.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/bn.h>
@@ -189,6 +189,9 @@ typedef struct {
     char **issuer_short;
     int  version;
     int  key_size;
+    char *signature_digest;
+    unsigned char *der;
+    int der_len;
 } Cert;
 
 Cert *
@@ -267,7 +270,7 @@ extract_cert_data(BIO *fdb)
 
     char *key_contents = BIO_all(key_bio);
     BIO_free(key_bio);
-    STACK_OF(X509_EXTENSION) *exts = cert->cert_info.extensions;
+    const STACK_OF(X509_EXTENSION) *exts = X509_get0_extensions(cert);
 
     int num_exts = sk_X509_EXTENSION_num(exts);
     if (num_exts < 0) {
@@ -378,6 +381,28 @@ extract_cert_data(BIO *fdb)
     result->issuer_short  = convert_NAME(issuer, 1);
     result->version       = version;
     result->key_size      = keysize;
+    // OpenSSL resolves algorithm parameters, including the default SHA-1
+    // digest and explicit hashes in RSA-PSS AlgorithmIdentifiers.
+    int digest_nid = NID_undef;
+    const char *digest_name = NULL;
+    if (X509_get_signature_info(cert, &digest_nid, NULL, NULL, NULL) == 1) {
+        digest_name = OBJ_nid2sn(digest_nid);
+    }
+    result->signature_digest = strdup(digest_name == NULL ? "" : digest_name);
+    // The Nim iterator copies these bytes before cleanup_cert_info frees
+    // them. Keeping the certificate permits later issuer signature checks.
+    result->der_len = i2d_X509(cert, NULL);
+    result->der = result->der_len > 0 ? malloc((size_t)result->der_len) : NULL;
+    if (result->der != NULL) {
+        unsigned char *cursor = result->der;
+        if (i2d_X509(cert, &cursor) != result->der_len) {
+            free(result->der);
+            result->der = NULL;
+        }
+    }
+    if (result->der == NULL) {
+        result->der_len = 0;
+    }
 
     // subj/issuer point into cert, so this must come after convert_NAME.
     EVP_PKEY_free(pub);
@@ -412,7 +437,33 @@ cleanup_cert_info(Cert *cert)
     cleanup_key_value(cert->subject_short);
     cleanup_key_value(cert->issuer);
     cleanup_key_value(cert->issuer_short);
+    free(cert->signature_digest);
+    free(cert->der);
     free(cert);
+}
+
+// Check the issuing key only; trust stores and chain validation are outside
+// the certificate policy's SHA-256 issuer pin contract.
+int
+verify_cert_issuer(const unsigned char *leaf_der, int leaf_len,
+                   const unsigned char *issuer_der, int issuer_len)
+{
+    if (leaf_der == NULL || issuer_der == NULL || leaf_len <= 0 || issuer_len <= 0) {
+        return 0;
+    }
+    const unsigned char *leaf_cursor = leaf_der;
+    const unsigned char *issuer_cursor = issuer_der;
+    X509 *leaf = d2i_X509(NULL, &leaf_cursor, leaf_len);
+    X509 *issuer = d2i_X509(NULL, &issuer_cursor, issuer_len);
+    EVP_PKEY *pub = issuer == NULL ? NULL : X509_get_pubkey(issuer);
+    int verified = leaf != NULL && pub != NULL &&
+                   leaf_cursor == leaf_der + leaf_len &&
+                   issuer_cursor == issuer_der + issuer_len &&
+                   X509_verify(leaf, pub) == 1;
+    EVP_PKEY_free(pub);
+    X509_free(issuer);
+    X509_free(leaf);
+    return verified;
 }
 
 BIO *
