@@ -11,10 +11,12 @@ import "."/[
   api,
   rules/custom_check,
   rules/golden_images,
+  rules/secrets,
 ]
 
 proc loadPolicyRules*() =
   if hasPolicyRules():
     return
   loadGoldenImagesRule()
+  loadSecretsRule()
   loadCustomCheckRule()

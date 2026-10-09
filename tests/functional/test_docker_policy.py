@@ -3,7 +3,9 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import json
+import random
 import re
+import string
 import subprocess
 from pathlib import Path
 
@@ -1289,3 +1291,107 @@ def test_step_summary_includes_presigned_report_location(
     # the presigned query string is a credential
     assert "X-Amz-Signature" not in text
     assert "presign-test" not in text
+
+
+def fake_github_token() -> str:
+    # generated per test so no secret-looking value is committed; it matches
+    # trufflehog's Github detector but is never a live token
+    return "ghp_" + "".join(
+        random.choice(string.ascii_letters + string.digits) for _ in range(36)
+    )
+
+
+def secrets_json(mode: str, **settings) -> str:
+    # verification calls GitHub with the token, which tests must not depend on
+    return json.dumps(
+        {
+            "id": "secrets@1",
+            "mode": mode,
+            "secrets": {
+                "enabled": True,
+                "verify": False,
+                "verified_only": False,
+                **settings,
+            },
+        }
+    )
+
+
+def test_secrets_enforce_blocks_secret_in_context(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    token = fake_github_token()
+    (tmp_data_dir / "app").mkdir()
+    (tmp_data_dir / "app" / "settings.env").write_text(f"DEBUG=1\nTOKEN={token}\n")
+    _, result = build_json(
+        chalk,
+        "FROM alpine\nCOPY app /app\n",
+        secrets_json("enforce", message="Use the vault"),
+        random_hex,
+        context=tmp_data_dir,
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_ID="secrets@1", _POLICY_RESULT="blocked")
+    assert report["_POLICY_FINDINGS"] == [
+        {
+            "policy_id": "secrets@1",
+            "rule": "secrets",
+            "kind": "violation",
+            "image": "",
+            "digest": "",
+            "stage": "",
+            "source": "",
+            "subject": "Github",
+            "location": "app/settings.env:2",
+            "severity": "unverified",
+            "reason": "unverified Github secret in the build context (may be a false positive). "
+            "Rotate it: https://howtorotate.com/docs/tutorials/github/. Use the vault",
+        }
+    ]
+    assert token not in report_file(random_hex).read_text()
+    assert token not in result.text
+    assert token not in result.logs
+
+
+def test_secrets_audit_reports_without_blocking(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    (tmp_data_dir / "token.txt").write_text(fake_github_token())
+    _, result = build_json(
+        chalk,
+        "FROM alpine\n",
+        secrets_json("audit"),
+        random_hex,
+        context=tmp_data_dir,
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="violation")
+    assert report["_POLICY_FINDINGS"][0]["location"] == "token.txt:1"
+
+
+def test_secrets_ignores_files_outside_the_image_context(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    # .dockerignore'd files are never sent to docker; tests/ is excluded by policy
+    (tmp_data_dir / ".env").write_text(f"TOKEN={fake_github_token()}\n")
+    (tmp_data_dir / ".dockerignore").write_text(".env\n")
+    (tmp_data_dir / "tests").mkdir()
+    (tmp_data_dir / "tests" / "fixture.txt").write_text(fake_github_token())
+    _, result = build_json(
+        chalk,
+        "FROM alpine\n",
+        secrets_json("enforce", exclude_paths=["tests"]),
+        random_hex,
+        context=tmp_data_dir,
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    assert policy_reports(random_hex) == []

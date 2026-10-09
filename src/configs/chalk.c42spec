@@ -2532,6 +2532,7 @@ See `docs/design-build-policy.md` in the chalk repository for details.
 """
 
   allow golden_images
+  allow secrets
 
   field mode {
     type:     string
@@ -2724,6 +2725,115 @@ Unknown kinds are reported as evaluation errors.
     doc: """
 Additional guidance shown to the user and included in the report when an
 image is not allowed, e.g. a link to the list of golden images.
+"""
+  }
+}
+
+singleton secrets {
+  user_def_ok:   false
+  doc: """
+Reports secrets (API keys, tokens, credentials) found by trufflehog in the
+local build context of `chalk docker build`, before docker runs. The rule
+runs its own trufflehog `filesystem` scan of every local context directory
+(the main context and local named contexts), using the `tool.trufflehog`
+settings (local binary or docker, installer, timeout, `trufflehog_config`)
+whether or not `run_secret_scanner_tools` is enabled. Files excluded by
+`.dockerignore` (or `<Dockerfile>.dockerignore`) and `.git` directories are
+ignored. Secret values are never reported, only the detector, `path:line`
+and verification status.
+
+A build context that is not a local directory, or a scan that fails or
+times out, is an evaluation error handled by `on_error`. `docker push` is
+only checked with `check_push`.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable the secrets policy"
+    doc: """
+When enabled, secrets in the build context are reported as violations.
+"""
+  }
+
+  field verify {
+    type:     bool
+    default:  true
+    shortdoc: "Let trufflehog verify secrets with their providers"
+    doc: """
+When true, trufflehog checks each candidate secret against its provider's
+API (network calls from the build host). Set to false for offline builds
+(`--no-verification`); `verified_only` must then be false, as no secret can
+be verified.
+"""
+  }
+
+  field verified_only {
+    type:     bool
+    default:  true
+    shortdoc: "Only report secrets the provider confirmed as live"
+    doc: """
+When true, only verified secrets are violations; unverified candidates
+(possible false positives) are ignored, and candidates trufflehog could not
+verify (e.g. the provider was unreachable) are evaluation errors handled by
+`on_error`. When false, every candidate is a violation.
+"""
+  }
+
+  field detectors {
+    type:     list[string]
+    default:  []
+    shortdoc: "Only report these trufflehog detectors"
+    doc: """
+Trufflehog detector names (case-insensitive, e.g. `AWS`, `Github`). When
+empty, every detector is reported.
+"""
+  }
+
+  field ignore_detectors {
+    type:     list[string]
+    default:  []
+    shortdoc: "Never report these trufflehog detectors"
+    doc: """
+Trufflehog detector names (case-insensitive) whose findings are ignored,
+e.g. `URI` for URLs with embedded credentials.
+"""
+  }
+
+  field exclude_paths {
+    type:     list[string]
+    default:  []
+    shortdoc: "Context paths to ignore, in .dockerignore syntax"
+    doc: """
+Paths relative to the context directory whose secrets are ignored, in
+`.dockerignore` syntax (`*` does not cross `/`, `**` does, a directory
+excludes everything under it), e.g. `tests`, `**/fixtures`. Negations
+(`!`) are not allowed.
+"""
+  }
+
+  field check_push {
+    type:     bool
+    default:  false
+    shortdoc: "Check secret scanner results recorded in pushed images' marks"
+    doc: """
+On `docker push`, report the trufflehog results recorded in the chalk mark
+of each pushed image (`SECRET_SCANNER`, only present when the image was
+built with `run_secret_scanner_tools` and a mark template including that
+key). They come from chalk's own scan at build time, in git mode when the
+context is in a git repository, so they can include secrets in committed
+history and are not filtered by `.dockerignore`. Images without such
+results pass.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance shown to the user and included in the report when a
+secret is found, e.g. a link to the secret handling guidelines.
 """
   }
 }
