@@ -324,6 +324,122 @@ func no_latest(image: string, digest: string, stage: string, source: string) {
 policy.custom_check: func no_latest
 ```
 
+### Secrets
+
+`policy.secrets` reports secrets (API keys, tokens, credentials) in the
+files a `docker build` sends to docker, found with
+[trufflehog](https://github.com/trufflesecurity/trufflehog).
+
+```con4m
+policy {
+  mode: "enforce"
+  secrets {
+    enabled:          true
+    verified_only:    true          # only secrets the provider confirmed as live
+    ignore_detectors: ["URI"]
+    exclude_paths:    ["tests", "**/fixtures"]
+    message:          "Move secrets to the vault: https://example.com/secrets"
+  }
+}
+```
+
+```json
+{
+  "id": "secrets@1",
+  "mode": "enforce",
+  "secrets": {
+    "enabled": true,
+    "verify": true,
+    "verified_only": true,
+    "detectors": [],
+    "ignore_detectors": ["URI"],
+    "exclude_paths": ["tests", "**/fixtures"],
+    "check_push": false,
+    "message": "Move secrets to the vault: https://example.com/secrets"
+  }
+}
+```
+
+| Field                             | Type           | Default |
+| --------------------------------- | -------------- | ------- |
+| `policy.secrets.enabled`          | `bool`         | `false` |
+| `policy.secrets.verify`           | `bool`         | `true`  |
+| `policy.secrets.verified_only`    | `bool`         | `true`  |
+| `policy.secrets.detectors`        | `list[string]` | `[]`    |
+| `policy.secrets.ignore_detectors` | `list[string]` | `[]`    |
+| `policy.secrets.exclude_paths`    | `list[string]` | `[]`    |
+| `policy.secrets.check_push`       | `bool`         | `false` |
+| `policy.secrets.message`          | `string`       | `""`    |
+
+What is checked on `docker build`:
+
+- Every local context directory (the main context, the checkout of a git
+  context and local named contexts) is scanned with
+  `trufflehog filesystem --json`, before docker runs. The scan uses the
+  `tool.trufflehog` settings (local binary, else docker, else the installer;
+  `trufflehog_timeout`, 300s by default; `trufflehog_config` for custom
+  detectors) whether or not `run_secret_scanner_tools` is enabled, and is
+  done once per directory however many policies enable the rule.
+- The rule does not reuse `SECRET_SCANNER`: chalk's own scan runs on the git
+  repository containing the first context, in git mode when it can. Git mode
+  reads committed history (secrets that were since removed) but skips
+  untracked and ignored files such as a `.env` that docker does send, and
+  a failed scan there looks the same as a clean one.
+- Files docker does not send are ignored: those matched by
+  `<Dockerfile>.dockerignore` (when it exists, main context only) or else the
+  context's `.dockerignore`, and `.git` directories. `exclude_paths` ignores
+  more paths, relative to the context directory, in `.dockerignore` syntax
+  (`*` does not cross `/`, `**` does, a directory covers everything under it);
+  negations are rejected.
+- `detectors` keeps only the listed trufflehog detectors and
+  `ignore_detectors` drops some (names are case-insensitive, e.g. `AWS`,
+  `Github`, `URI`).
+- Each result is reported with `subject` = detector, `location` =
+  `path:line` (relative to the main context, absolute for named contexts)
+  and `severity` = `verified`, `unverified` or `unknown`:
+
+  | Result                                                           | `verified_only: true`         | `verified_only: false` |
+  | ---------------------------------------------------------------- | ----------------------------- | ---------------------- |
+  | verified (provider accepted the secret)                          | violation                     | violation              |
+  | unverified (provider rejected it, or the detector cannot verify) | ignored                       | violation              |
+  | unknown (verification failed, e.g. no network)                   | evaluation error (`on_error`) | violation              |
+
+- Secret values are never stored, logged or reported. Only the detector,
+  location, verification status and the detector's rotation guide link are
+  kept from trufflehog's output.
+- A build context that is not a local directory (stdin, remote tarball), a
+  missing trufflehog that cannot be installed, a failed scan or a timeout is
+  an evaluation error handled by `on_error`.
+- At most 100 findings are reported per policy (violations first); the
+  rest are summarized in one more finding.
+
+Verification (`verify`, on by default) means trufflehog sends each candidate
+secret to its provider's API from the build host, which is what makes
+`verified` findings reliable. For offline builds, or when sending candidates
+to providers is not acceptable, set `verify: false`: trufflehog runs with
+`--no-verification`, every finding is `unverified`, and `verified_only` must
+be `false` (otherwise the policy is a `config` error, as it could never
+report anything). Unverified findings include false positives (examples,
+test keys), so use them with `audit`, or with `exclude_paths` and
+`ignore_detectors`.
+
+On `docker push` the build context is gone, so nothing is checked unless
+`check_push` is set. Then the trufflehog results recorded in each pushed
+image's chalk mark (`SECRET_SCANNER`, present only when the image was built
+with `run_secret_scanner_tools` and a mark template that includes the key)
+are reported with the same `detectors`, `ignore_detectors` and
+`verified_only` settings. These come from chalk's build-time scan: in git
+mode they can include secrets in committed history (the commit is named in
+the reason) and are not filtered by `.dockerignore`; `exclude_paths` only
+applies to their repository-relative (git mode) paths. Images without such
+results pass.
+
+Limitations: a Dockerfile outside the context (or read from stdin) is not
+scanned, nor are secrets passed as build arguments or created during the
+build; and scanning large contexts takes time (bounded by
+`trufflehog_timeout`), as trufflehog reads files `.dockerignore` excludes
+before chalk drops their findings.
+
 ## Reporting
 
 Findings are published to the `policy` topic, which is subscribed to
