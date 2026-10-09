@@ -68,6 +68,10 @@
 
 ### Bug Fixes
 
+- `chalk docker push` no longer crashes with `FieldDefect` (field
+  `gitContext` not accessible) when a policy has `enforce_repos`; the push
+  failed even when every policy passed.
+  ([#776](https://github.com/crashappsec/chalk/issues/776))
 - Component variable parameters (`parameter var`) now use configured values,
   including values supplied via `chalk load --params`. Previously parameters
   with defaults always used them (e.g. a custom heartbeat interval from

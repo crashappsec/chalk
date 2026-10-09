@@ -37,10 +37,12 @@ proc gitOriginRepo(path: string): string =
 proc commandRepo(ctx: DockerInvocation): string =
   ## Repository of the build context, or of the working directory for push,
   ## falling back to the CI job's repository.
-  if ctx.gitContext != nil:
-    result = normalizeRepo(ctx.gitContext.remoteUrl)
-  elif ctx.cmd == DockerCmd.push:
+  # gitContext is a build-only case field: reading it on push raises
+  # FieldDefect (https://github.com/crashappsec/chalk/issues/776)
+  if ctx.cmd == DockerCmd.push:
     result = gitOriginRepo(getCurrentDir())
+  elif ctx.gitContext != nil:
+    result = normalizeRepo(ctx.gitContext.remoteUrl)
   elif isGitContext(ctx.foundContext):
     # a failure before the git context was processed
     result = normalizeRepo(ctx.foundContext)

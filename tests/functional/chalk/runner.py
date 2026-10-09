@@ -850,10 +850,12 @@ class Chalk:
         config: Optional[Path] = None,
         ignore_errors: bool = False,
         expected_success: bool = True,
+        cwd: Optional[Path] = None,
     ) -> tuple[Optional[DockerDigests], ChalkProgram]:
         push = self.run(
             params=["docker", "push", image],
             config=config,
+            cwd=cwd,
             ignore_errors=ignore_errors,
             expected_success=expected_success,
             env={
