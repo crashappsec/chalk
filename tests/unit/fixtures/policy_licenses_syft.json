@@ -1,0 +1,178 @@
+{
+ "artifacts": [
+  {
+   "id": "83c90a82c3b7cbcd",
+   "name": "app",
+   "version": "1.0.0",
+   "type": "npm",
+   "foundBy": "javascript-lock-cataloger",
+   "locations": [
+    {
+     "path": "/package-lock.json",
+     "accessPath": "/package-lock.json",
+     "annotations": {
+      "evidence": "primary"
+     }
+    }
+   ],
+   "licenses": [
+    {
+     "value": "MIT",
+     "spdxExpression": "MIT",
+     "type": "declared",
+     "urls": [],
+     "locations": [
+      {
+       "path": "/package-lock.json",
+       "accessPath": "/package-lock.json",
+       "annotations": {
+        "evidence": "primary"
+       }
+      }
+     ]
+    }
+   ],
+   "language": "javascript",
+   "cpes": [
+    {
+     "cpe": "cpe:2.3:a:app:app:1.0.0:*:*:*:*:*:*:*",
+     "source": "syft-generated"
+    }
+   ],
+   "purl": "pkg:npm/app@1.0.0",
+   "metadataType": "javascript-npm-package-lock-entry",
+   "metadata": {
+    "resolved": "",
+    "integrity": "",
+    "dependencies": {
+     "gplpkg": "1.0.0"
+    }
+   }
+  },
+  {
+   "id": "87d44f0374ac3cba",
+   "name": "dual",
+   "version": "2.0.0",
+   "type": "npm",
+   "foundBy": "javascript-lock-cataloger",
+   "locations": [
+    {
+     "path": "/package-lock.json",
+     "accessPath": "/package-lock.json",
+     "annotations": {
+      "evidence": "primary"
+     }
+    }
+   ],
+   "licenses": [
+    {
+     "value": "(MIT OR GPL-2.0)",
+     "spdxExpression": "(MIT OR GPL-2.0)",
+     "type": "declared",
+     "urls": [],
+     "locations": [
+      {
+       "path": "/package-lock.json",
+       "accessPath": "/package-lock.json",
+       "annotations": {
+        "evidence": "primary"
+       }
+      }
+     ]
+    }
+   ],
+   "language": "javascript",
+   "cpes": [
+    {
+     "cpe": "cpe:2.3:a:dual:dual:2.0.0:*:*:*:*:*:*:*",
+     "source": "syft-generated"
+    }
+   ],
+   "purl": "pkg:npm/dual@2.0.0",
+   "metadataType": "javascript-npm-package-lock-entry",
+   "metadata": {
+    "resolved": "",
+    "integrity": "",
+    "dependencies": null
+   }
+  },
+  {
+   "id": "b6f6d5a9f5c97ffd",
+   "name": "github.com/pkg/errors",
+   "version": "v0.9.1",
+   "type": "go-module",
+   "foundBy": "go-module-file-cataloger",
+   "locations": [
+    {
+     "path": "/go.mod",
+     "accessPath": "/go.mod",
+     "annotations": {
+      "evidence": "primary"
+     }
+    }
+   ],
+   "licenses": [],
+   "language": "go",
+   "cpes": [
+    {
+     "cpe": "cpe:2.3:a:pkg:errors:v0.9.1:*:*:*:*:*:*:*",
+     "source": "syft-generated"
+    }
+   ],
+   "purl": "pkg:golang/github.com/pkg/errors@v0.9.1",
+   "metadataType": "go-module-entry",
+   "metadata": {}
+  },
+  {
+   "id": "12798a7fc5b93bd6",
+   "name": "gplpkg",
+   "version": "1.0.0",
+   "type": "npm",
+   "foundBy": "javascript-lock-cataloger",
+   "locations": [
+    {
+     "path": "/package-lock.json",
+     "accessPath": "/package-lock.json",
+     "annotations": {
+      "evidence": "primary"
+     }
+    }
+   ],
+   "licenses": [
+    {
+     "value": "GPL-3.0-only",
+     "spdxExpression": "GPL-3.0-only",
+     "type": "declared",
+     "urls": [],
+     "locations": [
+      {
+       "path": "/package-lock.json",
+       "accessPath": "/package-lock.json",
+       "annotations": {
+        "evidence": "primary"
+       }
+      }
+     ]
+    }
+   ],
+   "language": "javascript",
+   "cpes": [
+    {
+     "cpe": "cpe:2.3:a:gplpkg:gplpkg:1.0.0:*:*:*:*:*:*:*",
+     "source": "syft-generated"
+    }
+   ],
+   "purl": "pkg:npm/gplpkg@1.0.0",
+   "metadataType": "javascript-npm-package-lock-entry",
+   "metadata": {
+    "resolved": "",
+    "integrity": "",
+    "dependencies": null
+   }
+  }
+ ],
+ "schema": {
+  "version": "16.1.11",
+  "url": "https://raw.githubusercontent.com/anchore/syft/main/schema/json/schema-16.1.11.json"
+ }
+}

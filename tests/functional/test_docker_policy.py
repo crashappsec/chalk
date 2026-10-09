@@ -1289,3 +1289,135 @@ def test_step_summary_includes_presigned_report_location(
     # the presigned query string is a credential
     assert "X-Amz-Signature" not in text
     assert "presign-test" not in text
+
+
+LICENSES_SBOM = POLICY_CONFIG.with_name("policy_licenses_cyclonedx.json")
+
+
+def licenses_build(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    policy: dict,
+    sbom: Path = LICENSES_SBOM,
+    **kwargs,
+):
+    dockerfile = tmp_data_dir / "Dockerfile"
+    dockerfile.write_text("FROM alpine\nCMD true\n")
+    return chalk.docker_build(
+        dockerfile=dockerfile,
+        context=tmp_data_dir,
+        tag=random_hex,
+        config=CONFIGS / "policy_licenses.c4m",
+        env={
+            "POLICY_CONFIG_JSON": json.dumps(policy),
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+            "POLICY_SBOM_FIXTURE": str(sbom),
+            **kwargs.pop("env", {}),
+        },
+        run_docker=False,
+        **kwargs,
+    )
+
+
+def test_licenses_enforce_blocks_denied_license(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path
+):
+    summary = tmp_path / "summary.md"
+    _, result = licenses_build(
+        chalk,
+        random_hex,
+        tmp_data_dir,
+        {
+            "id": "licenses@1",
+            "mode": "enforce",
+            "licenses": {"enabled": True, "denied": ["@strong_copyleft"]},
+        },
+        env={"GITHUB_STEP_SUMMARY": str(summary)},
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_ID="licenses@1", _POLICY_RESULT="blocked")
+    assert [
+        (f["rule"], f["kind"], f["subject"], f["location"])
+        for f in report["_POLICY_FINDINGS"]
+    ] == [
+        ("licenses", "violation", "pkg:npm/gplpkg@1.0.0", "/package-lock.json"),
+        ("licenses", "violation", "pkg:pypi/legacy@0.1.0", "/requirements.txt"),
+    ]
+    assert report["_POLICY_FINDINGS"][0]["reason"] == (
+        "license GPL-3.0-only is not allowed"
+    )
+    text = summary.read_text()
+    assert "| Subject |" in text
+    assert "`pkg:npm/gplpkg@1.0.0`" in text
+
+
+def test_licenses_audit_allowlist(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
+    _, result = licenses_build(
+        chalk,
+        random_hex,
+        tmp_data_dir,
+        {
+            "mode": "audit",
+            "licenses": {
+                "enabled": True,
+                "allowed": ["MIT", "Apache-2.0", "CDDL-1.1"],
+                "exceptions": ["pkg:pypi/legacy"],
+            },
+        },
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="violation", _POLICY_MODE="audit")
+    assert [f["subject"] for f in report["_POLICY_FINDINGS"]] == [
+        "pkg:npm/gplpkg@1.0.0"
+    ]
+
+
+def test_licenses_pass(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
+    _, result = licenses_build(
+        chalk,
+        random_hex,
+        tmp_data_dir,
+        {"mode": "enforce", "licenses": {"enabled": True, "denied": ["AGPL-*"]}},
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    assert policy_reports(random_hex) == []
+
+
+@pytest.mark.parametrize("on_error, expected_exit", [("allow", 0), ("block", 1)])
+def test_licenses_without_sbom_honors_on_error(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    on_error: str,
+    expected_exit: int,
+):
+    _, result = licenses_build(
+        chalk,
+        random_hex,
+        tmp_data_dir,
+        {
+            "mode": "enforce",
+            "on_error": on_error,
+            "licenses": {"enabled": True, "denied": ["GPL-*"]},
+        },
+        sbom=tmp_data_dir / "missing.json",
+        expected_success=expected_exit == 0,
+        # evaluation errors are logged as errors
+        ignore_errors=True,
+    )
+    assert result.exit_code == expected_exit
+    assert image_exists(random_hex) == (expected_exit == 0)
+    (report,) = policy_reports(random_hex)
+    (finding,) = report["_POLICY_FINDINGS"]
+    assert (finding["rule"], finding["kind"], finding["reason"]) == (
+        "licenses",
+        "error",
+        "could not generate an SBOM of the build context",
+    )
