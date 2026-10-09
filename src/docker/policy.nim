@@ -68,14 +68,18 @@ proc localDir(path: string): string =
     return resolved
   return ""
 
-proc contextDirs(ctx: DockerInvocation): seq[string] =
+proc policyContextDirs*(ctx: DockerInvocation): seq[string] =
   ## local directories the build reads, for rules that scan the build context
   let main =
-    if ctx.gitContext != nil and ctx.gitContext.tmpWorkTree != "":
-      ctx.gitContext.tmpWorkTree
+    if ctx.gitContext != nil:
+      if not ctx.gitContext.isCheckedOut():
+        discard ctx.gitContext.checkout()
+      ctx.gitContext.contextPath()
     else:
       ctx.foundContext.localDir()
   if main != "":
+    if not main.dirExists():
+      raise newException(ValueError, "build context directory does not exist: " & main)
     result.add(main)
   if ctx.foundExtraContexts != nil:
     for _, value in ctx.foundExtraContexts:
@@ -96,7 +100,7 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
   let collect = proc(): PolicyInput =
     result = ctx.buildSubjects(allStages = not hasBuildX())
     let pushTargets = if ctx.foundPush: ctx.foundTags.asRepoTag() else: @[]
-    result.addCommandInput("build", pushTargets, ctx.contextDirs())
+    result.addCommandInput("build", pushTargets, ctx.policyContextDirs())
     if ctx.dockerFileLoc notin ["", stdinIndicator]:
       result.dockerfilePath = ctx.dockerFileLoc.resolvePath()
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver())
