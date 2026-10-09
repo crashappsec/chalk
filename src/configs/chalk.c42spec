@@ -2532,6 +2532,7 @@ See `docs/design-build-policy.md` in the chalk repository for details.
 """
 
   allow golden_images
+  allow licenses
 
   field mode {
     type:     string
@@ -2724,6 +2725,116 @@ Unknown kinds are reported as evaluation errors.
     doc: """
 Additional guidance shown to the user and included in the report when an
 image is not allowed, e.g. a link to the list of golden images.
+"""
+  }
+}
+
+singleton licenses {
+  user_def_ok:   false
+  doc: """
+Reports packages of the build context whose licenses are denied or not
+allowed, from its SBOM. The SBOM collected with `run_sbom_tools` is used
+for build context directories it covers, keeping the packages inside each
+directory; for others chalk runs the enabled SBOM tools (syft by default)
+on the directory when the policy is evaluated. When no SBOM can be
+generated, `on_error` decides. `docker push` only checks images whose chalk
+mark records the `SBOM` key.
+
+License ids and patterns are matched case-insensitively. Common non-SPDX
+names (`GPLv2`, `Apache 2.0`) and deprecated ids (`GPL-2.0+`) are
+normalized to SPDX ids (https://spdx.org/licenses/). SPDX expressions are
+evaluated: `OR` passes when any alternative passes, `AND` when all do.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable the license policy"
+  }
+
+  field denied {
+    type:     list[string]
+    default:  []
+    shortdoc: "Denied licenses"
+    doc: """
+SPDX license ids or shell-style globs (e.g. `GPL-*`), or presets:
+
+* `@strong_copyleft` - `GPL-*`, `AGPL-*`, `SSPL-1.0`, `OSL-*`, `EUPL-*`,
+  `RPL-*`, `Sleepycat`
+* `@weak_copyleft` - `LGPL-*`, `MPL-*`, `EPL-*`, `CDDL-*`, `CPL-1.0`, `MS-RL`
+* `@network_copyleft` - `AGPL-*`, `SSPL-1.0`, `OSL-3.0`, `RPL-*`
+
+A pattern without `WITH` matches a license whatever its exception
+(`GPL-*` matches `GPL-2.0-only WITH Classpath-exception-2.0`).
+"""
+  }
+
+  field allowed {
+    type:     list[string]
+    default:  []
+    shortdoc: "Allowed licenses"
+    doc: """
+When not empty, every license that does not match an entry is a
+violation. Entries are written like `denied`. `denied` takes precedence,
+except for an allowed entry with a `WITH` exception, e.g.
+`GPL-2.0-only WITH Classpath-exception-2.0`, which overrides a broader
+denied pattern such as `GPL-*`.
+"""
+  }
+
+  field unknown {
+    type:     string
+    default:  "ignore"
+    choices:  ["ignore", "violation", "error"]
+    shortdoc: "What to do with packages without license information"
+    doc: """
+Packages whose license is missing, `NOASSERTION`, `NONE` or `UNKNOWN` are
+ignored, reported as violations, or reported as evaluation errors handled
+by `on_error`. SBOMs of source trees often lack licenses (e.g. for Go
+modules), so `violation` can be noisy.
+"""
+  }
+
+  field exceptions {
+    type:     list[string]
+    default:  []
+    shortdoc: "Packages exempt from the policy"
+    doc: """
+Package URL globs (https://github.com/package-url/purl-spec) of approved
+uses, e.g. `pkg:npm/some-package` or `pkg:maven/org.acme/*@1.*`. A pattern
+without `@` matches every version.
+"""
+  }
+
+  field ignore_types {
+    type:     list[string]
+    default:  []
+    shortdoc: "Package types not checked"
+    doc: """
+Package URL types (e.g. `npm`, `pypi`, `golang`, `github`) or syft package
+types that are not checked.
+"""
+  }
+
+  field include_os_packages {
+    type:     bool
+    default:  false
+    shortdoc: "Also check OS distribution packages"
+    doc: """
+OS packages (`apk`, `alpm`, `deb`, `ebuild` and `rpm` package URL types),
+which are mostly GPL licensed and come with the base image rather than the
+application, are not checked unless enabled. Restrict base images with
+`golden_images` instead.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance included in each violation, e.g. a link to the
+license policy.
 """
   }
 }
