@@ -371,17 +371,19 @@ policy {
 | `policy.licenses.include_os_packages` | `bool`                                          | `false`    |
 | `policy.licenses.message`             | `string`                                        | `""`       |
 
-**Where licenses come from.** The rule reads the SBOM of the build
-context. When `run_sbom_tools` is enabled, chalk has already generated it
-(of the git repository containing the context) before policies run, and
-the rule uses it. Otherwise the rule runs the enabled SBOM tools itself
-(`syft` by default, see `tool.syft`) on each local build context directory,
-once per command whatever the number of policies. When no SBOM can be
-generated (the tool cannot be installed or fails, or the context is not a
-local directory, e.g. stdin), the rule reports an evaluation error and
-`on_error` decides. CycloneDX (syft's default, `components[].licenses[]`),
-SPDX JSON (`licenseConcluded`, else `licenseDeclared`) and syft JSON are
-understood.
+**Where licenses come from.** The rule reads the SBOM of each local build
+context directory (at most 8), shared with `policy.packages`
+(`src/policy/sbom.nim`). When `run_sbom_tools` is enabled, chalk has already
+generated one of the git repository containing the context before policies
+run; the rule uses it for the context directories inside that repository,
+keeping only the packages found inside each directory. For other
+directories, or without `run_sbom_tools`, the rule runs the enabled SBOM
+tools itself (`syft` by default, see `tool.syft`), once per directory and
+command whatever the number of policies. When no SBOM can be generated (the
+tool cannot be installed or fails, or the context is not a local directory,
+e.g. stdin), the rule reports an evaluation error and `on_error` decides.
+CycloneDX (syft's default, `components[].licenses[]`), SPDX JSON
+(`licenseConcluded`, else `licenseDeclared`) and syft JSON are understood.
 
 **Matching.**
 
@@ -418,9 +420,10 @@ understood.
   GitHub Actions referenced by workflows.
 
 Each finding has the package purl (else `name@version`) as `subject`, the
-SBOM path that declared it (e.g. `/package-lock.json`) as `location`, and the
-offending licenses and expression in `reason`. At most 200 findings are
-reported per policy, followed by one counting the rest.
+file that declared it, relative to the build context (e.g.
+`package-lock.json`), as `location`, and the offending licenses and
+expression in `reason`. At most 200 findings are reported per policy,
+followed by one counting the rest.
 
 **`docker push`** has no build context. It checks the `SBOM` recorded in the
 chalk mark of the pushed images, which requires both `run_sbom_tools` and

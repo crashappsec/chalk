@@ -6,8 +6,8 @@
 ##
 
 ## `policy.licenses`: report packages whose licenses are denied or not
-## allowed, read from the SBOM of the build context (CycloneDX, SPDX or syft
-## JSON). See docs/design-build-policy.md for the settings and semantics.
+## allowed, read from the SBOM of the build context (see policy/sbom.nim).
+## See docs/design-build-policy.md for the settings and semantics.
 
 import std/[
   algorithm,
@@ -18,12 +18,13 @@ import std/[
   tables,
 ]
 import "../.."/[
-  plugins/externalTool,
   types,
 ]
 import ".."/[
   api,
   configuration,
+  helpers,
+  sbom,
 ]
 import ./golden_images
 
@@ -40,9 +41,7 @@ const
   ## rather than with the application (https://github.com/package-url/purl-spec)
   osPackageTypes = ["apk", "alpm", "deb", "ebuild", "rpm"]
   unknownChoices = ["ignore", "violation", "error"]
-  maxPackages    = 100_000
   maxFindings    = 200
-  maxContextDirs = 4
 
 type
   LicenseNodeKind* = enum
@@ -56,14 +55,6 @@ type
 
   Verdict* = enum
     vAllowed, vUnknown, vDenied
-
-  SbomPackage* = object
-    name*:     string
-    version*:  string
-    purl*:     string
-    pkgType*:  string # syft package type, when the SBOM records one
-    location*: string
-    licenses*: seq[string] # as written in the SBOM, each applies (AND)
 
   LicensesConfig* = object
     denied*:            seq[string] # lowercase, presets expanded
@@ -304,14 +295,6 @@ proc expandPatterns(values: seq[string], path: string): seq[string] =
     for pattern in licensePresets[preset]:
       result.add(pattern.toLowerAscii())
 
-proc purlType(purl: string): string =
-  if not purl.startsWith("pkg:"):
-    return ""
-  let slash = purl.find('/')
-  if slash < 0:
-    return ""
-  purl[4 ..< slash].toLowerAscii()
-
 proc purlBase(purl: string): string =
   ## the purl without version, qualifiers and subpath
   result = purl
@@ -340,7 +323,7 @@ proc isException(settings: LicensesConfig, pkg: SbomPackage): bool =
   return false
 
 proc isIgnoredType(settings: LicensesConfig, pkg: SbomPackage): bool =
-  let types = [pkg.purl.purlType(), pkg.pkgType.toLowerAscii()]
+  let types = [pkg.purlType, pkg.pkgType.toLowerAscii()]
   for t in types:
     if t == "":
       continue
@@ -388,206 +371,24 @@ proc checkPackage*(settings: LicensesConfig, pkg: SbomPackage): Option[PolicyFin
                else: "license is unknown (" & expression & ")"
     return some(newSubjectFinding(ruleName, kind, pkg.subject(), reason, pkg.location))
 
-# SBOM parsing
-
-proc cyclonedxLocation(component: JsonNode): string =
-  for prop in component{"properties"}.getElems():
-    if prop{"name"}.getStr().startsWith("syft:location:") and
-       prop{"name"}.getStr().endsWith(":path"):
-      return prop{"value"}.getStr()
-
-proc cyclonedxType(component: JsonNode): string =
-  for prop in component{"properties"}.getElems():
-    if prop{"name"}.getStr() == "syft:package:type":
-      return prop{"value"}.getStr()
-
-proc addCyclonedx(packages: var seq[SbomPackage], components: JsonNode) =
-  # https://cyclonedx.org/docs/1.6/json/#components_items_licenses
-  for component in components.getElems():
-    if len(packages) > maxPackages:
-      return
-    packages.addCyclonedx(component{"components"})
-    if component{"type"}.getStr() == "file":
-      continue
-    var pkg = SbomPackage(
-      name:     component{"name"}.getStr(),
-      version:  component{"version"}.getStr(),
-      purl:     component{"purl"}.getStr(),
-      pkgType:  component.cyclonedxType(),
-      location: component.cyclonedxLocation(),
-    )
-    for entry in component{"licenses"}.getElems():
-      if entry{"expression"}.getStr() != "":
-        pkg.licenses.add(entry{"expression"}.getStr())
-      elif entry{"license"}{"id"}.getStr() != "":
-        pkg.licenses.add(entry{"license"}{"id"}.getStr())
-      elif entry{"license"}{"name"}.getStr() != "":
-        pkg.licenses.add(entry{"license"}{"name"}.getStr())
-    packages.add(pkg)
-
-proc spdxPurl(pkg: JsonNode): string =
-  for reference in pkg{"externalRefs"}.getElems():
-    if reference{"referenceType"}.getStr() == "purl":
-      return reference{"referenceLocator"}.getStr()
-
-proc spdxLocation(pkg: JsonNode): string =
-  # syft writes "acquired package info from <cataloger>: <path>"
-  let info = pkg{"sourceInfo"}.getStr()
-  let i = info.rfind(": /")
-  if i >= 0:
-    return info[i + 2 .. ^1].split(", ")[0]
-
-proc addSpdx(packages: var seq[SbomPackage], doc: JsonNode) =
-  # https://spdx.github.io/spdx-spec/v2.3/package-information/#713-concluded-license-field
-  for item in doc{"packages"}.getElems():
-    if len(packages) > maxPackages:
-      return
-    let purl = item.spdxPurl()
-    # the described directory or image itself, not a package
-    if purl == "" and item{"versionInfo"}.getStr() == "":
-      continue
-    var pkg = SbomPackage(
-      name:     item{"name"}.getStr(),
-      version:  item{"versionInfo"}.getStr(),
-      purl:     purl,
-      location: item.spdxLocation(),
-    )
-    let concluded = item{"licenseConcluded"}.getStr()
-    let license =
-      if not concluded.isUnknownLicense(): concluded
-      else: item{"licenseDeclared"}.getStr()
-    if not license.isUnknownLicense():
-      pkg.licenses.add(license)
-    packages.add(pkg)
-
-proc addSyftJson(packages: var seq[SbomPackage], doc: JsonNode) =
-  # https://github.com/anchore/syft/tree/main/schema/json
-  for artifact in doc{"artifacts"}.getElems():
-    if len(packages) > maxPackages:
-      return
-    var pkg = SbomPackage(
-      name:    artifact{"name"}.getStr(),
-      version: artifact{"version"}.getStr(),
-      purl:    artifact{"purl"}.getStr(),
-      pkgType: artifact{"type"}.getStr(),
-    )
-    let locations = artifact{"locations"}.getElems()
-    if len(locations) > 0:
-      pkg.location = locations[0]{"path"}.getStr()
-    for license in artifact{"licenses"}.getElems():
-      let expression = license{"spdxExpression"}.getStr()
-      pkg.licenses.add(if expression != "": expression else: license{"value"}.getStr())
-    packages.add(pkg)
-
-proc sbomPackages*(doc: JsonNode): seq[SbomPackage] =
-  ## Packages of a CycloneDX, SPDX or syft JSON document. Raises `ValueError`
-  ## for anything else.
-  if doc == nil or doc.kind != JObject:
-    raise newException(ValueError, "SBOM is not a JSON object")
-  if doc{"bomFormat"}.getStr() == "CycloneDX":
-    result.addCyclonedx(doc{"components"})
-  elif doc.hasKey("spdxVersion"):
-    result.addSpdx(doc)
-  elif doc.hasKey("artifacts"):
-    result.addSyftJson(doc)
-  else:
-    raise newException(ValueError, "unsupported SBOM format, expected CycloneDX, SPDX or syft JSON")
-  if len(result) > maxPackages:
-    raise newException(ValueError, "SBOM lists more than " & $maxPackages & " packages")
-
-proc sbomDocuments*(sbom: Box): seq[JsonNode] =
-  ## the documents of an `SBOM` key, which maps each tool to its output
-  let parsed = parseJson(boxToJson(sbom))
-  if parsed.kind != JObject:
-    raise newException(ValueError, "SBOM key is not a JSON object")
-  for _, doc in parsed.pairs():
-    result.add(doc)
-
-# SBOM collection
-
-proc runSbomToolsOn(dir: string): seq[JsonNode] =
-  ## Runs the enabled SBOM tools (syft by default) like `run_sbom_tools`
-  ## would, stopping at the first that produces an SBOM.
-  var tools: seq[(int, string)]
-  for name in getChalkSubsections("tool"):
-    let base = "tool." & name
-    if attrGet[bool](base & ".enabled") and attrGet[string](base & ".kind") == "sbom":
-      tools.add((attrGet[int](base & ".priority"), name))
-  tools.sort()
-  for (_, tool) in tools:
-    try:
-      let data = runTool(tool, dir, force = true)
-      if "SBOM" in data:
-        return @[parseJson(boxToJson(data["SBOM"]))]
-    except CatchableError:
-      error("policy: licenses: " & tool & " failed on " & dir & ": " & getCurrentExceptionMsg())
-
-type SbomRunner* = proc(dir: string): seq[JsonNode] {.closure.}
-
-var
-  ## replaced by unit tests
-  sbomRunner*: SbomRunner = runSbomToolsOn
-  # with several policies the rule runs once per policy, the tools only once
-  sbomCache   = initTable[string, seq[JsonNode]]()
-
-proc contextSboms(dir: string): seq[JsonNode] =
-  if dir notin sbomCache:
-    sbomCache[dir] = sbomRunner(dir)
-  sbomCache[dir]
-
-proc clearLicensesCache*() =
-  sbomCache.clear()
-
-proc collectFindings(settings: LicensesConfig, docs: seq[JsonNode],
-                     findings: var seq[PolicyFinding], seen: var HashSet[string]) =
-  for doc in docs:
-    for pkg in doc.sbomPackages():
+proc collectFindings(settings: LicensesConfig, sboms: seq[Sbom]): seq[PolicyFinding] =
+  var seen = initHashSet[string]()
+  for sbom in sboms:
+    for pkg in sbom.packages:
       let finding = settings.checkPackage(pkg)
       if finding.isNone():
         continue
       let f = finding.get()
-      let key = f.kind & "\0" & f.subject & "\0" & f.reason
-      if key in seen:
+      if seen.containsOrIncl(f.kind & "\0" & f.subject & "\0" & f.reason):
         continue
-      seen.incl(key)
-      findings.add(f)
-
-proc capFindings(findings: seq[PolicyFinding]): seq[PolicyFinding] =
-  if len(findings) <= maxFindings:
-    return findings
-  result = findings[0 ..< maxFindings]
-  var violations = 0
-  for f in findings[maxFindings .. ^1]:
-    if f.kind == "violation":
-      inc(violations)
-  let kind = if violations > 0: "violation" else: "error"
-  result.add(newSubjectFinding(ruleName, kind, "",
-                               $(len(findings) - maxFindings) & " more packages not shown"))
+      result.add(f)
 
 proc check*(settings: LicensesConfig, input: PolicyInput): seq[PolicyFinding] =
-  var seen = initHashSet[string]()
-  if input.command == "push":
-    # licenses are checked at build time; marks only carry an SBOM when
-    # the mark template records it
-    for mark in input.pushMarks:
-      if mark != nil and "SBOM" in mark:
-        settings.collectFindings(mark["SBOM"].sbomDocuments(), result, seen)
-    return result.capFindings()
-  var docs: seq[JsonNode]
-  if input.host != nil and "SBOM" in input.host:
-    docs = input.host["SBOM"].sbomDocuments()
-  else:
-    if len(input.contextDirs) == 0:
-      return @[newSubjectFinding(ruleName, "error", "",
-                                 "no local build context to generate an SBOM from")]
-    for dir in input.contextDirs[0 ..< min(len(input.contextDirs), maxContextDirs)]:
-      let sboms = contextSboms(dir)
-      if len(sboms) == 0:
-        result.add(newSubjectFinding(ruleName, "error", dir,
-                                     "could not generate an SBOM of the build context"))
-      docs.add(sboms)
-  settings.collectFindings(docs, result, seen)
-  return result.capFindings()
+  ## On push, only SBOMs recorded in the image marks are checked; marks only
+  ## carry one when the mark template records it.
+  let sboms = input.policySboms(ruleName)
+  result = sboms.errors
+  result.add(settings.collectFindings(sboms.sboms).capFindings(ruleName, maxFindings, "packages"))
 
 # configuration
 

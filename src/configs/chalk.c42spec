@@ -2734,8 +2734,9 @@ singleton licenses {
   doc: """
 Reports packages of the build context whose licenses are denied or not
 allowed, from its SBOM. The SBOM collected with `run_sbom_tools` is used
-when available, else chalk runs the enabled SBOM tools (syft by default)
-on the build context when the policy is evaluated. When no SBOM can be
+for build context directories it covers, keeping the packages inside each
+directory; for others chalk runs the enabled SBOM tools (syft by default)
+on the directory when the policy is evaluated. When no SBOM can be
 generated, `on_error` decides. `docker push` only checks images whose chalk
 mark records the `SBOM` key.
 

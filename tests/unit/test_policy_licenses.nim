@@ -2,6 +2,8 @@ import std/[json, os, strutils]
 import ../../src/types
 import ../../src/chalkjson
 import ../../src/policy/engine
+import ../../src/policy/sbom
+import ../../src/policy/tools
 import ../../src/policy/rules/licenses
 
 template assertEq(a, b: untyped) =
@@ -10,7 +12,16 @@ template assertEq(a, b: untyped) =
 let fixtures = currentSourcePath().parentDir() / "fixtures"
 
 proc fixture(name: string): JsonNode =
-  parseJson(readFile(fixtures / ("policy_licenses_" & name & ".json")))
+  let file = if name == "cyclonedx": "sbom_licenses_cyclonedx.json" else: "sbom_" & name & ".json"
+  parseJson(readFile(fixtures / file))
+
+proc hostInput(doc: JsonNode): PolicyInput =
+  ## chalk's SBOM of /ctx, the build context
+  let host = ChalkDict()
+  let sbom = newJObject()
+  sbom["syft"] = doc
+  host["SBOM"] = nimJsonToBox(sbom)
+  PolicyInput(command: "build", contextDirs: @["/ctx"], host: host)
 
 proc config(json: string): LicensesConfig =
   setPolicyJson("""{"mode": "audit", "licenses": """ & json & "}")
@@ -22,11 +33,7 @@ proc config(json: string): LicensesConfig =
 
 proc findings(settings: LicensesConfig, doc: JsonNode): seq[(string, string, string)] =
   ## (kind, subject, reason) of every finding
-  let host = ChalkDict()
-  let sbom = newJObject()
-  sbom["syft"] = doc
-  host["SBOM"] = nimJsonToBox(sbom)
-  for f in settings.check(PolicyInput(command: "build", host: host)):
+  for f in settings.check(hostInput(doc)):
     doAssert f.rule == "licenses"
     result.add((f.kind, f.subject, f.reason))
 
@@ -106,7 +113,7 @@ proc testExpressions() =
 
 proc testCycloneDx() =
   let doc = fixture("cyclonedx")
-  let packages = sbomPackages(doc)
+  let packages = parseSbom(doc).packages
   # file components are not packages
   for pkg in packages:
     doAssert not pkg.name.startsWith("/"), pkg.name
@@ -152,26 +159,29 @@ proc testCycloneDx() =
 proc testFormats() =
   let settings = config("""{"enabled": true, "denied": ["GPL-3.0*"]}""")
   for format in ["cyclonedx", "spdx", "syft"]:
-    let host = ChalkDict()
-    let sbom = newJObject()
-    sbom["syft"] = fixture(format)
-    host["SBOM"] = nimJsonToBox(sbom)
-    let found = settings.check(PolicyInput(command: "build", host: host))
+    let found = settings.check(hostInput(fixture(format)))
     doAssert len(found) >= 1, format
     assertEq(found[0].subject, "pkg:npm/gplpkg@1.0.0")
-    assertEq(found[0].location, "/package-lock.json")
-  doAssertRaises(ValueError):
-    discard sbomPackages(parseJson("""{"foo": 1}"""))
+    # relative to the build context
+    assertEq(found[0].location, "package-lock.json")
+  # chalk scans the repository containing the context: only packages inside
+  # the context directory count
+  var monorepo = hostInput(fixture("cyclonedx"))
+  monorepo.contextDirs = @["/ctx/libs"]
+  let inLibs = config("""{"enabled": true, "allowed": ["MIT"]}""").check(monorepo)
+  assertEq(len(inLibs), 1)
+  assertEq(inLibs[0].subject, "pkg:maven/javax.annotation/javax.annotation-api@1.3.2")
+  assertEq(inLibs[0].location, "javax.annotation-api-1.3.2.jar")
 
 proc testCollection() =
   let settings = config("""{"enabled": true, "denied": ["GPL-3.0-only"]}""")
   var runs = 0
-  sbomRunner = proc(dir: string): seq[JsonNode] =
+  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
     inc(runs)
-    if dir == "/ctx":
-      return @[fixture("cyclonedx")]
-    return @[]
-  clearLicensesCache()
+    if dir != "/ctx":
+      raise newException(ValueError, "syft produced no SBOM")
+    @[ToolOutput(tool: "syft", root: dir, value: fixture("cyclonedx"))]
+  clearPolicyToolCache()
   # generated on demand when the SBOM tools did not run, once per directory
   let input = PolicyInput(command: "build", contextDirs: @["/ctx"], host: ChalkDict())
   assertEq(len(settings.check(input)), 1)
@@ -179,7 +189,8 @@ proc testCollection() =
   assertEq(runs, 1)
   let failed = settings.check(PolicyInput(command: "build", contextDirs: @["/other"], host: ChalkDict()))
   assertEq(failed[0].kind, "error")
-  assertEq(failed[0].reason, "could not generate an SBOM of the build context")
+  assertEq(failed[0].subject, "/other")
+  assertEq(failed[0].reason, "could not produce an SBOM of the build context: syft produced no SBOM")
   let noContext = settings.check(PolicyInput(command: "build", host: ChalkDict()))
   assertEq(noContext[0].kind, "error")
 
@@ -200,10 +211,11 @@ proc testFindingsAreCapped() =
     components.add(%*{"type": "library", "name": "p" & $i, "version": "1",
                       "purl": "pkg:npm/p" & $i & "@1",
                       "licenses": [{"license": {"id": "GPL-3.0-only"}}]})
-  let doc = %*{"bomFormat": "CycloneDX", "components": components}
+  let doc = %*{"bomFormat": "CycloneDX", "metadata": {"component": {"name": "/ctx"}},
+               "components": components}
   let found = config("""{"enabled": true, "denied": ["GPL-*"]}""").findings(doc)
   assertEq(len(found), 201)
-  assertEq(found[^1], ("violation", "", "50 more packages not shown"))
+  assertEq(found[^1], ("violation", "licenses", "50 more packages not listed"))
 
 proc testJsonValidation() =
   proc rejects(json, reason: string) =

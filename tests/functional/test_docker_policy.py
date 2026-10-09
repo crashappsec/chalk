@@ -1291,7 +1291,7 @@ def test_step_summary_includes_presigned_report_location(
     assert "presign-test" not in text
 
 
-LICENSES_SBOM = POLICY_CONFIG.with_name("policy_licenses_cyclonedx.json")
+LICENSES_SBOM = POLICY_CONFIG.with_name("sbom_licenses_cyclonedx.json")
 
 
 def licenses_build(
@@ -1344,8 +1344,9 @@ def test_licenses_enforce_blocks_denied_license(
         (f["rule"], f["kind"], f["subject"], f["location"])
         for f in report["_POLICY_FINDINGS"]
     ] == [
-        ("licenses", "violation", "pkg:npm/gplpkg@1.0.0", "/package-lock.json"),
-        ("licenses", "violation", "pkg:pypi/legacy@0.1.0", "/requirements.txt"),
+        # relative to the build context
+        ("licenses", "violation", "pkg:npm/gplpkg@1.0.0", "package-lock.json"),
+        ("licenses", "violation", "pkg:pypi/legacy@0.1.0", "requirements.txt"),
     ]
     assert report["_POLICY_FINDINGS"][0]["reason"] == (
         "license GPL-3.0-only is not allowed"
@@ -1416,8 +1417,7 @@ def test_licenses_without_sbom_honors_on_error(
     assert image_exists(random_hex) == (expected_exit == 0)
     (report,) = policy_reports(random_hex)
     (finding,) = report["_POLICY_FINDINGS"]
-    assert (finding["rule"], finding["kind"], finding["reason"]) == (
-        "licenses",
-        "error",
-        "could not generate an SBOM of the build context",
+    assert (finding["rule"], finding["kind"]) == ("licenses", "error")
+    assert finding["reason"].startswith(
+        "could not produce an SBOM of the build context: fake_sbom produced no SBOM"
     )
