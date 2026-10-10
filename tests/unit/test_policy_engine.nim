@@ -109,6 +109,21 @@ proc testInputCollectionFailure() =
     PolicyInput(errors: @[collectionError("unresolved image")]))
   doAssert checks == 1
 
+proc testContextErrors() =
+  var checks = 0
+  let check = proc(input: PolicyInput): seq[PolicyFinding] = inc(checks)
+  let contextRule = PolicyRule(name: "secrets", load: proc(): bool = true,
+                               checkInput: check, requiresContext: true)
+  let pushRule = PolicyRule(name: "registries", load: proc(): bool = true,
+                            checkInput: check)
+  let input = PolicyInput(command: "build", contextDirs: @["/ctx"],
+    contextErrors: @[newSubjectFinding("", "error", "-", "stdin context")])
+  doAssert evaluate("enforce", "block", @[contextRule], input)
+  doAssert policyOutcome.findings.len == 1
+  doAssert policyOutcome.findings[0].rule == "secrets"
+  doAssert not evaluate("enforce", "block", @[pushRule], input)
+  doAssert checks == 2
+
 proc testCollectorFailureForMultiplePolicies() =
   setPolicyJson("""{"policies":[
     {"id":"blocked","mode":"enforce","on_error":"block"},
@@ -133,11 +148,46 @@ proc testCollectorFailureForMultiplePolicies() =
   doAssert policyOutcome.findings.len == 2
   setPolicyJson("")
 
+proc testContextCollectedOnlyWhenRequired() =
+  # checking out a git context changes what docker builds, so policies
+  # without context rules must not trigger it
+  setPolicyJson("""{"policies":[
+    {"id":"first","mode":"audit","on_error":"block"},
+    {"id":"second","mode":"audit","on_error":"block"}
+  ]}""")
+  let build = ChalkDict()
+  build["command"] = pack("build")
+  let collect = proc(): PolicyInput = PolicyInput(command: "build")
+  var contexts = 0
+  var dirs: seq[string]
+  let collectContext = proc(input: var PolicyInput) =
+    inc(contexts)
+    input.contextDirs.add("/ctx")
+  let check = proc(input: PolicyInput): seq[PolicyFinding] = dirs = input.contextDirs
+  let imageRule = PolicyRule(name: "registries", load: proc(): bool = true,
+                             checkInput: check)
+  let contextRule = PolicyRule(name: "secrets", load: proc(): bool = true,
+                               checkInput: check, requiresContext: true)
+  evaluatePolicies(build, collect, @[imageRule], collectContext = collectContext)
+  doAssert contexts == 0 and dirs.len == 0
+  evaluatePolicies(build, collect, @[imageRule, contextRule], collectContext = collectContext)
+  doAssert contexts == 1 and dirs == @["/ctx"]
+  let failing = proc(input: var PolicyInput) =
+    raise newException(ValueError, "Git checkout failed")
+  evaluatePolicies(build, collect, @[imageRule, contextRule], collectContext = failing)
+  doAssert policyOutcome.policies[0].result == "error"
+  doAssert policyOutcome.findings.len == 2
+  for f in policyOutcome.findings:
+    doAssert f.rule == "secrets" and "Git checkout failed" in f.reason
+  setPolicyJson("")
+
 testOnError()
 testInputRule()
 testInputCollectionFailure()
+testContextErrors()
 testCollectionErrorsOnlyForRulesNeedingAllSubjects()
 testRuleFailureIsAnError()
 testGoldenImagesRule()
 testModeOff()
 testCollectorFailureForMultiplePolicies()
+testContextCollectedOnlyWhenRequired()

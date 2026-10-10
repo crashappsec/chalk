@@ -506,12 +506,21 @@ Rules that need more than the referenced images register with
 `newPolicyInputRule` and receive the whole `PolicyInput`:
 
 - `command`: `build` or `push`;
-- `contextDirs`: local build context directories (the cloned checkout for git
-  contexts, plus local named contexts), empty for `push`;
+- `contextDirs`: local build context directories (the checked out subdirectory
+  for git contexts, plus local named contexts), empty for `push`;
+- `contextErrors`: build contexts that are not local directories (stdin,
+  tarball URLs, git named contexts). Image and stage named contexts
+  (`docker-image://`, `oci-layout://`, `target:`) are left to image rules. The
+  engine reports these against rules registered with `requiresContext`, so a
+  context-scanning rule cannot pass a context it never saw;
 - `pushTargets`: the image references the command pushes (`build --push` tags,
   or the `docker push` reference and, with `--all-tags`, every local tag);
-- `host`: chalk-time host info collected before policies run, such as `SBOM`,
-  `SAST` and `SECRET_SCANNER` when those tools are enabled.
+- `pushMarks`: chalk marks of the images `push` pushes, for those that are
+  chalked;
+- `host`: `build` only, a copy of the chalk-time host info collected before
+  policies run, such as `SBOM`, `SAST` and `SECRET_SCANNER` when those tools
+  are enabled. `push` policies run before collection, so `host` is nil there
+  and push rules read `pushMarks`.
 
 Findings about something other than an image (`newSubjectFinding`) set
 `subject` (e.g. a package purl, a file or a registry) and optionally

@@ -35,6 +35,9 @@ type
     command*:  string # "build" or "push"
     ## local build context directories, empty for push
     contextDirs*: seq[string]
+    ## build contexts that are not local directories (stdin, URLs, git named
+    ## contexts); the engine attributes them to rules that require the context
+    contextErrors*: seq[PolicyFinding]
     ## Dockerfile of a build, so rules can honor `<Dockerfile>.dockerignore`;
     ## empty for push or when read from stdin
     dockerfilePath*: string
@@ -42,8 +45,10 @@ type
     pushTargets*: seq[string]
     ## chalk marks of the images `push` pushes, for those that are chalked
     pushMarks*: seq[ChalkDict]
-    ## chalk-time host info collected before policies run, e.g. `SBOM`,
-    ## `SAST` and `SECRET_SCANNER` when those tools are enabled
+    ## build only: a copy of the chalk-time host info collected before
+    ## policies run, e.g. `SBOM`, `SAST` and `SECRET_SCANNER` when those
+    ## tools are enabled. Nil for push, whose policies run before collection;
+    ## push rules read `pushMarks` instead.
     host*: ChalkDict
 
   PolicyRule* = ref object
@@ -52,6 +57,9 @@ type
     ## errors are reported against them, as an incomplete list could let a
     ## disallowed image through.
     requiresAllSubjects*: bool
+    ## the rule scans `contextDirs`, so a build context it cannot scan is an
+    ## error rather than a silent pass
+    requiresContext*: bool
     ## Reads the rule's configuration for this evaluation and returns whether
     ## the rule is enabled. Raising reports a configuration error.
     load*:  proc(): bool
@@ -79,10 +87,12 @@ proc newPolicyInputRule*(name: string,
                          load: proc(): bool,
                          check: proc(input: PolicyInput): seq[PolicyFinding],
                          requiresAllSubjects = false,
+                         requiresContext = false,
                          hint: proc(): PolicyHint = nil) =
   ## A rule that sees the whole `PolicyInput`, not just its image subjects.
   newPolicyRule(name, load, nil, requiresAllSubjects, hint)
-  registeredRules[^1].checkInput = check
+  registeredRules[^1].checkInput      = check
+  registeredRules[^1].requiresContext = requiresContext
 
 iterator policyRules*(): PolicyRule =
   for rule in registeredRules:
