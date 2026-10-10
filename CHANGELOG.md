@@ -29,7 +29,8 @@
   `_POLICY_RESULTS` (outcome of each policy), `_POLICY_FINDINGS` (each with
   the `policy_id` that produced it) and `_POLICY_BUILD` keys. Each policy report carries its
   own `_ACTION_ID`, like every chalk report; correlate it with the build or
-  push report via `BUILD_URI` and `_POLICY_BUILD`. See
+  push report via `BUILD_URI` and `_POLICY_BUILD`. It also carries `_COMMIT_ID` so it
+  can be linked to the pull request that introduced the violation. See
   `docs/design-build-policy.md`.
   A policy can be enforced in selected repositories only via `enforce_repos`
   (glob entries over the normalized `host/owner/name` of the git origin of the
