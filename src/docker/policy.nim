@@ -2,8 +2,8 @@
 ## This file is part of Chalk (see https://crashoverride.com/docs/chalk).
 
 ## Collect images before a build or push, inside the policy error boundary.
-import std/[os]
-import ".."/[policy/engine, types, utils/git]
+import std/[os, strutils]
+import ".."/[policy/engine, types, utils/git, utils/tables]
 import "."/[exe, git as dockerGit, ids, inspect, policy_subjects, scan]
 
 export engine
@@ -59,12 +59,83 @@ proc commandRepo(ctx: DockerInvocation): string =
 proc repoResolver(ctx: DockerInvocation): PolicyRepoResolver =
   return proc(): string = ctx.commandRepo()
 
+proc isImageContext(value: string): bool =
+  ## named contexts that are images or other stages, which image rules check
+  value.startsWith("docker-image://") or value.startsWith("oci-layout://") or
+    value.startsWith("target:")
+
+proc localDir(path: string): string =
+  ## `path` when it is a local directory, as opposed to a URL or a stdin context
+  if path in ["", "-"] or "://" in path or isImageContext(path) or isGitContext(path):
+    return ""
+  let resolved = path.resolvePath()
+  if resolved.dirExists():
+    return resolved
+  return ""
+
+proc contextError(what, value: string): PolicyFinding =
+  newSubjectFinding("", "error", value, what & " cannot be checked by build context rules")
+
+proc addPolicyContexts*(input: var PolicyInput, ctx: DockerInvocation) =
+  ## Local directories the build reads, for rules that scan the build context.
+  ## Contexts that are not local directories (stdin, URLs, git named contexts)
+  ## go to `contextErrors` so those rules cannot pass without checking them.
+  let main =
+    if ctx.gitContext != nil:
+      if not ctx.gitContext.isCheckedOut():
+        discard ctx.gitContext.checkout()
+      ctx.gitContext.contextPath()
+    else:
+      ctx.foundContext.localDir()
+  if main != "":
+    if not main.dirExists():
+      raise newException(ValueError, "build context directory does not exist: " & main)
+    if ctx.gitContext != nil:
+      # Command-line processing precedes this checkout. Build the worktree
+      # we inspected rather than fetching the mutable Git reference again.
+      ctx.newCmdLine = ctx.gitContext.replaceContextArg(ctx.newCmdLine)
+    input.contextDirs.add(main)
+  elif ctx.foundContext == "-":
+    input.contextErrors.add(contextError("the build context from stdin", "-"))
+  else:
+    input.contextErrors.add(contextError("the build context", ctx.foundContext))
+  if ctx.foundExtraContexts != nil:
+    for name, value in ctx.foundExtraContexts:
+      if value.isImageContext():
+        continue
+      let dir = value.localDir()
+      if dir == "":
+        input.contextErrors.add(contextError("the build context " & name, value))
+      elif dir notin input.contextDirs:
+        input.contextDirs.add(dir)
+
+proc policyDockerfilePath*(ctx: DockerInvocation): string =
+  if ctx.dockerFileLoc == stdinIndicator:
+    return ""
+  if ctx.gitContext != nil:
+    let name = if ctx.foundFileArg == "": "Dockerfile" else: ctx.foundFileArg
+    return (ctx.gitContext.contextPath() / name).resolvePath()
+  if ctx.dockerFileLoc != "":
+    return ctx.dockerFileLoc.resolvePath()
+
+proc addCommandInput(input: var PolicyInput, command: string, pushTargets: seq[string]) =
+  input.command     = command
+  input.pushTargets = pushTargets
+
 proc evaluateBuildPolicies*(ctx: DockerInvocation) =
   if not policyEnabled():
     return
   let collect = proc(): PolicyInput =
-    ctx.buildSubjects(allStages = not hasBuildX())
-  evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver())
+    result = ctx.buildSubjects(allStages = not hasBuildX())
+    let pushTargets = if ctx.foundPush: ctx.foundTags.asRepoTag() else: @[]
+    result.addCommandInput("build", pushTargets)
+    # a copy, so a rule cannot change the host report; push policies run
+    # before initCollection(), so only build has host info
+    result.host = hostInfo.copy()
+  let collectContext = proc(input: var PolicyInput) =
+    input.addPolicyContexts(ctx)
+    input.dockerfilePath = ctx.policyDockerfilePath()
+  evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver(), collectContext)
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
   if not policyEnabled():
@@ -72,12 +143,20 @@ proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
   let build = ctx.pushInfo()
   let collect = proc(): PolicyInput =
     if not ctx.foundAllTags:
-      return pushInput(chalk, ctx.foundImage)
+      result = pushInput(chalk, ctx.foundImage)
+      result.addCommandInput("push", @[ctx.foundImage])
+      if chalk != nil and chalk.extract != nil:
+        result.pushMarks.add(chalk.extract)
+      return
     let tags = repositoryImageTags(ctx.foundImage)
     build["tags"] = pack(tags)
+    result.addCommandInput("push", tags)
     for tag in tags:
       try:
-        let input = pushInput(scanLocalPolicyImage(tag).get(nil), tag)
+        let tagChalk = scanLocalPolicyImage(tag).get(nil)
+        let input = pushInput(tagChalk, tag)
+        if tagChalk != nil and tagChalk.extract != nil:
+          result.pushMarks.add(tagChalk.extract)
         result.subjects.add(input.subjects)
         result.errors.add(input.errors)
       except CatchableError:

@@ -25,10 +25,18 @@ type
     modeSource*:    string # "default" or "enforce_repos"
     repo*:          string # normalized repository, empty when unknown
 
-  PolicyJsonField = object
-    name:    string
-    kind:    JsonNodeKind
-    choices: seq[string]
+  PolicyJsonField* = object
+    name*:    string
+    kind*:    JsonNodeKind
+    choices*: seq[string]
+
+  ## Validates a rule's section of a `policy.config_json` policy. `path` is
+  ## the section's field prefix used in errors, e.g. `policy.sast.`
+  PolicyJsonValidator* = proc(node: JsonNode, path: string)
+
+  PolicyJsonSection = object
+    name:     string
+    validate: PolicyJsonValidator
 
 const
   policyJsonFields = [
@@ -45,6 +53,20 @@ const
     PolicyJsonField(name: "message",         kind: JString),
   ]
 
+var policyJsonSections: seq[PolicyJsonSection]
+
+proc registerPolicyJsonSection*(name: string, validate: PolicyJsonValidator) =
+  ## Lets `policy.config_json` policies carry a JSON object `name` for a rule.
+  ## Rules register at module initialization, as configurations can be read
+  ## before rules are loaded (`policyEnabled`).
+  for field in policyJsonFields:
+    if field.name == name:
+      raise newException(ValueError, "policy field is already defined: " & name)
+  for section in policyJsonSections:
+    if section.name == name:
+      raise newException(ValueError, "policy section is already registered: " & name)
+  policyJsonSections.add(PolicyJsonSection(name: name, validate: validate))
+
 proc jsonKindName(kind: JsonNodeKind): string =
   case kind
   of JString:          "string"
@@ -54,7 +76,7 @@ proc jsonKindName(kind: JsonNodeKind): string =
   of JInt, JFloat:     "number"
   of JNull:            "null"
 
-proc validateFields(node: JsonNode, fields: openArray[PolicyJsonField], path: string) =
+proc validateFields*(node: JsonNode, fields: openArray[PolicyJsonField], path: string) =
   for key, value in node.pairs():
     var found = false
     for field in fields:
@@ -70,7 +92,7 @@ proc validateFields(node: JsonNode, fields: openArray[PolicyJsonField], path: st
     if not found:
       raise newException(ValueError, "unknown field " & path & key)
 
-proc validatePairs(node: JsonNode, path: string) =
+proc validatePairs*(node: JsonNode, path: string) =
   for entry in node.getElems():
     if entry.kind != JArray or len(entry) != 2 or
        entry[0].kind != JString or entry[1].kind != JString:
@@ -81,7 +103,23 @@ proc validatePolicy(node: JsonNode, path: string) =
   if node.kind != JObject:
     raise newException(ValueError, path[0 .. ^2] & " must be a JSON object, got " &
                                    jsonKindName(node.kind))
-  node.validateFields(policyJsonFields, path)
+  var
+    base     = newJObject()
+    sections = newSeq[(PolicyJsonSection, JsonNode)]()
+  for key, value in node.pairs():
+    var registered = false
+    for section in policyJsonSections:
+      if section.name == key:
+        registered = true
+        if value.kind != JObject:
+          raise newException(ValueError, path & key & " must be an object, got " &
+                                         jsonKindName(value.kind))
+        sections.add((section, value))
+    if not registered:
+      base[key] = value
+  base.validateFields(policyJsonFields, path)
+  for (section, value) in sections:
+    section.validate(value, path & section.name & ".")
   node{"enforce_repos"}.validatePairs(path & "enforce_repos")
   if node.hasKey("golden_images"):
     let golden = node["golden_images"]
@@ -92,7 +130,7 @@ proc invalidPolicy(id, reason: string): PolicyConfig =
   # a configuration that cannot be read cannot be trusted to block either
   PolicyConfig(id: id, mode: "audit", onError: "allow", configError: reason)
 
-proc jsonPairs(node: JsonNode): seq[(string, string)] =
+proc jsonPairs*(node: JsonNode): seq[(string, string)] =
   for entry in node.getElems():
     result.add((entry[0].getStr(), entry[1].getStr()))
 
@@ -219,6 +257,19 @@ proc policyBoolSetting*(path: openArray[string], default: bool): bool =
     let node = jsonSetting(path)
     return if node == nil: default else: node.getBool()
   attrGetOpt[bool](attrPath(path)).get(default)
+
+proc policyIntSetting*(path: openArray[string], default: int): int =
+  if policyJsonInUse():
+    let node = jsonSetting(path)
+    return if node == nil: default else: node.getInt()
+  attrGetOpt[int](attrPath(path)).get(default)
+
+proc policyStringsSetting*(path: openArray[string]): seq[string] =
+  if policyJsonInUse():
+    for entry in jsonSetting(path).getElems():
+      result.add(entry.getStr())
+    return
+  attrGetOpt[seq[string]](attrPath(path)).get(@[])
 
 proc attrPairs(attr: string): seq[(string, string)] =
   for entry in attrGetOpt[seq[Box]](attr).get(@[]):

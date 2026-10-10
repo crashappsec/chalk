@@ -1,4 +1,4 @@
-import std/[os, strutils]
+import std/[json, os, strutils]
 import ../../src/types
 import ../../src/policy/engine
 import ../../src/policy/rules
@@ -233,7 +233,27 @@ proc testInvalidEntryIsIsolated() =
   doAssert blocked
   doAssert results() == @[("broken", "error"), ("golden", "blocked")]
 
+proc testRegisteredSection() =
+  registerPolicyJsonSection("example_rule", proc(node: JsonNode, path: string) =
+    node.validateFields([PolicyJsonField(name: "enabled", kind: JBool),
+                         PolicyJsonField(name: "allowed", kind: JArray)], path))
+  rejects("""{"example_rule": []}""", "policy.example_rule must be an object, got array")
+  rejects("""{"example_rule": {"enabeld": true}}""", "unknown field policy.example_rule.enabeld")
+  let configs = parsePolicyJson("""{"policies": [{"id": "a", "example_rule": {"enabled": 1}}]}""")
+  doAssert "policy.policies[0].example_rule.enabled must be a boolean" in configs[0].configError
+  setPolicyJson("""{"mode": "audit", "example_rule": {"enabled": true, "allowed": ["a", "b"]}}""")
+  selectPolicy(policy())
+  doAssert policyBoolSetting(["example_rule", "enabled"], false)
+  doAssert policyStringsSetting(["example_rule", "allowed"]) == @["a", "b"]
+  doAssert policyIntSetting(["example_rule", "max"], 3) == 3
+  doAssertRaises(ValueError):
+    registerPolicyJsonSection("example_rule", nil)
+  doAssertRaises(ValueError):
+    registerPolicyJsonSection("mode", nil)
+  setPolicyJson("")
+
 testValidation()
+testRegisteredSection()
 testFixture()
 testDefaults()
 testEnforcedFromJson()

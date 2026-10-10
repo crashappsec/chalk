@@ -9,6 +9,8 @@
 ## `policy/rules/` that registers itself with `newPolicyRule` from its
 ## `load*Rule` proc (see `policy/rules.nim`). The engine evaluates every
 ## registered rule against the images a docker command references.
+## Rules that need more than images (the build context, push targets or
+## SBOM/SAST/secret scanner output) register with `newPolicyInputRule`.
 
 import ".."/[
   types,
@@ -28,6 +30,26 @@ type
   PolicyInput* = object
     subjects*: seq[PolicySubject]
     errors*:   seq[PolicyFinding] # subjects that could not be determined
+    ## The collector failed before it could supply command/context data.
+    collectionFailed*: bool
+    command*:  string # "build" or "push"
+    ## local build context directories, empty for push
+    contextDirs*: seq[string]
+    ## build contexts that are not local directories (stdin, URLs, git named
+    ## contexts); the engine attributes them to rules that require the context
+    contextErrors*: seq[PolicyFinding]
+    ## Dockerfile of a build, so rules can honor `<Dockerfile>.dockerignore`;
+    ## empty for push or when read from stdin
+    dockerfilePath*: string
+    ## image references the command pushes, as given on the command line
+    pushTargets*: seq[string]
+    ## chalk marks of the images `push` pushes, for those that are chalked
+    pushMarks*: seq[ChalkDict]
+    ## build only: a copy of the chalk-time host info collected before
+    ## policies run, e.g. `SBOM`, `SAST` and `SECRET_SCANNER` when those
+    ## tools are enabled. Nil for push, whose policies run before collection;
+    ## push rules read `pushMarks` instead.
+    host*: ChalkDict
 
   PolicyRule* = ref object
     name*: string
@@ -35,10 +57,15 @@ type
     ## errors are reported against them, as an incomplete list could let a
     ## disallowed image through.
     requiresAllSubjects*: bool
+    ## the rule scans `contextDirs`, so a build context it cannot scan is an
+    ## error rather than a silent pass
+    requiresContext*: bool
     ## Reads the rule's configuration for this evaluation and returns whether
     ## the rule is enabled. Raising reports a configuration error.
     load*:  proc(): bool
     check*: proc(subjects: seq[PolicySubject]): seq[PolicyFinding]
+    ## used instead of `check` when set, see `newPolicyInputRule`
+    checkInput*: proc(input: PolicyInput): seq[PolicyFinding]
     ## optional, describes the loaded configuration for the step summary
     hint*:  proc(): PolicyHint
 
@@ -55,6 +82,17 @@ proc newPolicyRule*(name: string,
   registeredRules.add(PolicyRule(name: name, load: load, check: check,
                                  requiresAllSubjects: requiresAllSubjects,
                                  hint: hint))
+
+proc newPolicyInputRule*(name: string,
+                         load: proc(): bool,
+                         check: proc(input: PolicyInput): seq[PolicyFinding],
+                         requiresAllSubjects = false,
+                         requiresContext = false,
+                         hint: proc(): PolicyHint = nil) =
+  ## A rule that sees the whole `PolicyInput`, not just its image subjects.
+  newPolicyRule(name, load, nil, requiresAllSubjects, hint)
+  registeredRules[^1].checkInput      = check
+  registeredRules[^1].requiresContext = requiresContext
 
 iterator policyRules*(): PolicyRule =
   for rule in registeredRules:
@@ -81,4 +119,16 @@ proc newFinding*(subject: PolicySubject, rule, kind, reason: string): PolicyFind
     stage:  subject.stage,
     source: subject.source,
     reason: reason,
+  )
+
+proc newSubjectFinding*(rule, kind, subject, reason: string,
+                        location = "", severity = ""): PolicyFinding =
+  ## a finding about something other than an image
+  PolicyFinding(
+    rule:     rule,
+    kind:     kind,
+    subject:  subject,
+    location: location,
+    severity: severity,
+    reason:   reason,
   )
