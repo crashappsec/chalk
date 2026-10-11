@@ -130,7 +130,7 @@ proc resolveMode*(policy: PolicyConfig, repo: string): PolicyConfig =
   result.repo       = repo
   result.modeSource = "default"
   result.effectiveMode = policy.mode
-  if policy.configError != "" or len(policy.enforceRepos) == 0:
+  if len(policy.enforceRepos) == 0:
     return
   let prefix = if policy.id != "": "policy: " & policy.id & ": " else: "policy: "
   for (kind, value) in policy.enforceRepos:
