@@ -51,6 +51,7 @@ type
     kind*:      LicenseNodeKind
     id*:        string # lnLicense: normalized SPDX id or the name as written
     exception*: string # lnLicense: `WITH` exception, empty without one
+    family*:    string # lnLicense: lowercase copyleft family, e.g. `gpl`
     children*:  seq[LicenseNode] # lnAnd, lnOr
 
   Verdict* = enum
@@ -61,7 +62,8 @@ type
     allowed*:           seq[string]
     configuredAllowed*: seq[string] # as configured, for the step summary
     unknown*:           string
-    exceptions*:        seq[string]
+    exceptions*:        seq[string] # lowercase globs of entries that are not purls
+    purlExceptions*:    seq[PurlPattern]
     ignoreTypes*:       seq[string]
     includeOsPackages*: bool
     message*:           string
@@ -79,6 +81,16 @@ proc dropVersionV(s: string): string =
       continue
     result.add(c)
 
+proc dropWord(s, word: string): string =
+  ## removes `word` where it starts a word, so `unlicense` keeps `license`
+  var i = 0
+  while i < len(s):
+    if s.continuesWith(word, i) and (i == 0 or not s[i - 1].isAlphaAscii()):
+      i += len(word)
+    else:
+      result.add(s[i])
+      inc(i)
+
 proc compactName(name: string): string =
   result = " " & name.toLowerAscii() & " "
   for (long, short) in [("gnu lesser general public", "lgpl"),
@@ -91,11 +103,14 @@ proc compactName(name: string): string =
                         ("general public", "gpl"),
                         ("mozilla public", "mpl"),
                         ("eclipse public", "epl"),
+                        ("european union public", "eupl"),
+                        ("common development and distribution", "cddl"),
                         ("apache software", "apache"),
                         ("or later", ""), ("or-later", ""), ("-only", ""), (" only", ""),
-                        ("licenses", ""), ("license", ""), ("licence", ""),
-                        ("version", ""), (" the ", " ")]:
+                        (" the ", " ")]:
     result = result.replace(long, short)
+  for word in ["licenses", "license", "licence", "version"]:
+    result = result.dropWord(word)
   var alnum = ""
   for c in result:
     if c.isAlphaNumeric():
@@ -120,37 +135,98 @@ const
     "modifiedbsd": "BSD-3-Clause",
     "mpl1": "MPL-1.0", "mpl11": "MPL-1.1", "mpl2": "MPL-2.0",
     "epl1": "EPL-1.0", "epl2": "EPL-2.0",
+    "eupl1": "EUPL-1.0", "eupl11": "EUPL-1.1", "eupl12": "EUPL-1.2",
+    "cddl1": "CDDL-1.0", "cddl11": "CDDL-1.1",
     "unlicense": "Unlicense", "cc01": "CC0-1.0", "cc0": "CC0-1.0",
     "zlib": "Zlib", "sspl1": "SSPL-1.0", "serversidepublic1": "SSPL-1.0",
   }.toTable()
+  ## A GNU license without a version lets the recipient choose any version
+  ## (e.g. GPL-2.0 section 9), i.e. the first one or later.
+  unversionedGnu = {
+    "gpl": "GPL-1.0", "gnugpl": "GPL-1.0",
+    "lgpl": "LGPL-2.0", "gnulgpl": "LGPL-2.0",
+    "agpl": "AGPL-1.0", "gnuagpl": "AGPL-1.0",
+  }.toTable()
   # GNU families take an -only/-or-later suffix since SPDX 3.0
   gnuFamilies = ["GPL-", "LGPL-", "AGPL-"]
+  ## Deprecated SPDX ids with an exception, see https://spdx.org/licenses/
+  ## (deprecated ids) and https://spdx.org/licenses/exceptions-index.html
+  deprecatedWithIds = {
+    "gpl-2.0-with-autoconf-exception":  ("GPL-2.0-only", "Autoconf-exception-2.0"),
+    "gpl-2.0-with-bison-exception":     ("GPL-2.0-only", "Bison-exception-2.2"),
+    "gpl-2.0-with-classpath-exception": ("GPL-2.0-only", "Classpath-exception-2.0"),
+    "gpl-2.0-with-font-exception":      ("GPL-2.0-only", "Font-exception-2.0"),
+    "gpl-2.0-with-gcc-exception":       ("GPL-2.0-only", "GCC-exception-2.0"),
+    "gpl-3.0-with-autoconf-exception":  ("GPL-3.0-only", "Autoconf-exception-3.0"),
+    "gpl-3.0-with-gcc-exception":       ("GPL-3.0-only", "GCC-exception-3.1"),
+  }.toTable()
+  ## copyleft families recognized in names that are not otherwise normalized
+  ## (`GPL v2+ with some notice`), so that family globs such as `GPL-*` still
+  ## deny them
+  copyleftFamilies = ["gpl", "lgpl", "agpl", "mpl", "epl", "eupl", "cddl",
+                      "osl", "rpl", "sspl", "cpl"]
 
-proc normalizeLicense*(name: string): string =
-  ## Best effort mapping of common non-SPDX names (`GPLv2`, `Apache 2.0`) and
-  ## deprecated ids (`GPL-2.0+`) to SPDX ids. Anything else is kept as is.
+type NormalizedLicense = tuple[id, exception, family: string]
+
+proc licenseFamily(compact: string): string =
+  ## `gpl2withnotice` -> `gpl`; the family must be followed by a version,
+  ## so `mplus` or `gplcompatible` are not copyleft
+  let compact = if compact.startsWith("gnu"): compact[3 .. ^1] else: compact
+  for family in copyleftFamilies:
+    if compact == family or
+       (compact.startsWith(family) and compact[len(family)].isDigit()):
+      return family
+  return ""
+
+proc lookupAlias(compact: string): string =
+  if compact in unversionedGnu:
+    return unversionedGnu[compact] & "-or-later"
+  licenseAliases.getOrDefault(compact)
+
+proc normalizeTerm(name: string): NormalizedLicense =
   var name = name.strip()
+  let deprecated = deprecatedWithIds.getOrDefault(name.toLowerAscii())
+  if deprecated[0] != "":
+    return (deprecated[0], deprecated[1], "gpl")
   if name.toLowerAscii().startsWith("licenseref-"):
-    let alias = licenseAliases.getOrDefault(compactName(name[11 .. ^1].replace("-", " ")))
+    let compact = compactName(name[11 .. ^1].replace("-", " "))
+    result.family = licenseFamily(compact)
+    let alias = lookupAlias(compact)
     if alias == "":
-      return name
+      result.id = name
+      return
     name = alias
   let
     lower   = name.toLowerAscii()
     orLater = lower.endsWith("+") or "or later" in lower or "or-later" in lower
-  var alias = licenseAliases.getOrDefault(compactName(name))
+    compact = compactName(name)
+  if result.family == "":
+    result.family = licenseFamily(compact)
+  var alias = lookupAlias(compact)
   # e.g. `GNU General Public License v3 or later (GPLv3+)`
   let open = name.rfind('(')
   if alias == "" and open > 0 and name.endsWith(")"):
-    alias = licenseAliases.getOrDefault(compactName(name[0 ..< open]))
+    alias = lookupAlias(compactName(name[0 ..< open]))
     if alias == "":
-      alias = licenseAliases.getOrDefault(compactName(name[open + 1 .. ^2]))
+      alias = lookupAlias(compactName(name[open + 1 .. ^2]))
   if alias == "":
-    return name
-  for family in gnuFamilies:
-    if alias.startsWith(family):
-      return alias & (if orLater: "-or-later" else: "-only")
-  return alias
+    result.id = name
+    return
+  result.id = alias
+  if not alias.endsWith("-or-later"):
+    for family in gnuFamilies:
+      if alias.startsWith(family):
+        result.id = alias & (if orLater: "-or-later" else: "-only")
+
+proc normalizeLicense*(name: string): string =
+  ## Best effort mapping of common non-SPDX names (`GPLv2`, `Apache 2.0`) and
+  ## deprecated ids (`GPL-2.0+`) to SPDX ids. Anything else is kept as is.
+  let n = normalizeTerm(name)
+  if n.exception == "": n.id else: n.id & " WITH " & n.exception
+
+proc licenseNode(name: string): LicenseNode =
+  let n = normalizeTerm(name)
+  LicenseNode(kind: lnLicense, id: n.id, exception: n.exception, family: n.family)
 
 proc tokenize(expression: string): seq[string] =
   var current = ""
@@ -191,7 +267,7 @@ proc parseLicenseExpression*(expression: string): LicenseNode =
       return
     if pos >= len(tokens) or tokens[pos] == ")" or tokens[pos].isOperator():
       raise newException(ValueError, "expected a license id")
-    result = LicenseNode(kind: lnLicense, id: normalizeLicense(tokens[pos]))
+    result = licenseNode(tokens[pos])
     inc(pos)
     if peek() == "WITH":
       inc(pos)
@@ -223,10 +299,15 @@ proc parseLicenseExpression*(expression: string): LicenseNode =
     if pos != len(tokens):
       raise newException(ValueError, "unexpected " & tokens[pos])
   except ValueError:
-    result = LicenseNode(kind: lnLicense, id: normalizeLicense(expression))
+    result = licenseNode(expression)
 
 proc isUnknownLicense(id: string): bool =
-  id == "" or id.toUpperAscii() in ["NOASSERTION", "NONE", "UNKNOWN"]
+  ## npm's `UNLICENSED` (not to be confused with `Unlicense`) and
+  ## `SEE LICENSE IN <file>` do not name a license
+  ## (https://docs.npmjs.com/cli/v10/configuring-npm/package-json#license)
+  let upper = id.toUpperAscii()
+  upper in ["", "NOASSERTION", "NONE", "UNKNOWN", "UNLICENSED"] or
+    upper.startsWith("SEE LICENSE IN ") or upper.startsWith("SEE LICENCE IN ")
 
 proc matches(pattern: string, node: LicenseNode): bool =
   ## `pattern` is lowercase. Without `WITH` it matches the license whatever
@@ -236,6 +317,13 @@ proc matches(pattern: string, node: LicenseNode): bool =
       return false
     return globMatch(pattern, (node.id & " with " & node.exception).toLowerAscii())
   return globMatch(pattern, node.id.toLowerAscii())
+
+proc deniedBy(pattern: string, node: LicenseNode): bool =
+  ## Names that are not SPDX ids, e.g. `GPL v2+ with notice`, are also
+  ## denied by globs of their copyleft family (`GPL-*`), as they would
+  ## otherwise pass a denylist.
+  pattern.matches(node) or
+    (node.family != "" and " with " notin pattern and globMatch(pattern, node.family & "-"))
 
 proc licenseVerdict*(settings: LicensesConfig, node: LicenseNode,
                      offending: var seq[string]): Verdict =
@@ -251,7 +339,7 @@ proc licenseVerdict*(settings: LicensesConfig, node: LicenseNode,
         if " with " in pattern:
           allowedWith = true
     for pattern in settings.denied:
-      if pattern.matches(node):
+      if pattern.deniedBy(node):
         deniedHit = true
     # an explicitly allowed `X WITH exception` overrides a broader denial of X
     if (deniedHit and not allowedWith) or (len(settings.allowed) > 0 and not allowedHit):
@@ -311,6 +399,9 @@ proc subject*(pkg: SbomPackage): string =
   pkg.name
 
 proc isException(settings: LicensesConfig, pkg: SbomPackage): bool =
+  # a version range that cannot be compared (pmUnknown) does not exempt
+  if pkg.purl != "" and settings.purlExceptions.firstMatch(pkg.purl).result == pmMatch:
+    return true
   let
     subject = pkg.subject().toLowerAscii()
     base    = pkg.purl.purlBase().toLowerAscii()
@@ -392,6 +483,17 @@ proc check*(settings: LicensesConfig, input: PolicyInput): seq[PolicyFinding] =
 
 # configuration
 
+proc addException(settings: var LicensesConfig, value, path: string) =
+  let value = value.strip()
+  if not value.toLowerAscii().startsWith("pkg:"):
+    settings.exceptions.add(value.toLowerAscii())
+    return
+  try:
+    settings.purlExceptions.add(parsePurlPattern(value))
+  except ValueError:
+    raise newException(ValueError, path & ": invalid purl " & value & ": " &
+                                   getCurrentExceptionMsg())
+
 proc loadLicensesConfig*(): Option[LicensesConfig] =
   if not policyBoolSetting([ruleName, "enabled"], false):
     return none(LicensesConfig)
@@ -407,7 +509,7 @@ proc loadLicensesConfig*(): Option[LicensesConfig] =
   )
   settings.allowed = settings.configuredAllowed.expandPatterns("policy.licenses.allowed")
   for pattern in policyStringsSetting([ruleName, "exceptions"]):
-    settings.exceptions.add(pattern.strip().toLowerAscii())
+    settings.addException(pattern, "policy.licenses.exceptions")
   for t in policyStringsSetting([ruleName, "ignore_types"]):
     settings.ignoreTypes.add(t.strip().toLowerAscii())
   return some(settings)
@@ -433,6 +535,10 @@ proc validateLicensesJson(node: JsonNode, path: string) =
       values.add(entry.getStr())
     if field in ["denied", "allowed"]:
       discard values.expandPatterns(path & field)
+    elif field == "exceptions":
+      var settings: LicensesConfig
+      for value in values:
+        settings.addException(value, path & field)
 
 registerPolicyJsonSection(ruleName, validateLicensesJson)
 
@@ -454,4 +560,6 @@ proc licensesHint(): PolicyHint =
   PolicyHint(rule: ruleName, message: loaded.message, allowed: loaded.configuredAllowed)
 
 proc loadLicensesRule*() =
-  newPolicyInputRule(ruleName, loadLicenses, checkLicenses, hint = licensesHint)
+  # without it contextDirs stay empty and builds would pass unchecked
+  newPolicyInputRule(ruleName, loadLicenses, checkLicenses,
+                     requiresContext = true, hint = licensesHint)

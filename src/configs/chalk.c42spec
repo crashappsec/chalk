@@ -2759,12 +2759,18 @@ for build context directories it covers, keeping the packages inside each
 directory; for others chalk runs the enabled SBOM tools (syft by default)
 on the directory when the policy is evaluated. When no SBOM can be
 generated, `on_error` decides. `docker push` only checks images whose chalk
-mark records the `SBOM` key.
+mark records the `SBOM` key (the SBOM of the whole repository chalk
+scanned); images without one pass.
 
 License ids and patterns are matched case-insensitively. Common non-SPDX
-names (`GPLv2`, `Apache 2.0`) and deprecated ids (`GPL-2.0+`) are
-normalized to SPDX ids (https://spdx.org/licenses/). SPDX expressions are
-evaluated: `OR` passes when any alternative passes, `AND` when all do.
+names (`GPLv2`, `Apache 2.0`), deprecated ids (`GPL-2.0+`,
+`GPL-2.0-with-classpath-exception`) and unversioned GNU names (`GPL` is
+`GPL-1.0-or-later`) are normalized to SPDX ids
+(https://spdx.org/licenses/). Other names starting with a copyleft family
+and a version (`GPL v2+ with notice`) are also denied by family globs such
+as `GPL-*`. SPDX expressions are evaluated: `OR` passes when any
+alternative passes, `AND` when all do; several licenses listed for one
+package must all pass.
 """
 
   field enabled {
@@ -2800,6 +2806,10 @@ violation. Entries are written like `denied`. `denied` takes precedence,
 except for an allowed entry with a `WITH` exception, e.g.
 `GPL-2.0-only WITH Classpath-exception-2.0`, which overrides a broader
 denied pattern such as `GPL-*`.
+
+Packages without license information are governed by `unknown`, not by
+this list: with the default `unknown: "ignore"` they pass. Set
+`unknown: "violation"` to require an allowed license for every package.
 """
   }
 
@@ -2809,10 +2819,12 @@ denied pattern such as `GPL-*`.
     choices:  ["ignore", "violation", "error"]
     shortdoc: "What to do with packages without license information"
     doc: """
-Packages whose license is missing, `NOASSERTION`, `NONE` or `UNKNOWN` are
-ignored, reported as violations, or reported as evaluation errors handled
-by `on_error`. SBOMs of source trees often lack licenses (e.g. for Go
-modules), so `violation` can be noisy.
+Packages whose license is missing, `NOASSERTION`, `NONE`, `UNKNOWN`, or
+npm's `UNLICENSED` or `SEE LICENSE IN <file>` are ignored, reported as
+violations, or reported as evaluation errors handled by `on_error`. This
+applies with `allowed` too: by default such packages pass an allowlist.
+SBOMs of source trees often lack licenses (e.g. for Go modules), so
+`violation` can be noisy.
 """
   }
 
@@ -2821,9 +2833,12 @@ modules), so `violation` can be noisy.
     default:  []
     shortdoc: "Packages exempt from the policy"
     doc: """
-Package URL globs (https://github.com/package-url/purl-spec) of approved
-uses, e.g. `pkg:npm/some-package` or `pkg:maven/org.acme/*@1.*`. A pattern
-without `@` matches every version.
+Package URL patterns (https://github.com/package-url/purl-spec) of
+approved uses, e.g. `pkg:npm/@scope/some-package`,
+`pkg:maven/org.acme/*@1.*` or `pkg:npm/foo@<2`: the name is a glob, the
+version a glob or a range, and qualifiers and subpaths are ignored. A
+pattern without a version matches every version. Entries not starting with
+`pkg:` are globs of the package's `name@version` (or purl).
 """
   }
 

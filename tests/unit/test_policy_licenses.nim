@@ -1,6 +1,7 @@
 import std/[json, os, strutils]
 import ../../src/types
 import ../../src/chalkjson
+import ../../src/policy/api
 import ../../src/policy/engine
 import ../../src/policy/sbom
 import ../../src/policy/tools
@@ -64,6 +65,25 @@ proc testNormalize() =
     ("Python-2.0", "Python-2.0"),
     ("MIT-0", "MIT-0"),
     ("0BSD", "0BSD"),
+    # unversioned GNU licenses allow any version
+    ("GPL", "GPL-1.0-or-later"),
+    ("GNU GPL", "GPL-1.0-or-later"),
+    ("GNU General Public License", "GPL-1.0-or-later"),
+    ("LGPL", "LGPL-2.0-or-later"),
+    ("GNU Lesser General Public License", "LGPL-2.0-or-later"),
+    ("AGPL", "AGPL-1.0-or-later"),
+    ("LicenseRef-GPL", "GPL-1.0-or-later"),
+    ("EUPL 1.2", "EUPL-1.2"),
+    ("European Union Public Licence 1.2", "EUPL-1.2"),
+    ("EUPL-1.1", "EUPL-1.1"),
+    ("Common Development and Distribution License 1.0", "CDDL-1.0"),
+    ("Unlicense", "Unlicense"),
+    ("The Unlicense", "Unlicense"),
+    ("UNLICENSED", "UNLICENSED"),
+    ("GPL-2.0-with-classpath-exception", "GPL-2.0-only WITH Classpath-exception-2.0"),
+    ("GPL-2.0-with-GCC-exception", "GPL-2.0-only WITH GCC-exception-2.0"),
+    ("GPL-3.0-with-GCC-exception", "GPL-3.0-only WITH GCC-exception-3.1"),
+    ("GPL-3.0-with-autoconf-exception", "GPL-3.0-only WITH Autoconf-exception-3.0"),
   ]:
     assertEq(normalizeLicense(name), expected)
 
@@ -110,6 +130,82 @@ proc testExpressions() =
   assertEq(allowed.verdict("MIT"), vAllowed)
   assertEq(allowed.verdict("ISC"), vDenied)
   assertEq(allowed.verdict("Custom license"), vDenied)
+
+proc testUnrecognizedCopyleft() =
+  let strong = config("""{"enabled": true, "denied": ["@strong_copyleft"]}""")
+  for name in ["GPL", "GNU GPL", "GNU General Public License", "AGPL",
+               "EUPL 1.2", "European Union Public Licence 1.2",
+               "GPL v2+ with some notice", "GNU GPL v3 (see COPYING)",
+               "GPL-2.0-with-classpath-exception"]:
+    doAssert strong.verdict(name) == vDenied, name
+  for name in ["LGPL", "LGPL v2.1 with linking notice", "GPL compatible",
+               "MPLUS-1", "MIT"]:
+    doAssert strong.verdict(name) == vAllowed, name
+  let weak = config("""{"enabled": true, "denied": ["@weak_copyleft"]}""")
+  for name in ["LGPL", "LGPL v2.1 with linking notice", "MPL", "Mozilla Public License"]:
+    doAssert weak.verdict(name) == vDenied, name
+  doAssert weak.verdict("GPL v2+ with some notice") == vAllowed
+  # a family only matches family globs, not a version
+  let gpl3 = config("""{"enabled": true, "denied": ["GPL-3.0*"]}""")
+  assertEq(gpl3.verdict("GPL v2+ with some notice"), vAllowed)
+  let classpath = config("""{"enabled": true, "denied": ["GPL-*"],
+                             "allowed": ["MIT", "GPL-2.0-only WITH Classpath-exception-2.0"]}""")
+  assertEq(classpath.verdict("GPL-2.0-with-classpath-exception"), vAllowed)
+  let unlicense = config("""{"enabled": true, "allowed": ["The Unlicense"]}""")
+  assertEq(unlicense.verdict("Unlicense"), vAllowed)
+  assertEq(unlicense.verdict("UNLICENSED"), vUnknown)
+
+proc testNpmNonLicenses() =
+  let allowlist = config("""{"enabled": true, "allowed": ["MIT"]}""")
+  for name in ["UNLICENSED", "SEE LICENSE IN LICENSE.md", "see license in ./EULA"]:
+    doAssert allowlist.verdict(name) == vUnknown, name
+  let pkg = SbomPackage(name: "app", version: "1.0.0", purl: "pkg:npm/app@1.0.0",
+                        licenses: @["UNLICENSED"])
+  doAssert allowlist.checkPackage(pkg).isNone()
+  let unknown = config("""{"enabled": true, "allowed": ["MIT"], "unknown": "violation"}""")
+  assertEq(unknown.checkPackage(pkg).get().reason, "license is unknown (UNLICENSED)")
+
+proc testExceptions() =
+  let settings = config("""{"enabled": true, "denied": ["GPL-*"],
+                            "exceptions": ["pkg:npm/@scope/x", "pkg:pypi/Foo_Bar",
+                                           "pkg:npm/ranged@<2", "legacy-*"]}""")
+  proc exempt(purl: string, name = ""): bool =
+    let pkg = SbomPackage(name: name, version: "1.0.0", purl: purl,
+                          licenses: @["GPL-3.0-only"])
+    settings.checkPackage(pkg).isNone()
+  doAssert exempt("pkg:npm/%40scope/x@1.0.0")
+  doAssert exempt("pkg:npm/@scope/x@1.0.0")
+  doAssert exempt("pkg:pypi/foo-bar@1.0?arch=x86_64")
+  doAssert exempt("pkg:npm/ranged@1.9.0")
+  doAssert not exempt("pkg:npm/ranged@2.0.0")
+  # a version that cannot be compared with the range does not exempt
+  doAssert not exempt("pkg:npm/ranged@latest")
+  doAssert not exempt("pkg:npm/@scope/y@1.0.0")
+  # other patterns are globs of the package name (`name@version`)
+  doAssert exempt("", "legacy-tool")
+  doAssert not exempt("", "tool")
+
+proc testSourceIsNotAPackage() =
+  ## the scanned project itself, as an SBOM describes it, is not a dependency
+  let cyclonedx = %*{"bomFormat": "CycloneDX",
+                     "metadata": {"component": {"type": "application", "name": "myapp",
+                                                "purl": "pkg:npm/myapp@1.0.0",
+                                                "licenses": [{"license": {"id": "GPL-3.0-only"}}]}},
+                     "components": []}
+  assertEq(len(parseSbom(cyclonedx).packages), 0)
+  let syft = %*{"artifacts": [],
+                "source": {"type": "directory", "name": "myapp", "metadata": {"path": "/ctx"}}}
+  assertEq(len(parseSbom(syft).packages), 0)
+
+proc testRegistration() =
+  loadLicensesRule()
+  var found = false
+  for rule in policyRules():
+    if rule.name == "licenses":
+      found = true
+      # context directories are only collected for such rules
+      doAssert rule.requiresContext
+  doAssert found
 
 proc testCycloneDx() =
   let doc = fixture("cyclonedx")
@@ -228,6 +324,8 @@ proc testJsonValidation() =
           "policy.policies[0].licenses.allowed: unknown preset @copyleft, expected one of " &
           "@network_copyleft, @strong_copyleft, @weak_copyleft")
   rejects("""{"unknown": "block"}""", "policy.policies[0].licenses.unknown must be one of")
+  rejects("""{"exceptions": ["pkg:npm/x@<>1"]}""",
+          "policy.policies[0].licenses.exceptions: invalid purl pkg:npm/x@<>1")
   setPolicyJson("""{"mode": "audit", "licenses": {"enabled": false, "denied": ["GPL-*"]}}""")
   selectPolicy(policyConfigs()[0])
   doAssert loadLicensesConfig().isNone()
@@ -235,6 +333,11 @@ proc testJsonValidation() =
 
 testNormalize()
 testExpressions()
+testUnrecognizedCopyleft()
+testNpmNonLicenses()
+testExceptions()
+testSourceIsNotAPackage()
+testRegistration()
 testCycloneDx()
 testFormats()
 testCollection()
