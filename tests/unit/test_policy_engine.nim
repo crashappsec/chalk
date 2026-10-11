@@ -181,6 +181,36 @@ proc testContextCollectedOnlyWhenRequired() =
     doAssert f.rule == "secrets" and "Git checkout failed" in f.reason
   setPolicyJson("")
 
+proc testConfigErrorHonorsDeclaredMode() =
+  # rules never run on a broken policy; its declared mode, on_error and
+  # enforce_repos decide whether the configuration error blocks
+  let doc = """{"policies":[
+    {"id":"strict","mode":"enforce","on_error":"block","golden_images":{"enabled":1}},
+    {"id":"rollout","mode":"off","on_error":"block",
+     "enforce_repos":[["glob","github.com/acme/*"]],"golden_images":{"enabled":1}},
+    {"id":"off","mode":"off","on_error":"block","golden_images":{"enabled":1}}
+  ]}"""
+  setPolicyJson(doc)
+  let build = ChalkDict()
+  build["command"] = pack("build")
+  var checks = 0
+  let checked = PolicyRule(name: "registries", load: proc(): bool = true,
+    checkInput: proc(input: PolicyInput): seq[PolicyFinding] = inc(checks))
+  let collect = proc(): PolicyInput = PolicyInput(command: "build")
+  for (repo, expected) in [("github.com/acme/app", @[("strict", "blocked"), ("rollout", "blocked")]),
+                           ("github.com/other/app", @[("strict", "blocked")])]:
+    policyOutcome = nil
+    doAssertRaises(PolicyViolation):
+      evaluatePolicies(build, collect, @[checked], proc(): string = repo)
+    var results: seq[(string, string)]
+    for r in policyOutcome.policies:
+      results.add((r.id, r.result))
+    doAssert results == expected, $results
+    for f in policyOutcome.findings:
+      doAssert f.rule == "config" and f.kind == "error"
+  doAssert checks == 0
+  setPolicyJson("")
+
 testOnError()
 testInputRule()
 testInputCollectionFailure()
@@ -191,3 +221,4 @@ testGoldenImagesRule()
 testModeOff()
 testCollectorFailureForMultiplePolicies()
 testContextCollectedOnlyWhenRequired()
+testConfigErrorHonorsDeclaredMode()

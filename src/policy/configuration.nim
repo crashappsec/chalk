@@ -126,13 +126,49 @@ proc validatePolicy(node: JsonNode, path: string) =
     golden.validateFields(goldenImagesJsonFields, path & "golden_images.")
     golden{"allowed"}.validatePairs(path & "golden_images.allowed")
 
-proc invalidPolicy(id, reason: string): PolicyConfig =
-  # a configuration that cannot be read cannot be trusted to block either
-  PolicyConfig(id: id, mode: "audit", onError: "allow", configError: reason)
+proc invalidPolicy(id, reason: string,
+                   mode = "", onError = "",
+                   enforceRepos: seq[(string, string)] = @[]): PolicyConfig =
+  ## Rules never run on a configuration that cannot be read, which is only
+  ## reported as an error. The `mode`, `on_error` and `enforce_repos` it
+  ## validly declares are kept, so an enforced policy with `on_error: block`
+  ## blocks and one in mode `off` stays off. Without a declared mode it
+  ## is audited, so the error is reported but never blocks.
+  PolicyConfig(id:           id,
+               mode:         (if mode != "": mode else: "audit"),
+               onError:      (if onError != "": onError else: "allow"),
+               enforceRepos: enforceRepos,
+               configError:  reason)
 
 proc jsonPairs*(node: JsonNode): seq[(string, string)] =
   for entry in node.getElems():
     result.add((entry[0].getStr(), entry[1].getStr()))
+
+proc declaredChoice(node: JsonNode, name: string): string =
+  ## `node`'s value of base field `name` when it is valid, else ""
+  let value = node{name}
+  if value == nil or value.kind != JString:
+    return ""
+  for field in policyJsonFields:
+    if field.name == name and value.getStr() in field.choices:
+      return value.getStr()
+  return ""
+
+proc invalidJsonPolicy(node: JsonNode, reason: string): PolicyConfig =
+  if node.kind != JObject:
+    return invalidPolicy("", reason)
+  var enforceRepos: seq[(string, string)]
+  let repos = node{"enforce_repos"}
+  if repos != nil and repos.kind == JArray:
+    try:
+      repos.validatePairs("enforce_repos")
+      enforceRepos = repos.jsonPairs()
+    except ValueError:
+      discard
+  invalidPolicy(node{"id"}.getStr(), reason,
+                mode         = node.declaredChoice("mode"),
+                onError      = node.declaredChoice("on_error"),
+                enforceRepos = enforceRepos)
 
 proc toPolicyConfig(node: JsonNode): PolicyConfig =
   PolicyConfig(
@@ -150,8 +186,8 @@ proc parsePolicyJson*(text: string): seq[PolicyConfig] =
   ## Parses and validates `policy.config_json`: one policy object, or
   ## `{"policies": [<policy object>, ...]}`. Raises `ValueError` with a
   ## user-facing reason when the document as a whole cannot be used. An
-  ## unusable `policies` entry is returned with `configError` set instead, so
-  ## that one broken policy does not disable the others.
+  ## unusable policy is returned with `configError` set instead, so that one
+  ## broken policy does not disable the others, see `invalidPolicy`.
   var doc: JsonNode
   try:
     doc = parseJson(text)
@@ -161,7 +197,10 @@ proc parsePolicyJson*(text: string): seq[PolicyConfig] =
   if doc.kind != JObject:
     raise newException(ValueError, "policy.config_json must be a JSON object")
   if not doc.isPolicyList():
-    doc.validatePolicy("policy.")
+    try:
+      doc.validatePolicy("policy.")
+    except ValueError:
+      return @[doc.invalidJsonPolicy(getCurrentExceptionMsg())]
     return @[doc.toPolicyConfig()]
   if len(doc) != 1:
     raise newException(ValueError, "policy.policies cannot be combined with other fields")
@@ -180,14 +219,14 @@ proc parsePolicyJson*(text: string): seq[PolicyConfig] =
     try:
       entry.validatePolicy(path)
     except ValueError:
-      result.add(invalidPolicy(id, getCurrentExceptionMsg()))
+      result.add(entry.invalidJsonPolicy(getCurrentExceptionMsg()))
       continue
     # results and findings are attributed to policies by id, so with several
     # policies an id that is missing or shared would make them ambiguous
     if len(entries) > 1 and id == "":
-      result.add(invalidPolicy(id, path & "id must be set when there are several policies"))
+      result.add(entry.invalidJsonPolicy(path & "id must be set when there are several policies"))
     elif counts[id] > 1:
-      result.add(invalidPolicy(id, path & "id " & escapeJson(id) & " is not unique"))
+      result.add(entry.invalidJsonPolicy(path & "id " & escapeJson(id) & " is not unique"))
     else:
       result.add(entry.toPolicyConfig())
 
@@ -285,23 +324,26 @@ proc policyPairsSetting*(path: openArray[string]): seq[(string, string)] =
 
 proc policyConfigs*(): seq[PolicyConfig] =
   ## Every configured policy, including those in mode `off`. A
-  ## `policy.config_json` that cannot be read at all is a single policy that
-  ## only reports why.
+  ## `policy.config_json` that cannot be read at all declares no mode, so it
+  ## is a single audited policy that only reports why.
   ensurePolicyJson()
   if policyJsonError != "":
     return @[invalidPolicy("", policyJsonError)]
   if policyJsonSet:
     return policyJsonConfigs
-  let id = attrGetOpt[string]("policy.id").get("")
+  let
+    id      = attrGetOpt[string]("policy.id").get("")
+    mode    = attrGetOpt[string]("policy.mode").get("off")
+    onError = attrGetOpt[string]("policy.on_error").get("allow")
   var enforceRepos: seq[(string, string)]
   try:
     enforceRepos = attrPairs("policy.enforce_repos")
   except CatchableError:
-    return @[invalidPolicy(id, getCurrentExceptionMsg())]
+    return @[invalidPolicy(id, getCurrentExceptionMsg(), mode = mode, onError = onError)]
   return @[PolicyConfig(
     id:           id,
-    mode:         attrGetOpt[string]("policy.mode").get("off"),
-    onError:      attrGetOpt[string]("policy.on_error").get("allow"),
+    mode:         mode,
+    onError:      onError,
     enforceRepos: enforceRepos,
   )]
 
@@ -315,7 +357,7 @@ proc isEvaluated*(policy: PolicyConfig): bool =
 proc mayBeEvaluated*(policy: PolicyConfig): bool =
   ## whether the policy is evaluated in some repository, as `enforce_repos`
   ## can turn on a policy whose `mode` is `off`
-  policy.isEvaluated() or (policy.configError == "" and len(policy.enforceRepos) > 0)
+  policy.isEvaluated() or len(policy.enforceRepos) > 0
 
 proc policyEnabled*(): bool =
   for policy in policyConfigs():

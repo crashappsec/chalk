@@ -35,6 +35,9 @@ type
     command*:  string # "build" or "push"
     ## local build context directories, empty for push
     contextDirs*: seq[string]
+    ## the main build context's entry of `contextDirs`, empty when the main
+    ## context is not a local directory (named contexts may still be)
+    mainContextDir*: string
     ## build contexts that are not local directories (stdin, URLs, git named
     ## contexts); the engine attributes them to rules that require the context
     contextErrors*: seq[PolicyFinding]
