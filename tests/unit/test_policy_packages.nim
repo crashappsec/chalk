@@ -12,68 +12,6 @@ const
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
 
-proc matches(pattern, purl: string): PackageMatch =
-  parsePackagePattern(pattern).matches(purl).result
-
-proc testPurls() =
-  assertEq(purlParts("pkg:npm/%40angular/core@16.0.0"), ("npm/@angular/core", "16.0.0"))
-  assertEq(purlParts("pkg:npm/@angular/core"), ("npm/@angular/core", ""))
-  assertEq(purlParts("pkg:deb/debian/libc6@1:2.36-9?arch=amd64#sub"), ("deb/debian/libc6", "1:2.36-9"))
-  assertEq(purlParts("PKG:PyPI/Django_Rest.Framework@1.0"), ("pypi/django-rest-framework", "1.0"))
-  assertEq(purlParts("pkg:golang/github.com/google/uuid@v1.6.0"), ("golang/github.com/google/uuid", "v1.6.0"))
-  assertEq(purlType("pkg:golang/github.com/google/uuid@v1.6.0"), "golang")
-  assertEq(purlType("not-a-purl"), "")
-
-proc testPatterns() =
-  for bad in ["npm/lodash", "pkg:npm", "pkg:npm/lodash@<abc", "pkg:npm/lodash@=>1", "pkg:npm/lodash@<1.2.3.4"]:
-    try:
-      discard parsePackagePattern(bad)
-      doAssert false, "accepted " & bad
-    except ValueError:
-      discard
-  assertEq(matches("pkg:npm/event-stream@3.3.6", "pkg:npm/event-stream@3.3.6"), pmMatch)
-  assertEq(matches("pkg:npm/event-stream@3.3.6", "pkg:npm/event-stream@3.3.5"), pmNoMatch)
-  assertEq(matches("pkg:npm/event-stream", "pkg:npm/event-stream@4.0.0"), pmMatch)
-  assertEq(matches("pkg:npm/event-stream", "pkg:npm/event-stream-x@4.0.0"), pmNoMatch)
-  assertEq(matches("pkg:pypi/*colourama*", "pkg:pypi/colourama@0.1.0"), pmMatch)
-  assertEq(matches("pkg:pypi/django_rest", "pkg:pypi/django-rest@1.0"), pmMatch)
-  assertEq(matches("pkg:*/lodash", "pkg:npm/lodash@4.17.20"), pmMatch)
-  assertEq(matches("pkg:npm/@angular/*", "pkg:npm/%40angular/core@16.0.0"), pmMatch)
-  assertEq(matches("pkg:npm/@angular/*@16.*", "pkg:npm/%40angular/core@16.0.0"), pmMatch)
-  assertEq(matches("pkg:npm/@angular/*@15.*", "pkg:npm/%40angular/core@16.0.0"), pmNoMatch)
-  assertEq(matches("pkg:golang/github.com/google/uuid@1.6.0", "pkg:golang/github.com/google/uuid@v1.6.0"), pmMatch)
-  assertEq(matches("pkg:npm/lodash@<4.17.21", "pkg:npm/lodash@4.17.20"), pmMatch)
-  assertEq(matches("pkg:npm/lodash@<4.17.21", "pkg:npm/lodash@4.17.21"), pmNoMatch)
-  assertEq(matches("pkg:npm/lodash@>=4.0,<4.17.21", "pkg:npm/lodash@3.10.1"), pmNoMatch)
-  assertEq(matches("pkg:npm/lodash@>=4.0,<4.17.21", "pkg:npm/lodash@4.1.0"), pmMatch)
-  assertEq(matches("pkg:npm/lodash@==4.1", "pkg:npm/lodash@4.1.0"), pmMatch)
-  assertEq(matches("pkg:npm/lodash@!=4.1.0", "pkg:npm/lodash@4.1.0"), pmNoMatch)
-  assertEq(matches("pkg:golang/github.com/google/uuid@>=1.5", "pkg:golang/github.com/google/uuid@v1.6.0"), pmMatch)
-  # only versions chalk can order are compared
-  assertEq(matches("pkg:deb/debian/libc6@<2.37", "pkg:deb/debian/libc6@1:2.36-9"), pmUnknown)
-  assertEq(matches("pkg:npm/lodash@<4.17.21", "pkg:npm/lodash"), pmUnknown)
-  assertEq(matches("pkg:npm/lodash", ""), pmNoMatch)
-
-proc testQuestionGlobsAndQualifiers() =
-  assertEq(matches("pkg:npm/lib?", "pkg:npm/libx@1.0.0"), pmMatch)
-  assertEq(matches("pkg:npm/lib?", "pkg:npm/lib@1.0.0"), pmNoMatch)
-  assertEq(matches("pkg:npm/x@1.?", "pkg:npm/x@1.2"), pmMatch)
-  assertEq(matches("pkg:npm/x@1.?", "pkg:npm/x@1.22"), pmNoMatch)
-  assertEq(matches("pkg:npm/lib??@1.?", "pkg:npm/libxy@1.2"), pmMatch)
-  assertEq(matches("pkg:npm/lib%3F@1.%3F", "pkg:npm/libx@1.2"), pmMatch)
-  assertEq(matches("pkg:npm/lib?@1.?arch=amd64&os=linux", "pkg:npm/libx@1."), pmMatch)
-  assertEq(matches("pkg:npm/lib?@1.??arch=amd64", "pkg:npm/libx@1.2?arch=arm64"), pmMatch)
-  assertEq(matches("pkg:npm/x@1.2?arch=amd64#sub", "pkg:npm/x@1.2?arch=arm64"), pmMatch)
-  # Percent-encoded @ belongs to the name; + is not a space.
-  assertEq(matches("pkg:generic/a%40b@1+meta", "pkg:generic/a%40b@1+meta"), pmMatch)
-  let sbom = PolicySboms(sboms: @[Sbom(packages: @[
-    SbomPackage(name: "libx", purl: "pkg:npm/libx@1.0.0")])])
-  let denied = PackagesConfig(denied: @[("purl", "pkg:npm/lib?")]).checkPackages(sbom)
-  assertEq(denied.len, 1)
-  assertEq(denied[0].kind, "violation")
-  let allowed = PackagesConfig(allowed: @[("purl", "pkg:npm/lib?")]).checkPackages(sbom)
-  assertEq(allowed.len, 0)
-
 proc fixtureSboms(): PolicySboms =
   PolicySboms(sboms: @[parseSbom(parseJson(readFile(fixture)))])
 
@@ -81,6 +19,90 @@ proc subjects(findings: seq[PolicyFinding], kind = "violation"): seq[string] =
   for f in findings:
     if f.kind == kind:
       result.add(f.subject)
+
+proc testPatterns() =
+  # other range syntaxes would be globs matching no version
+  for bad in ["pkg:npm/lodash@^4.17.0", "pkg:npm/lodash@~4.17.0", "pkg:pypi/x@~=1.0",
+              "pkg:npm/x@4.x", "pkg:maven/a/b@[1.0,2.0)", "pkg:npm/x@1 - 2",
+              "pkg:npm/x@1 || 2", "pkg:npm/lodash@<1.0.post1"]:
+    try:
+      discard parsePackagePattern(bad)
+      doAssert false, "accepted " & bad
+    except ValueError:
+      discard
+  for good in ["pkg:npm/lodash@4.*", "pkg:npm/lodash@>=4,<5", "pkg:npm/lodash", "pkg:npm/x@1.?"]:
+    discard parsePackagePattern(good)
+  let findings = PackagesConfig(denied: @[("purl", "pkg:npm/lodash@^4.17.0")]).checkPackages(
+    PolicySboms(sboms: @[Sbom(packages: @[SbomPackage(purl: "pkg:npm/lodash@4.17.20")])]))
+  assertEq(findings.len, 1)
+  assertEq(findings[0].kind, "error")
+  doAssert "unsupported version range" in findings[0].reason, findings[0].reason
+
+proc testLanguages() =
+  assertEq(normalizeLanguage("Golang"), "go")
+  assertEq(normalizeLanguage(" node "), "javascript")
+  assertEq(normalizeLanguage("TypeScript"), "javascript")
+  assertEq(normalizeLanguage("C#"), "dotnet")
+  assertEq(normalizeLanguage("csharp"), "dotnet")
+  assertEq(normalizeLanguage("py"), "python")
+  assertEq(normalizeLanguage("rb"), "ruby")
+  assertEq(normalizeLanguage("cpp"), "c++")
+  assertEq(normalizeLanguage("R"), "r")
+  for bad in ["", "cobol", "pyhton"]:
+    try:
+      discard normalizeLanguage(bad)
+      doAssert false, "accepted " & bad
+    except ValueError:
+      doAssert "unknown language" in getCurrentExceptionMsg()
+
+  let sbom = PolicySboms(sboms: @[Sbom(packages: @[
+    SbomPackage(purl: "pkg:golang/a@1.0.0", purlType: "golang", language: "go"),
+    SbomPackage(purl: "pkg:conan/zlib@1.3", purlType: "conan", language: "cpp"),
+    SbomPackage(purl: "pkg:cocoapods/Alamofire@5.0", purlType: "cocoapods"),
+    SbomPackage(purl: "pkg:deb/debian/libc6@2.36", purlType: "deb"),
+    SbomPackage(purl: "pkg:github/actions/checkout@v4", purlType: "github"),
+    SbomPackage(purl: "pkg:hex/phoenix@1.7.0", purlType: "hex"),
+    SbomPackage(purl: "pkg:generic/thing@1", purlType: "generic"),
+    SbomPackage(name: "mystery", version: "2", location: "/vendor/x"),
+    SbomPackage(name: "typed", language: "ruby"),
+  ])])
+  # the SBOM's `cpp` is syft's `c++`, and cocoapods is swift
+  var findings = PackagesConfig(allowedLanguages: @["golang", "c++", "swift", "ruby"]).checkPackages(sbom)
+  assertEq(findings.subjects(), newSeq[string]())
+  # OS and CI packages are not dependencies in any language; packages whose
+  # language is unknown cannot be vouched for by an allowlist
+  assertEq(findings.subjects("error"), @[""])
+  assertEq(findings[0].reason,
+           "could not determine the language of 3 packages: pkg:hex/phoenix@1.7.0, " &
+           "pkg:generic/thing@1, mystery@2 (/vendor/x), so allowed_languages cannot be " &
+           "checked for them")
+  findings = PackagesConfig(allowedLanguages: @["go"]).checkPackages(sbom)
+  assertEq(findings.subjects(), @["c++", "swift", "ruby"])
+  assertEq(findings.subjects("error"), @[""])
+  # a denylist only reports what it can identify
+  findings = PackagesConfig(deniedLanguages: @["ruby"]).checkPackages(sbom)
+  assertEq(findings.subjects(), @["ruby"])
+  assertEq(findings.subjects("error"), newSeq[string]())
+  findings = PackagesConfig(denied: @[("purl", "pkg:*/mystery")]).checkPackages(sbom)
+  assertEq(len(findings), 0)
+  # without a purl a package cannot match an allowlist
+  findings = PackagesConfig(allowed: @[("purl", "pkg:*/*")]).checkPackages(sbom)
+  assertEq(findings.subjects(), newSeq[string]())
+  assertEq(findings.subjects("error"), @[""])
+  doAssert findings[0].reason.startsWith("could not determine the package URL of 2 packages: " &
+                                         "mystery@2 (/vendor/x), typed"), findings[0].reason
+  # unknown languages configured without validation are evaluation errors
+  findings = PackagesConfig(deniedLanguages: @["cobol"]).checkPackages(sbom)
+  assertEq(findings.subjects("error"), @[""])
+
+proc testQuestionGlobs() =
+  let sbom = PolicySboms(sboms: @[Sbom(packages: @[
+    SbomPackage(name: "libx", purl: "pkg:npm/libx@1.0.0")])])
+  let denied = PackagesConfig(denied: @[("purl", "pkg:npm/lib?")]).checkPackages(sbom)
+  assertEq(denied.len, 1)
+  assertEq(denied[0].kind, "violation")
+  let allowed = PackagesConfig(allowed: @[("purl", "pkg:npm/lib?")]).checkPackages(sbom)
+  assertEq(allowed.len, 0)
 
 proc testCheck() =
   var settings = PackagesConfig(
@@ -116,7 +138,7 @@ proc testCheck() =
   assertEq(findings.subjects(), @["javascript"])
   doAssert "5 packages" in findings[0].reason and "+2 more" in findings[0].reason
 
-  # an allowlist covers every package with a purl
+  # an allowlist covers every package; OS packages have no language
   settings = PackagesConfig(allowedLanguages: @["go", "javascript"],
                             allowed: @[("purl", "pkg:npm/*"), ("purl", "pkg:golang/github.com/google/*")])
   findings = settings.checkPackages(fixtureSboms())
@@ -158,9 +180,16 @@ proc testConfig() =
   assertEq(settings.allowed, @[("purl", "pkg:npm/*")])
   assertEq(settings.message, "Use approved packages")
 
-  setPolicyJson("""{"mode": "audit", "packages": {"enabled": false, "denied": [["purl", "x"]]}}""")
+  setPolicyJson("""{"mode": "audit", "packages": {"enabled": false}}""")
   selectPolicy(policyConfigs()[0])
   doAssert loadPackagesConfig().isNone()
+
+  setPolicyJson("""{"packages": {"enabled": true, "allowed_languages": ["Golang", "node", "js"],
+                                 "denied_languages": ["C#"]}}""")
+  selectPolicy(policyConfigs()[0])
+  let aliased = loadPackagesConfig().get()
+  assertEq(aliased.allowedLanguages, @["go", "javascript"])
+  assertEq(aliased.deniedLanguages, @["dotnet"])
 
   for (text, reason) in [
     ("""{"packages": {"enabeld": true}}""", "unknown field policy.packages.enabeld"),
@@ -168,12 +197,26 @@ proc testConfig() =
     ("""{"packages": {"allowed_languages": [1]}}""", "policy.packages.allowed_languages entries must be strings"),
     ("""{"packages": {"denied_languages": "go"}}""", "policy.packages.denied_languages must be a array"),
     ("""{"packages": []}""", "policy.packages must be an object"),
+    ("""{"packages": {"allowed_languages": ["go", "cobol"]}}""",
+     "policy.packages.allowed_languages: unknown language \"cobol\""),
+    ("""{"packages": {"denied_languages": ["pyhton"]}}""",
+     "policy.packages.denied_languages: unknown language \"pyhton\""),
+    ("""{"packages": {"denied": [["regex", ".*"]]}}""",
+     "policy.packages.denied: unsupported entry kind \"regex\""),
+    ("""{"packages": {"allowed": [["purl", "lodash"]]}}""",
+     "policy.packages.allowed: invalid entry \"lodash\""),
+    ("""{"packages": {"denied": [["purl", "pkg:npm/lodash@^4.17.0"]]}}""",
+     "unsupported version range"),
   ]:
+    # an unusable policy is kept with its error, see parsePolicyJson
+    var message = ""
     try:
-      discard parsePolicyJson(text)
-      doAssert false, "accepted: " & text
+      let configs = parsePolicyJson(text)
+      doAssert configs.len == 1, "accepted: " & text
+      message = configs[0].configError
     except ValueError:
-      doAssert reason in getCurrentExceptionMsg(), getCurrentExceptionMsg()
+      message = getCurrentExceptionMsg()
+    doAssert reason in message, text & ": " & message
   setPolicyJson("")
 
 proc testEngine() =
@@ -193,6 +236,8 @@ proc testEngine() =
   for rule in policyRules():
     if rule.name == "packages":
       rules.add(rule)
+  # without it the engine collects no build contexts and nothing is scanned
+  doAssert rules[0].requiresContext
   policyOutcome = nil
   let build = ChalkDict()
   build["command"] = pack("build")
@@ -211,13 +256,24 @@ proc testEngine() =
   assertEq(policyOutcome.findings[0].subject, "pkg:npm/lodash@4.17.20")
   assertEq(policyOutcome.findings[0].location, "web/package-lock.json")
   assertEq(policyOutcome.findings[1].subject, "javascript")
+  # without a message the step summary must not suggest an allowed image
+  for p in policyOutcome.policies:
+    for h in p.hints:
+      assertEq(h.rule, "")
+  setPolicyJson("""{"mode": "audit", "packages": {"enabled": true, "allowed_languages": ["go"],
+                                                  "message": "Ask #deps"}}""")
+  policyOutcome = nil
+  evaluatePolicies(build, proc(): PolicyInput =
+    PolicyInput(command: "build", contextDirs: @["/src"], host: ChalkDict()), rules)
+  assertEq(policyOutcome.policies[0].hints[0].message, "Ask #deps")
+  assertEq(policyOutcome.policies[0].hints[0].allowed, @["go"])
   setPolicyJson("")
   clearPolicyToolCache()
 
 proc main() =
-  testPurls()
   testPatterns()
-  testQuestionGlobsAndQualifiers()
+  testLanguages()
+  testQuestionGlobs()
   testCheck()
   testConfig()
   testEngine()

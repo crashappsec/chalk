@@ -384,36 +384,60 @@ policy {
 | `policy.packages.denied_languages`  | `list[string]`                              | `[]`    |
 | `policy.packages.message`           | `string`                                    | `""`    |
 
-What is checked, for every package of the SBOM that has a
-[package URL](https://github.com/package-url/purl-spec) (purl):
+What is checked, for every package of the SBOM:
 
-- `denied`: a package matching any entry is a violation.
+- `denied`: a package whose
+  [package URL](https://github.com/package-url/purl-spec) (purl) matches
+  any entry is a violation.
 - `allowed`: when not empty, a package matching no entry is a violation.
 - `allowed_languages`: when not empty, packages of any other language are a
   violation. `denied_languages`: packages of these languages are a
   violation. Language violations are reported once per language (subject
   is the language, e.g. `python`, with the number of packages and a few
-  examples), not once per package. Languages are syft's
-  `syft:package:language` (`go`, `javascript`, `python`, `java`, `rust`,
-  `ruby`, `php`, `dotnet`, `swift`, `dart`, `cpp`, ...), or, for SBOMs
-  without it, derived from the purl type (`npm` → `javascript`, `pypi` →
-  `python`, `golang` → `go`, `maven` → `java`, `cargo` → `rust`, ...).
-  Packages without a language, such as OS packages or GitHub Actions, are
-  only checked against `denied` and `allowed`.
+  examples), not once per package.
+
+Languages are those of the dependencies the SBOM lists, not of the build
+context's own source files: a Go service with no third-party modules has no
+`go` packages. They are syft's `syft:package:language` (`c++`, `dart`,
+`dotnet`, `elixir`, `erlang`, `go`, `haskell`, `java`, `javascript`, `lua`,
+`ocaml`, `perl`, `php`, `python`, `r`, `ruby`, `rust`, `swift`, `swipl`),
+or, for SBOMs without it, derived from the purl type (`npm` →
+`javascript`, `pypi` → `python`, `golang` → `go`, `maven` → `java`,
+`cargo` → `rust`, `cocoapods` → `swift`, ...). Configured languages may
+also be common aliases (`golang`, `node`, `js`, `typescript`, `csharp`,
+`c#`, `py`, `rb`, `cpp`, ...), which are normalized to syft's names; any
+other name is a configuration error.
+
+Allowlists fail closed: when `allowed` is not empty, a package without a
+purl is an evaluation error, and when `allowed_languages` is not empty, a
+package whose language cannot be determined (no purl and no language, or
+a purl type that maps to no single language, such as `generic` or `hex`)
+is an evaluation error, reported once with a few examples, so `on_error`
+decides. OS, CI and container packages (purl types `deb`, `rpm`, `apk`,
+`alpm`, `github`, `githubactions`, `docker`, `oci`, `bitnami`, `qpkg`) are
+not dependencies in any language and are only checked against `denied` and
+`allowed`. Denylists only report what they can identify.
 
 `denied` and `allowed` entries are `(kind, value)` tuples. The supported
 kind is `purl`: `pkg:<type>/<namespace>/<name>[@<version>]`, where
 `type/namespace/name` is a shell-style glob (`*` also matches `/`). Without
 a version any version matches; otherwise the version is a glob (`3.3.6`,
 `1.*`) or a comma-separated range of `<`, `<=`, `>`, `>=`, `=`, `!=`
-constraints (`>=1.0,<1.2`). Matching ignores case, qualifiers
+constraints (`>=1.0,<1.2`). Other range syntaxes (`^1.2`, `~1.2`, `~=1.2`,
+`1.x`, `[1.0,2.0)`, `1 - 2`, `1 || 2`) are rejected rather than taken as
+globs that match nothing. Matching ignores case, qualifiers
 (`?arch=amd64`) and subpaths, percent-decodes both sides
 (`pkg:npm/@angular/core` matches `pkg:npm/%40angular/core`), normalizes
 PyPI names (`Django_Rest` is `django-rest`) and ignores the `v` prefix of
-Go versions. Ranges only compare `MAJOR[.MINOR[.PATCH]][-suffix]`
-versions: a package whose name matches a range entry but whose version
-cannot be compared (e.g. Debian's `1:2.36-9`) is an evaluation error, as
-are unknown kinds and invalid patterns, so `on_error` decides.
+Go versions. Ranges compare versions made of any number of dot-separated
+numbers (missing ones are 0, so `1.2` is `1.2.0` and NuGet's `4.0.0.0` is
+`4`) with an optional `-prerelease`, ordered by
+[semver 2.0 precedence](https://semver.org/#spec-item-11) (`1.0.0-rc.9` <
+`1.0.0-rc.10` < `1.0.0`); `+build` metadata (e.g. Go's `+incompatible`)
+is ignored. A package whose name matches a range entry but whose version
+cannot be compared (e.g. Debian's `1:2.36-9`, Python's `1.0.post1`, Maven's
+`1.2.3.RELEASE`) is an evaluation error, so `on_error` decides. Unknown
+kinds, invalid patterns and unknown languages are configuration errors.
 
 Findings set `subject` to the package purl (or the language) and
 `location` to the manifest or lock file the package was found in, relative
@@ -439,8 +463,13 @@ Where the SBOM comes from:
 - `chalk docker push`: the `SBOM` recorded in the chalk mark of each pushed
   image. The default mark templates do not include `SBOM` (enable it with
   `mark_template.<template>.key.SBOM.use` and `run_sbom_tools`), and
-  images without it, or with it stored in an object store (`@SBOM`), are
-  not checked on push. Locations are relative to the directory chalk
+  images without it, unchalked images, or images with it stored in an
+  object store (`@SBOM`) are not checked and pass on push: this is
+  deliberate, as the build is where the context is checked and the build
+  context is gone on push. The mark's SBOM covers all of what chalk
+  scanned when it built the image (the git repository of its first build
+  context), not just the build context, so packages elsewhere in a
+  monorepo are checked too. Locations are relative to the directory chalk
   scanned when it built the image.
 
 The SBOM describes the build context (manifests and lock files), not the

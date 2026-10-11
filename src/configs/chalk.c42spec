@@ -2757,12 +2757,14 @@ Restricts the languages and packages a `docker build` depends on, as
 listed by the SBOM of each local build context (the one chalk collects
 with `run_sbom_tools`, else one produced on demand by the enabled `sbom`
 tools, `tool.syft` by default). `docker push` checks the SBOM recorded in
-the image's chalk mark, when the mark template includes `SBOM`; otherwise nothing is
-checked on push.
+the image's chalk mark, when the mark template includes `SBOM`, covering
+all of the repository chalk scanned at build time; images without it
+pass on push.
 
 Packages are identified by their package URL (purl), e.g.
-`pkg:npm/lodash@4.17.21`, and languages as syft reports them, e.g.
-`go`, `javascript`, `python`, `java`, `rust`.
+`pkg:npm/lodash@4.17.21`, and languages as syft reports them for the
+dependencies the SBOM lists, e.g. `go`, `javascript`, `python`, `java`,
+`rust`.
 """
 
   field enabled {
@@ -2784,11 +2786,13 @@ Packages the build must not depend on. Each entry is a `(kind, value)`
 tuple. The supported kind is `purl`: a package URL whose
 `type/namespace/name` is a shell-style glob, optionally followed by
 `@<version>`, where the version is a glob (`3.3.6`, `1.*`) or a
-comma-separated range (`<4.17.21`, `>=1.0,<1.2`). Without a version any
+comma-separated range (`<4.17.21`, `>=1.0,<1.2`); other range syntaxes
+(`^1.2`, `~1.2`, `1.x`, `[1.0,2.0)`) are rejected. Without a version any
 version matches. Matching ignores case, qualifiers and subpaths, and
 normalizes PyPI names (`Django_Rest` is `django-rest`). Ranges compare
-`MAJOR[.MINOR[.PATCH]][-suffix]` versions; a package whose version cannot
-be compared is an evaluation error.
+dot-separated numeric versions with an optional `-prerelease` by semver
+precedence, ignoring `+build` metadata; a package whose version cannot be
+compared (e.g. `1:2.36-9`, `1.0.post1`) is an evaluation error.
 
 ```
 denied: [
@@ -2798,7 +2802,7 @@ denied: [
 ]
 ```
 
-Unknown kinds and invalid patterns are reported as evaluation errors.
+Unknown kinds and invalid patterns are configuration errors.
 """
   }
 
@@ -2809,6 +2813,7 @@ Unknown kinds and invalid patterns are reported as evaluation errors.
     doc: """
 When not empty, every package must match one of these entries (same
 format as `denied`), e.g. `("purl", "pkg:golang/github.com/acme/*")`.
+Packages without a purl are an evaluation error.
 """
   }
 
@@ -2818,8 +2823,13 @@ format as `denied`), e.g. `("purl", "pkg:golang/github.com/acme/*")`.
     shortdoc: "Languages packages may be written in"
     doc: """
 When not empty, a package of any other language is a violation, reported
-once per language. Packages without a language (e.g. OS packages or
-GitHub Actions) are not checked.
+once per language. Names are syft's (`c++`, `dart`, `dotnet`, `elixir`,
+`erlang`, `go`, `haskell`, `java`, `javascript`, `lua`, `ocaml`, `perl`,
+`php`, `python`, `r`, `ruby`, `rust`, `swift`, `swipl`) or aliases
+(`golang`, `node`, `js`, `typescript`, `csharp`, `c#`, `py`, `rb`, `cpp`,
+...); others are configuration errors. OS, CI and container packages
+(e.g. `deb`, `rpm`, `apk`, GitHub Actions) are not checked; other packages
+whose language cannot be determined are an evaluation error.
 """
   }
 
@@ -2829,7 +2839,7 @@ GitHub Actions) are not checked.
     shortdoc: "Languages packages must not be written in"
     doc: """
 A package of one of these languages is a violation, reported once per
-language.
+language. Same names as `allowed_languages`.
 """
   }
 
