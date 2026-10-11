@@ -22,8 +22,12 @@ import std/[
 ]
 import "."/[
   api,
+  dockerignore,
+  purl,
   tools,
 ]
+
+export dockerignore, purl
 
 type
   SbomPackage* = object
@@ -69,16 +73,6 @@ const purlLanguages = [
   ("swift",    "swift"),
   ("conan",    "cpp"),
 ]
-
-proc purlType*(purl: string): string =
-  ## lowercase type of `pkg:<type>/...`, empty when `purl` is not a purl
-  if not purl.toLowerAscii().startsWith("pkg:"):
-    return ""
-  let rest = purl[4 .. ^1].strip(leading = true, trailing = false, chars = {'/'})
-  let slash = rest.find('/')
-  if slash <= 0:
-    return ""
-  return rest[0 ..< slash].toLowerAscii()
 
 proc languageOf(purlType: string): string =
   for (t, lang) in purlLanguages:
@@ -207,16 +201,19 @@ proc spdxSourceIds(doc: JsonNode): seq[string] =
          rel{"relatedSpdxElement"}.getStr() == documentId and documentId != "":
       result.add(rel{"spdxElementId"}.getStr())
 
+const sourcePurposes = ["FILE", "CONTAINER", "DIRECTORY"]
+
 proc parseSpdx(doc: JsonNode): Sbom =
   let sourceIds = doc.spdxSourceIds()
   for item in packageArray(doc{"packages"}, "packages"):
     let purl = item.spdxPurl()
-    # Only an explicitly described source file/container row is omitted.
-    # A described application/library is still a dependency to check, even
-    # when its optional version and purl metadata are absent.
-    if item{"SPDXID"}.getStr() != "" and item{"SPDXID"}.getStr() in sourceIds and
-       item{"primaryPackagePurpose"}.getStr() in ["FILE", "CONTAINER"] and
-       purl == "" and item{"versionInfo"}.getStr() == "":
+    # The scanned source (syft: the directory, file or image, with the image
+    # digest as version) is not a dependency; a described application or
+    # library is, even without optional version and purl metadata.
+    let id = item{"SPDXID"}.getStr()
+    if id != "" and id in sourceIds and
+       (item{"primaryPackagePurpose"}.getStr() in sourcePurposes or
+        id.startsWith("SPDXRef-DocumentRoot-")):
       continue
     var pkg = SbomPackage(
       name:     item{"name"}.getStr(),
@@ -256,8 +253,13 @@ proc parseSyftJson(doc: JsonNode): Sbom =
         if path != "" and path notin pkg.locations:
           pkg.locations.add(path)
     for license in artifact{"licenses"}.getElems():
-      let expression = license{"spdxExpression"}.getStr()
-      pkg.licenses.add(if expression != "": expression else: license{"value"}.getStr())
+      # older syft schemas list licenses as plain strings
+      let value =
+        if license.kind == JString: license.getStr()
+        elif license{"spdxExpression"}.getStr() != "": license{"spdxExpression"}.getStr()
+        else: license{"value"}.getStr()
+      if value.strip() != "":
+        pkg.licenses.add(value)
     if not result.add(pkg):
       return
 
@@ -287,10 +289,11 @@ proc parseSbom*(doc: JsonNode, source = ""): Sbom =
     raise newException(ValueError, "unsupported SBOM format, expected CycloneDX, SPDX or syft JSON")
   result.source = if source != "": source else: doc.describedSource()
 
-proc forContext*(sbom: Sbom, root, dir: string): Sbom =
-  ## Packages of an SBOM of `root` found within `dir`, with locations made
-  ## relative to `dir`. Packages without a location are kept, as they could
-  ## be anywhere.
+proc forContext*(sbom: Sbom, root, dir: string, ignore = DockerIgnore()): Sbom =
+  ## Packages of an SBOM of `root` found within `dir` and not left out of
+  ## the build context by `ignore` (see `loadDockerignore`), with locations
+  ## made relative to `dir`. Packages without a location are kept, as they
+  ## could be anywhere.
   result = Sbom(source: dir, truncated: sbom.truncated)
   for pkg in sbom.packages:
     var p = pkg
@@ -298,7 +301,8 @@ proc forContext*(sbom: Sbom, root, dir: string): Sbom =
     let locations = if pkg.locations.len > 0: pkg.locations else: @[pkg.location]
     for occurrence in locations:
       let location = occurrence.contextPath(root, dir)
-      if location.isSome() and location.get() notin p.locations:
+      if location.isSome() and location.get() notin p.locations and
+         not ignore.isIgnored(location.get()):
         p.locations.add(location.get())
     if p.locations.len == 0:
       continue
@@ -306,11 +310,11 @@ proc forContext*(sbom: Sbom, root, dir: string): Sbom =
     result.packages.add(p)
 
 proc addOutput(result: var PolicySboms, rule: string, output: ToolOutput,
-               root, dir: string) =
+               root, dir: string, ignore = DockerIgnore()) =
   try:
     var sbom = output.value.parseSbom(output.image)
     if dir != "":
-      sbom = sbom.forContext(root, dir)
+      sbom = sbom.forContext(root, dir, ignore)
     else:
       for p in sbom.packages.mitems():
         p.location = p.location.strip(trailing = false, chars = {'/'})
@@ -344,14 +348,19 @@ proc hostSboms(input: PolicyInput, rule: string): ToolOutputs =
 
 proc policySboms*(input: PolicyInput, rule: string): PolicySboms =
   ## SBOMs of what the command builds or pushes. Errors are reported by
-  ## `rule`.
+  ## `rule`, which must be registered with `requiresContext = true`, as
+  ## build contexts are only collected for such rules.
   ##
   ## * build: per local build context directory, the SBOM chalk collected
   ##   when it covers the directory, else one produced on demand (cached for
-  ##   the process). Only packages within the directory are kept, with
-  ##   locations relative to it.
-  ## * push: the SBOMs recorded in the pushed images' chalk marks; images
-  ##   without one are skipped, as default chalk marks do not include it.
+  ##   the process). Only packages within the directory that its
+  ##   `.dockerignore` does not leave out are kept, with locations relative
+  ##   to it.
+  ## * push: the SBOMs recorded in the pushed images' chalk marks, unfiltered:
+  ##   all of the repository chalk scanned when it built the image, as the
+  ##   build context is gone. Images whose mark has no SBOM (the default
+  ##   marks do not record it), that are not chalked, or whose SBOM is in an
+  ##   object store (`@SBOM`) are skipped and the policy passes for them.
   if input.command == "push":
     let pushed = input.pushedToolOutputs(rule, "SBOM")
     result.errors = pushed.errors
@@ -364,5 +373,13 @@ proc policySboms*(input: PolicyInput, rule: string): PolicySboms =
   let outputs = input.contextToolOutputs(request, host.outputs)
   result.errors = host.errors & outputs.errors
   for context in outputs.contexts:
+    var ignore: DockerIgnore
+    try:
+      ignore = loadDockerignore(context.dir, input.mainContextDockerfile(context.dir))
+    except CatchableError:
+      # without it every package of the context is checked
+      result.errors.add(newSubjectFinding(rule, "error", context.dir,
+                                          "could not read .dockerignore: " &
+                                          getCurrentExceptionMsg()))
     for output in context.outputs:
-      result.addOutput(rule, output, output.root, context.dir)
+      result.addOutput(rule, output, output.root, context.dir, ignore)

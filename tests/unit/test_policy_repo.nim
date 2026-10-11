@@ -124,20 +124,21 @@ proc testResolveMode() =
   # without enforce_repos the repository does not matter
   let plain = PolicyConfig(mode: "audit").resolveMode("github.com/crashappsec/dummy-deployments")
   doAssert plain.activeMode() == "audit" and plain.modeSource == "default"
-  # an invalid policy only reports, whatever it asks for
-  let invalid = PolicyConfig(mode: "audit", configError: "broken", enforceRepos: repos)
-  doAssert invalid.resolveMode("github.com/crashappsec/dummy-deployments").activeMode() == "audit"
+  # an invalid policy keeps its valid enforce_repos, so on_error decides
+  # whether its configuration error blocks where it is enforced
+  let invalid = PolicyConfig(mode: "off", configError: "broken", enforceRepos: repos)
+  doAssert invalid.mayBeEvaluated()
+  doAssert invalid.resolveMode("github.com/crashappsec/dummy-deployments").activeMode() == "enforce"
+  doAssert not invalid.resolveMode("github.com/crashappsec/chalk").isEvaluated()
 
 proc testJsonValidation() =
   for doc in ["""{"enforce_repos": {}}""",
               """{"enforce_repos": ["github.com/a/b"]}""",
               """{"enforce_repos": [["glob"]]}""",
               """{"enforce_repos": [["glob", 1]]}"""]:
-    try:
-      discard parsePolicyJson(doc)
-      doAssert false, "accepted: " & doc
-    except ValueError:
-      doAssert "policy.enforce_repos" in getCurrentExceptionMsg(), getCurrentExceptionMsg()
+    let configs = parsePolicyJson(doc)
+    doAssert "policy.enforce_repos" in configs[0].configError, configs[0].configError
+    doAssert configs[0].enforceRepos.len == 0
   let policies = parsePolicyJson("""{"policies": [
     {"id": "a", "mode": "audit", "enforce_repos": "github.com/a/b"},
     {"id": "b", "mode": "audit", "enforce_repos": [["glob", "github.com/a/*"]]}
@@ -263,14 +264,19 @@ proc testRepoNotResolvedWithoutEnforceRepos() =
   let r = firstResult()
   doAssert r["effective_mode"] == "audit" and r["mode_source"] == "default" and r["repo"] == ""
 
-proc testInvalidEnforceReposNeverBlocks() =
+proc testInvalidEnforceRepos() =
+  # the policy is invalid and only reports, with its declared mode and on_error
   let doc = """{"mode": "enforce", "on_error": "block",
     "enforce_repos": [["glob"]], "golden_images": {"enabled": true}}"""
-  let (blocked, resolved) = evaluate(doc, listed)
-  doAssert not blocked and resolved == 0
-  doAssert policyOutcome.result == "error"
+  var (blocked, resolved) = evaluate(doc, listed)
+  doAssert blocked and resolved == 0
+  doAssert policyOutcome.result == "blocked"
+  doAssert policyOutcome.findings.len == 1
   doAssert policyOutcome.findings[0].rule == "config"
   doAssert "policy.enforce_repos" in policyOutcome.findings[0].reason
+  (blocked, resolved) = evaluate(doc.replace("\"enforce\"", "\"audit\""), listed)
+  doAssert not blocked and resolved == 0
+  doAssert policyOutcome.result == "error"
 
 testNormalizeRepo()
 testRepoFromEnv()
@@ -283,4 +289,4 @@ testEnforcedInListedRepo()
 testResolverFailureIsUnknownRepo()
 testOffEnforcesOnlyListedRepos()
 testRepoNotResolvedWithoutEnforceRepos()
-testInvalidEnforceReposNeverBlocks()
+testInvalidEnforceRepos()

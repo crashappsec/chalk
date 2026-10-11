@@ -85,8 +85,9 @@ proc runTools(request: ToolRequest, dir: string): seq[ToolOutput] =
   var failures: seq[string]
   for tool in tools:
     try:
-      # force: chalk's own run may have scanned another directory already
-      let keys = runTool(tool, dir, force = true)
+      # force: chalk's own run may have scanned `dir` already. Not recorded,
+      # so a failed chalk run can still retry it for the chalk mark.
+      let keys = runTool(tool, dir, force = true, record = false)
       if request.key notin keys:
         failures.add(tool & " produced no " & request.key)
         continue
@@ -154,9 +155,16 @@ proc markName(input: PolicyInput, mark: ChalkDict): string =
   return "pushed image"
 
 proc pushedToolOutputs*(input: PolicyInput, rule, key: string): ToolOutputs =
-  ## Tool output recorded in the chalk marks of the pushed images. Images
-  ## without it are skipped: default chalk marks do not record it, and the
-  ## build context is gone.
+  ## Tool output recorded in the chalk marks of the pushed images, covering
+  ## all of what chalk scanned when it built the image (the git repository
+  ## of its first build context), not filtered to the build context.
+  ##
+  ## Images without it are skipped, so a rule passes for them rather than
+  ## reporting an error: default chalk marks do not record tool output,
+  ## unchalked images have no mark, a mark may keep the key in an object
+  ## store (`@<key>`), and the build context is gone, so the tools cannot run
+  ## on demand. Policies that must check pushes need marks that record the
+  ## key; build policies check the build context itself.
   for mark in input.pushMarks:
     if mark == nil:
       continue
@@ -174,13 +182,24 @@ proc pushedToolOutputs*(input: PolicyInput, rule, key: string): ToolOutputs =
 
 proc contextToolOutputs*(input: PolicyInput, request: ToolRequest,
                          host: seq[ToolOutput]): ToolOutputs =
-  ## Per build context directory, the `host` output (see `toolOutputs`) of
-  ## the tools that scanned a directory containing it, else the output of
-  ## running the tools on it on demand. Rules filter the output to the
-  ## directory, as chalk scans the whole repository of a monorepo.
+  ## Build only. Per build context directory, the `host` output (see
+  ## `toolOutputs`) of the tools that scanned a directory containing it,
+  ## else the output of running the tools on it on demand. Rules filter the
+  ## output to the directory, as chalk scans the whole repository of a
+  ## monorepo.
+  ##
+  ## `request.rule` must be registered with `requiresContext = true`:
+  ## `contextDirs` is only collected for such rules, and the engine reports
+  ## `contextErrors` (contexts that are not local directories) against them.
+  ##
+  ## On-demand runs ignore `run_*_tools`, may install the tool (e.g. syft's
+  ## installer or docker image) and take up to `maxContextDirs` x tools x the
+  ## tool's timeout.
   if len(input.contextDirs) == 0:
-    result.errors.add(newSubjectFinding(request.rule, "error", "",
-                                        "the build has no local build context to check"))
+    # contexts the engine already reported cannot be checked are not repeated
+    if len(input.contextErrors) == 0:
+      result.errors.add(newSubjectFinding(request.rule, "error", "",
+                                          "the build has no local build context to check"))
     return
   for i, dir in input.contextDirs:
     if i >= maxContextDirs:

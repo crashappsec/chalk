@@ -157,9 +157,13 @@ names and types match con4m, with tuples written as arrays:
 
 Missing fields take their defaults. The document is validated strictly: invalid
 JSON, unknown fields, wrong types or invalid choices are reported as a single
-`config` evaluation error and no rule runs. This never blocks the build,
-whatever `mode` or `on_error` the document asks for, since a document that
-cannot be read cannot be trusted either. Only policy settings can be expressed,
+`config` evaluation error (kind `error`) and no rule runs. The policy keeps the
+`mode`, `on_error` and `enforce_repos` it declares when those are themselves
+valid, so `on_error` decides as for any other error: an `enforce` policy with
+`on_error = "block"` blocks the build, and a policy in mode `off` stays off.
+A policy that declares no valid `mode`, like a document that cannot be used as
+a whole (not JSON, not an object, an invalid `policies` list), is audited: the error is reported and never blocks. An invalid
+`on_error` is `allow`. Only policy settings can be expressed,
 so a JSON document can neither change other chalk configuration nor provide
 callbacks.
 
@@ -204,8 +208,9 @@ same fields as the single-policy document above:
 - An entry that is invalid (not an object, unknown fields, wrong types,
   invalid choices, missing or duplicate `id`) is reported as a `config`
   evaluation error of that entry (`policy_id` is its `id`, when it has a
-  string one) and never blocks. The other entries are still evaluated. An entry
-  with a duplicate `id` invalidates every entry using that `id`.
+  string one), which blocks only as the entry's own valid `mode`, `on_error`
+  and `enforce_repos` say (see above). The other entries are still evaluated.
+  An entry with a duplicate `id` invalidates every entry using that `id`.
 - `policies` cannot be combined with other top-level fields; such a document,
   or one whose `policies` is not an array, is invalid as a whole.
 - `{"policies": []}` configures no policy, as does a list where every entry is
@@ -256,8 +261,10 @@ repositories while `mode` applies everywhere else:
   removed, so a glob in the port position (`github.com:*/acme/app`) never
   matches.
 - An `enforce_repos` that is not a list of `[kind, value]` string pairs makes
-  the policy invalid: it is reported as a `config` evaluation error and never
-  blocks, like any other invalid policy.
+  the policy invalid: it is reported as a `config` evaluation error, like any
+  other invalid policy, with its `mode` and `on_error` and no `enforce_repos`.
+  A valid `enforce_repos` of a policy that is invalid otherwise still applies,
+  so the error can block (`on_error = "block"`) in the listed repositories.
 
 The repository is identified as `host/path`, lowercase, without scheme,
 credentials, port or `.git` suffix, e.g. `github.com/acme/app` (GitLab
@@ -525,7 +532,16 @@ policies above and `FROM busybox`:
 ```
 
 plus host-level operation and CI keys (`_OPERATION`, `_ACTION_ID`,
-`_OP_CHALKER_VERSION`, `_OP_EXIT_CODE`, `_OP_ERRORS`, `BUILD_*`).
+`_OP_CHALKER_VERSION`, `_OP_EXIT_CODE`, `_OP_ERRORS`, `BUILD_*`) and
+`_COMMIT_ID`, the HEAD commit of the first local git worktree found among the
+build's context directories. `_COMMIT_ID` is the commit builds are linked to
+pull requests by (matched against a pull request's head or merge commit), so a
+policy report from a `push` build on the default branch can be tied to the
+merged pull request. Builds on `pull_request` events usually check out a
+synthetic merge commit (`refs/pull/N/merge`) that matches neither, the same
+limitation build reports have. `_COMMIT_ID` is absent when there is no local
+worktree, e.g. for a remote git context
+(`docker build https://github.com/org/repo.git#ref`).
 Artifact-level keys are not included because a blocked build stops before any
 artifact exists; `_POLICY_BUILD` identifies the build instead. Use
 `policy.report_template` to select a different template.
@@ -605,12 +621,25 @@ Rules that need more than the referenced images register with
 `newPolicyInputRule` and receive the whole `PolicyInput`:
 
 - `command`: `build` or `push`;
-- `contextDirs`: local build context directories (the cloned checkout for git
-  contexts, plus local named contexts), empty for `push`;
+- `contextDirs`: local build context directories (the checked out subdirectory
+  for git contexts, plus local named contexts), empty for `push`;
+- `mainContextDir`: the entry of `contextDirs` that is the main build context,
+  e.g. to apply `<Dockerfile>.dockerignore` only there; empty when the main
+  context is not a local directory, in which case `contextDirs` only has
+  named contexts;
+- `contextErrors`: build contexts that are not local directories (stdin,
+  tarball URLs, git named contexts). Image and stage named contexts
+  (`docker-image://`, `oci-layout://`, `target:`) are left to image rules. The
+  engine reports these against rules registered with `requiresContext`, so a
+  context-scanning rule cannot pass a context it never saw;
 - `pushTargets`: the image references the command pushes (`build --push` tags,
   or the `docker push` reference and, with `--all-tags`, every local tag);
-- `host`: chalk-time host info collected before policies run, such as `SBOM`,
-  `SAST` and `SECRET_SCANNER` when those tools are enabled.
+- `pushMarks`: chalk marks of the images `push` pushes, for those that are
+  chalked;
+- `host`: `build` only, a copy of the chalk-time host info collected before
+  policies run, such as `SBOM`, `SAST` and `SECRET_SCANNER` when those tools
+  are enabled. `push` policies run before collection, so `host` is nil there
+  and push rules read `pushMarks`.
 
 Findings about something other than an image (`newSubjectFinding`) set
 `subject` (e.g. a package purl, a file or a registry) and optionally
@@ -628,14 +657,52 @@ Rules that read external tool output (`tool.*`, e.g. syft or semgrep) share
   demand, once per process. Chalk scans the git repository containing the
   first context, so rules keep only what is inside each context directory
   (`contextPath`). Missing output is an evaluation error, so `on_error`
-  decides;
+  decides. Such rules must register with `requiresContext = true`: context
+  directories are only collected for them, and contexts that are not local
+  directories are reported against them by the engine (so
+  `contextToolOutputs` does not repeat them);
 - on push, `pushedToolOutputs` reads the output recorded in the pushed
   images' chalk marks;
 - `capFindings` bounds the findings a rule reports.
 
+On-demand runs ignore `run_sbom_tools`, `run_sast_tools` and
+`run_secret_scanner_tools`: enabling a rule that needs a tool's output runs
+the tool. Like chalk's own runs they may install it first (e.g. download the
+syft installer, or run the `anchore/syft` docker image), and each run is
+bounded by the tool's timeout (`syft_timeout`, `semgrep_timeout`,
+`trufflehog_timeout`, 300s by default), so a build may take up to
+`maxContextDirs` (8) contexts x enabled tools x timeout longer. These runs do not count as chalk's own: when chalk's
+run failed, it still runs the tool again for the chalk mark.
+
+On push the tool output comes only from the pushed images' chalk marks, as
+the build context is gone and the tools cannot run on it. Images whose mark
+does not record the output pass: the default mark templates do not include
+`SBOM`, `SAST` or `SECRET_SCANNER`, unchalked images have no mark, and a
+mark may keep the key in an object store (`@SBOM`, logged at trace level).
+Checking pushes requires mark templates that record the key. The recorded
+output covers everything chalk scanned when it built the image (the git
+repository of the first build context), not just the build context, as push
+cannot tell which part was the context.
+
 `src/policy/sbom.nim` builds on it for rules that read SBOMs (CycloneDX, SPDX
 or syft JSON): `policySboms` returns the packages of each build context, or
-of each pushed image.
+of each pushed image. On build it keeps the packages found within each
+context directory, dropping those whose every location the context's
+`.dockerignore` leaves out of the build (the Dockerfile's
+`<Dockerfile>.dockerignore` for the main context).
+
+Shared helpers for rules:
+
+- `src/policy/dockerignore.nim`: `loadDockerignore(dir, dockerfilePath)`
+  reads the ignore file docker applies to a context
+  (`mainContextDockerfile(input, dir)` gives the Dockerfile path for the main
+  context only), `isIgnored(relPath)` and `prunes(relDir)` match paths with
+  the moby-compatible matcher of `src/docker/tar.nim`;
+- `src/policy/purl.nim`: `purlParts`, `purlType`, `parsePurlPattern` and
+  `matches`/`firstMatch` for purl patterns with globs and version ranges
+  (e.g. `pkg:npm/lodash@<4.17.21`, `pkg:npm/@angular/*`), ignoring case,
+  qualifiers and subpaths, decoding percent-encoding and normalizing pypi
+  names and go `v` versions.
 
 A rule with settings in `policy.config_json` registers its section at module
 initialization with `registerPolicyJsonSection(name, validate)`, as
@@ -664,15 +731,27 @@ the `policy*Setting` accessors, which read the same path from con4m when
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.
+- A remote git build context is checked out for rules that scan the build
+  context, and docker then builds that checkout, so it builds the commit the
+  rules inspected. The checkout has no git submodules and no `.git`
+  directory, which BuildKit's git source provides, so when the repository has
+  a `.gitmodules` file or the build arg `BUILDKIT_CONTEXT_KEEP_GIT_DIR` is
+  set, docker fetches the git context itself instead. With submodules this is
+  reported as an evaluation error of those rules, as their contents are not
+  checked. In both cases a branch or tag that moves between the policy check
+  and the build is built at its new commit.
 
 SBOM policy parsing retains every package occurrence. A repository scan keeps a
 package in a build context when any recorded location belongs to that context;
 findings use an in-context location. Packages without locations remain eligible.
-SPDX dependencies do not need optional version or purl metadata. An unversioned
-row without a purl is excluded only when it is explicitly identified as the
-document source by `documentDescribes`, `DESCRIBES` or `DESCRIBED_BY` and has
-`primaryPackagePurpose` of `FILE` or `CONTAINER`. Described applications and
-libraries, and described packages with a version or purl, remain checked. Optional omitted package arrays and empty arrays
+SPDX dependencies do not need optional version or purl metadata. The row
+the document describes (`documentDescribes`, `DESCRIBES` or `DESCRIBED_BY`) is
+the scanned source and excluded, whatever its version or purl, when its
+`primaryPackagePurpose` is `FILE`, `CONTAINER` or `DIRECTORY`, or it is
+syft's `SPDXRef-DocumentRoot-*` (syft gives a scanned image its digest as
+version). Described applications and libraries remain checked. syft JSON
+licenses may be objects or, in older schemas, plain strings; empty values are
+skipped. Optional omitted package arrays and empty arrays
 are valid; present arrays must contain package objects with nonempty names.
 Malformed arrays/entries and content omitted by package-count or nesting limits
 produce evaluation errors governed by `on_error`.
