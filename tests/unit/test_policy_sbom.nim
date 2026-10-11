@@ -86,6 +86,10 @@ proc testFormats() =
     if pkg.name == "dual":
       assertEq(pkg.licenses, @["(MIT OR GPL-2.0)"])
   assertEq(parseSbom(fixture("syft")).packages[2].pkgType, "go-module")
+  # older syft JSON schemas list licenses as strings
+  let legacy = parseSbom(%*{"artifacts": [{"name": "x", "licenses": ["MIT", "", {"value": "BSD-3-Clause"},
+                                                                     {"spdxExpression": "", "value": ""}]}]})
+  assertEq(legacy.packages[0].licenses, @["MIT", "BSD-3-Clause"])
   doAssertRaises(ValueError):
     discard parseSbom(parseJson("""{"foo": 1}"""))
   doAssertRaises(ValueError):
@@ -138,6 +142,10 @@ proc testPolicySboms() =
 
   sboms = input(@[]).policySboms("r")
   doAssert "no local build context" in sboms.errors[0].reason
+  # the engine reports contexts that are not local directories
+  var stdin = input(@[])
+  stdin.contextErrors.add(collectionError("stdin"))
+  assertEq(stdin.policySboms("r").errors.len, 0)
 
   let bad = ChalkDict()
   bad["SBOM"] = nimJsonToBox(%*{"syft": {"foo": 1}})
@@ -180,6 +188,44 @@ proc testAllLocations() =
     assertEq(context.packages[0].locations, @["package-lock.json"])
     assertEq(sbom.forContext("/repo", "/repo/other").packages.len, 0)
 
+proc testDockerignore() =
+  let sbom = parseSbom(%*{"artifacts": [
+    {"name": "vendored", "locations": [{"path": "/svc/vendor/package-lock.json"}]},
+    {"name": "both", "locations": [{"path": "/svc/vendor/a/package-lock.json"},
+                                   {"path": "/svc/package-lock.json"}]},
+    {"name": "kept", "locations": [{"path": "/svc/vendor/keep/package-lock.json"}]},
+    {"name": "nowhere"},
+  ]})
+  let ignore = parseDockerignore("vendor\n!vendor/keep\n")
+  let context = sbom.forContext("/repo", "/repo/svc", ignore)
+  assertEq(context.names(), @["both", "kept", "nowhere"])
+  assertEq(context.packages[0].locations, @["package-lock.json"])
+  assertEq(sbom.forContext("/repo", "/repo/svc").packages.len, 4)
+
+  # policySboms applies each context's ignore file, the Dockerfile's to the
+  # main context only
+  let dir = getTempDir() / "chalk_test_policy_sbom_dockerignore"
+  removeDir(dir)
+  createDir(dir / "main")
+  createDir(dir / "named")
+  defer: removeDir(dir)
+  writeFile(dir / "main" / ".dockerignore", "web\n")
+  writeFile(dir / "Dockerfile.dockerignore", "py\n")
+  writeFile(dir / "named" / ".dockerignore", "web\n")
+  clearPolicyToolCache()
+  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+    @[ToolOutput(tool: "syft", root: dir, value: fixture("cyclonedx"))]
+  let sboms = PolicyInput(command: "build", contextDirs: @[dir / "main", dir / "named"],
+                          mainContextDir: dir / "main",
+                          dockerfilePath: dir / "Dockerfile").policySboms("r")
+  assertEq(sboms.errors.len, 0)
+  for name in ["colourama", "requests"]:
+    doAssert name notin sboms.sboms[0].names()
+    doAssert name in sboms.sboms[1].names()
+  doAssert "lodash" in sboms.sboms[0].names()
+  doAssert "lodash" notin sboms.sboms[1].names()
+  clearPolicyToolCache()
+
 proc testSpdxOptionalMetadata() =
   for sourceKey in ["documentDescribes", "relationships"]:
     var doc = %*{"spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "packages": [
@@ -196,7 +242,7 @@ proc testSpdxOptionalMetadata() =
     assertEq(sbom.packages[0].licenses, @["GPL-3.0-only"])
   # SPDX documents can describe an actual package, not just a scanned source.
   # Described package metadata and licenses must remain eligible for checks.
-  for purpose in ["LIBRARY", "APPLICATION", "CONTAINER"]:
+  for purpose in ["LIBRARY", "APPLICATION"]:
     let described = parseSbom(%*{"spdxVersion": "SPDX-2.3", "documentDescribes": ["SPDXRef-package"],
       "packages": [{"SPDXID": "SPDXRef-package", "name": "gpl-package", "primaryPackagePurpose": purpose,
         "versionInfo": "1", "licenseDeclared": "GPL-3.0-only", "externalRefs": [
@@ -204,15 +250,19 @@ proc testSpdxOptionalMetadata() =
     assertEq(described.names(), @["gpl-package"])
     assertEq(described.packages[0].purl, "pkg:npm/gpl-package@1")
     assertEq(described.packages[0].licenses, @["GPL-3.0-only"])
-  for metadata in ["versionInfo", "externalRefs"]:
-    var item = %*{"SPDXID": "SPDXRef-package", "name": "gpl-package", "primaryPackagePurpose": "CONTAINER",
-                  "licenseDeclared": "GPL-3.0-only"}
-    if metadata == "versionInfo":
-      item[metadata] = %"1"
-    else:
-      item[metadata] = %*[{"referenceType": "purl", "referenceLocator": "pkg:npm/gpl-package@1"}]
-    assertEq(parseSbom(%*{"spdxVersion": "SPDX-2.3", "documentDescribes": ["SPDXRef-package"],
-                          "packages": [item]}).names(), @["gpl-package"])
+  # the scanned image (syft: the digest as version, an oci purl) or directory
+  # is not a dependency, whatever metadata it has
+  for purpose in ["CONTAINER", "FILE", "DIRECTORY", ""]:
+    var root = %*{"SPDXID": "SPDXRef-DocumentRoot-Image-app", "name": "app:1",
+                  "versionInfo": "sha256:0123", "licenseDeclared": "NOASSERTION",
+                  "externalRefs": [{"referenceType": "purl",
+                                    "referenceLocator": "pkg:oci/app@sha256%3A0123"}]}
+    if purpose != "":
+      root["primaryPackagePurpose"] = %purpose
+    assertEq(parseSbom(%*{"spdxVersion": "SPDX-2.3", "documentDescribes": ["SPDXRef-DocumentRoot-Image-app"],
+                          "packages": [root, {"SPDXID": "SPDXRef-lib", "name": "lib"}]}).names(), @["lib"])
+    # only when it is what the document describes
+    assertEq(parseSbom(%*{"spdxVersion": "SPDX-2.3", "packages": [root]}).names(), @["app:1"])
   for purpose in ["LIBRARY", "APPLICATION"]:
     let unversioned = parseSbom(%*{"spdxVersion": "SPDX-2.3", "documentDescribes": ["SPDXRef-package"],
       "packages": [{"SPDXID": "SPDXRef-package", "name": "gpl-package", "primaryPackagePurpose": purpose,
@@ -268,5 +318,6 @@ testTruncated()
 testPolicySboms()
 
 testAllLocations()
+testDockerignore()
 testSpdxOptionalMetadata()
 testDepthAndMalformedOutput()
