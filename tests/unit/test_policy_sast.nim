@@ -1,6 +1,7 @@
 import std/[json, os, strutils, tables]
 import ../../src/types
 import ../../src/chalkjson
+import ../../src/policy/api
 import ../../src/policy/engine
 import ../../src/policy/tools
 import ../../src/policy/rules/sast
@@ -237,14 +238,15 @@ proc testCollectSources() =
     @[ToolOutput(tool: "semgrep", root: dir, value: parseFile(sarifFile))]
 
   input = PolicyInput(command: "build", contextDirs: @["/src", "/other"], host: ChalkDict())
-  (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
+  (sources, errors) = input.collectSources(runTools = false, toolsRan = true)
   assertEq(len(sources), 0)
   doAssert "produced no results" in errors[0].reason
   (sources, errors) = input.collectSources(runTools = false, toolsRan = false)
   doAssert "were not collected" in errors[0].reason
   assertEq(len(calls), 0)
 
-  (sources, errors) = input.collectSources(runTools = true, toolsRan = false)
+  # run_sast_tools produced nothing: run_tools scans the contexts instead
+  (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
   assertEq(calls, @["/src", "/other"])
   assertEq(len(sources), 1)
   assertEq(sources[0].roots, @["/src"])
@@ -269,11 +271,16 @@ proc testCollectSources() =
   clearPolicyToolCache()
 
 proc rejects(text, reason: string) =
+  ## the document is unusable as a whole, or as its only policy
+  var message = ""
   try:
-    discard parsePolicyJson(text)
-    doAssert false, "accepted: " & text
+    let configs = parsePolicyJson(text)
+    doAssert configs.len == 1, "accepted: " & text
+    message = configs[0].configError
   except ValueError:
-    doAssert reason in getCurrentExceptionMsg(), getCurrentExceptionMsg()
+    message = getCurrentExceptionMsg()
+  doAssert message != "", "accepted: " & text
+  doAssert reason in message, message
 
 proc testConfig() =
   rejects("""{"sast": {"enabeld": true}}""", "unknown field policy.sast.enabeld")
@@ -349,12 +356,101 @@ proc testSemgrepScanErrors() =
   source.doc["results"] = newJArray()
   source.doc["errors"] = %*[{"level": "info", "type": "notice"}]
   assertEq(defaults().check(@[source]).len, 0)
+  # semgrep's partial parses: the rest of the file was scanned
+  source.doc["errors"] = %*[{"code": 3, "level": "warn", "path": "/src/app.py",
+                             "type": ["PartialParsing", [{"path": "/src/app.py"}]]}]
+  assertEq(defaults().check(@[source]).len, 0)
+  source.doc["errors"] = %*[{"code": 2, "level": "warn", "type": "Timeout",
+                             "rule_id": "r", "path": "/src/app.py"}]
+  let timeout = defaults().check(@[source])
+  assertEq(timeout.len, 1)
+  doAssert "(Timeout)" in timeout[0].reason, timeout[0].reason
   source.doc["errors"] = %*[{"level": "warn", "path": "/sibling/app.py"}]
   assertEq(defaults().check(@[source]).len, 0)
   source.doc["errors"] = %*[{"level": "error", "type": "global scan error"}]
   assertEq(defaults().check(@[source])[0].kind, "error")
   source.doc["errors"] = %*{"malformed": true}
   assertEq(defaults().check(@[source])[0].kind, "error")
+
+proc testSarifScanErrors() =
+  var doc = parseFile(sarifFile)
+  let notifications = doc["runs"][0]["invocations"][0]["toolExecutionNotifications"]
+  let source = SastSource(tool: "semgrep", roots: @["/src"], dir: "/src", doc: doc)
+  # partial parses and notes do not make the scan incomplete
+  notifications.add(%*{"descriptor": {"id": "Syntax error"}, "level": "warning",
+                       "message": {"text": "Syntax error at line src/app.py:4"}})
+  notifications.add(%*{"descriptor": {"id": "Info"}, "level": "note",
+                       "message": {"text": "x"}})
+  assertEq(defaults().check(@[source]).ids(), @[shellTrue])
+  for (id, level) in [("Timeout", "warning"), ("Fatal error", "error"),
+                      ("Syntax error", "error"), ("Rule parse error", "")]:
+    notifications.elems.setLen(2)
+    var notification = %*{"descriptor": {"id": id}, "message": {"text": "x"}}
+    if level != "":
+      notification["level"] = %level
+    notifications.add(notification)
+    let findings = defaults().check(@[source])
+    assertEq(findings.len, 2)
+    assertEq(findings[0].kind, "error")
+    doAssert id in findings[0].reason, findings[0].reason
+    # matches are still reported
+    assertEq(findings[1].subject, shellTrue)
+  # located outside the build context of a monorepo
+  notifications.elems.setLen(2)
+  notifications.add(%*{"descriptor": {"id": "Timeout"}, "level": "warning",
+                       "locations": [{"physicalLocation": {"artifactLocation": {"uri": "/web/a.py"}}}]})
+  assertEq(defaults().check(@[source]).ids(), @[shellTrue])
+  notifications[2]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] = %"/src/a.py"
+  assertEq(defaults().check(@[source])[0].location, "a.py")
+  doc["runs"][0]["invocations"][0]["toolExecutionNotifications"] = %"bad"
+  assertEq(defaults().check(@[source])[0].kind, "error")
+
+proc testSecretMessages() =
+  let secret = "hunter2supersecret"
+  let json = %*{"results": [
+    {"check_id": "custom.hardcoded", "path": "a.py", "start": {"line": 1},
+     "extra": {"severity": "ERROR", "message": "found " & secret,
+               "metadata": {"cwe": ["CWE-798: Use of Hard-coded Credentials"]}}},
+    {"check_id": "custom.leak", "path": "b.py", "start": {"line": 1},
+     "extra": {"severity": "ERROR", "message": "found " & secret,
+               "metadata": {"technology": ["secrets"]}}},
+    {"check_id": "generic.secrets.security.detected-aws-access-key", "path": "c.py",
+     "start": {"line": 1}, "extra": {"severity": "ERROR", "message": "found " & secret}},
+    {"check_id": "custom.shell", "path": "d.py", "start": {"line": 1},
+     "extra": {"severity": "ERROR", "message": "shell=True with " & secret}},
+  ]}
+  let findings = defaults().check(@[SastSource(tool: "semgrep", doc: json)])
+  assertEq(findings.len, 4)
+  for f in findings[0 ..< 3]:
+    doAssert secret notin f.reason, f.reason
+    doAssert "message omitted" in f.reason, f.reason
+    doAssert f.location != ""
+  doAssert secret in findings[3].reason
+  let sarif = %*{"runs": [{
+    "tool": {"driver": {"name": "semgrep", "rules": [
+      {"id": "custom.hardcoded", "defaultConfiguration": {"level": "error"},
+       "properties": {"tags": ["CWE-798: Use of Hard-coded Credentials", "security"]}},
+    ]}},
+    "results": [{"ruleId": "custom.hardcoded", "message": {"text": "found " & secret},
+                 "locations": [{"physicalLocation": {"artifactLocation": {"uri": "a.py"},
+                                                     "region": {"startLine": 3}}}]}],
+  }]}
+  let sarifFindings = defaults().check(@[SastSource(tool: "semgrep", doc: sarif)])
+  assertEq(sarifFindings.len, 1)
+  doAssert secret notin sarifFindings[0].reason, sarifFindings[0].reason
+  assertEq(sarifFindings[0].location, "a.py:3")
+
+proc testRequiresContext() =
+  # contextDirs is only collected for rules requiring it; without it every
+  # build would pass unscanned
+  loadSastRule()
+  var found = false
+  for rule in policyRules():
+    if rule.name == "sast":
+      found = true
+      doAssert rule.requiresContext
+      doAssert rule.checkInput != nil
+  doAssert found
 
 testSeverityMapping()
 testParseSarif()
@@ -365,5 +461,7 @@ testOrderingAndCap()
 testBadOutput()
 testCollectSources()
 testConfig()
-
 testSemgrepScanErrors()
+testSarifScanErrors()
+testSecretMessages()
+testRequiresContext()

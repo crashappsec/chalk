@@ -35,6 +35,11 @@ const
   # keeps reports and the job summary bounded on noisy codebases
   maxReportedFindings = 100
   maxMessageLen = 300
+  # Rules detecting secrets interpolate the matched value into their message
+  # (e.g. `$SECRET`), so reports and job summaries omit it for them
+  secretCwes = ["CWE-798", "CWE-259", "CWE-321"]
+  secretRuleWords = ["secret", "credential", "password", "passwd", "token",
+                     "api-key", "api_key", "apikey", "private-key"]
 
 type
   SastResult* = object
@@ -48,6 +53,7 @@ type
     cwes*:          seq[string] # e.g. `CWE-78`
     subcategories*: seq[string] # lowercase, e.g. `vuln`, `audit`
     message*:       string
+    secret*:        bool # see `secretCwes`
 
   SastSource* = object
     ## one tool's output, e.g. `SAST.semgrep`
@@ -154,6 +160,18 @@ proc resultPath(source: SastSource, path: string): Option[string] =
     else: ""
   path.contextPath(root, source.dir)
 
+proc isSecretRule(ruleId: string, cwes, labels: seq[string]): bool =
+  for cwe in cwes:
+    if cwe in secretCwes:
+      return true
+  for label in labels:
+    if "secret" in label.toLowerAscii():
+      return true
+  let id = ruleId.toLowerAscii()
+  for word in secretRuleWords:
+    if word in id:
+      return true
+
 proc truncate(s: string): string =
   let flat = s.strip().replace('\n', ' ')
   if len(flat) <= maxMessageLen:
@@ -217,6 +235,8 @@ proc parseSarif(source: SastSource): seq[SastResult] =
           r.confidence = tag[0 ..< len(tag) - len(" CONFIDENCE")].strip().toLowerAscii()
         elif not upper.startsWith("OWASP-"):
           r.categories.add(tag.toLowerAscii())
+      # SARIF drops `metadata.technology`, e.g. `secrets`
+      r.secret = isSecretRule(ruleId, r.cwes, r.categories)
       result.add(r)
 
 proc parseSemgrepJson(source: SastSource): seq[SastResult] =
@@ -248,6 +268,9 @@ proc parseSemgrepJson(source: SastSource): seq[SastResult] =
         r.categories.add("security")
     for subcategory in metadata{"subcategory"}.strings():
       r.subcategories.add(subcategory.toLowerAscii())
+    r.secret = isSecretRule(r.ruleId, r.cwes,
+                            r.categories & r.subcategories &
+                            metadata{"technology"}.strings() & metadata{"tags"}.strings())
     result.add(r)
 
 proc parseSastSource*(source: SastSource): seq[SastResult] =
@@ -311,40 +334,94 @@ proc location(r: SastResult): string =
     return r.path & ":" & $r.line
   r.path
 
-proc semgrepScanErrors(source: SastSource): seq[PolicyFinding] =
-  # Scan failures are independent of matches. Keep valid matches while
-  # allowing on_error to decide whether incomplete analysis blocks.
-  if (source.doc{"runs"} != nil and source.doc{"runs"}.kind == JArray) or
-     source.doc{"results"} == nil:
+type ScanErrors = object
+  found:    bool
+  location: string
+  kinds:    seq[string]
+
+proc add(errors: var ScanErrors, source: SastSource, kind, path: string) =
+  if path != "":
+    let relative = source.resultPath(path)
+    # errors elsewhere in a monorepo do not affect the build context
+    if relative.isNone():
+      return
+    if errors.location == "":
+      errors.location = relative.get()
+  errors.found = true
+  if kind != "" and kind notin errors.kinds:
+    errors.kinds.add(kind)
+
+proc semgrepJsonErrors(source: SastSource, errors: var ScanErrors) =
+  let node = source.doc{"errors"}
+  if node == nil:
     return
-  let errors = source.doc{"errors"}
-  if errors == nil:
+  if node.kind != JArray:
+    errors.found = true
     return
-  var incomplete = false
-  var location = ""
-  if errors.kind != JArray:
-    incomplete = true
-  else:
-    for error in errors.getElems():
-      if error.kind != JObject:
-        incomplete = true
-        continue
-      # Semgrep scan errors use warn/error. Ignore informational diagnostics.
-      if error{"level"}.getStr().toLowerAscii() in ["info", "debug"]:
-        continue
-      let path = error{"path"}.getStr()
-      if path != "":
-        let relative = source.resultPath(path)
-        if relative.isNone():
+  for error in node.getElems():
+    if error.kind != JObject:
+      errors.found = true
+      continue
+    # semgrep scan errors use warn/error, e.g. `Timeout` is a warning
+    if error{"level"}.getStr().toLowerAscii() in ["info", "debug"]:
+      continue
+    let kind = error{"type"}
+    let name =
+      if kind != nil and kind.kind == JArray and len(kind) > 0: kind[0].getStr()
+      else: kind.getStr()
+    # `["PartialParsing", [<spans>]]`: only those spans were skipped, the
+    # rest of the file was scanned. Routine on real codebases.
+    if name == "PartialParsing":
+      continue
+    errors.add(source, name, error{"path"}.getStr())
+
+proc sarifErrors(source: SastSource, errors: var ScanErrors) =
+  ## semgrep reports scan errors as `toolExecutionNotifications` while
+  ## keeping `executionSuccessful` true
+  for run in source.doc["runs"].getElems():
+    for invocation in run{"invocations"}.getElems():
+      for field in ["toolExecutionNotifications", "toolConfigurationNotifications"]:
+        let node = invocation{field}
+        if node == nil:
           continue
-        if location == "":
-          location = relative.get()
-      incomplete = true
-  if incomplete:
-    var reason = source.tool & " reported scan errors; SAST analysis is incomplete"
-    if source.image != "":
-      reason &= " (mark of " & source.image & ")"
-    result.add(newSubjectFinding(ruleName, "error", source.tool, reason, location = location))
+        if node.kind != JArray:
+          errors.found = true
+          continue
+        for notification in node.getElems():
+          # https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html#_Toc34317857
+          # a missing level defaults to "warning"
+          let level = notification{"level"}.getStr("warning")
+          if level notin ["error", "warning"]:
+            continue
+          let name = notification{"descriptor", "id"}.getStr()
+          # semgrep's SARIF names partial parses `Syntax error` too, so they
+          # cannot be told apart from files it could not parse at all
+          if name == "Syntax error" and level == "warning":
+            continue
+          let locations = notification{"locations"}.getElems()
+          let path =
+            if len(locations) > 0:
+              locations[0]{"physicalLocation", "artifactLocation", "uri"}.getStr()
+            else: ""
+          errors.add(source, name, path)
+
+proc scanErrors(source: SastSource): seq[PolicyFinding] =
+  ## Scan failures are independent of matches: valid matches are kept and
+  ## on_error decides whether incomplete analysis blocks.
+  var errors: ScanErrors
+  if source.doc{"runs"} != nil and source.doc{"runs"}.kind == JArray:
+    source.sarifErrors(errors)
+  else:
+    source.semgrepJsonErrors(errors)
+  if not errors.found:
+    return
+  var reason = source.tool & " reported scan errors"
+  if len(errors.kinds) > 0:
+    reason &= " (" & errors.kinds.join(", ") & ")"
+  reason &= "; SAST analysis is incomplete"
+  if source.image != "":
+    reason &= " (mark of " & source.image & ")"
+  result.add(newSubjectFinding(ruleName, "error", source.tool, reason, location = errors.location))
 
 proc check*(settings: SastConfig, sources: seq[SastSource]): seq[PolicyFinding] =
   var counted: seq[(SastSource, SastResult)]
@@ -358,7 +435,7 @@ proc check*(settings: SastConfig, sources: seq[SastSource]): seq[PolicyFinding] 
         reason &= " (mark of " & source.image & ")"
       result.add(newSubjectFinding(ruleName, "error", source.tool, reason))
       continue
-    result.add(source.semgrepScanErrors())
+    result.add(source.scanErrors())
     for r in results:
       if settings.counts(r):
         counted.add((source, r))
@@ -369,7 +446,9 @@ proc check*(settings: SastConfig, sources: seq[SastSource]): seq[PolicyFinding] 
   var violations: seq[PolicyFinding]
   for (source, r) in counted:
     var reason = r.severity & " " & r.tool & " finding"
-    if r.message != "":
+    if r.secret:
+      reason &= " (message omitted, the rule detects secrets)"
+    elif r.message != "":
       reason &= ": " & r.message.truncate()
     if source.image != "":
       reason &= " (in " & source.image & ")"
@@ -399,7 +478,8 @@ proc collectSources*(input: PolicyInput, runTools, toolsRan: bool): tuple[source
     result.errors.add(newSubjectFinding(ruleName, "error", "sast",
                                         "could not read SAST results: " & getCurrentExceptionMsg()))
     return
-  if len(host) == 0 and toolsRan:
+  # with `run_tools` the contexts are scanned on demand below instead
+  if len(host) == 0 and toolsRan and not runTools:
     result.errors.add(newSubjectFinding(ruleName, "error", "sast",
                                         "SAST tools produced no results, see the chalk logs"))
     return
@@ -487,4 +567,4 @@ proc sastHint(): PolicyHint =
     result = PolicyHint(rule: ruleName, message: loaded.message)
 
 proc loadSastRule*() =
-  newPolicyInputRule(ruleName, loadSast, checkSast, hint = sastHint)
+  newPolicyInputRule(ruleName, loadSast, checkSast, requiresContext = true, hint = sastHint)
