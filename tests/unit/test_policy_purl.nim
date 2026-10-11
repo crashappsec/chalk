@@ -20,7 +20,7 @@ proc testParts() =
   assertEq(purlType("not-a-purl"), "")
 
 proc testPatterns() =
-  for bad in ["npm/lodash", "pkg:npm", "pkg:npm/lodash@<abc", "pkg:npm/lodash@=>1", "pkg:npm/lodash@<1.2.3.4"]:
+  for bad in ["npm/lodash", "pkg:npm", "pkg:npm/lodash@<abc", "pkg:npm/lodash@=>1", "pkg:npm/lodash@<1.0.post1"]:
     try:
       discard parsePurlPattern(bad)
       doAssert false, "accepted " & bad
@@ -46,7 +46,11 @@ proc testPatterns() =
   assertEq(matches("pkg:npm/lodash@==4.1", "pkg:npm/lodash@4.1.0"), pmMatch)
   assertEq(matches("pkg:npm/lodash@!=4.1.0", "pkg:npm/lodash@4.1.0"), pmNoMatch)
   assertEq(matches("pkg:golang/github.com/google/uuid@>=1.5", "pkg:golang/github.com/google/uuid@v1.6.0"), pmMatch)
+  assertEq(matches("pkg:nuget/x@<4.0.0.1", "pkg:nuget/x@4.0.0.0"), pmMatch)
+  assertEq(matches("pkg:npm/x@<1.0.0-rc.10", "pkg:npm/x@1.0.0-rc.9"), pmMatch)
+  assertEq(matches("pkg:golang/x@>=2.0.0", "pkg:golang/x@v2.0.0+incompatible"), pmMatch)
   # only versions chalk can order are compared
+  assertEq(matches("pkg:pypi/x@<2", "pkg:pypi/x@1.0.post1"), pmUnknown)
   assertEq(matches("pkg:deb/debian/libc6@<2.37", "pkg:deb/debian/libc6@1:2.36-9"), pmUnknown)
   assertEq(matches("pkg:npm/lodash@<4.17.21", "pkg:npm/lodash"), pmUnknown)
   assertEq(matches("pkg:npm/lodash", ""), pmNoMatch)
