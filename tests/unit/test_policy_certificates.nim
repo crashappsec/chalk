@@ -1,4 +1,5 @@
 import std/[json, os, strutils, tempfiles, times]
+from std/posix import mkfifo
 import ../../src/types
 import ../../src/policy/engine
 import ../../src/policy/rules
@@ -92,6 +93,50 @@ proc testParsing() =
   assertEq(parseCertInfos("not a certificate").len, 0)
   assertEq(parseCertInfos("\x30\x03\x02\x01\x01").len, 0)
 
+  # a malformed block neither hides the certificates after it nor passes
+  let
+    bad = "-----BEGIN CERTIFICATE-----\nnot base64!\n-----END CERTIFICATE-----\n"
+    bundle = parseCertFile(fixture("leaf.pem") & bad & fixture("expired.pem"), "b.pem")
+  assertEq(bundle.certs.len, 2)
+  assertEq(bundle.certs[1].location(), "b.pem#2")
+  assertEq(bundle.certs[1].subjectCn, "expired.example.com")
+  assertEq(bundle.errors.len, 1)
+  assertEq(bundle.errors[0].kind, "error")
+  assertEq(bundle.errors[0].location, "b.pem")
+  doAssert "1 of 3 certificates could not be parsed" in bundle.errors[0].reason
+  assertEq(parseCertFile(fixture("chain.pem")).errors.len, 0)
+  assertEq(parseCertFile(fixture("leaf.der")).errors.len, 0)
+  doAssert fixture("leaf.der").looksLikeDerCert()
+  doAssert not "\x30\x03\x02\x01\x01".looksLikeDerCert()
+  let truncatedDer = fixture("leaf.der")[0 .. 40]
+  assertEq(truncatedDer.expectedCerts(), 1)
+  assertEq(parseCertFile(truncatedDer, "t.der").errors.len, 1)
+  let trusted = parseCertFile("-----BEGIN TRUSTED CERTIFICATE-----\nAAAA\n" &
+                              "-----END TRUSTED CERTIFICATE-----\n", "t.pem")
+  assertEq(trusted.certs.len, 0)
+  doAssert "1 TRUSTED CERTIFICATE block(s) are not supported" in trusted.errors[0].reason
+  var many = ""
+  for i in 0 .. maxCertsPerFile:
+    many &= fixture("leaf.pem")
+  let capped = parseCertFile(many, "many.pem")
+  assertEq(capped.certs.len, maxCertsPerFile)
+  assertEq(capped.certs[^1].count, maxCertsPerFile)
+  doAssert "only the first 1000 certificates were checked" in capped.errors[0].reason
+
+  # keys OpenSSL cannot load: the certificate is still checked
+  doAssert ca.keyLoaded
+  let unknownKey = info("unknown-key.pem")
+  doAssert not unknownKey.keyLoaded
+  assertEq(unknownKey.keyType, "1.2.840.113549.1.1.99")
+  assertEq(unknownKey.keySize, 0)
+  assertEq(unknownKey.subjectDn, ca.subjectDn)
+  let unknownCurve = info("unknown-curve.pem")
+  doAssert not unknownCurve.keyLoaded
+  assertEq(unknownCurve.keyType, "ec")
+  assertEq(unknownCurve.curve, "1.2.840.10045.3.1.99")
+  # and does not end the bundle
+  assertEq(parseCertInfos(fixture("unknown-key.pem") & fixture("leaf.pem")).len, 2)
+
 proc testHelpers() =
   for weak in ["sha1WithRSAEncryption", "ecdsa-with-SHA1", "md5WithRSAEncryption",
                "md2WithRSAEncryption", "dsaWithSHA1", "shaWithRSAEncryption"]:
@@ -106,6 +151,7 @@ proc testHelpers() =
   doAssert parseCertTime("Foo  1 00:00:00 2030 GMT").isNone()
   assertEq(normalizeCurve("secp256r1"), "P-256")
   assertEq(normalizeCurve("P-384"), "P-384")
+  assertEq(normalizeCurve("brainpoolP256r1"), "brainpoolp256r1")
   assertEq(normalizeKeyType("RSA"), "rsa")
   assertEq(toDn(@[("C", "US"), ("O", "Acme, Inc."), ("CN", "x")]), "CN=x,O=Acme\\, Inc.,C=US")
 
@@ -146,6 +192,16 @@ proc testDefaultChecks() =
   let expiring = soon.check(@[info("leaf.pem")], dateTime(2119, mDec, 15, zone = utc()).toTime())
   assertEq(expiring.len, 1)
   assertEq(expiring[0].reason, "certificate expires on 2120-01-01, within 30 days")
+
+  # undecidable checks are errors, not silent passes
+  var noDates = info("leaf.pem")
+  noDates.notAfter = none(Time)
+  noDates.notBefore = none(Time)
+  let undecided = settings.check(@[noDates], now)
+  assertEq(undecided.locations("error"), @["leaf.pem"])
+  assertEq(undecided[0].reason,
+           "certificate not fully checked: expiry date could not be parsed; start date could not be parsed")
+  assertEq(off.check(@[noDates], now).len, 0)
 
   var msg = settings
   msg.message = "See https://example.com/pki"
@@ -190,12 +246,15 @@ proc testAllowedIssuers() =
   settings.allowedIssuers = @[("sha256", caSha256)]
   assertEq(settings.findings(@[leafOnly]).locations(), @["leaf.pem"])
 
-  # unknown kinds are errors unless another entry allows the issuer
-  settings.allowedIssuers = @[("ski", "x"), ("cn", "Chalk Test Root CA")]
-  let found = settings.findings(@[ctx])
-  assertEq(found.locations(), newSeq[string]())
-  assertEq(found.locations("error"), @["self.pem"])
-  doAssert "unsupported allowed_issuers kind(s): ski" in found.reasonOf("self.pem")
+  # a pinned CA in a skipped CA bundle still resolves the pin
+  let bundled = newContext({"leaf.pem": "leaf.pem", "rootfs/etc/ssl/certs/ca.pem": "ca.pem",
+                            "venv/certifi/cacert.pem": "self-signed.pem",
+                            "self.pem": "self-signed.pem"})
+  defer: removeDir(bundled)
+  settings.allowedIssuers = @[("sha256", caSha256)]
+  assertEq(settings.findings(@[bundled]).locations(), @["self.pem"])
+  settings.allowedIssuers = @[("cn", "Chalk Test Root CA")]
+  assertEq(settings.findings(@[bundled]).locations(), @["self.pem"])
 
 proc testKeys() =
   let ctx = newContext({"ca.pem": "ca.pem", "leaf.pem": "leaf.pem", "self.pem": "self-signed.pem"})
@@ -212,6 +271,26 @@ proc testKeys() =
   assertEq(settings.findings(@[ctx]).len, 0)
   settings.minRsaKeySize = 4096
   assertEq(settings.findings(@[ctx]).locations(), @["ca.pem"])
+
+  settings = defaultCertificatesConfig()
+  let unknown = newContext({"key.pem": "unknown-key.pem", "curve.pem": "unknown-curve.pem"})
+  defer: removeDir(unknown)
+  assertEq(settings.findings(@[unknown]).len, 0)
+  settings.allowedEcCurves = @["P-256"]
+  assertEq(settings.findings(@[unknown]).reasonOf("curve.pem"),
+           "certificate EC curve 1.2.840.10045.3.1.99 is not allowed")
+  settings.allowedKeyTypes = @["rsa", "ec"]
+  assertEq(settings.findings(@[unknown]).reasonOf("key.pem"),
+           "certificate key type 1.2.840.113549.1.1.99 is not allowed")
+  # an RSA key that cannot be loaded has no size to compare
+  var rsa = info("ca.pem")
+  rsa.keyLoaded = false
+  rsa.keySize = 0
+  let unsized = defaultCertificatesConfig().check(@[rsa], now)
+  assertEq(unsized.len, 1)
+  assertEq(unsized[0].kind, "error")
+  assertEq(unsized[0].reason,
+           "certificate not fully checked: RSA key could not be loaded, its size is unknown")
 
 proc testSignatureSecurity() =
   let weak = info("sha1-pss.pem")
@@ -263,7 +342,9 @@ proc testScanning() =
     "excluded/expired.pem": "expired.pem",
     "notes/expired.txt": "expired.pem",
     "noext": "expired.pem",
+    # bundle names are only skipped where packages install bundles
     "ca-certificates.crt": "expired.pem",
+    "lib/certifi/cacert.pem": "expired.pem",
     "rootfs/etc/ssl/certs/expired.pem": "expired.pem",
     ".git/expired.pem": "expired.pem",
     "key.pem": "=-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n",
@@ -278,14 +359,16 @@ proc testScanning() =
 
   var settings = defaultCertificatesConfig()
   settings.excludePaths = @["excluded"]
-  assertEq(settings.findings(@[ctx]).locations(), @["a/expired.pem", "ignored/keep.pem"])
+  assertEq(settings.findings(@[ctx]).locations(),
+           @["a/expired.pem", "ca-certificates.crt", "ignored/keep.pem"])
 
   settings.honorDockerignore = false
   settings.skipCaBundles = false
   settings.extensions = @["*"]
   assertEq(settings.findings(@[ctx]).locations(),
            @["a/expired.pem", "ca-certificates.crt", "ignored/expired.pem", "ignored/keep.pem",
-             "noext", "notes/expired.txt", "rootfs/etc/ssl/certs/expired.pem"])
+             "lib/certifi/cacert.pem", "noext", "notes/expired.txt",
+             "rootfs/etc/ssl/certs/expired.pem"])
 
   settings.includePaths = @["a", "notes/*.txt"]
   assertEq(settings.findings(@[ctx]).locations(), @["a/expired.pem", "notes/expired.txt"])
@@ -296,8 +379,28 @@ proc testScanning() =
   doAssert "expired.pem" in found.locations()
   doAssert ctx / "a/expired.pem" in found.locations()
 
+  # files too large to check are errors when they look like certificates
   settings.maxFileSize = 100
-  assertEq(settings.findings(@[ctx]).len, 0)
+  let large = settings.findings(@[ctx])
+  assertEq(large.locations(), newSeq[string]())
+  assertEq(large.locations("error").len, 4)
+  doAssert "ca-certificates.crt" in large.locations("error")
+  doAssert "not checked: larger than max_file_size (100 bytes)" in large.reasonOf("a/expired.pem")
+  let big = newContext({"big.bin": "=" & repeat('x', 200), "big.txt": "expired.pem",
+                        "small.pem": "=x"})
+  defer: removeDir(big)
+  settings.extensions = @["*"]
+  assertEq(settings.findings(@[big]).locations("error"), @["big.txt"])
+  settings.extensions = @["*", "bin"]
+  assertEq(settings.findings(@[big]).locations("error"), @["big.bin", "big.txt"])
+
+  # FIFOs are not read, which would block
+  let special = newContext({"cert.pem": "expired.pem"})
+  defer: removeDir(special)
+  doAssert mkfifo(cstring(special / "fifo.pem"), 0o600) == 0
+  settings = defaultCertificatesConfig()
+  settings.extensions = @["*"]
+  assertEq(settings.findings(@[special]).locations(), @["cert.pem"])
 
   settings = defaultCertificatesConfig()
   settings.maxFiles = 3
@@ -317,14 +420,23 @@ proc testScanning() =
   let withDockerfile = PolicyInput(command: "build", contextDirs: @[ctx, outside],
                                    dockerfilePath: dfDir / "Dockerfile")
   let dfFound = settings.check(withDockerfile, now).locations()
-  assertEq(dfFound, @[outside / "expired.pem", "excluded/expired.pem",
+  assertEq(dfFound, @[outside / "expired.pem", "ca-certificates.crt", "excluded/expired.pem",
                       "ignored/expired.pem", "ignored/keep.pem"])
   let noSpecific = PolicyInput(command: "build", contextDirs: @[ctx],
                                dockerfilePath: ctx / "Dockerfile")
-  assertEq(settings.check(noSpecific, now).locations(), @["a/expired.pem", "excluded/expired.pem", "ignored/keep.pem"])
+  assertEq(settings.check(noSpecific, now).locations(),
+           @["a/expired.pem", "ca-certificates.crt", "excluded/expired.pem", "ignored/keep.pem"])
 
   # push has no build context
   assertEq(settings.check(PolicyInput(command: "push", pushTargets: @["app:1"]), now).len, 0)
+  # a build without a local context is an error, reported once
+  let noContext = settings.check(PolicyInput(command: "build"), now)
+  assertEq(noContext.len, 1)
+  assertEq(noContext[0].kind, "error")
+  assertEq(noContext[0].reason, "no local build context to check")
+  let remote = PolicyInput(command: "build", contextErrors: @[PolicyFinding(
+    kind: "error", subject: "-", reason: "the build context from stdin cannot be checked")])
+  assertEq(settings.check(remote, now).len, 0)
 
 proc rejects(text, reason: string) =
   try:
@@ -342,6 +454,8 @@ proc testJson() =
   rejects("""{"certificates": {"allowed_key_types": [1]}}""", "allowed_key_types entries must be strings")
   rejects("""{"certificates": {"min_rsa_key_size": -1}}""", "min_rsa_key_size must not be negative")
   rejects("""{"certificates": {"max_files": 0}}""", "max_files must be positive")
+  rejects("""{"certificates": {"allowed_issuers": [["ski", "x"]]}}""",
+          "allowed_issuers has unsupported kind ski")
   doAssert parsePolicyJson("""{"policies": [{"id": "a", "certificates": {"y": 1}}]}""")[0].configError != ""
 
   setPolicyJson("""{"mode": "audit", "certificates": {"enabled": false}}""")
@@ -358,7 +472,7 @@ proc testJson() =
       "min_rsa_key_size": 3072,
       "allowed_key_types": ["rsa", "ec"],
       "allowed_ec_curves": ["P-256"],
-      "allowed_issuers": [["cn", "Acme *"], ["sha256", caSha256]],
+      "allowed_issuers": [["CN", "Acme *"], ["sha256", caSha256]],
       "exclude_paths": ["test/**"],
       "message": "Use the Acme PKI",
     },
@@ -399,6 +513,7 @@ proc testJson() =
   for rule in policyRules():
     if rule.name == "certificates":
       rules.add(rule)
+  doAssert rules[0].requiresContext
   doAssert rules[0].load()
   let hint = rules[0].hint()
   assertEq(hint.rule, "certificates")
@@ -408,6 +523,12 @@ proc testJson() =
   assertEq(res.result, "blocked")
   assertEq(res.findings.locations(), @["expired.pem"])
   doAssert res.findings[0].reason.endsWith(". Use the Acme PKI")
+  # an unscannable context is the engine's error only, not a second one
+  let stdin = evaluatePolicy(policy, rules, PolicyInput(command: "build", contextErrors: @[
+    PolicyFinding(kind: "error", subject: "-", reason: "the build context from stdin cannot be checked")]))
+  assertEq(stdin.findings.len, 1)
+  assertEq(stdin.findings[0].rule, "certificates")
+  assertEq(stdin.findings[0].subject, "-")
   setPolicyJson("")
 
 proc main() =

@@ -20,6 +20,7 @@ import std/[
   tables,
   times,
 ]
+from std/posix import Stat, S_ISREG, stat
 import "../.."/[
   types,
   utils/x509,
@@ -34,7 +35,8 @@ import ".."/[
 const
   ruleName = "certificates"
   defaultExtensions* = @["pem", "crt", "cer", "cert", "der", "ca-bundle"]
-  ## well-known CA bundles that would otherwise flood findings
+  ## well-known CA bundles that would otherwise flood findings, skipped only
+  ## in `caBundleNameDirs` so an application's own `roots.pem` is checked
   caBundleNames = [
     "ca-bundle.crt",
     "ca-bundle.pem",
@@ -46,6 +48,15 @@ const
     "roots.pem",
     "tls-ca-bundle.pem",
   ]
+  caBundleNameDirs = @[
+    "**/etc/ssl",
+    "**/etc/pki",
+    "**/usr/lib/ssl",
+    "**/usr/local/etc/openssl",
+    "**/usr/local/etc/openssl@*",
+    "**/certifi",
+    "**/grpc/_cython/_credentials",
+  ]
   caBundleDirs = @[
     "**/etc/ssl/certs",
     "**/etc/pki/ca-trust",
@@ -53,7 +64,13 @@ const
     "**/usr/share/ca-certificates",
     "**/usr/local/share/ca-certificates",
   ]
-  maxCertsPerFile = 1000
+  maxCertsPerFile* = 1000
+  pemMarkers = ["-----BEGIN CERTIFICATE-----", "-----BEGIN X509 CERTIFICATE-----"]
+  trustedMarker = "-----BEGIN TRUSTED CERTIFICATE-----"
+  issuerKinds* = ["cn", "dn", "sha256"]
+  ## how much of a file over `max_file_size` is read to tell whether it holds
+  ## certificates
+  headSize = 65536
   weakDigests = ["md2", "md4", "md5", "sha1"]
 
 type
@@ -91,6 +108,7 @@ type
     isCa*:       bool
     keyType*:    string # rsa, ec, ed25519, ed448, dsa or the OpenSSL name
     keySize*:    int
+    keyLoaded*:  bool   # false: OpenSSL could not load the key, size unknown
     curve*:      string
     signature*:  string
     signatureDigest*: string
@@ -102,6 +120,9 @@ type
   CertScan* = object
     certs*:  seq[CertInfo]
     errors*: seq[PolicyFinding]
+    ## certificates of skipped CA bundles, only candidates for `sha256`
+    ## issuer pins
+    issuers*: seq[CertInfo]
 
 proc defaultCertificatesConfig*(): CertificatesConfig =
   CertificatesConfig(
@@ -171,7 +192,7 @@ proc normalizeCurve*(name: string): string =
   of "prime256v1", "secp256r1", "p-256", "p256": "P-256"
   of "secp384r1", "p-384", "p384": "P-384"
   of "secp521r1", "p-521", "p521": "P-521"
-  else: name
+  else: name.toLowerAscii()
 
 proc isWeakSignature*(signature: string, digest = ""): bool =
   let s = (signature & " " & digest).toLowerAscii()
@@ -222,6 +243,7 @@ proc toCertInfo*(cert: X509Cert, path = "", index = 1, count = 1): CertInfo =
     isCa:      "CA:TRUE" in kv.getOrDefault("X509v3 Basic Constraints"),
     keyType:   kv.getOrDefault("Key Type").normalizeKeyType(),
     keySize:   cert.keySize,
+    keyLoaded: cert.keyLoaded,
     curve:     kv.getOrDefault("Key Group").normalizeCurve(),
     signature: kv.getOrDefault("Signature Type"),
     signatureDigest: cert.signatureDigest,
@@ -234,25 +256,82 @@ proc toCertInfo*(cert: X509Cert, path = "", index = 1, count = 1): CertInfo =
   result.selfSigned = result.subjectDn == result.issuerDn and
                       (result.aki == "" or result.aki == result.ski)
 
-proc parseCertInfos*(data: string, path = ""): seq[CertInfo] =
-  let certs = parseX509(data, limit = maxCertsPerFile)
-  for i, cert in certs:
-    result.add(cert.toCertInfo(path, i + 1, len(certs)))
+proc looksLikeDerCert*(data: string): bool =
+  ## Certificate ::= SEQUENCE { tbsCertificate SEQUENCE, ... }: both are
+  ## longer than 127 bytes, so both have long-form lengths, unlike DER keys
+  ## (an INTEGER or a short AlgorithmIdentifier SEQUENCE first)
+  proc longForm(c: char): bool = ord(c) in 0x81 .. 0x84
+  if len(data) < 4 or data[0] != '\x30' or not data[1].longForm():
+    return false
+  let inner = 2 + (ord(data[1]) and 0x7f)
+  inner + 1 < len(data) and data[inner] == '\x30' and data[inner + 1].longForm()
+
+proc expectedCerts*(data: string): int =
+  ## certificates a file holds by its PEM markers, or 1 for a DER certificate
+  for marker in pemMarkers:
+    result += data.count(marker)
+  if result == 0 and data.looksLikeDerCert():
+    result = 1
 
 proc looksLikeCert(data: string): bool =
   # PEM anywhere in the file, or DER (an ASN.1 SEQUENCE)
-  "-----BEGIN CERTIFICATE-----" in data or
-    "-----BEGIN X509 CERTIFICATE-----" in data or
-    (len(data) > 0 and data[0] == '\x30')
+  for marker in pemMarkers:
+    if marker in data:
+      return true
+  trustedMarker in data or (len(data) > 0 and data[0] == '\x30')
 
-proc hasCertExtension(name: string, extensions: seq[string]): bool =
-  if "*" in extensions:
+proc parseCertFile*(data: string, path = ""): CertScan =
+  ## The certificates in `data`, and an error when some of them could not be
+  ## checked: malformed or unsupported blocks, more than `maxCertsPerFile`
+  ## certificates or `TRUSTED CERTIFICATE` blocks.
+  let
+    certs = parseX509(data, limit = maxCertsPerFile + 1)
+    count = min(len(certs), maxCertsPerFile)
+  for i in 0 ..< count:
+    result.certs.add(certs[i].toCertInfo(path, i + 1, count))
+  var problems: seq[string]
+  if len(certs) > maxCertsPerFile:
+    problems.add("only the first " & $maxCertsPerFile & " certificates were checked")
+  else:
+    let expected = data.expectedCerts()
+    if len(certs) < expected:
+      problems.add($(expected - len(certs)) & " of " & $expected &
+                   " certificates could not be parsed (malformed or unsupported)")
+  let trusted = data.count(trustedMarker)
+  if trusted > 0:
+    problems.add($trusted & " TRUSTED CERTIFICATE block(s) are not supported")
+  if len(problems) > 0:
+    result.errors.add(newSubjectFinding(ruleName, "error", path,
+                      "certificate file not fully checked: " & problems.join("; "), path))
+
+proc parseCertInfos*(data: string, path = ""): seq[CertInfo] =
+  data.parseCertFile(path).certs
+
+proc hasCertExtension(name: string, extensions: seq[string], wildcard = true): bool =
+  if wildcard and "*" in extensions:
     return true
   let lower = name.toLowerAscii()
   for ext in extensions:
-    if lower.endsWith("." & ext.strip(chars = {'.'}).toLowerAscii()):
+    if ext != "*" and lower.endsWith("." & ext.strip(chars = {'.'}).toLowerAscii()):
       return true
   false
+
+proc readHead(path: string): string =
+  var f = open(path)
+  defer: f.close()
+  result = newString(headSize)
+  result.setLen(f.readBuffer(addr result[0], headSize))
+
+proc hasPins(settings: CertificatesConfig): bool =
+  for (kind, _) in settings.allowedIssuers:
+    if kind == "sha256":
+      return true
+  false
+
+proc isCaBundle(rel, relDir, entry: string): bool =
+  isExcluded(rel, caBundleDirs) or
+    (entry.toLowerAscii() in caBundleNames and relDir != "" and
+     isExcluded(relDir, caBundleNameDirs))
 
 proc dockerignorePath(dir, dockerfilePath: string): string =
   ## `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
@@ -292,26 +371,66 @@ proc byLocation(a, b: CertInfo): int =
   if result == 0:
     result = cmp(a.index, b.index)
 
+proc scanFile(scan: var CertScan, full, report, entry: string,
+              settings: CertificatesConfig, bundle: bool) =
+  ## Files of skipped CA bundles only supply issuer candidates, so they
+  ## report nothing: a missing candidate fails the pin rather than passing.
+  var st: Stat
+  if stat(cstring(full), st) != 0:
+    if not bundle:
+      scan.errors.add(newSubjectFinding(ruleName, "error", report,
+                      "not checked: " & osErrorMsg(osLastError()), report))
+    return
+  if not S_ISREG(st.st_mode):
+    # FIFOs, sockets and devices: reading could block, and docker sends no
+    # contents for them
+    trace("policy: certificates: skipping non-regular file " & full)
+    return
+  try:
+    if int64(st.st_size) > int64(settings.maxFileSize):
+      if not bundle and (entry.hasCertExtension(settings.extensions, wildcard = false) or
+                         full.readHead().looksLikeCert()):
+        scan.errors.add(newSubjectFinding(ruleName, "error", report,
+                        "not checked: larger than max_file_size (" & $settings.maxFileSize &
+                        " bytes)", report))
+      return
+    let data = readFile(full)
+    if not data.looksLikeCert():
+      return
+    let parsed = data.parseCertFile(report)
+    if bundle:
+      scan.issuers.add(parsed.certs)
+    else:
+      scan.certs.add(parsed.certs)
+      scan.errors.add(parsed.errors)
+  except CatchableError:
+    if not bundle:
+      scan.errors.add(newSubjectFinding(ruleName, "error", report,
+                      "not checked: " & getCurrentExceptionMsg(), report))
+
 proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
-                   dockerfilePath = ""): CertScan =
+                   dockerfilePath = "", mainDir = ""): CertScan =
   ## Certificates in the build context directories. Paths are relative to
-  ## the first (main) context; certificates of other (named) contexts are
+  ## the main context `mainDir`; certificates of other (named) contexts are
   ## reported with absolute paths. `dockerfilePath` only selects the
   ## ignore file of the main context, as BuildKit does.
+  let pins = settings.hasPins()
   var visited = 0
-  for n, dir in dirs:
+  for dir in dirs:
+    let isMain = mainDir != "" and dir == mainDir
     let ignore =
       if settings.honorDockerignore:
         try:
-          readDockerignore(dir, if n == 0: dockerfilePath else: "")
+          readDockerignore(dir, if isMain: dockerfilePath else: "")
         except CatchableError:
           result.errors.add(newSubjectFinding(ruleName, "error", dir,
                             "could not read .dockerignore: " & getCurrentExceptionMsg()))
           continue
       else: @[]
-    var stack = @[""]
+    # (directory, inside a skipped CA bundle directory)
+    var stack = @[("", false)]
     while len(stack) > 0:
-      let relDir = stack.pop()
+      let (relDir, bundled) = stack.pop()
       for kind, entry in walkDir(dir / relDir, relative = true):
         inc(visited)
         if visited > settings.maxFiles:
@@ -324,43 +443,28 @@ proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
         of pcDir:
           if entry == ".git" or rel.prunes(ignore) or rel.prunes(settings.excludePaths):
             continue
-          if settings.skipCaBundles and rel.prunes(caBundleDirs):
+          let bundle = bundled or (settings.skipCaBundles and rel.prunes(caBundleDirs))
+          if bundle and not pins:
+            trace("policy: certificates: skipping CA bundle directory " & rel)
             continue
-          stack.add(rel)
+          stack.add((rel, bundle))
         of pcFile:
           if not entry.hasCertExtension(settings.extensions) or
              isExcluded(rel, ignore) or isExcluded(rel, settings.excludePaths):
             continue
-          if len(settings.includePaths) > 0 and not isExcluded(rel, settings.includePaths):
-            continue
-          if settings.skipCaBundles and (entry.toLowerAscii() in caBundleNames or
-                                         isExcluded(rel, caBundleDirs)):
+          let bundle = bundled or (settings.skipCaBundles and isCaBundle(rel, relDir, entry))
+          if bundle:
             trace("policy: certificates: skipping CA bundle " & rel)
-            continue
-          let
-            full   = dir / rel
-            report = if n == 0: rel else: full
-          var data: string
-          try:
-            if getFileSize(full) > settings.maxFileSize:
-              trace("policy: certificates: skipping large file " & full)
+            if not pins:
               continue
-            data = readFile(full)
-          except CatchableError:
-            trace("policy: certificates: could not read " & full & ": " & getCurrentExceptionMsg())
+          elif len(settings.includePaths) > 0 and not isExcluded(rel, settings.includePaths):
             continue
-          if not data.looksLikeCert():
-            continue
-          result.certs.add(data.parseCertInfos(report))
+          let full = dir / rel
+          result.scanFile(full, if isMain: rel else: full, entry, settings, bundle)
         of pcLinkToFile, pcLinkToDir:
           # docker sends symlinks as links: a target inside the context is
           # scanned on its own and one outside it never reaches the image
           continue
-
-proc unknownIssuerKinds(settings: CertificatesConfig): seq[string] =
-  for (kind, _) in settings.allowedIssuers:
-    if kind notin ["cn", "dn", "sha256"] and kind notin result:
-      result.add(kind)
 
 proc issuerCerts(cert: CertInfo, all: seq[CertInfo]): seq[CertInfo] =
   ## Candidate names and identifiers are untrusted; verify the issuing key
@@ -421,8 +525,10 @@ proc violations*(cert: CertInfo, all: seq[CertInfo], settings: CertificatesConfi
       if t.normalizeKeyType() == cert.keyType:
         allowed = true
     if not allowed:
-      result.add("key type " & cert.keyType & " is not allowed")
-  if settings.minRsaKeySize > 0 and cert.keyType == "rsa" and cert.keySize < settings.minRsaKeySize:
+      let keyType = if cert.keyType != "": cert.keyType else: "unknown"
+      result.add("key type " & keyType & " is not allowed")
+  if settings.minRsaKeySize > 0 and cert.keyType == "rsa" and cert.keyLoaded and
+     cert.keySize < settings.minRsaKeySize:
     result.add("RSA key is " & $cert.keySize & " bits, minimum " & $settings.minRsaKeySize)
   if len(settings.allowedEcCurves) > 0 and cert.keyType == "ec":
     var allowed = false
@@ -432,9 +538,17 @@ proc violations*(cert: CertInfo, all: seq[CertInfo], settings: CertificatesConfi
     if not allowed:
       let curve = if cert.curve != "": cert.curve else: "unknown"
       result.add("EC curve " & curve & " is not allowed")
-  if len(settings.allowedIssuers) > 0 and len(settings.unknownIssuerKinds()) == 0 and
-     not cert.issuerAllowed(all, settings):
+  if len(settings.allowedIssuers) > 0 and not cert.issuerAllowed(all, settings):
     result.add("issuer " & cert.issuerDn & " is not allowed")
+
+proc unchecked*(cert: CertInfo, settings: CertificatesConfig): seq[string] =
+  ## enabled checks that could not be decided for `cert`
+  if cert.notAfter.isNone() and (settings.denyExpired or settings.expiresWithinDays > 0):
+    result.add("expiry date could not be parsed")
+  if cert.notBefore.isNone() and settings.denyNotYetValid:
+    result.add("start date could not be parsed")
+  if settings.minRsaKeySize > 0 and cert.keyType == "rsa" and not cert.keyLoaded:
+    result.add("RSA key could not be loaded, its size is unknown")
 
 proc subject*(cert: CertInfo): string =
   let name = if cert.subjectCn != "": cert.subjectCn else: cert.subjectDn
@@ -447,28 +561,40 @@ proc location*(cert: CertInfo): string =
     return cert.path & "#" & $cert.index
   cert.path
 
-proc check*(settings: CertificatesConfig, certs: seq[CertInfo], now: Time): seq[PolicyFinding] =
-  let unknownKinds = settings.unknownIssuerKinds()
+proc check*(settings: CertificatesConfig, certs: seq[CertInfo], now: Time,
+            issuers: seq[CertInfo] = @[]): seq[PolicyFinding] =
+  ## `issuers` are additional `sha256` pin candidates, not checked themselves
+  let candidates = certs & issuers
   for cert in certs:
-    let reasons = cert.violations(certs, settings, now)
+    let reasons = cert.violations(candidates, settings, now)
     if len(reasons) > 0:
       var reason = "certificate " & reasons.join("; ")
       if settings.message != "":
         reason &= ". " & settings.message
       result.add(newSubjectFinding(ruleName, "violation", cert.subject(), reason, cert.location()))
-    # like golden_images, an unknown kind can only be decided by another entry
-    if len(unknownKinds) > 0 and not cert.issuerAllowed(certs, settings):
+    let unchecked = cert.unchecked(settings)
+    if len(unchecked) > 0:
       result.add(newSubjectFinding(ruleName, "error", cert.subject(),
-                                   "unsupported allowed_issuers kind(s): " & unknownKinds.join(", "),
+                                   "certificate not fully checked: " & unchecked.join("; "),
                                    cert.location()))
+
+proc mainContextDir(input: PolicyInput): string =
+  if len(input.contextDirs) > 0:
+    return input.contextDirs[0]
 
 proc check*(settings: CertificatesConfig, input: PolicyInput, now = getTime()): seq[PolicyFinding] =
   if len(input.contextDirs) == 0:
-    trace("policy: certificates: no local build context to check (" & input.command & ")")
+    # Push has no build context. For build, the engine reports contexts that
+    # are not local directories (`contextErrors`); without any, nothing was
+    # checked, which must not pass silently.
+    if input.command == "build" and len(input.contextErrors) == 0:
+      result.add(newSubjectFinding(ruleName, "error", "build context",
+                                   "no local build context to check"))
     return
-  let scan = input.contextDirs.scanContexts(settings, input.dockerfilePath)
-  result.add(scan.errors)
-  result.add(settings.check(scan.certs.sorted(byLocation), now))
+  let scan = input.contextDirs.scanContexts(settings, input.dockerfilePath,
+                                            input.mainContextDir())
+  result.add(scan.errors.sorted(proc(a, b: PolicyFinding): int = cmp(a.location, b.location)))
+  result.add(settings.check(scan.certs.sorted(byLocation), now, scan.issuers))
 
 proc nonNegative(path: openArray[string], default: int): int =
   result = policyIntSetting(path, default)
@@ -479,6 +605,14 @@ proc positive(path: openArray[string], default: int): int =
   result = policyIntSetting(path, default)
   if result <= 0:
     raise newException(ValueError, "policy." & path.join(".") & " must be positive")
+
+proc issuerPairs(path: openArray[string]): seq[(string, string)] =
+  for (kind, value) in policyPairsSetting(path):
+    let k = kind.toLowerAscii()
+    if k notin issuerKinds:
+      raise newException(ValueError, "unsupported kind in policy." & path.join(".") & ": " &
+                         kind & " (expected cn, dn or sha256)")
+    result.add((k, value))
 
 proc patterns(path: openArray[string]): seq[string] =
   for p in policyStringsSetting(path):
@@ -500,7 +634,7 @@ proc loadCertificatesConfig*(): Option[CertificatesConfig] =
     minRsaKeySize:      nonNegative([ruleName, "min_rsa_key_size"], d.minRsaKeySize),
     allowedKeyTypes:    policyStringsSetting([ruleName, "allowed_key_types"]),
     allowedEcCurves:    policyStringsSetting([ruleName, "allowed_ec_curves"]),
-    allowedIssuers:     policyPairsSetting([ruleName, "allowed_issuers"]),
+    allowedIssuers:     issuerPairs([ruleName, "allowed_issuers"]),
     includePaths:       patterns([ruleName, "include_paths"]),
     excludePaths:       patterns([ruleName, "exclude_paths"]),
     extensions:         policyStringsSetting([ruleName, "extensions"]),
@@ -539,6 +673,11 @@ const certificatesJsonFields = [
 proc validateCertificatesJson(node: JsonNode, path: string) =
   node.validateFields(certificatesJsonFields, path)
   node{"allowed_issuers"}.validatePairs(path & "allowed_issuers")
+  for pair in node{"allowed_issuers"}.getElems():
+    let kind = pair[0].getStr()
+    if kind.toLowerAscii() notin issuerKinds:
+      raise newException(ValueError, path & "allowed_issuers has unsupported kind " &
+                         kind & " (expected cn, dn or sha256)")
   for name in ["allowed_key_types", "allowed_ec_curves", "include_paths",
                "exclude_paths", "extensions"]:
     for entry in node{name}.getElems():
@@ -574,4 +713,5 @@ proc certificatesHint(): PolicyHint =
     result.allowed.add(kind & ":" & value)
 
 proc loadCertificatesRule*() =
-  newPolicyInputRule(ruleName, loadCertificates, checkCertificates, hint = certificatesHint)
+  newPolicyInputRule(ruleName, loadCertificates, checkCertificates,
+                     requiresContext = true, hint = certificatesHint)
