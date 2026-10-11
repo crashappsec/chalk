@@ -42,3 +42,14 @@ EOF
 "$O" x509 -req -in leaf.csr -CA "$F/spoofed-ca.pem" -CAkey fake-ca.key \
   -set_serial 1 -sha256 -not_before 20200101000000Z -not_after 21200101000000Z \
   -extfile leaf.ext -out "$F/spoofed-issuer.pem" 2>/dev/null
+
+# Certificates whose public key OpenSSL cannot load: the test root with an
+# unknown SubjectPublicKeyInfo algorithm (1.2.840.113549.1.1.99) and the leaf
+# with an unknown named curve (1.2.840.10045.3.1.99). Signatures break, which
+# the parser does not check.
+patch_oid() {
+  "$O" x509 -in "$1" -outform DER | xxd -p | tr -d '\n' | sed "s/$2/$3/" | xxd -r -p |
+    "$O" x509 -inform DER -out "$4"
+}
+patch_oid "$F/ca.pem" 06092a864886f70d010101 06092a864886f70d010163 "$F/unknown-key.pem"
+patch_oid "$F/leaf.pem" 06082a8648ce3d030107 06082a8648ce3d030163 "$F/unknown-curve.pem"

@@ -27,6 +27,7 @@ type
     signature_digest: cstring
     der:           pointer
     der_len:       cint
+    key_loaded:    cint
   X509Cert* = ref object of RootRef
     keyValue*:     TableRef[string, string]
     subject*:      TableRef[string, string]
@@ -41,6 +42,9 @@ type
     keySize*:      int
     signatureDigest*: string
     der*:          string # Nim-owned copy, independent of the parser BIO
+    ## false when OpenSSL cannot load the public key (unsupported algorithm
+    ## or curve, malformed key): `Key` is empty and `keySize` 0
+    keyLoaded*:    bool
 
 proc open_cert*(fd: FileHandle): CertBIO {.importc.}
 proc read_cert*(data: cstring, c: cint): CertBIO {.importc.}
@@ -72,7 +76,8 @@ proc toTable(pairs: seq[(string, string)]): TableRef[string, string] =
     result[key] = value
 
 iterator x509Certs*(bio: CertBIO): X509Cert =
-  ## every certificate (PEM or DER) readable from `bio`, in order
+  ## every certificate (PEM or DER) readable from `bio`, in order. Malformed
+  ## PEM blocks are skipped, see `read_next_cert` in certs.c.
   while true:
     let output = extract_cert_data(bio)
     if output == nil:
@@ -92,6 +97,7 @@ iterator x509Certs*(bio: CertBIO): X509Cert =
         subjectNames: subjectShort,
         issuerNames:  issuerShort,
         keySize:      int(output.key_size),
+        keyLoaded:    output.key_loaded != 0,
         signatureDigest: if output.signature_digest == nil: "" else: $output.signature_digest,
       )
       if output.der != nil and output.der_len > 0:
