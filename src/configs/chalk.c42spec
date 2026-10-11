@@ -2524,6 +2524,22 @@ without running docker, so the image is neither built nor pushed.
 Unlike other chalk failures, a policy violation never falls back to
 running docker without chalk.
 
+Rules that check the build context's dependencies, code or secrets run
+the enabled `sbom`, `sast` or `secret_scanner` tools on each local build
+context (at most 8) that chalk's own run did not cover, whatever
+`run_sbom_tools`, `run_sast_tools` and `run_secret_scanner_tools` say.
+Like chalk's own runs, these may install the tool first (e.g. download the
+syft installer or run the `anchore/syft` docker image) and each run is
+bounded by the tool's timeout (300 seconds by default), so a build can take
+up to contexts x tools x timeout longer. SBOM packages found only in
+files the context's `.dockerignore` leaves out are not checked.
+
+On push, these rules read the tool output recorded in the pushed image's
+chalk mark, which covers the whole repository chalk scanned when it built
+the image. Images whose mark does not record it (the default mark
+templates do not), unchalked images and marks that keep it in an object
+store pass these rules.
+
 Violations and evaluation errors are published to the `policy` topic
 using the `policy_report` report template. Nothing is published when
 all policies pass.
@@ -2554,9 +2570,9 @@ See `docs/design-build-policy.md` in the chalk repository for details.
     doc: """
 When a policy cannot reach a decision (e.g. an image digest could not be
 resolved, subject metadata could not be read, repository tags could not
-be enumerated, or an allowlist entry kind is unknown), `allow` lets the build
-continue while `block` treats it as a violation. In both cases the error
-is reported.
+be enumerated, an allowlist entry kind is unknown, or the policy
+configuration is invalid), `allow` lets the build continue while `block`
+treats it as a violation. In both cases the error is reported.
 """
   }
 
@@ -2623,11 +2639,16 @@ non-empty `id`. Each policy is evaluated with its own `mode` and
 `on_error`; the build is blocked when any of them blocks it. With a
 `policies` list, `custom_check` is not evaluated.
 
-Missing fields take their defaults. A value that is not valid JSON, or that
-has unknown fields or wrongly typed values, is reported as a policy
-evaluation error and never blocks the build. An invalid entry of a
-`policies` list (including a missing or duplicate `id`) is reported the
-same way, while the other entries are still evaluated.
+Missing fields take their defaults. A policy with unknown fields or wrongly
+typed values is reported as a policy evaluation error and no rule runs. It
+keeps the `mode`, `on_error` and `enforce_repos` it declares when those are
+valid, so in `enforce` mode with `on_error` set to `block` it blocks the
+build, and in mode `off` it is not evaluated. Without a valid `mode`, and
+for a value that cannot be used as a whole (not a JSON object, or an
+invalid `policies` list), the error is reported in `audit` mode and never
+blocks. An invalid entry of a `policies` list (including a
+missing or duplicate `id`) is reported the same way, while the other entries
+are still evaluated.
 """
   }
 
@@ -4465,6 +4486,8 @@ This is primarily meant to make it easier to test new configurations by disablin
     shortdoc: "Run any configured SBOM tools"
     doc: """
 When true, this will cause chalk to run any configured and enabled SBOM tool implementations. Currently, this is just `syft`, which will be downloaded into /tmp if not found on the system.
+
+Build policies that read SBOMs run the SBOM tools on the build context even when this is false (see `policy`).
 
 You can change that directory by setting the global variable `SYFT_EXE_DIR` with the `:=` operator (it is *not* an attribute).
 The syft command line arguments used at invocation (minus the target location) can be set via the `SYFT_ARGV` global variable. It's default value is:

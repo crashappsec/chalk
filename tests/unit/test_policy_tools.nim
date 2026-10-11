@@ -97,6 +97,11 @@ proc testContextOutputs() =
 
   outputs = PolicyInput(command: "build").contextToolOutputs(request, hostOutputs)
   doAssert "no local build context" in outputs.errors[0].reason
+  # not repeated for contexts the engine reports against the rule
+  outputs = PolicyInput(command: "build", contextErrors: @[collectionError("stdin")]).contextToolOutputs(
+    request, hostOutputs)
+  assertEq(len(outputs.errors), 0)
+  assertEq(len(outputs.contexts), 0)
 
   var many: seq[string]
   for i in 0 .. maxContextDirs:

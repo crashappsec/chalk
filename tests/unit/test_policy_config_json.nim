@@ -14,11 +14,16 @@ proc policy(): PolicyConfig =
   selectPolicy(result)
 
 proc rejects(text, reason: string) =
+  ## the document is unusable as a whole, or as its only policy
+  var message = ""
   try:
-    discard parsePolicyJson(text)
-    doAssert false, "accepted: " & text
+    let configs = parsePolicyJson(text)
+    doAssert configs.len == 1, "accepted: " & text
+    message = configs[0].configError
   except ValueError:
-    doAssert reason in getCurrentExceptionMsg(), getCurrentExceptionMsg()
+    message = getCurrentExceptionMsg()
+  doAssert message != "", "accepted: " & text
+  doAssert reason in message, message
 
 proc testValidation() =
   rejects("{", "not valid JSON")
@@ -83,21 +88,70 @@ proc testEnforcedFromJson() =
   doAssert policyOutcome.asChalkDict().hasKey("_POLICY_ID")
   doAssert policyOutcome.findings[0].policyId == "golden-images@3"
 
-proc testInvalidJsonReportsAndNeverBlocks() =
-  # even if the broken document asks for enforce
-  setPolicyJson("""{"mode": "enforce", "on_error": "block", "golden_images": {"enabled": 1}}""")
-  doAssert policyEnabled()
+proc evaluateInvalid(text: string): tuple[blocked, collected: bool] =
+  setPolicyJson(text)
   policyOutcome = nil
   var collected = false
-  evaluatePolicies(build(), proc(): PolicyInput =
-    collected = true
-    PolicyInput())
-  doAssert not collected
-  doAssert policyOutcome.result == "error"
+  try:
+    evaluatePolicies(build(), proc(): PolicyInput =
+      collected = true
+      PolicyInput())
+  except PolicyViolation:
+    result.blocked = true
+  result.collected = collected
+
+proc testInvalidConfigHonorsDeclaredMode() =
+  let broken = """"golden_images": {"enabled": 1}"""
+  # a broken enforced policy fails closed with on_error=block
+  var (blocked, collected) = evaluateInvalid(
+    """{"id": "p", "mode": "enforce", "on_error": "block", """ & broken & "}")
+  doAssert blocked and not collected
+  doAssert policyOutcome.result == "blocked"
   doAssert policyOutcome.findings.len == 1
   doAssert policyOutcome.findings[0].rule == "config"
+  doAssert policyOutcome.findings[0].kind == "error"
+  doAssert policyOutcome.findings[0].policyId == "p"
   doAssert "policy.golden_images.enabled" in policyOutcome.findings[0].reason
+
+  (blocked, collected) = evaluateInvalid(
+    """{"mode": "enforce", "on_error": "allow", """ & broken & "}")
+  doAssert not blocked and not collected
+  doAssert policyOutcome.result == "error"
   doAssert not policyOutcome.asChalkDict().hasKey("_POLICY_ID")
+
+  # a broken policy in mode off stays off
+  setPolicyJson("""{"mode": "off", "on_error": "block", """ & broken & "}")
+  doAssert policyConfigs()[0].configError != ""
+  doAssert not policyEnabled()
+  (blocked, collected) = evaluateInvalid(
+    """{"mode": "off", "on_error": "block", """ & broken & "}")
+  doAssert not blocked and policyOutcome == nil
+
+  # nothing (validly) declared: reported, never blocks
+  for doc in ["{", "[]", """{"policies": {}}""",
+              """{"on_error": "block", """ & broken & "}",
+              """{"mode": "enforced", "on_error": "block", """ & broken & "}"]:
+    (blocked, collected) = evaluateInvalid(doc)
+    doAssert not blocked and not collected, doc
+    doAssert policyOutcome.result == "error", doc
+    doAssert policyOutcome.policies[0].mode == "audit", doc
+    doAssert policyOutcome.findings[0].rule == "config", doc
+
+  # an invalid on_error is not declared either
+  (blocked, collected) = evaluateInvalid("""{"mode": "enforce", "on_error": true, """ & broken & "}")
+  doAssert not blocked and policyOutcome.result == "error"
+  doAssert policyOutcome.policies[0].mode == "enforce"
+  doAssert policyOutcome.policies[0].onError == "allow"
+
+  # a valid enforce_repos is kept, an invalid one is not
+  var configs = parsePolicyJson("""{"mode": "off", "enforce_repos": [["glob", "github.com/a/*"]], """ &
+                                broken & "}")
+  doAssert configs[0].mode == "off" and configs[0].configError != ""
+  doAssert configs[0].enforceRepos == @[("glob", "github.com/a/*")]
+  doAssert configs[0].mayBeEvaluated()
+  configs = parsePolicyJson("""{"mode": "enforce", "enforce_repos": [["glob"]]}""")
+  doAssert configs[0].mode == "enforce" and configs[0].enforceRepos.len == 0
+  setPolicyJson("")
 
 proc goldenImagesRule(): PolicyRule =
   # the registered rule, reading the selected policy's settings; custom_check
@@ -171,8 +225,9 @@ proc testIdsMustBeUnique() =
   doAssert "policy.policies[1].id \"a\" is not unique" in policies[1].configError
   doAssert "policy.policies[2].id must be set" in policies[2].configError
   doAssert policies[3].configError == "" and policies[3].id == "b"
-  # invalid entries only report, whatever they ask for
-  doAssert policies[0].mode == "audit" and policies[0].onError == "allow"
+  # invalid entries keep the mode and on_error they declare
+  doAssert policies[0].mode == "enforce" and policies[0].onError == "allow"
+  doAssert policies[1].mode == "audit"
 
 proc testAuditAndEnforceDecideIndependently() =
   let multi = readFile(multiFixture)
@@ -219,19 +274,22 @@ proc testInvalidEntryIsIsolated() =
   let doc = """{"policies": [
     {"id": "broken", "mode": "enforce", "on_error": "block", "golden_images": {"enabled": 1}},
     {"id": "golden", "mode": "enforce", "golden_images": {"enabled": true,
-     "allowed": [["glob", "alpine:*"]]}}
+     "allowed": [["glob", "alpine:*"]]}},
+    {"id": "lenient", "mode": "enforce", "golden_images": {"enabled": 1}},
+    {"id": "off", "mode": "off", "on_error": "block", "golden_images": {"enabled": 1}}
   ]}"""
   var (blocked, _) = evaluateJson(doc, @[subject("alpine:3.20")])
-  doAssert not blocked
-  doAssert results() == @[("broken", "error"), ("golden", "pass")]
-  doAssert policyOutcome.findings.len == 1
+  # the broken entry blocks as it declares, without running rules
+  doAssert blocked
+  doAssert results() == @[("broken", "blocked"), ("golden", "pass"), ("lenient", "error")]
+  doAssert policyOutcome.findings.len == 2
   doAssert policyOutcome.findings[0].rule == "config"
   doAssert policyOutcome.findings[0].policyId == "broken"
   doAssert "policy.policies[0].golden_images.enabled" in policyOutcome.findings[0].reason
   # the valid entry still enforces
   (blocked, _) = evaluateJson(doc, @[subject("busybox")])
   doAssert blocked
-  doAssert results() == @[("broken", "error"), ("golden", "blocked")]
+  doAssert results() == @[("broken", "blocked"), ("golden", "blocked"), ("lenient", "error")]
 
 proc testRegisteredSection() =
   registerPolicyJsonSection("example_rule", proc(node: JsonNode, path: string) =
@@ -257,7 +315,7 @@ testRegisteredSection()
 testFixture()
 testDefaults()
 testEnforcedFromJson()
-testInvalidJsonReportsAndNeverBlocks()
+testInvalidConfigHonorsDeclaredMode()
 testMultiFixture()
 testSingleObjectIsNotAList()
 testEmptyListIsNoPolicy()
