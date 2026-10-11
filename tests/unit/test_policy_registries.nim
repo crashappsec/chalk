@@ -267,11 +267,10 @@ proc testJson() =
      "policy.registries.require_digest must be a boolean"),
     ("""{"registries": []}""", "policy.registries must be an object"),
   ]:
-    try:
-      discard parsePolicyJson(text)
-      doAssert false, "accepted: " & text
-    except ValueError:
-      doAssert reason in getCurrentExceptionMsg(), getCurrentExceptionMsg()
+    # an invalid policy is returned with its error, see invalidPolicy
+    let configs = parsePolicyJson(text)
+    doAssert configs.len == 1 and configs[0].configError != "", "accepted: " & text
+    doAssert reason in configs[0].configError, configs[0].configError
 
   setPolicyJson("""{"mode": "audit", "registries": {"enabled": false, "pull_allowed": [["glob", "x"]]}}""")
   selectPolicy(policyConfigs()[0])
