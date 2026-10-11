@@ -548,7 +548,16 @@ policies above and `FROM busybox`:
 ```
 
 plus host-level operation and CI keys (`_OPERATION`, `_ACTION_ID`,
-`_OP_CHALKER_VERSION`, `_OP_EXIT_CODE`, `_OP_ERRORS`, `BUILD_*`).
+`_OP_CHALKER_VERSION`, `_OP_EXIT_CODE`, `_OP_ERRORS`, `BUILD_*`) and
+`_COMMIT_ID`, the HEAD commit of the first local git worktree found among the
+build's context directories. `_COMMIT_ID` is the commit builds are linked to
+pull requests by (matched against a pull request's head or merge commit), so a
+policy report from a `push` build on the default branch can be tied to the
+merged pull request. Builds on `pull_request` events usually check out a
+synthetic merge commit (`refs/pull/N/merge`) that matches neither, the same
+limitation build reports have. `_COMMIT_ID` is absent when there is no local
+worktree, e.g. for a remote git context
+(`docker build https://github.com/org/repo.git#ref`).
 Artifact-level keys are not included because a blocked build stops before any
 artifact exists; `_POLICY_BUILD` identifies the build instead. Use
 `policy.report_template` to select a different template.
@@ -628,12 +637,21 @@ Rules that need more than the referenced images register with
 `newPolicyInputRule` and receive the whole `PolicyInput`:
 
 - `command`: `build` or `push`;
-- `contextDirs`: local build context directories (the cloned checkout for git
-  contexts, plus local named contexts), empty for `push`;
+- `contextDirs`: local build context directories (the checked out subdirectory
+  for git contexts, plus local named contexts), empty for `push`;
+- `contextErrors`: build contexts that are not local directories (stdin,
+  tarball URLs, git named contexts). Image and stage named contexts
+  (`docker-image://`, `oci-layout://`, `target:`) are left to image rules. The
+  engine reports these against rules registered with `requiresContext`, so a
+  context-scanning rule cannot pass a context it never saw;
 - `pushTargets`: the image references the command pushes (`build --push` tags,
   or the `docker push` reference and, with `--all-tags`, every local tag);
-- `host`: chalk-time host info collected before policies run, such as `SBOM`,
-  `SAST` and `SECRET_SCANNER` when those tools are enabled.
+- `pushMarks`: chalk marks of the images `push` pushes, for those that are
+  chalked;
+- `host`: `build` only, a copy of the chalk-time host info collected before
+  policies run, such as `SBOM`, `SAST` and `SECRET_SCANNER` when those tools
+  are enabled. `push` policies run before collection, so `host` is nil there
+  and push rules read `pushMarks`.
 
 Findings about something other than an image (`newSubjectFinding`) set
 `subject` (e.g. a package purl, a file or a registry) and optionally
