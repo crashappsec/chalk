@@ -40,6 +40,29 @@ proc dockerignorePath*(dir: string, dockerfilePath = ""): string =
     return root
   return ""
 
+proc cleanPattern(pattern: string): string =
+  ## Lexical cleanup as moby's ignorefile.ReadAll does with `filepath.Clean`
+  ## (`./a` -> `a`, `a//b` -> `a/b`, `a/../b` -> `b`), keeping a trailing `/`
+  ## as it only signals a directory. The leading `/` moby strips afterwards is
+  ## dropped too; `..` above it is dropped as `filepath.Clean` does.
+  ## https://github.com/moby/patternmatcher/blob/main/ignorefile/ignorefile.go
+  let rooted = pattern.startsWith('/')
+  var parts: seq[string]
+  for part in pattern.split('/'):
+    case part
+    of "", ".":
+      discard
+    of "..":
+      if len(parts) > 0 and parts[^1] != "..":
+        discard parts.pop()
+      elif not rooted:
+        parts.add(part)
+    else:
+      parts.add(part)
+  result = parts.join("/")
+  if result != "" and pattern.endsWith('/'):
+    result &= "/"
+
 proc parseDockerignore*(content: string, path = ""): DockerIgnore =
   result.path = path
   for line in content.splitLines():
@@ -47,9 +70,7 @@ proc parseDockerignore*(content: string, path = ""): DockerIgnore =
     if p.len == 0 or p.startsWith('#'):
       continue
     let negate = p.startsWith('!')
-    var pattern = (if negate: p[1 .. ^1] else: p).strip()
-    while pattern.startsWith('/'):
-      pattern = pattern[1 .. ^1]
+    let pattern = (if negate: p[1 .. ^1] else: p).strip().cleanPattern()
     # docker fails the build on these; skipping keeps more files checked
     if not isValidPattern(pattern):
       result.invalid.add(p)
