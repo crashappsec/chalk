@@ -51,9 +51,12 @@ proc testLoad() =
 
   # only the main context uses the Dockerfile's ignore file
   let input = PolicyInput(command: "build", contextDirs: @[ctx, dir],
-                          dockerfilePath: dockerfile)
+                          mainContextDir: ctx, dockerfilePath: dockerfile)
   assertEq(input.mainContextDockerfile(ctx), dockerfile)
   assertEq(input.mainContextDockerfile(dir), "")
+  # a stdin or remote main context leaves only named contexts
+  let named = PolicyInput(command: "build", contextDirs: @[dir], dockerfilePath: dockerfile)
+  assertEq(named.mainContextDockerfile(dir), "")
 
 testParse()
 testLoad()

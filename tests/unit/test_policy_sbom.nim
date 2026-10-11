@@ -216,6 +216,7 @@ proc testDockerignore() =
   policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
     @[ToolOutput(tool: "syft", root: dir, value: fixture("cyclonedx"))]
   let sboms = PolicyInput(command: "build", contextDirs: @[dir / "main", dir / "named"],
+                          mainContextDir: dir / "main",
                           dockerfilePath: dir / "Dockerfile").policySboms("r")
   assertEq(sboms.errors.len, 0)
   for name in ["colourama", "requests"]:

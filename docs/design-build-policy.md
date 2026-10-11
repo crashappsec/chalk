@@ -157,9 +157,13 @@ names and types match con4m, with tuples written as arrays:
 
 Missing fields take their defaults. The document is validated strictly: invalid
 JSON, unknown fields, wrong types or invalid choices are reported as a single
-`config` evaluation error and no rule runs. This never blocks the build,
-whatever `mode` or `on_error` the document asks for, since a document that
-cannot be read cannot be trusted either. Only policy settings can be expressed,
+`config` evaluation error (kind `error`) and no rule runs. The policy keeps the
+`mode`, `on_error` and `enforce_repos` it declares when those are themselves
+valid, so `on_error` decides as for any other error: an `enforce` policy with
+`on_error = "block"` blocks the build, and a policy in mode `off` stays off.
+A policy that declares no valid `mode`, like a document that cannot be used as
+a whole (not JSON, not an object, an invalid `policies` list), is audited: the error is reported and never blocks. An invalid
+`on_error` is `allow`. Only policy settings can be expressed,
 so a JSON document can neither change other chalk configuration nor provide
 callbacks.
 
@@ -204,8 +208,9 @@ same fields as the single-policy document above:
 - An entry that is invalid (not an object, unknown fields, wrong types,
   invalid choices, missing or duplicate `id`) is reported as a `config`
   evaluation error of that entry (`policy_id` is its `id`, when it has a
-  string one) and never blocks. The other entries are still evaluated. An entry
-  with a duplicate `id` invalidates every entry using that `id`.
+  string one), which blocks only as the entry's own valid `mode`, `on_error`
+  and `enforce_repos` say (see above). The other entries are still evaluated.
+  An entry with a duplicate `id` invalidates every entry using that `id`.
 - `policies` cannot be combined with other top-level fields; such a document,
   or one whose `policies` is not an array, is invalid as a whole.
 - `{"policies": []}` configures no policy, as does a list where every entry is
@@ -256,8 +261,10 @@ repositories while `mode` applies everywhere else:
   removed, so a glob in the port position (`github.com:*/acme/app`) never
   matches.
 - An `enforce_repos` that is not a list of `[kind, value]` string pairs makes
-  the policy invalid: it is reported as a `config` evaluation error and never
-  blocks, like any other invalid policy.
+  the policy invalid: it is reported as a `config` evaluation error, like any
+  other invalid policy, with its `mode` and `on_error` and no `enforce_repos`.
+  A valid `enforce_repos` of a policy that is invalid otherwise still applies,
+  so the error can block (`on_error = "block"`) in the listed repositories.
 
 The repository is identified as `host/path`, lowercase, without scheme,
 credentials, port or `.git` suffix, e.g. `github.com/acme/app` (GitLab
@@ -508,6 +515,10 @@ Rules that need more than the referenced images register with
 - `command`: `build` or `push`;
 - `contextDirs`: local build context directories (the checked out subdirectory
   for git contexts, plus local named contexts), empty for `push`;
+- `mainContextDir`: the entry of `contextDirs` that is the main build context,
+  e.g. to apply `<Dockerfile>.dockerignore` only there; empty when the main
+  context is not a local directory, in which case `contextDirs` only has
+  named contexts;
 - `contextErrors`: build contexts that are not local directories (stdin,
   tarball URLs, git named contexts). Image and stage named contexts
   (`docker-image://`, `oci-layout://`, `target:`) are left to image rules. The
@@ -612,6 +623,15 @@ the `policy*Setting` accessors, which read the same path from con4m when
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.
+- A remote git build context is checked out for rules that scan the build
+  context, and docker then builds that checkout, so it builds the commit the
+  rules inspected. The checkout has no git submodules and no `.git`
+  directory, which BuildKit's git source provides, so when the repository has
+  a `.gitmodules` file or the build arg `BUILDKIT_CONTEXT_KEEP_GIT_DIR` is
+  set, docker fetches the git context itself instead. With submodules this is
+  reported as an evaluation error of those rules, as their contents are not
+  checked. In both cases a branch or tag that moves between the policy check
+  and the build is built at its new commit.
 
 SBOM policy parsing retains every package occurrence. A repository scan keeps a
 package in a build context when any recorded location belongs to that context;

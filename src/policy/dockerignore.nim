@@ -78,6 +78,6 @@ proc prunes*(ignore: DockerIgnore, relDir: string): bool =
 proc mainContextDockerfile*(input: PolicyInput, dir: string): string =
   ## `input.dockerfilePath` when `dir` is the main build context, for
   ## `loadDockerignore`; empty for named contexts
-  if len(input.contextDirs) > 0 and dir == input.contextDirs[0]:
+  if input.mainContextDir != "" and dir == input.mainContextDir:
     return input.dockerfilePath
   return ""
