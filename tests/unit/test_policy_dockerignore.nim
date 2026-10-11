@@ -30,6 +30,15 @@ node_modules/
   doAssert not ignore.prunes("vendor")
   doAssert not DockerIgnore().isIgnored("anything")
 
+proc testClean() =
+  # as moby's filepath.Clean of each pattern
+  let ignore = parseDockerignore("./secrets\na//b/\nc/../d\n!./e/./f\n/../g\n../h\n")
+  assertEq(ignore.patterns, @["secrets", "a/b/", "d", "!e/f", "g", "../h"])
+  doAssert ignore.isIgnored("secrets/.env")
+  doAssert ignore.isIgnored("a/b/c")
+  doAssert ignore.isIgnored("d")
+  doAssert not ignore.isIgnored("c/d")
+
 proc testLoad() =
   let dir = getTempDir() / "chalk_test_policy_dockerignore"
   removeDir(dir)
@@ -59,4 +68,5 @@ proc testLoad() =
   assertEq(named.mainContextDockerfile(dir), "")
 
 testParse()
+testClean()
 testLoad()
