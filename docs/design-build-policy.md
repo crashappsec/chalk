@@ -377,7 +377,24 @@ Both sides are normalized like docker references: `alpine` is
 `docker.io/library/alpine`, `docker.io/alpine` is
 `docker.io/library/alpine`, and `docker.io`, `index.docker.io` and
 `registry-1.docker.io` are the same registry. Hosts are compared in lower
-case. Tags and digests in entries are ignored.
+case and the default HTTPS port is dropped, so `GHCR.io:443/acme/app` is
+`ghcr.io/acme/app` and `docker.io:443/alpine` is
+`docker.io/library/alpine`; other ports are part of the host
+(`ghcr.io:8443` is not `ghcr.io`). Tags and digests in entries are
+ignored.
+
+Writing entries:
+
+- patterns are globs over the whole name, not prefixes: `ghcr.io/acme`
+  matches only the repository `ghcr.io/acme`, not `ghcr.io/acme/app`. Use
+  `ghcr.io/acme/*` for a namespace, and a bare host (`ghcr.io`) for a
+  whole registry;
+- prefer allowlists. A denylist only blocks the spellings it matches;
+  references are normalized as above, but the same content can still be
+  reached through another name (a mirror, a pull-through cache, a
+  different host or IP for the same registry). `pull_denied` and
+  `push_denied` are best effort, `pull_allowed` and `push_allowed` fail
+  closed.
 
 What is checked:
 
@@ -389,28 +406,53 @@ What is checked:
   by digest (`alpine@sha256:...`) as written in the Dockerfile or named
   context; chalk pinning a tag to a digest for its own metadata does not
   count, as it does not pin what the next build pulls;
+- other build pulls (`pullRefs`, only checked by this rule since they are
+  not part of the built image, so `golden_images` ignores them): the
+  BuildKit frontend from `# syntax=<image>` and
+  `--build-arg BUILDKIT_SYNTAX=<image>` (both are checked, as either may
+  be used; source `syntax`) and registry cache imports
+  (`--cache-from <ref>` or `--cache-from type=registry,ref=<ref>`; source
+  `cache_from`; `local`, `gha` and other cache types are not registry
+  pulls). `require_digest` applies to the frontend but not to cache
+  imports, whose tags every `--cache-to` export rewrites. A
+  `--cache-from` that cannot be parsed is an error finding;
 - pushes: every push target must satisfy `push_denied` and `push_allowed`
   the same way. For `docker build`, the targets are the `--tag`s when the
   build pushes (`--push`, `--output type=registry` or
   `--output type=image,push=true`, as buildx replaces exporter names with
-  `--tag`), else the `name`s of the pushing exporters. For `docker push`,
-  the pushed reference, or every local tag of the repository with
-  `--all-tags`.
+  `--tag`), else the `name`s of the pushing exporters, plus an exporter's
+  `dangling-name-prefix` unless BuildKit's `danging-name-empty-only` (sic)
+  suppresses it, plus registry cache exports
+  (`--cache-to type=registry,ref=<ref>`; `type=inline` cache goes with the
+  image). For `docker push`, the pushed reference, or every local tag of
+  the repository with `--all-tags`.
 
 On `docker push` the pull checks apply to the images recorded in the
-image's chalk mark, as for `golden_images`. Those references include the
-base image digests chalk pinned during the build, so `require_digest` is
-effectively a build-time check. A policy with pull checks
+image's chalk mark, as for `golden_images`; the frontend and cache imports
+are not recorded and are only checked at build time. Those references
+include the base image digests chalk pinned during the build, so
+`require_digest` passes on push for any chalked image and is effectively a
+build-time check. A policy with pull checks
 (`pull_allowed`, `pull_denied` or `require_digest`) needs every pulled
-image, so subject collection errors (e.g. pushing an unchalked image) are
-reported against it and `on_error` decides; a push-only policy does not
-need them and only reports an error when the push targets themselves
-could not be determined (e.g. `--all-tags` could not list the tags).
+image, so subject collection errors are reported against it and
+`on_error` decides: pushing an unchalked image (whose base images are
+unknown) under such a policy is an error, and with `on_error: block` in
+enforce mode it is blocked. A push-only policy does not need them and
+only reports an error when the push targets themselves could not be
+determined (e.g. `--all-tags` could not list the tags).
 
 Violations are reported with `image` set to the image or push target and
-`source` set to `from`, `copy_from`, `mount_from` or `push`.
+`source` set to `from`, `copy_from`, `mount_from`, `syntax`, `cache_from`
+or `push`.
 
 Not covered:
+
+- `ONBUILD` instructions of a base image run in the build but are not in
+  the Dockerfile chalk parses, so images they pull (`ONBUILD COPY --from`)
+  are not checked. The base image itself is;
+- commands chalk does not wrap: `docker buildx bake`, `docker compose
+  build`/`push` and other tools that push (crane, skopeo, `buildctl`) are
+  not checked at all;
 
 - registry mirrors (`registry-mirrors` in the docker daemon, buildkitd
   `mirrors`) and pull-through caches: the reference as written is checked,
@@ -635,7 +677,13 @@ Rules that need more than the referenced images register with
   engine reports these against rules registered with `requiresContext`, so a
   context-scanning rule cannot pass a context it never saw;
 - `pushTargets`: the image references the command pushes (`build --push` tags,
-  or the `docker push` reference and, with `--all-tags`, every local tag);
+  exporter names and `--cache-to type=registry` refs, or the `docker push`
+  reference and, with `--all-tags`, every local tag);
+- `pullRefs`: `build` only, images the build pulls that are not part of the
+  built image (BuildKit frontend from `# syntax=`/`BUILDKIT_SYNTAX`, registry
+  `--cache-from` refs), kept out of `subjects` so image rules such as
+  `golden_images` do not check them; `pullRefErrors` holds those that could
+  not be parsed, which rules checking `pullRefs` must report;
 - `pushMarks`: chalk marks of the images `push` pushes, for those that are
   chalked;
 - `host`: `build` only, a copy of the chalk-time host info collected before
