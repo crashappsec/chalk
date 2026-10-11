@@ -202,6 +202,12 @@ proc extractOutputs(ctx: DockerInvocation) =
         p.close()
         s.close()
 
+proc extractCache(ctx: DockerInvocation) =
+  if "cache-from" in ctx.processedFlags:
+    ctx.foundCacheFrom = unpack[seq[string]](ctx.processedFlags["cache-from"].getValue())
+  if "cache-to" in ctx.processedFlags:
+    ctx.foundCacheTo = unpack[seq[string]](ctx.processedFlags["cache-to"].getValue())
+
 proc extractContext(ctx: DockerInvocation) =
   # Con4m "ignoring unknown flags" jams them into the command line.
   # We try to spec every flag, but there may be new flags, or
@@ -331,6 +337,7 @@ proc extractDockerCommand*(self: DockerInvocation): DockerCmd =
     self.extractPush()
     self.extractLoad()
     self.extractOutputs()
+    self.extractCache()
     # set any other non-automatically initialized attributes to avoid segfaults
     self.addedPlatform = newOrderedTable[string, seq[string]]()
     self.dfDirectives  = newOrderedTable[string, string]()

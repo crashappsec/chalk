@@ -1,4 +1,4 @@
-import std/[os, strutils, tables]
+import std/[os, sequtils, strutils, tables]
 import ../../src/types
 import ../../src/docker/ids
 import ../../src/docker/util
@@ -41,6 +41,23 @@ proc testPatterns() =
   assertEq(parseImage("alpine").registryRef(),
            ("registry-1.docker.io", "registry-1.docker.io/library/alpine"))
   assertEq(parseImage("Localhost:5000/App").registryRef().host, "localhost:5000")
+  # case and the default HTTPS port do not change the registry
+  assertEq(normalizeRegistryPattern("GHCR.io:443"), "ghcr.io")
+  assertEq(normalizeRegistryPattern("ghcr.io:443/acme/*"), "ghcr.io/acme/*")
+  assertEq(normalizeRegistryPattern("Docker.io:443/alpine"), "registry-1.docker.io/library/alpine")
+  assertEq(normalizeRegistryPattern("*.example.com:443"), "*.example.com")
+  for (image, repo) in [
+    ("ghcr.io:443/acme/app", "ghcr.io/acme/app"),
+    ("GHCR.IO/acme/app", "ghcr.io/acme/app"),
+    ("Docker.io/library/alpine", "registry-1.docker.io/library/alpine"),
+    ("Docker.io/alpine", "registry-1.docker.io/library/alpine"),
+    ("docker.io:443/alpine", "registry-1.docker.io/library/alpine"),
+    ("index.docker.io:443/acme/app", "registry-1.docker.io/acme/app"),
+    ("registry-1.docker.io:443/library/alpine", "registry-1.docker.io/library/alpine"),
+    ("localhost:5000/app", "localhost:5000/app"),
+    ("ghcr.io:8443/acme/app", "ghcr.io:8443/acme/app"),
+  ]:
+    assertEq(parseImage(image, defaultTag = "").registryRef().repo, repo)
 
 proc testMatching() =
   let hub: seq[RegistryEntry] = @[("glob", "docker.io")]
@@ -64,6 +81,16 @@ proc testMatching() =
   let ecr: seq[RegistryEntry] = @[("glob", "*.dkr.ecr.*.amazonaws.com")]
   assertEq(decide("123.dkr.ecr.us-east-1.amazonaws.com/app", ecr), mrAllowed)
   assertEq(decide("public.ecr.aws/app", ecr), mrDenied)
+
+  # denylists cannot be bypassed by spelling the host differently
+  let ghcr: seq[RegistryEntry] = @[("glob", "ghcr.io")]
+  for image in ["ghcr.io:443/acme/app", "GHCR.io/acme/app", "Ghcr.IO:443/acme/app"]:
+    assertEq(decide(image, @[], ghcr), mrDenied)
+  for image in ["Docker.io/library/alpine", "registry-1.docker.io:443/library/alpine",
+                "docker.io:443/alpine", "INDEX.docker.io/alpine"]:
+    assertEq(decide(image, @[], hub), mrDenied)
+    assertEq(decide(image, official), mrAllowed)
+  assertEq(decide("ghcr.io:8443/acme/app", @[], ghcr), mrAllowed)
 
   let ports: seq[RegistryEntry] = @[("glob", "localhost:*")]
   assertEq(decide("localhost:5000/app", ports), mrAllowed)
@@ -137,11 +164,15 @@ proc testRequireDigest() =
   assertEq(both.check(PolicyInput(subjects: @[subject("alpine")])).len, 1)
 
 proc invocation(outputs: openArray[string], tags: seq[string] = @[],
-                push = false): DockerInvocation =
+                push = false, cacheFrom: seq[string] = @[],
+                cacheTo: seq[string] = @[]): DockerInvocation =
   ## outputs as parsed by cmdline.nim, with fields separated by `;` so that
   ## names can contain the commas of a quoted CSV field
   result = DockerInvocation(cmd: DockerCmd.build, foundPush: push,
-                            foundTags: parseImages(tags))
+                            foundTags: parseImages(tags),
+                            foundCacheFrom: cacheFrom, foundCacheTo: cacheTo,
+                            foundBuildArgs: newTable[string, string](),
+                            dfDirectives: newOrderedTable[string, string]())
   for spec in outputs:
     var kv = newOrderedTable[string, string]()
     for field in spec.split(";"):
@@ -195,11 +226,17 @@ proc testBuildPushTargets() =
   assertEq(invocation(["type=registry;name=ignored.example/app;" &
     "dangling-name-prefix=denied.example/app"], @["ghcr.io/acme/app:1"], push = true)
     .buildPushTargets(), @["ghcr.io/acme/app:1", "denied.example/app"])
+  # BuildKit's own (misspelled) key
   assertEq(invocation(["type=registry;name=ghcr.io/acme/app:1;" &
-    "dangling-name-prefix=denied.example/app;dangling-name-only=true"])
+    "dangling-name-prefix=denied.example/app;danging-name-empty-only=true"])
     .buildPushTargets(), @["ghcr.io/acme/app:1"])
   assertEq(invocation(["type=registry;dangling-name-prefix=denied.example/app;" &
-    "dangling-name-only=true"]).buildPushTargets(), @["denied.example/app"])
+    "danging-name-empty-only=true"]).buildPushTargets(), @["denied.example/app"])
+  # BuildKit ignores other spellings, so they do not suppress the prefix push
+  for key in ["dangling-name-only", "dangling-name-empty-only"]:
+    assertEq(invocation(["type=registry;name=ghcr.io/acme/app:1;" &
+      "dangling-name-prefix=denied.example/app;" & key & "=true"])
+      .buildPushTargets(), @["ghcr.io/acme/app:1", "denied.example/app"])
   assertEq(invocation(["type=image;name=local/app;push=false;" &
     "dangling-name-prefix=denied.example/app"]).buildPushTargets(), newSeq[string]())
   assertEq(invocation(["type=image;name=local/app;push-by-digest=true"])
@@ -303,6 +340,67 @@ proc testEngine() =
     pushTargets: @["123.dkr.ecr.eu-west-1.amazonaws.com/app:1"]))
   doAssert policyOutcome == nil
 
+proc testCache() =
+  assertEq(parseCacheEntry("ghcr.io/acme/cache")["ref"], "ghcr.io/acme/cache")
+  assertEq(parseCacheEntry("ghcr.io/acme/cache")["type"], "registry")
+  let entry = parseCacheEntry("type=registry,\"REF=ghcr.io/acme/cache:1\",mode=max")
+  doAssert entry["type"] == "registry" and entry["ref"] == "ghcr.io/acme/cache:1"
+  doAssertRaises(ValueError): discard parseCacheEntry("ref=ghcr.io/acme/cache")
+  doAssertRaises(ValueError): discard parseCacheEntry("type=registry,ref")
+
+  # registry cache exports push; inline, local and gha caches do not
+  assertEq(invocation([], @["ghcr.io/acme/app:1"], push = true, cacheTo = @[
+    "type=registry,ref=denied.example/cache,mode=max", "type=inline",
+    "type=local,dest=/tmp/cache", "type=gha", "quay.io/acme/cache"]).buildPushTargets(),
+    @["ghcr.io/acme/app:1", "denied.example/cache", "quay.io/acme/cache"])
+  assertEq(invocation([], cacheTo = @["type=registry,ref=denied.example/cache"])
+    .buildPushTargets(), @["denied.example/cache"])
+  doAssertRaises(ValueError):
+    discard invocation([], cacheTo = @["type=registry"]).buildPushTargets()
+
+  var ctx = invocation([], cacheFrom = @["ghcr.io/acme/cache:1",
+    "type=registry,ref=denied.example/cache", "type=local,src=/tmp/cache",
+    "type=gha", "type=registry", "nonsense"])
+  ctx.dfDirectives["syntax"] = "docker/dockerfile:1"
+  ctx.foundBuildArgs["BUILDKIT_SYNTAX"] = "denied.example/frontend:1 --flag"
+  var input = PolicyInput(command: "build")
+  input.addPullRefs(ctx)
+  # a bare value is a registry cache reference
+  let refs = input.pullRefs.mapIt((it.raw, it.source))
+  let wantRefs = @[
+    ("denied.example/frontend:1", "syntax"), ("docker/dockerfile:1", "syntax"),
+    ("ghcr.io/acme/cache:1", "cache_from"), ("denied.example/cache", "cache_from"),
+    ("nonsense", "cache_from")]
+  doAssert refs == wantRefs, $refs
+  assertEq(input.pullRefErrors.len, 1)
+  doAssert "type=registry" in input.pullRefErrors[0].reason
+  doAssert input.pullRefErrors[0].kind == "error"
+
+  # pull refs are not build inputs, so image rules do not see them
+  doAssert input.subjects.len == 0
+
+  let settings = RegistriesConfig(pullAllowed: @[("glob", "docker.io"), ("glob", "ghcr.io")],
+                                  requireDigest: true)
+  let findings = settings.check(input)
+  let got = findings.mapIt((it.image, it.source, it.kind))
+  let wantGot = @[
+    ("", "", "error"),
+    ("denied.example/frontend:1", "syntax", "violation"),
+    ("docker/dockerfile:1", "syntax", "violation"),
+    ("denied.example/cache", "cache_from", "violation")]
+  doAssert got == wantGot
+  assertEq(findings[2].reason, "image is not pinned by digest")
+  doAssert findings.allIt(it.rule == "registries")
+  # push-only policies ignore pulled images, including pull refs
+  assertEq(RegistriesConfig(pushDenied: @[("glob", "docker.io")]).check(input).len, 0)
+  doAssert evaluateJson("""{"mode":"enforce","on_error":"block","registries":
+    {"enabled":true,"pull_allowed":[["glob","docker.io"],["glob","ghcr.io"]]}}""",
+    PolicyInput(command: "build", pullRefErrors: input.pullRefErrors))
+  doAssert policyOutcome.findings[0].kind == "error"
+  doAssert not evaluateJson("""{"mode":"enforce","on_error":"allow","registries":
+    {"enabled":true,"pull_allowed":[["glob","docker.io"],["glob","ghcr.io"]]}}""",
+    PolicyInput(command: "build", pullRefErrors: input.pullRefErrors))
+
 testPatterns()
 testMatching()
 testCheck()
@@ -310,3 +408,4 @@ testRequireDigest()
 testBuildPushTargets()
 testJson()
 testEngine()
+testCache()

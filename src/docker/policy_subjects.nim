@@ -3,7 +3,7 @@
 
 ## Pure subject collection from parsed Dockerfiles and extracted chalk marks.
 ## Docker I/O lives in policy.nim so metadata decoding can be tested directly.
-import std/[sequtils, strutils, tables]
+import std/[os, parsecsv, sequtils, streams, strutils, tables]
 import ".."/[policy/engine, types]
 import "."/[dockerfile, ids, util]
 
@@ -62,6 +62,85 @@ proc buildSubjects*(ctx: DockerInvocation, allStages = false): PolicyInput =
       result.subjects.add(PolicySubject(image: image, raw: $image, digests: digests,
                                         stage: section.alias, source: source))
 
+proc danglingNameOnly(output: OrderedTableRef[string, string]): bool =
+  # BuildKit only reads its misspelled key and ignores other spellings, which
+  # must then not suppress the prefix push:
+  # https://github.com/moby/buildkit/blob/master/exporter/containerimage/exptypes/keys.go
+  output.exporterBool("danging-name-empty-only")
+
+proc parseCacheEntry*(value: string): OrderedTableRef[string, string] =
+  ## a `--cache-from`/`--cache-to` value, as buildx parses it: a bare
+  ## reference is a registry cache, otherwise CSV `key=value` attributes:
+  ## https://github.com/docker/buildx/blob/master/util/buildflags/cache.go
+  result = newOrderedTable[string, string]()
+  var
+    p: CsvParser
+    fields: seq[string]
+  let s = newStringStream(value)
+  p.open(s, "cache", separator = ',', quote = '"')
+  try:
+    if p.readRow():
+      fields = p.row
+  finally:
+    p.close()
+  if len(fields) == 1 and '=' notin fields[0]:
+    result["type"] = "registry"
+    result["ref"]  = fields[0].strip()
+    return
+  for field in fields:
+    let parts = field.split('=', maxsplit = 1)
+    if len(parts) != 2:
+      raise newException(ValueError, "invalid cache attribute: " & field)
+    result[parts[0].strip().toLowerAscii()] = parts[1]
+  if result.getOrDefault("type") == "":
+    raise newException(ValueError, "cache type required: " & value)
+
+proc registryCacheRef(value: string): string =
+  ## the registry reference of a cache entry, "" when it is not a registry cache
+  let entry = parseCacheEntry(value)
+  if entry["type"] != "registry":
+    return ""
+  result = entry.getOrDefault("ref").strip()
+  if result == "":
+    raise newException(ValueError, "registry cache without a ref: " & value)
+
+proc syntaxRefs(ctx: DockerInvocation): seq[string] =
+  ## BuildKit pulls the frontend named by `BUILDKIT_SYNTAX` or else the
+  ## `# syntax=` directive; both are checked as either may be used
+  if ctx.foundBuildArgs != nil and "BUILDKIT_SYNTAX" in ctx.foundBuildArgs:
+    var value = ctx.foundBuildArgs["BUILDKIT_SYNTAX"]
+    if value == "":
+      # `--build-arg BUILDKIT_SYNTAX` takes the value from the environment
+      value = getEnv("BUILDKIT_SYNTAX")
+    # the value may carry frontend arguments after the image
+    let image = value.strip().split(' ', maxsplit = 1)[0]
+    if image != "":
+      result.add(image)
+  if ctx.dfDirectives != nil:
+    let image = ctx.dfDirectives.getOrDefault("syntax").strip()
+    if image != "" and image notin result:
+      result.add(image)
+
+proc addPullRefs*(input: var PolicyInput, ctx: DockerInvocation) =
+  ## Images a build pulls besides its build inputs: the BuildKit frontend and
+  ## registry cache imports. Only the registries rule checks them, as they
+  ## are not part of the built image.
+  for image in ctx.syntaxRefs():
+    let parsed = parseImage(image, defaultTag = "")
+    var digests: seq[string]
+    digests.addDigest(parsed.digest)
+    input.pullRefs.add(PolicySubject(image: parsed, raw: image, digests: digests,
+                                     source: "syntax"))
+  for value in ctx.foundCacheFrom:
+    try:
+      let cacheRef = registryCacheRef(value)
+      if cacheRef != "":
+        input.pullRefs.add(PolicySubject(image: parseImage(cacheRef, defaultTag = ""),
+                                         raw: cacheRef, source: "cache_from"))
+    except CatchableError:
+      input.pullRefErrors.add(collectionError("could not parse --cache-from " & value &
+                                              ": " & getCurrentExceptionMsg()))
+
 proc buildPushTargets*(ctx: DockerInvocation): seq[string] =
   ## images `docker build` pushes. buildx treats `--push` and
   ## `--output type=registry` as `type=image,push=true`, and `--tag` replaces
@@ -88,11 +167,16 @@ proc buildPushTargets*(ctx: DockerInvocation): seq[string] =
           if name notin result:
             result.add(name)
     let prefix = output.getOrDefault("dangling-name-prefix")
-    if prefix != "" and (not output.exporterBool("dangling-name-only") or not named) and
+    if prefix != "" and (not output.danglingNameOnly() or not named) and
        prefix notin result:
       # Its digest is only known after the build; registry matching needs
       # the destination repository, which is already supplied here.
       result.add(prefix)
+  # registry cache exports push to their ref; inline caches go with the image
+  for value in ctx.foundCacheTo:
+    let cacheRef = registryCacheRef(value)
+    if cacheRef != "" and cacheRef notin result:
+      result.add(cacheRef)
 
 proc metadataTable(value: Box): OrderedTableRef[string, Box] =
   if value.isNil() or value.kind != MkTable:

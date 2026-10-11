@@ -53,12 +53,20 @@ proc looksLikeHost(part: string): bool =
     part != part.toLowerAscii() or
     part.hasGlob()
 
+proc canonicalHost*(host: string): string =
+  ## Registry hosts are case-insensitive and `:443` is the default HTTPS port,
+  ## so `GHCR.io:443` is `ghcr.io`; Docker Hub's aliases are the host docker
+  ## pulls from. `parseImage` and `DockerImage.normalize` keep both the case
+  ## and the port, so a denylist on `ghcr.io` would miss `ghcr.io:443/...`.
+  result = host.toLowerAscii()
+  result.removeSuffix(":443")
+  if result in ["docker.io", "index.docker.io"]:
+    result = dockerHub
+
 proc normalizeHost(host: string): string =
-  let lower = host.toLowerAscii()
-  if lower.hasGlob() or not lower.looksLikeHost():
-    return lower
-  # maps docker.io and index.docker.io to the registry docker pulls from
-  return parseImage(lower & "/x").registry
+  if host.looksLikeHost():
+    return canonicalHost(host)
+  return host.toLowerAscii()
 
 proc normalizeRegistryPattern*(pattern: string): string =
   ## `host` or `host/repository` glob, matched against the normalized
@@ -84,7 +92,7 @@ proc normalizeRegistryPattern*(pattern: string): string =
   return host & "/" & path
 
 proc registryRef*(image: DockerImage): tuple[host, repo: string] =
-  ## lowercase registry host and `host/repository` the image is pulled from
+  ## canonical registry host and `host/repository` the image is pulled from
   ## or pushed to
   if image.repo == "":
     return ("", "")
@@ -93,8 +101,12 @@ proc registryRef*(image: DockerImage): tuple[host, repo: string] =
     slash      = normalized.find('/')
   if slash < 0:
     return ("", "")
-  let host = normalized[0 ..< slash].toLowerAscii()
-  return (host, host & normalized[slash .. ^1])
+  let host = canonicalHost(normalized[0 ..< slash])
+  var path = normalized[slash + 1 .. ^1]
+  # `normalize` only adds `library/` for hosts it maps to Docker Hub itself
+  if host == dockerHub and '/' notin path:
+    path = "library/" & path
+  return (host, host & "/" & path)
 
 proc familiarRegistry(value: string): string =
   if value == dockerHub or value.startsWith(dockerHub & "/"):
@@ -166,7 +178,11 @@ proc pushFinding(target, kind, reason: string): PolicyFinding =
 
 proc check*(settings: RegistriesConfig, input: PolicyInput): seq[PolicyFinding] =
   if settings.checksPull():
-    for subject in input.subjects:
+    for e in input.pullRefErrors:
+      var f = e
+      f.rule = ruleName
+      result.add(f)
+    for subject in input.subjects & input.pullRefs:
       if subject.image.repo == "scratch":
         continue
       let (res, reason) = subject.image.checkRegistry(settings.pullAllowed,
@@ -181,8 +197,10 @@ proc check*(settings: RegistriesConfig, input: PolicyInput): seq[PolicyFinding] 
         result.add(subject.newFinding(ruleName, "error", reason))
         continue
       # the reference as written: a digest chalk resolved for a tag
-      # does not pin what a later build pulls
-      if settings.requireDigest and subject.image.digest == "":
+      # does not pin what a later build pulls. Cache imports are exempt:
+      # their tags are rewritten by every --cache-to export.
+      if settings.requireDigest and subject.source != "cache_from" and
+         subject.image.digest == "":
         result.add(subject.newFinding(ruleName, "violation",
                                       settings.withMessage("image is not pinned by digest")))
 

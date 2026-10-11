@@ -25,7 +25,8 @@ type
     raw*:     string      # as referenced, used for reporting
     digests*: seq[string] # all known digests of the image
     stage*:   string
-    source*:  string      # "from", "copy_from" or "mount_from"
+    source*:  string      # "from", "copy_from", "mount_from", or for
+                          # `pullRefs` "syntax" or "cache_from"
 
   PolicyInput* = object
     subjects*: seq[PolicySubject]
@@ -41,7 +42,16 @@ type
     ## Dockerfile of a build, so rules can honor `<Dockerfile>.dockerignore`;
     ## empty for push or when read from stdin
     dockerfilePath*: string
-    ## image references the command pushes, as given on the command line
+    ## build only: images the build pulls that are not part of the built
+    ## image, i.e. the BuildKit frontend (`# syntax=`, `BUILDKIT_SYNTAX`,
+    ## source "syntax") and registry cache imports (`--cache-from`, source
+    ## "cache_from"). Not in `subjects` so image rules such as
+    ## `golden_images` do not check them; the `registries` rule does.
+    pullRefs*: seq[PolicySubject]
+    ## `pullRefs` that could not be determined, for rules that check them
+    pullRefErrors*: seq[PolicyFinding]
+    ## image references the command pushes, as given on the command line,
+    ## including registry cache exports (`--cache-to type=registry,ref=`)
     pushTargets*: seq[string]
     ## chalk marks of the images `push` pushes, for those that are chalked
     pushMarks*: seq[ChalkDict]

@@ -133,6 +133,7 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
       result = PolicyInput()
       result.errors.add(collectionError("could not collect policy subjects: " &
                                         getCurrentExceptionMsg()))
+    result.addPullRefs(ctx)
     result.addCommandInput("build", ctx.buildPushTargets())
     # a copy, so a rule cannot change the host report; push policies run
     # before initCollection(), so only build has host info

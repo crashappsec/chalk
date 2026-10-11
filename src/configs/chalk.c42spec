@@ -2733,8 +2733,10 @@ singleton registries {
   user_def_ok:   false
   doc: """
 Restricts the registries a build pulls images from (`FROM`,
-`COPY --from`, `RUN --mount=from` and image named contexts) and the
-registries `docker build --push` and `docker push` push to. Unlike
+`COPY --from`, `RUN --mount=from`, image named contexts, the BuildKit
+frontend from `# syntax=` or `BUILDKIT_SYNTAX` and `--cache-from` registry
+caches) and the registries `docker build --push` (including
+`--cache-to type=registry`) and `docker push` push to. Unlike
 `golden_images`, which allowlists exact images, this works at the level of
 registry hosts and repository namespaces; both can be enabled together.
 
@@ -2749,8 +2751,16 @@ Entries are `(kind, value)` tuples. The supported kind is `glob`:
 
 Images are normalized like docker does, so `alpine` is
 `docker.io/library/alpine` and `docker.io`, `index.docker.io` and
-`registry-1.docker.io` are the same registry. Tags and digests in values
-are ignored. Unknown kinds are reported as evaluation errors.
+`registry-1.docker.io` are the same registry. Hosts are case-insensitive
+and the default port `:443` is ignored. Tags and digests in values are
+ignored. Unknown kinds are reported as evaluation errors.
+
+Patterns match the whole name, not a prefix: `ghcr.io/acme` matches only
+that repository, use `ghcr.io/acme/*` for the namespace. Prefer
+allowlists: a denylist only blocks the names it matches (not mirrors or
+other names for the same registry). Commands chalk does not wrap
+(`docker buildx bake`, `docker compose`) and images pulled by a base
+image's `ONBUILD` instructions are not checked.
 """
 
   field enabled {
@@ -2811,9 +2821,10 @@ Push targets matching an entry are violations, even if they match
     shortdoc: "Require pulled images to be pinned by digest"
     doc: """
 Every image the build pulls must be referenced by digest
-(`image@sha256:...`). On `docker push` the references recorded in the
+(`image@sha256:...`), including the BuildKit frontend but not
+`--cache-from` caches. On `docker push` the references recorded in the
 image's chalk mark are checked, which include base image digests chalk
-pinned during the build.
+pinned during the build, so this is effectively a build-time check.
 """
   }
 

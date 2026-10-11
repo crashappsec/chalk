@@ -514,6 +514,8 @@ type
       foundPush*:             bool
       foundLoad*:             bool
       foundOutputs*:          seq[OrderedTableRef[string, string]]
+      foundCacheFrom*:        seq[string]
+      foundCacheTo*:          seq[string]
 
       platforms*:             seq[DockerPlatform]
       gitContext*:            DockerGitContext
