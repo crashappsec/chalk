@@ -41,7 +41,9 @@ proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
     raise newException(ValueError, "missing implementation of " & $(cb))
   return unpack[T](value.get())
 
-proc runTool*(tool: string, path: string, force = false): ChalkDict =
+proc runTool*(tool: string, path: string, force = false, record = true): ChalkDict =
+  ## `force` runs `tool` even if it already ran on `path`; without `record`
+  ## the run does not count as one, so chalk's own run can still follow
   let key = tool & ":" & path
   if not force and key in alreadyRan:
     raise newException(AlreadyRanError, "")
@@ -85,7 +87,8 @@ proc runTool*(tool: string, path: string, force = false): ChalkDict =
     d.del("info")
 
   trace(tool & ": produced keys " & $(d.keys().toSeq()))
-  alreadyRan.incl(key)
+  if record:
+    alreadyRan.incl(key)
   return d
 
 proc runOneTool(tool: string, path: string): ChalkDict =
