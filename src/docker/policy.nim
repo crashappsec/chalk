@@ -76,25 +76,54 @@ proc localDir(path: string): string =
 proc contextError(what, value: string): PolicyFinding =
   newSubjectFinding("", "error", value, what & " cannot be checked by build context rules")
 
+proc buildArgIsTrue(ctx: DockerInvocation, name: string): bool =
+  ## Whether build arg `name` is set to anything BuildKit may read as true.
+  ## `--build-arg NAME` without a value takes it from the environment.
+  if ctx.foundBuildArgs == nil or name notin ctx.foundBuildArgs:
+    return false
+  var value = ctx.foundBuildArgs[name]
+  if value == "":
+    value = getEnv(name)
+  return value notin ["", "0", "f", "F", "false", "FALSE", "False"]
+
+proc buildsCheckout(ctx: DockerInvocation, input: var PolicyInput): bool =
+  ## Whether docker can build the git context from chalk's checkout rather
+  ## than fetching it again, which keeps the build to the commit the rules
+  ## inspected. The checkout has neither submodules nor `.git`, which
+  ## BuildKit's git source provides, so then BuildKit fetches the URL.
+  let git = ctx.gitContext
+  if fileExists(git.tmpWorkTree / ".gitmodules"):
+    input.contextErrors.add(newSubjectFinding(
+      "", "error", git.context,
+      "git submodules of " & git.context & " cannot be checked by build context rules"))
+    return false
+  if ctx.buildArgIsTrue("BUILDKIT_CONTEXT_KEEP_GIT_DIR"):
+    trace("policy: BUILDKIT_CONTEXT_KEEP_GIT_DIR is set, docker fetches " & git.context)
+    return false
+  return true
+
 proc addPolicyContexts*(input: var PolicyInput, ctx: DockerInvocation) =
   ## Local directories the build reads, for rules that scan the build context.
   ## Contexts that are not local directories (stdin, URLs, git named contexts)
   ## go to `contextErrors` so those rules cannot pass without checking them.
+  var checkedOut = false
   let main =
     if ctx.gitContext != nil:
       if not ctx.gitContext.isCheckedOut():
         discard ctx.gitContext.checkout()
+        checkedOut = true
       ctx.gitContext.contextPath()
     else:
       ctx.foundContext.localDir()
   if main != "":
     if not main.dirExists():
       raise newException(ValueError, "build context directory does not exist: " & main)
-    if ctx.gitContext != nil:
-      # Command-line processing precedes this checkout. Build the worktree
-      # we inspected rather than fetching the mutable Git reference again.
+    # without build context flag support, processGitContext already checked
+    # the context out and command-line processing built from it
+    if checkedOut and ctx.buildsCheckout(input):
       ctx.newCmdLine = ctx.gitContext.replaceContextArg(ctx.newCmdLine)
     input.contextDirs.add(main)
+    input.mainContextDir = main
   elif ctx.foundContext == "-":
     input.contextErrors.add(contextError("the build context from stdin", "-"))
   else:

@@ -515,6 +515,10 @@ Rules that need more than the referenced images register with
 - `command`: `build` or `push`;
 - `contextDirs`: local build context directories (the checked out subdirectory
   for git contexts, plus local named contexts), empty for `push`;
+- `mainContextDir`: the entry of `contextDirs` that is the main build context,
+  e.g. to apply `<Dockerfile>.dockerignore` only there; empty when the main
+  context is not a local directory, in which case `contextDirs` only has
+  named contexts;
 - `contextErrors`: build contexts that are not local directories (stdin,
   tarball URLs, git named contexts). Image and stage named contexts
   (`docker-image://`, `oci-layout://`, `target:`) are left to image rules. The
@@ -562,3 +566,12 @@ the `policy*Setting` accessors, which read the same path from con4m when
 - Policies that need the contents of the built image (for example its SBOM)
   are not supported yet, as they require evaluating the image after it is
   built but before it is pushed.
+- A remote git build context is checked out for rules that scan the build
+  context, and docker then builds that checkout, so it builds the commit the
+  rules inspected. The checkout has no git submodules and no `.git`
+  directory, which BuildKit's git source provides, so when the repository has
+  a `.gitmodules` file or the build arg `BUILDKIT_CONTEXT_KEEP_GIT_DIR` is
+  set, docker fetches the git context itself instead. With submodules this is
+  reported as an evaluation error of those rules, as their contents are not
+  checked. In both cases a branch or tag that moves between the policy check
+  and the build is built at its new commit.
