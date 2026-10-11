@@ -34,7 +34,7 @@ proc newContext(files: openArray[(string, string)]): string =
     writeFile(result / path, content)
 
 proc findings(settings: CertificatesConfig, dirs: seq[string]): seq[PolicyFinding] =
-  settings.check(PolicyInput(command: "build", contextDirs: dirs), now)
+  settings.check(PolicyInput(command: "build", contextDirs: dirs, mainContextDir: dirs[0]), now)
 
 proc locations(findings: seq[PolicyFinding], kind = "violation"): seq[string] =
   for f in findings:
@@ -418,14 +418,21 @@ proc testScanning() =
   defer: removeDir(dfDir)
   settings = defaultCertificatesConfig()
   let withDockerfile = PolicyInput(command: "build", contextDirs: @[ctx, outside],
-                                   dockerfilePath: dfDir / "Dockerfile")
+                                   mainContextDir: ctx, dockerfilePath: dfDir / "Dockerfile")
   let dfFound = settings.check(withDockerfile, now).locations()
   assertEq(dfFound, @[outside / "expired.pem", "ca-certificates.crt", "excluded/expired.pem",
                       "ignored/expired.pem", "ignored/keep.pem"])
-  let noSpecific = PolicyInput(command: "build", contextDirs: @[ctx],
+  let noSpecific = PolicyInput(command: "build", contextDirs: @[ctx], mainContextDir: ctx,
                                dockerfilePath: ctx / "Dockerfile")
   assertEq(settings.check(noSpecific, now).locations(),
            @["a/expired.pem", "ca-certificates.crt", "excluded/expired.pem", "ignored/keep.pem"])
+  # a named context never uses <Dockerfile>.dockerignore, even when the main
+  # context is not local
+  let namedOnly = PolicyInput(command: "build", contextDirs: @[ctx],
+                              dockerfilePath: dfDir / "Dockerfile")
+  let namedFound = settings.check(namedOnly, now).locations()
+  doAssert ctx / "a/expired.pem" in namedFound
+  doAssert "a/expired.pem" notin namedFound
 
   # push has no build context
   assertEq(settings.check(PolicyInput(command: "push", pushTargets: @["app:1"]), now).len, 0)
@@ -439,11 +446,16 @@ proc testScanning() =
   assertEq(settings.check(remote, now).len, 0)
 
 proc rejects(text, reason: string) =
+  ## the document is unusable as a whole, or as its only policy
+  var message = ""
   try:
-    discard parsePolicyJson(text)
-    doAssert false, "accepted: " & text
+    let configs = parsePolicyJson(text)
+    doAssert configs.len == 1, "accepted: " & text
+    message = configs[0].configError
   except ValueError:
-    doAssert reason in getCurrentExceptionMsg(), getCurrentExceptionMsg()
+    message = getCurrentExceptionMsg()
+  doAssert message != "", "accepted: " & text
+  doAssert reason in message, message
 
 proc testJson() =
   loadPolicyRules()
@@ -519,7 +531,8 @@ proc testJson() =
   assertEq(hint.rule, "certificates")
   assertEq(hint.message, "Use the Acme PKI")
   assertEq(hint.allowed, @["cn:Acme *", "sha256:" & caSha256])
-  let res = evaluatePolicy(policy, rules, PolicyInput(command: "build", contextDirs: @[ctx]))
+  let res = evaluatePolicy(policy, rules, PolicyInput(command: "build", contextDirs: @[ctx],
+                                                          mainContextDir: ctx))
   assertEq(res.result, "blocked")
   assertEq(res.findings.locations(), @["expired.pem"])
   doAssert res.findings[0].reason.endsWith(". Use the Acme PKI")

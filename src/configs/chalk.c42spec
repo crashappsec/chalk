@@ -2742,9 +2742,14 @@ build context directories of `chalk docker build`: expired or not yet valid
 certificates, weak keys and signatures, self-signed or CA certificates and
 untrusted issuers.
 
-The build context is scanned before docker runs, skipping symlinks, `.git`
-directories, files excluded by the context's `.dockerignore` and
-well-known CA bundles. `chalk docker push` has no build context, so the rule
+The whole build context is scanned before docker runs (not only the files
+the Dockerfile copies), skipping symlinks, non-regular files, `.git`
+directories, files excluded by `.dockerignore` and well-known CA bundles;
+test fixtures need `exclude_paths` or a `.dockerignore` entry. Certificates
+that cannot be checked (malformed or unsupported blocks, files over
+`max_file_size`, unparseable dates) are evaluation errors, so `on_error`
+decides. PKCS#7, PKCS#12, Java keystores and `TRUSTED CERTIFICATE` blocks
+are not supported. `chalk docker push` has no build context, so the rule
 does not apply to it. Private keys are not reported by this rule.
 
 Each offending certificate is one finding whose `subject` is the
@@ -2865,7 +2870,8 @@ When not empty, every certificate's issuer must match an entry:
   certificate is its own issuer, so this also pins trusted roots.
 
 Names are not authenticated, so `cn` and `dn` only guard against mistakes;
-use `sha256` to pin a CA. Unknown kinds are reported as evaluation errors.
+use `sha256` to pin a CA. Kinds are case insensitive; unknown kinds are
+configuration errors.
 """
   }
 
@@ -2905,8 +2911,12 @@ Extensions of the files checked. Empty means `pem`, `crt`, `cer`, `cert`,
     default:  true
     shortdoc: "Skip well-known CA bundles"
     doc: """
-Skip system and library CA bundles such as `ca-certificates.crt`,
-`cacert.pem` and `etc/ssl/certs/`, which would otherwise flood findings.
+Skip system and library CA bundles, which would otherwise flood findings:
+`etc/ssl/certs/`, `etc/pki/ca-trust/`, `usr/share/ca-certificates/` and
+similar directories at any depth, and bundle names such as
+`ca-certificates.crt` or `cacert.pem` only under `etc/ssl/`, `etc/pki/`,
+`certifi/` and other library CA directories. Skipped bundles still supply
+`sha256` issuer pins.
 """
   }
 
@@ -2917,7 +2927,8 @@ Skip system and library CA bundles such as `ca-certificates.crt`,
     doc: """
 Skip files excluded by `.dockerignore`, as they never reach the image. As
 in BuildKit, a `<Dockerfile>.dockerignore` next to the Dockerfile takes
-precedence over the build context's `.dockerignore`.
+precedence over the main build context's `.dockerignore`; the legacy
+builder ignores it.
 """
   }
 
@@ -2936,7 +2947,8 @@ scan stops and an evaluation error is reported, so `on_error` decides.
     default:  1048576
     shortdoc: "Maximum size of a checked file in bytes"
     doc: """
-Larger files are skipped.
+Larger files are not read. One whose extension is in `extensions` or that
+starts like a certificate is reported as an evaluation error.
 """
   }
 

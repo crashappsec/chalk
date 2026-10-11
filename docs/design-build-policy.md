@@ -418,9 +418,18 @@ or DER) found:
   4514 distinguished name (most specific attribute first, e.g.
   `CN=Acme Root CA,O=Acme,C=US`). `sha256` is the fingerprint (hex, colons
   and case ignored) of the issuing certificate, which must itself be in the
-  build context; a self-signed certificate is its own issuer. Names are not
-  authenticated, so only `sha256` pins a CA. Unknown kinds are evaluation
-  errors unless another entry matches.
+  build context (CA bundles skipped by `skip_ca_bundles` count) and must
+  have signed the certificate; a self-signed certificate is its own issuer.
+  Names are not authenticated, so only `sha256` pins a CA. Kinds are case
+  insensitive; an unknown kind is a configuration error.
+
+Checks that cannot be decided are evaluation errors (`on_error` decides),
+never silent passes: a file with a malformed or unsupported certificate
+block (later certificates of a bundle are still checked), a validity date
+that cannot be parsed while a validity check is enabled, or an RSA key
+OpenSSL cannot load while `min_rsa_key_size` is set. Keys of unsupported
+algorithms or curves are reported by their OID, so `allowed_key_types` and
+`allowed_ec_curves` still apply.
 
 A certificate with several problems is one finding whose `reason` lists
 them, e.g. `certificate expired on 2020-01-01; weak signature algorithm
@@ -432,32 +441,48 @@ named contexts other than the main one are reported with absolute paths.
 
 Which files are read:
 
-- files with the extensions in `extensions` (by default `pem`, `crt`, `cer`,
-  `cert`, `der` and `ca-bundle`; `*` reads every file) that contain a PEM
-  certificate or start like a DER one;
+- every regular file of the context with the extensions in `extensions` (by
+  default `pem`, `crt`, `cer`, `cert`, `der` and `ca-bundle`; `*` reads
+  every file) that contains a PEM certificate or starts like a DER one, not
+  only the files the Dockerfile `COPY`s. Test fixtures with expired or
+  self-signed certificates therefore need `exclude_paths` or a
+  `.dockerignore` entry. FIFOs, sockets and devices are skipped;
 - `include_paths` and `exclude_paths` use `.dockerignore` syntax, relative
   to the context; files excluded by `.dockerignore` are skipped
   (`honor_dockerignore`), as they never reach the image. As in BuildKit, a
   `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
-  the context's `.dockerignore` (main context only);
+  the context's `.dockerignore` (main context only). The legacy (non
+  BuildKit) builder ignores `<Dockerfile>.dockerignore`, so files it would
+  send may go unchecked there;
 - symlinks are never followed: docker sends them as links, so a target
   inside the context is checked on its own and one outside never reaches
   the image. `.git` directories are skipped;
 - `skip_ca_bundles` skips system and library CA bundles that would otherwise
-  flood findings (`ca-certificates.crt`, `ca-bundle.crt`, `cacert.pem`,
-  `tls-ca-bundle.pem`, `roots.pem`, ... and `etc/ssl/certs/`,
-  `etc/pki/ca-trust/`, `usr/share/ca-certificates/`);
-- work is bounded: files larger than `max_file_size` are skipped, at most
-  1000 certificates are read per file, and a context with more than
-  `max_files` entries stops the scan with an evaluation error (`on_error`
-  decides).
+  flood findings: the directories `etc/ssl/certs/`, `etc/pki/ca-trust/`,
+  `etc/pki/tls/certs/`, `usr/share/ca-certificates/` and
+  `usr/local/share/ca-certificates/` at any depth, and bundle file names
+  (`ca-certificates.crt`, `ca-bundle.crt`, `cacert.pem`,
+  `tls-ca-bundle.pem`, `roots.pem`, ...) only under `etc/ssl/`, `etc/pki/`,
+  `usr/lib/ssl/`, `usr/local/etc/openssl*/`, `certifi/` and
+  `grpc/_cython/_credentials/`, so an application's own `roots.pem` is
+  checked. Skipped bundles still supply `sha256` issuer pins;
+- work is bounded: a file larger than `max_file_size` is not read and is an
+  evaluation error when its extension is one of `extensions` or its first
+  64 KiB look like a certificate; at most 1000 certificates are read per
+  file (more is an evaluation error); a context with more than `max_files`
+  entries stops the scan with an evaluation error.
+- not supported (not checked): PKCS#7 (`.p7b`), PKCS#12 (`.p12`, `.pfx`)
+  and Java keystores; PEM `TRUSTED CERTIFICATE` blocks are evaluation
+  errors.
 
 In the job summary, each offending certificate is listed with its reasons,
 and "How to fix" shows `message` (or a generic hint) and the
 `allowed_issuers` entries.
 
 `chalk docker push` has no build context, so the rule does not apply to it
-and reports nothing. Certificates added to an image by `RUN` steps or base
+and reports nothing: certificates are only checked at build time. A build
+whose contexts are not local directories (stdin, URLs, git named contexts)
+reports each of them as an evaluation error. Certificates added to an image by `RUN` steps or base
 images are not checked, as the image does not exist yet when policies run.
 Private keys in the context are not reported by this rule; they belong to
 secret scanning.

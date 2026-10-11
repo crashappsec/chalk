@@ -578,10 +578,6 @@ proc check*(settings: CertificatesConfig, certs: seq[CertInfo], now: Time,
                                    "certificate not fully checked: " & unchecked.join("; "),
                                    cert.location()))
 
-proc mainContextDir(input: PolicyInput): string =
-  if len(input.contextDirs) > 0:
-    return input.contextDirs[0]
-
 proc check*(settings: CertificatesConfig, input: PolicyInput, now = getTime()): seq[PolicyFinding] =
   if len(input.contextDirs) == 0:
     # Push has no build context. For build, the engine reports contexts that
@@ -592,7 +588,7 @@ proc check*(settings: CertificatesConfig, input: PolicyInput, now = getTime()): 
                                    "no local build context to check"))
     return
   let scan = input.contextDirs.scanContexts(settings, input.dockerfilePath,
-                                            input.mainContextDir())
+                                            input.mainContextDir)
   result.add(scan.errors.sorted(proc(a, b: PolicyFinding): int = cmp(a.location, b.location)))
   result.add(settings.check(scan.certs.sorted(byLocation), now, scan.issuers))
 
