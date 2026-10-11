@@ -2761,7 +2761,17 @@ results inside each directory count), else the tools are run on the
 directory when the policy is evaluated (see `run_tools`).
 
 `docker push` only checks SAST results recorded in the image's chalk
-mark (not recorded by default), as there is no source code to scan.
+mark (not recorded by default), as there is no source code to scan; an
+image whose mark has no `SAST` (or `@SAST`) passes.
+
+Scan errors (e.g. timeouts) are evaluation errors and `on_error` decides;
+semgrep partial-parse warnings are ignored, and in SARIF output all
+`Syntax error` warnings are. Files semgrep skips are not checked:
+`.semgrepignore` paths (or its default list, including `build/`, `dist/`,
+`vendor/`, `test/`, `tests/` and `*_test.go`), git-ignored and large files,
+and `# nosemgrep` code. `.dockerignore` is not applied to the scan.
+Violations of rules detecting secrets omit the rule's message, which may
+contain the secret.
 
 See `docs/design-build-policy.md` in the chalk repository for details.
 """
@@ -2841,6 +2851,8 @@ local config file with the file's path, so match those with `*.<id>`.
     doc: """
 Findings in files matching one of these globs are ignored. Paths are
 relative to the scanned directory, `*` matches across `/`, e.g. `tests/*`.
+The scan does not apply `.dockerignore`, so use this for files that are
+not sent to the builder.
 """
   }
 
@@ -2870,9 +2882,9 @@ The policy is violated when more findings count than this.
     shortdoc: "Run SAST tools when results were not collected"
     doc: """
 Run the enabled `sast` tools on the build context directories
-`run_sast_tools` did not scan while evaluating the policy. When false, or when the
-tools cannot run, the policy reports an evaluation error and `on_error`
-decides.
+`run_sast_tools` did not scan, or produced no results for, while
+evaluating the policy. When false, or when the tools cannot run, the
+policy reports an evaluation error and `on_error` decides.
 """
   }
 

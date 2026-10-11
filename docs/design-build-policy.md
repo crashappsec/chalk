@@ -396,6 +396,13 @@ the normalized severity, most severe first, up to 100 findings plus one
 summarizing the rest. Findings suppressed in source (`# nosemgrep`) never
 count.
 
+Rules detecting secrets interpolate the matched value into their message
+(e.g. `hard-coded secret $VALUE`), so their violations omit the message and
+report only the rule id and location: rules with CWE-798, CWE-259 or
+CWE-321, a `category`, `subcategory`, `technology` or tag containing
+`secret`, or a rule id containing `secret`, `credential`, `password`,
+`passwd`, `token`, `api-key`, `api_key`, `apikey` or `private-key`.
+
 **Where results come from.** On `docker build`, per local build context
 directory (including local named contexts and the checkout of a git
 context; at most 8): the results `run_sast_tools` collected before policies
@@ -406,15 +413,31 @@ enabled `sast` tools on the directory, once per directory however many
 policies enable the rule, bounded by `tool.semgrep.semgrep_timeout`.
 Results it collects this way are not added to chalk reports or marks. A
 build with no local context (stdin or a remote tarball), `run_tools: false`
-for a directory `run_sast_tools` did not cover, `run_sast_tools` producing
-no results, or tools that fail or cannot be installed are evaluation errors
-handled by `on_error`.
+for a directory `run_sast_tools` did not cover (including `run_sast_tools`
+producing no results), or tools that fail or cannot be installed are
+evaluation errors handled by `on_error`. With `run_tools`, contexts
+`run_sast_tools` produced no results for are scanned on demand.
+
+**What is not checked.** semgrep decides which files it scans, and files it
+skips are not reported, so the policy cannot tell them apart from clean
+files:
+
+- paths in `.semgrepignore`, or, without one, semgrep's default ignore
+  list, which includes `build/`, `dist/`, `vendor/`, `node_modules/`,
+  `.venv/`, `test/`, `tests/`, `testsuite/`, `*_test.go` and `*.min.js`;
+- files ignored by git (`.gitignore`) inside a git repository;
+- files larger than semgrep's `--max-target-bytes` (1 MB by default);
+- code suppressed with `# nosemgrep` comments.
+
+The scan does not apply `.dockerignore`: results in files that are not sent
+to the builder still count (exclude them with `ignore_paths`).
 
 **On `docker push`** there is no source to scan, so only results recorded
 in the image's chalk mark count (`SAST` is not in the default docker mark
 template; add it with `mark_template.minimal.key.SAST.use: true`). An image
-whose mark has no `SAST` is not applicable and passes; the build was
-already checked by the build policy.
+whose mark has no `SAST`, or keeps it in an object store (`@SAST`), is not
+applicable and passes, by design: the build was already checked by the build
+policy.
 
 **Severity.** semgrep rule severities are normalized to one scale:
 
@@ -752,12 +775,25 @@ the `policy*Setting` accessors, which read the same path from con4m when
   checked. In both cases a branch or tag that moves between the policy check
   and the build is built at its new commit.
 
-Semgrep JSON `errors` with warning/error severity (including syntax errors on
-successful scanner exit) produce SAST evaluation errors. Valid matches from a
-partial scan still count. Errors scoped to files outside the evaluated build
-context do not count; errors without a path apply to the scan. Informational
-and debug diagnostics do not affect policy decisions. `on_error` controls
-whether incomplete analysis blocks an enforced policy.
+SAST scan errors produce one SAST evaluation error per tool output, even when
+semgrep exits successfully; `on_error` controls whether incomplete analysis
+blocks an enforced policy. Valid matches from a partial scan still count.
+
+- semgrep JSON: `errors` with level `warn` or `error`, e.g. `Timeout`,
+  `Fatal error`, rule errors and `Syntax error` (a file semgrep could not
+  parse at all). `PartialParsing` warnings (only some spans of a file could
+  not be parsed; the rest was scanned) are ignored, as semgrep emits them
+  routinely on real codebases. `info` and `debug` diagnostics are ignored.
+- SARIF (the default): `runs[].invocations[].toolExecutionNotifications` (and
+  `toolConfigurationNotifications`) with level `error` or `warning` (the
+  default), plus `executionSuccessful: false`. semgrep's SARIF names partial
+  parses `Syntax error` like whole-file parse failures, so `Syntax error`
+  warnings are ignored; set `tool.semgrep.semgrep_format: "json"` to treat
+  files semgrep could not parse at all as errors.
+
+Errors scoped to files outside the evaluated build context do not count;
+errors without a path (all of semgrep's SARIF notifications) apply to the
+scan.
 
 SBOM policy parsing retains every package occurrence. A repository scan keeps a
 package in a build context when any recorded location belongs to that context;
