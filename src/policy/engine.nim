@@ -183,7 +183,7 @@ proc resolveModes(configs: seq[PolicyConfig], resolver: PolicyRepoResolver): seq
     repo     = ""
     resolved = false
   for p in configs:
-    if p.configError != "" or len(p.enforceRepos) == 0:
+    if len(p.enforceRepos) == 0:
       result.add(p)
       continue
     if not resolved:

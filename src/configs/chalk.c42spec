@@ -2553,9 +2553,9 @@ See `docs/design-build-policy.md` in the chalk repository for details.
     doc: """
 When a policy cannot reach a decision (e.g. an image digest could not be
 resolved, subject metadata could not be read, repository tags could not
-be enumerated, or an allowlist entry kind is unknown), `allow` lets the build
-continue while `block` treats it as a violation. In both cases the error
-is reported.
+be enumerated, an allowlist entry kind is unknown, or the policy
+configuration is invalid), `allow` lets the build continue while `block`
+treats it as a violation. In both cases the error is reported.
 """
   }
 
@@ -2622,11 +2622,16 @@ non-empty `id`. Each policy is evaluated with its own `mode` and
 `on_error`; the build is blocked when any of them blocks it. With a
 `policies` list, `custom_check` is not evaluated.
 
-Missing fields take their defaults. A value that is not valid JSON, or that
-has unknown fields or wrongly typed values, is reported as a policy
-evaluation error and never blocks the build. An invalid entry of a
-`policies` list (including a missing or duplicate `id`) is reported the
-same way, while the other entries are still evaluated.
+Missing fields take their defaults. A policy with unknown fields or wrongly
+typed values is reported as a policy evaluation error and no rule runs. It
+keeps the `mode`, `on_error` and `enforce_repos` it declares when those are
+valid, so in `enforce` mode with `on_error` set to `block` it blocks the
+build, and in mode `off` it is not evaluated. Without a valid `mode`, and
+for a value that cannot be used as a whole (not a JSON object, or an
+invalid `policies` list), the error is reported in `audit` mode and never
+blocks. An invalid entry of a `policies` list (including a
+missing or duplicate `id`) is reported the same way, while the other entries
+are still evaluated.
 """
   }
 
