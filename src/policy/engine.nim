@@ -24,6 +24,10 @@ export api, configuration, repo, summary
 
 type
   PolicyCollector* = proc(): PolicyInput {.closure.}
+  ## Adds the build context to the input. Separate from `PolicyCollector` as
+  ## it may check out a git context, which changes what docker builds, so it
+  ## runs only when an enabled rule `requiresContext`.
+  PolicyContextCollector* = proc(input: var PolicyInput) {.closure.}
   ## normalized repository the command builds, empty when unknown
   PolicyRepoResolver* = proc(): string {.closure.}
 
@@ -60,6 +64,11 @@ proc evaluatePolicy*(settings: PolicyConfig,
         findings.add(f)
       if input.collectionFailed:
         continue
+    if rule.requiresContext:
+      for e in input.contextErrors:
+        var f = e
+        f.rule = rule.name
+        findings.add(f)
     try:
       if rule.checkInput != nil:
         findings.add(rule.checkInput(input))
@@ -187,10 +196,11 @@ proc resolveModes(configs: seq[PolicyConfig], resolver: PolicyRepoResolver): seq
       trace("policy: repository for enforce_repos: " & (if repo != "": repo else: "unknown"))
     result.add(p.resolveMode(repo))
 
-proc evaluatePolicies*(build:   ChalkDict,
-                       collect: PolicyCollector,
-                       rules:   seq[PolicyRule],
-                       repo:    PolicyRepoResolver = nil) =
+proc evaluatePolicies*(build:          ChalkDict,
+                       collect:        PolicyCollector,
+                       rules:          seq[PolicyRule],
+                       repo:           PolicyRepoResolver = nil,
+                       collectContext: PolicyContextCollector = nil) =
   ## Evaluates every configured policy with `rules`.
   ## Rule loading and subject collection belong to evaluation: failures here
   ## must never reach docker's generic failsafe without honoring policy.on_error.
@@ -205,6 +215,7 @@ proc evaluatePolicies*(build:   ChalkDict,
     results:   seq[PolicyResult]
     input:     PolicyInput
     collected = false
+    contextCollected = false
   for settings in policies:
     if settings.configError != "":
       # rules must not run on a configuration that could not be read
@@ -234,13 +245,24 @@ proc evaluatePolicies*(build:   ChalkDict,
         input.collectionFailed = true
         input.errors.add(collectionError("could not collect policy subjects: " &
                                          getCurrentExceptionMsg()))
+    if collectContext != nil and not contextCollected and not input.collectionFailed:
+      for rule in enabled:
+        if rule.requiresContext:
+          contextCollected = true
+          try:
+            collectContext(input)
+          except CatchableError:
+            input.contextErrors.add(collectionError("could not collect the build context: " &
+                                                    getCurrentExceptionMsg()))
+          break
     results.add(evaluatePolicy(settings, enabled, input, findings))
   selectPolicy(PolicyConfig())
   recordPolicyResults(results, build)
 
-proc evaluatePolicies*(build:   ChalkDict,
-                       collect: PolicyCollector,
-                       repo:    PolicyRepoResolver = nil) =
+proc evaluatePolicies*(build:          ChalkDict,
+                       collect:        PolicyCollector,
+                       repo:           PolicyRepoResolver = nil,
+                       collectContext: PolicyContextCollector = nil) =
   ## Evaluates every configured policy with the registered rules.
   if not policyEnabled():
     policyEvaluated = true
@@ -249,4 +271,4 @@ proc evaluatePolicies*(build:   ChalkDict,
   var rules: seq[PolicyRule]
   for rule in policyRules():
     rules.add(rule)
-  evaluatePolicies(build, collect, rules, repo)
+  evaluatePolicies(build, collect, rules, repo, collectContext)

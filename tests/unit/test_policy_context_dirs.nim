@@ -37,7 +37,10 @@ try:
     foundExtraContexts: newOrderedTable[string, string]())
   # Modern Buildx has fetched Git objects but has not checked them out.
   doAssert ctx.gitContext.tmpWorkTree == ""
-  let dirs = ctx.policyContextDirs()
+  var input: PolicyInput
+  input.addPolicyContexts(ctx)
+  let dirs = input.contextDirs
+  doAssert input.contextErrors.len == 0
   doAssert dirs == @[ctx.gitContext.tmpWorkTree / "service"]
   doAssert fileExists(dirs[0] / "included.pem")
   doAssert not fileExists(dirs[0] / "outside.pem")
@@ -49,11 +52,36 @@ try:
   doAssert ctx.policyDockerfilePath() == ""
   # An existing checkout is reused with its selected subdirectory intact.
   let checkout = ctx.gitContext.tmpWorkTree
-  doAssert ctx.policyContextDirs() == dirs
+  var again: PolicyInput
+  again.addPolicyContexts(ctx)
+  doAssert again.contextDirs == dirs
   doAssert ctx.gitContext.tmpWorkTree == checkout
   ctx.gitContext.subdir = "missing"
   doAssertRaises(ValueError):
-    discard ctx.policyContextDirs()
+    var missing: PolicyInput
+    missing.addPolicyContexts(ctx)
   removeDir(checkout)
+
+  # Contexts rules cannot scan are reported rather than silently skipped;
+  # image and stage contexts are left to the image rules.
+  let local = root / "local"
+  createDir(local)
+  let extra = newOrderedTable[string, string]()
+  extra["lib"]   = local
+  extra["git"]   = "https://github.com/acme/lib.git#main"
+  extra["tar"]   = "https://example.invalid/ctx.tar.gz"
+  extra["base"]  = "docker-image://alpine:3"
+  extra["stage"] = "target:builder"
+  extra["oci"]   = "oci-layout://" & local
+  let stdinCtx = DockerInvocation(cmd: DockerCmd.build, foundContext: "-",
+                                  foundExtraContexts: extra)
+  var skipped: PolicyInput
+  skipped.addPolicyContexts(stdinCtx)
+  doAssert skipped.contextDirs == @[local.resolvePath()]
+  var subjects: seq[string]
+  for e in skipped.contextErrors:
+    doAssert e.kind == "error"
+    subjects.add(e.subject)
+  doAssert subjects == @["-", extra["git"], extra["tar"]], $subjects
 finally:
   removeDir(root)
