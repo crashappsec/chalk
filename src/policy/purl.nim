@@ -21,9 +21,7 @@ import std/[
   strutils,
   uri,
 ]
-import ".."/[
-  utils/semver,
-]
+import ./version
 from ./rules/golden_images import globMatch
 
 type
@@ -34,7 +32,7 @@ type
 
   VersionConstraint = tuple
     op:      string
-    version: Version
+    version: PackageVersion
 
   PurlPattern* = object
     raw*:        string # as configured
@@ -140,12 +138,11 @@ proc parsePurlPattern*(value: string): PurlPattern =
     if op notin ["<", "<=", ">", ">=", "=", "!="]:
       raise newException(ValueError, "invalid version operator " & escapeJson(op))
     try:
-      result.constraints.add((op, parseVersion(constraint[i .. ^1].strip())))
-    except CatchableError:
-      raise newException(ValueError, "invalid version " & escapeJson(constraint[i .. ^1]) &
-                                     " (ranges support MAJOR[.MINOR[.PATCH]][-suffix])")
+      result.constraints.add((op, parsePackageVersion(constraint[i .. ^1])))
+    except ValueError:
+      raise newException(ValueError, "invalid version range: " & getCurrentExceptionMsg())
 
-proc satisfies(version: Version, constraint: VersionConstraint): bool =
+proc satisfies(version: PackageVersion, constraint: VersionConstraint): bool =
   case constraint.op
   of "<":  version < constraint.version
   of "<=": version <= constraint.version
@@ -167,9 +164,9 @@ proc matches*(pattern: PurlPattern, purl: string): tuple[result: PurlMatch, reas
        globMatch(pattern.versionGlob.normalizeVersion(), version.normalizeVersion()):
       return (pmMatch, "")
     return (pmNoMatch, "")
-  var parsed: Version
+  var parsed: PackageVersion
   try:
-    parsed = parseVersion(version)
+    parsed = parsePackageVersion(version)
   except CatchableError:
     return (pmUnknown, "version " & escapeJson(version) & " cannot be compared with " &
                        pattern.raw)
