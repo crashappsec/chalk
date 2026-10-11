@@ -386,7 +386,15 @@ What is checked on `docker build`:
   `tool.trufflehog` settings (local binary, else docker, else the installer;
   `trufflehog_timeout`, 300s by default; `trufflehog_config` for custom
   detectors) whether or not `run_secret_scanner_tools` is enabled, and is
-  done once per directory however many policies enable the rule.
+  done once per directory and `exclude_paths` however many policies enable
+  the rule. trufflehog >= 3.90.9 is required (`--fail-on-scan-errors`);
+  an older one is an evaluation error saying so.
+- The Dockerfile is always scanned, as BuildKit always sends it and secrets
+  in `ENV`/`ARG` defaults end up in the image config: as part of its context
+  directory, or on its own when `.dockerignore` excludes it or it is outside
+  the context (`-f ../Dockerfile`). Its findings are reported once. A
+  Dockerfile read from stdin (`-f -`) cannot be scanned and is an evaluation
+  error (`on_error`), so with `on_error: block` such builds are blocked.
 - The rule does not reuse `SECRET_SCANNER`: chalk's own scan runs on the git
   repository containing the first context, in git mode when it can. Git mode
   reads committed history (secrets that were since removed) but skips
@@ -394,10 +402,19 @@ What is checked on `docker build`:
   a failed scan there looks the same as a clean one.
 - Files docker does not send are ignored: those matched by
   `<Dockerfile>.dockerignore` (when it exists, main context only) or else the
-  context's `.dockerignore`, and `.git` directories. `exclude_paths` ignores
-  more paths, relative to the context directory, in `.dockerignore` syntax
-  (`*` does not cross `/`, `**` does, a directory covers everything under it);
-  negations are rejected.
+  context's `.dockerignore` (patterns are cleaned like docker does, e.g.
+  `./a` is `a`). `exclude_paths` ignores more paths, relative to the context
+  directory, in `.dockerignore` syntax (`*` does not cross `/`, `**` does, a
+  directory covers everything under it); negations are rejected. Both are
+  passed to trufflehog as anchored `--exclude-paths` regexes (up to 1000;
+  directories no negation re-includes are skipped whole), so it does not
+  read, unpack or fail on files docker does not send, such as a
+  `node_modules` with broken symlinks; results are filtered again
+  afterwards.
+- A `.git` directory docker sends (not excluded by `.dockerignore`) is not
+  scanned except for its `config`, which can hold credentialed remote URLs
+  or the `http.extraheader` token `actions/checkout` persists. Objects,
+  packs, hooks and logs are not scanned, as reading history is costly.
 - `detectors` keeps only the listed trufflehog detectors and
   `ignore_detectors` drops some (names are case-insensitive, e.g. `AWS`,
   `Github`, `URI`).
@@ -410,6 +427,15 @@ What is checked on `docker build`:
   | verified (provider accepted the secret)                          | violation                     | violation              |
   | unverified (provider rejected it, or the detector cannot verify) | ignored                       | violation              |
   | unknown (verification failed, e.g. no network)                   | evaluation error (`on_error`) | violation              |
+
+  With the defaults (`verify: true`, `verified_only: true`) only secrets
+  the provider confirmed as live are violations. A detector that cannot
+  verify (no provider API) never yields a violation then, however real the
+  secret looks; set `verified_only: false` to report those. A provider that
+  rate-limits or is unreachable makes the result `unknown`, an evaluation
+  error.
+- A `trufflehog:ignore` comment on the line of a secret suppresses it, as
+  trufflehog does natively; such lines are not reported.
 
 - Secret values are never stored, logged or reported. Only the detector,
   location, verification status and the detector's rotation guide link are
@@ -438,14 +464,19 @@ are reported with the same `detectors`, `ignore_detectors` and
 `verified_only` settings. These come from chalk's build-time scan: in git
 mode they can include secrets in committed history (the commit is named in
 the reason) and are not filtered by `.dockerignore`; `exclude_paths` only
-applies to their repository-relative (git mode) paths. Images without such
-results pass.
+applies to their repository-relative (git mode) paths. Images whose mark
+has no `SECRET_SCANNER` pass (e.g. the build did not scan, or only reported
+the run-time `@SECRET_SCANNER`), as do unchalked images: the rule cannot tell an image that was never scanned from a clean
+one, so use it together with a build policy rather than on its own.
 
-Limitations: a Dockerfile outside the context (or read from stdin) is not
-scanned, nor are secrets passed as build arguments or created during the
-build; and scanning large contexts takes time (bounded by
-`trufflehog_timeout`), as trufflehog reads files `.dockerignore` excludes
-before chalk drops their findings.
+Limitations: secrets passed as build arguments or created during the build
+are not scanned; scanning large contexts takes time (bounded by
+`trufflehog_timeout`); a scan error anywhere trufflehog walks (outside the
+excluded paths) fails the scan, as trufflehog does not attribute every
+error to a path. The legacy builder (`DOCKER_BUILDKIT=0`, or docker without
+buildx) ignores `<Dockerfile>.dockerignore` and only applies the context's
+`.dockerignore`, so with it files the Dockerfile's ignore file excludes are
+sent to docker but not scanned.
 
 ## Reporting
 
@@ -755,8 +786,8 @@ failing its exit status. Such scans produce an evaluation error governed by
 `on_error` and are not cached as completed scans. Diagnostic values are never
 included in findings or logs. Verification failures retain their existing
 `verified_only` behavior, and native `trufflehog:ignore` suppressions remain
-respected. The Git exclusion matches the complete `.git` path component;
-ordinary directories such as `app.git` remain scanned.
+respected. Exclusions are anchored at the scanned directory, so ordinary
+directories such as `app.git` (or a context below one) remain scanned.
 
 SBOM policy parsing retains every package occurrence. A repository scan keeps a
 package in a build context when any recorded location belongs to that context;

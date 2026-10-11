@@ -20,6 +20,8 @@
 ##
 ## Secret values never leave this module: only the detector, file, line and
 ## verification status of each result are kept.
+##
+## Requires trufflehog >= 3.90.9 for `--fail-on-scan-errors`.
 
 import std/[
   json,
@@ -37,6 +39,7 @@ from "../.."/docker/tar import isExcluded, isValidPattern
 import ".."/[
   api,
   configuration,
+  dockerignore,
   helpers,
 ]
 
@@ -48,7 +51,12 @@ const
   trufflehogFoundExit = 183
   # exit codes of `timeout`, see `with_timeout` in base_callbacks.c4m
   timeoutExits = [124, 137]
-  trufflehogGitExclude* = "(^|/)[.]git(/|$)"
+  # https://github.com/trufflesecurity/trufflehog/pull/4476
+  scanErrorsFlag    = "--fail-on-scan-errors"
+  scanErrorsVersion = "3.90.9"
+  # trufflehog matches every path against each `-x` regex, so past this many
+  # the rest of the ignored paths is scanned and only filtered afterwards
+  maxExcludes* = 1000
 
 type
   SecretsConfig* = object
@@ -207,6 +215,10 @@ proc checkedTrufflehogOutput*(code: int, output, diagnostics: string): seq[Secre
   ## The same validation used before caching an actual filesystem scan.
   ## Failure messages are fixed text; either stream may contain a secret.
   if code != 0 and code != trufflehogFoundExit:
+    # kingpin's error for an unknown flag
+    if ("unknown long flag '" & scanErrorsFlag & "'") in diagnostics & output:
+      raise newException(ValueError, "trufflehog >= " & scanErrorsVersion &
+                         " is required (" & scanErrorsFlag & " is not supported)")
     raise newException(ValueError, "trufflehog exited with code " & $code)
   if diagnostics.hasScanDiagnostics():
     raise newException(ValueError, "trufflehog reported scan errors; filesystem analysis is incomplete")
@@ -243,28 +255,6 @@ proc severity*(self: SecretResult): string =
     "unknown"
   else:
     "unverified"
-
-proc parseDockerignore(text: string): seq[string] =
-  for line in text.splitLines():
-    let p = line.strip()
-    if p.len == 0 or p.startsWith('#'):
-      continue
-    if p.startsWith('!'):
-      result.add('!' & p[1 .. ^1].strip(trailing = false, chars = {'/'}))
-    else:
-      result.add(p.strip(trailing = false, chars = {'/'}))
-
-proc readDockerignore*(dir: string, dockerfilePath = ""): seq[string] =
-  ## Patterns docker applies to context `dir`: `<Dockerfile>.dockerignore`
-  ## next to the Dockerfile when it exists, else `<dir>/.dockerignore`
-  ## https://docs.docker.com/build/concepts/context/#dockerignore-files
-  if dockerfilePath != "":
-    let specific = dockerfilePath & ".dockerignore"
-    if fileExists(specific):
-      return readFile(specific).parseDockerignore()
-  let path = dir / ".dockerignore"
-  if fileExists(path):
-    return readFile(path).parseDockerignore()
 
 proc reason(settings: SecretsConfig, r: SecretResult, where: string): string =
   result =
@@ -305,7 +295,7 @@ proc addFinding(findings: var seq[PolicyFinding], seen: var HashSet[string],
 proc check*(settings:  SecretsConfig,
             results:   seq[SecretResult],
             dir:       string,
-            dockerignore: seq[string],
+            ignore:    DockerIgnore,
             relative = true): seq[PolicyFinding] =
   ## Findings for the results of scanning context directory `dir`. Locations
   ## are relative to `dir` unless `relative` is false.
@@ -320,11 +310,31 @@ proc check*(settings:  SecretsConfig,
       continue
     let rel = inContext.get()
     # docker never sends ignored files, so their secrets cannot reach the image
-    if rel.isExcluded(dockerignore) or rel.isExcluded(settings.excludePaths):
+    if ignore.isIgnored(rel) or rel.isExcluded(settings.excludePaths):
       continue
     let path = if relative: rel else: r.file
     result.addFinding(seen, settings, r, kind, path & ":" & $r.line,
                       "in the build context")
+
+proc checkDockerfile*(settings: SecretsConfig, results: seq[SecretResult],
+                      location: string): seq[PolicyFinding] =
+  ## Findings for the results of scanning the Dockerfile alone, reported at
+  ## `location`. BuildKit always sends the Dockerfile, whatever
+  ## `.dockerignore` says, and `ENV`/`ARG` defaults end up in the image.
+  var seen = initHashSet[string]()
+  for r in results:
+    let kind = settings.findingKind(r)
+    if kind == "":
+      continue
+    result.addFinding(seen, settings, r, kind, location & ":" & $r.line,
+                      "in the Dockerfile")
+
+proc scannedWith*(dockerfile, dir: string, ignore: DockerIgnore): bool =
+  ## whether scanning context `dir` covers the Dockerfile
+  if dockerfile == "":
+    return false
+  let rel = dockerfile.contextPath("/", dir)
+  rel.isSome() and not ignore.isIgnored(rel.get())
 
 proc checkMark*(settings: SecretsConfig, results: seq[SecretResult]): seq[PolicyFinding] =
   ## Findings for the results recorded in a pushed image's chalk mark.
@@ -346,44 +356,90 @@ proc toolCallback[T](name: string, dir: string): T =
     raise newException(ValueError, "missing implementation of tool.trufflehog." & name)
   return unpack[T](value.get())
 
-proc trufflehogArguments*(dir: string, verify: bool, exclude, config = ""): seq[string] =
+proc reQuote(s: string): string =
+  ## as Go's regexp.QuoteMeta
+  for c in s:
+    if c in {'\\', '.', '+', '*', '?', '(', ')', '|', '[', ']', '{', '}', '^', '$'}:
+      result.add('\\')
+    result.add(c)
+
+proc trufflehogExcludes*(dir: string, ignore: DockerIgnore,
+                         excludePaths: seq[string]): seq[string] =
+  ## trufflehog `-x` regexes, matched against the absolute paths it walks,
+  ## for what docker does not send or `exclude_paths` drops, so trufflehog
+  ## neither reads (or unpacks) those files nor fails the scan on them.
+  ## Directories are skipped whole when no negation can re-include anything
+  ## below them. `check` still filters results, so this only saves work.
+  ##
+  ## A `.git` directory docker sends is history rather than build files, and
+  ## scanning its objects is costly: only its `config` is scanned, which may
+  ## hold credentialed remote URLs or `actions/checkout`'s extraheader.
+  let root = dir.strip(leading = false, chars = {'/'})
+  proc regex(rel: string, isDir: bool): string =
+    "^" & reQuote(root & "/" & rel) & (if isDir: "(/|$)" else: "$")
+  proc excluded(rel: string): bool =
+    ignore.isIgnored(rel) or rel.isExcluded(excludePaths)
+  var pending = @[""]
+  while len(pending) > 0:
+    let rel = pending.pop()
+    for kind, name in walkDir(if rel == "": dir else: dir / rel, relative = true):
+      if len(result) >= maxExcludes:
+        return
+      let path = if rel == "": name else: rel & "/" & name
+      if kind == pcDir:
+        if path.isExcluded(excludePaths) or ignore.prunes(path):
+          result.add(regex(path, true))
+        elif name == ".git":
+          for entryKind, entry in walkDir(dir / path, relative = true):
+            let entryPath = path & "/" & entry
+            if entry != "config" or excluded(entryPath):
+              result.add(regex(entryPath, entryKind == pcDir))
+        else:
+          pending.add(path)
+      elif excluded(path):
+        result.add(regex(path, false))
+
+proc trufflehogArguments*(path: string, verify: bool, exclude = "", config = ""): seq[string] =
   ## Arguments are shell-quoted because the configured executable may be a
   ## timeout or container wrapper. Keep scan-error signaling independent of
   ## secret verification and retain the scanner's native ignore-tag behavior.
-  result = @["filesystem", "--json", "--no-update", "--fail-on-scan-errors",
-             "-x", exclude.quoteShell()]
+  result = @["filesystem", "--json", "--no-update", scanErrorsFlag]
+  if exclude != "":
+    result.add(["-x", exclude.quoteShell()])
   if not verify:
     result.add("--no-verification")
   if config != "":
     result.add("--config=" & config.quoteShell())
-  result.add(dir.quoteShell())
+  result.add(path.quoteShell())
 
-proc trufflehogCommand(dir: string, verify: bool): string =
+proc trufflehogCommand(path: string, verify: bool, excludes: seq[string]): string =
   ## Reuses the trufflehog tool configuration (docker or local binary,
   ## installer, timeout, `trufflehog_config`) but always in filesystem mode.
   if not sectionExists("tool.trufflehog"):
     raise newException(ValueError, "the trufflehog tool is not configured")
-  var exe = toolCallback[string]("get_tool_location", dir)
+  var exe = toolCallback[string]("get_tool_location", path)
   if exe == "":
-    if not toolCallback[bool]("attempt_install", dir):
+    if not toolCallback[bool]("attempt_install", path):
       raise newException(ValueError, "trufflehog is not available and could not be installed")
-    exe = toolCallback[string]("get_tool_location", dir)
+    exe = toolCallback[string]("get_tool_location", path)
   if exe == "":
     raise newException(ValueError, "trufflehog is not available")
-  # .git holds history, not files docker uses; regexes per trufflehog -x
-  let exclude = writeNewTempFile(trufflehogGitExclude & "\n", suffix = ".txt")
+  # in the temp directory, which the docker variant of the tool mounts
+  let exclude = if len(excludes) == 0: ""
+                else: writeNewTempFile(excludes.join("\n") & "\n", suffix = ".txt")
   let config = attrGetOpt[string]("tool.trufflehog.trufflehog_config").get("")
-  let args = trufflehogArguments(dir, verify, exclude, config)
+  let args = trufflehogArguments(path, verify, exclude, config)
   return exe & " " & args.join(" ")
 
 var scanned = initTable[string, seq[SecretResult]]()
 
-proc scanDir(dir: string, verify: bool): seq[SecretResult] =
-  ## cached as every policy enabling the rule scans the same directories
-  let key = $verify & ":" & dir
+proc scanPath(path: string, verify: bool, excludes: seq[string] = @[]): seq[SecretResult] =
+  ## cached as every policy enabling the rule scans the same directories;
+  ## `exclude_paths` differs between policies, so it is part of the key
+  let key = $verify & "\0" & path & "\0" & excludes.join("\n")
   if key in scanned:
     return scanned[key]
-  let cmd = trufflehogCommand(dir, verify)
+  let cmd = trufflehogCommand(path, verify, excludes)
   trace("policy: secrets: " & cmd)
   var output: ExecOutput
   unprivileged:
@@ -405,6 +461,17 @@ proc loadSecrets(): bool =
     loaded = settings.get()
   return settings.isSome()
 
+proc unscannable*(input: PolicyInput): seq[PolicyFinding] =
+  ## build inputs the rule cannot scan, besides the engine's `contextErrors`
+  if len(input.contextDirs) == 0:
+    if len(input.contextErrors) == 0:
+      result.add(newSubjectFinding(ruleName, "error", "build context",
+                                   "the build context is not a local directory and cannot be scanned for secrets"))
+  elif input.mainContextDir != "" and input.dockerfilePath == "":
+    # BuildKit sends it like any Dockerfile, but only docker reads stdin
+    result.add(newSubjectFinding(ruleName, "error", "Dockerfile",
+                                 "the Dockerfile from stdin cannot be scanned for secrets"))
+
 proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
   var findings: seq[PolicyFinding]
   if input.command == "push":
@@ -419,19 +486,35 @@ proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
                                        "could not read secret scanner results: " &
                                        getCurrentExceptionMsg()))
     return findings.capFindings(ruleName, maxFindings, "secrets")
-  if len(input.contextDirs) == 0:
-    return @[newSubjectFinding(ruleName, "error", "build context",
-                               "the build context is not a local directory and cannot be scanned for secrets")]
-  for i, dir in input.contextDirs:
-    # the Dockerfile's own ignore file only applies to the main context
-    let dockerfile = if i == 0: input.dockerfilePath else: ""
+  findings.add(input.unscannable())
+  let dockerfile = input.dockerfilePath
+  var dockerfileScanned = false
+  for dir in input.contextDirs:
+    let main = dir == input.mainContextDir
     try:
-      let results = scanDir(dir, loaded.verify)
-      findings.add(loaded.check(results, dir, readDockerignore(dir, dockerfile),
-                                relative = i == 0))
+      let ignore = loadDockerignore(dir, input.mainContextDockerfile(dir))
+      let results = scanPath(dir, loaded.verify,
+                             trufflehogExcludes(dir, ignore, loaded.excludePaths))
+      findings.add(loaded.check(results, dir, ignore, relative = main))
+      if dockerfile.scannedWith(dir, ignore):
+        dockerfileScanned = true
     except CatchableError:
       findings.add(newSubjectFinding(ruleName, "error", dir,
                                      "could not scan for secrets: " & getCurrentExceptionMsg()))
+  # with a remote main context the Dockerfile is usually in it, which the
+  # engine already reports as not checked
+  if dockerfile != "" and not dockerfileScanned and
+     (input.mainContextDir != "" or dockerfile.fileExists()):
+    let rel = if input.mainContextDir == "": none(string)
+              else: dockerfile.contextPath("/", input.mainContextDir)
+    if rel.isNone() or not rel.get().isExcluded(loaded.excludePaths):
+      try:
+        let results = scanPath(dockerfile, loaded.verify)
+        findings.add(loaded.checkDockerfile(results, rel.get(dockerfile)))
+      except CatchableError:
+        findings.add(newSubjectFinding(ruleName, "error", dockerfile,
+                                       "could not scan the Dockerfile for secrets: " &
+                                       getCurrentExceptionMsg()))
   return findings.capFindings(ruleName, maxFindings, "secrets")
 
 proc secretsHint(): PolicyHint =
@@ -440,4 +523,5 @@ proc secretsHint(): PolicyHint =
     result = PolicyHint(rule: ruleName, message: loaded.message)
 
 proc loadSecretsRule*() =
-  newPolicyInputRule(ruleName, loadSecrets, checkSecrets, hint = secretsHint)
+  newPolicyInputRule(ruleName, loadSecrets, checkSecrets, requiresContext = true,
+                     hint = secretsHint)
