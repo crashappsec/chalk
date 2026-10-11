@@ -457,10 +457,9 @@ Not covered:
 - `ONBUILD` instructions of a base image run in the build but are not in
   the Dockerfile chalk parses, so images they pull (`ONBUILD COPY --from`)
   are not checked. The base image itself is;
-- commands chalk does not wrap: `docker buildx bake`, `docker compose
-build`/`push` and other tools that push (crane, skopeo, `buildctl`) are
-  not checked at all;
-
+- commands chalk does not wrap: `docker buildx bake`,
+  `docker compose build`, `docker compose push` and other tools that push
+  (crane, skopeo, `buildctl`) are not checked at all;
 - registry mirrors (`registry-mirrors` in the docker daemon, buildkitd
   `mirrors`) and pull-through caches: the reference as written is checked,
   not the mirror that serves it;
