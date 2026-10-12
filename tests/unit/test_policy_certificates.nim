@@ -440,6 +440,15 @@ proc testScanning() =
   doAssert ctx / "a/expired.pem" in namedFound
   doAssert "a/expired.pem" notin namedFound
 
+  # patterns are cleaned as docker does, so `!./cert.pem` re-includes cert.pem
+  let cleaned = newContext({
+    "cert.pem": "expired.pem",
+    "b/weak.pem": "expired.pem",
+    ".dockerignore": "=\xEF\xBB\xBFcert.pem\n!./cert.pem\nb/../b//weak.pem\n",
+  })
+  defer: removeDir(cleaned)
+  assertEq(settings.findings(@[cleaned]).locations(), @["cert.pem"])
+
   # push has no build context
   assertEq(settings.check(PolicyInput(command: "push", pushTargets: @["app:1"]), now).len, 0)
   # a build without a local context is an error, reported once
@@ -450,6 +459,53 @@ proc testScanning() =
   let remote = PolicyInput(command: "build", contextErrors: @[PolicyFinding(
     kind: "error", subject: "-", reason: "the build context from stdin cannot be checked")])
   assertEq(settings.check(remote, now).len, 0)
+
+proc testBudgets() =
+  # parsing stops past `maxCerts` certificates; listed findings are capped
+  # and the rest counted in one violation
+  let one = fixture("expired.pem")
+  var files: seq[(string, string)]
+  for i in 0 .. maxCerts div maxCertsPerFile:
+    files.add(("bundle" & $i & ".pem", "=" & one.repeat(maxCertsPerFile)))
+  let many = newContext(files)
+  defer: removeDir(many)
+  var settings = defaultCertificatesConfig()
+  settings.maxFileSize = len(one) * maxCertsPerFile
+  let found = settings.findings(@[many])
+  # the incomplete-scan error is listed although violations fill the cap
+  assertEq(found.len, maxFindings + 2)
+  assertEq(found[0].kind, "error")
+  doAssert "certificate scan is incomplete" in found[0].reason, found[0].reason
+  # the dropped findings are violations, so the summary one is too
+  assertEq(found[^1].kind, "violation")
+  assertEq(found[^1].reason, $(maxCerts + maxCertsPerFile - maxFindings) &
+                             " more certificate findings not listed")
+
+proc testBundleBudget() =
+  # certificates of CA bundles only count toward `maxCerts` when they are
+  # kept for a pin, so vendored bundles do not stop the scan early; they have
+  # their own, larger budget
+  let one = fixture("expired.pem")
+  var files = @[("leaf.pem", "leaf.pem"), ("rootfs/etc/ssl/certs/ca.pem", "ca.pem")]
+  for i in 0 .. maxCerts div maxCertsPerFile:
+    files.add(("vendor" & $i & "/certifi/cacert.pem", "=" & one.repeat(maxCertsPerFile)))
+  let vendored = newContext(files)
+  defer: removeDir(vendored)
+  var settings = defaultCertificatesConfig()
+  settings.maxFileSize = len(one) * maxCertsPerFile
+  settings.allowedIssuers = @[("sha256", caSha256)]
+  let found = settings.findings(@[vendored])
+  assertEq(found.locations("error"), newSeq[string]())
+  assertEq(found.locations(), newSeq[string]())
+
+  for i in 0 .. maxBundleCerts div maxCertsPerFile:
+    files.add(("more" & $i & "/certifi/cacert.pem", "=" & one.repeat(maxCertsPerFile)))
+  let huge = newContext(files)
+  defer: removeDir(huge)
+  let capped = settings.findings(@[huge])
+  assertEq(capped.len, 1)
+  assertEq(capped[0].kind, "error")
+  doAssert "CA bundles in the build context have more than" in capped[0].reason, capped[0].reason
 
 proc rejects(text, reason: string) =
   ## the document is unusable as a whole, or as its only policy
@@ -559,6 +615,8 @@ proc main() =
   testKeys()
   testSignatureSecurity()
   testScanning()
+  testBudgets()
+  testBundleBudget()
   testJson()
 
 main()

@@ -38,6 +38,8 @@ proc testClean() =
   doAssert ignore.isIgnored("a/b/c")
   doAssert ignore.isIgnored("d")
   doAssert not ignore.isIgnored("c/d")
+  # a cleaned negation re-includes what docker sends
+  doAssert not parseDockerignore("cert.pem\n!./cert.pem\n").isIgnored("cert.pem")
   # as moby's ignorefile.ReadAll: BOM dropped, only a leading `#` comments
   assertEq(parseDockerignore("\xEF\xBB\xBF.env\n  #x\n#y\n").patterns, @[".env", "#x"])
 
