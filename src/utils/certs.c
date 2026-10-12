@@ -5,11 +5,12 @@
 // (see https://crashoverride.com/docs/chalk)
 //
 
-#include <crypto/x509.h>
+#include <openssl/x509.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/encoder.h>
+#include <openssl/err.h>
 #include <openssl/objects.h>
 #include <openssl/pem.h>
 #include <openssl/types.h>
@@ -179,7 +180,7 @@ BIO_all(BIO *bio)
     return result;
 }
 
-#define FIXED_LEN 15
+#define FIXED_LEN 19
 
 typedef struct {
     char **key_value;
@@ -189,36 +190,114 @@ typedef struct {
     char **issuer_short;
     int  version;
     int  key_size;
+    char *signature_digest;
+    unsigned char *der;
+    int der_len;
+    int key_loaded;
 } Cert;
 
-Cert *
-extract_cert_data(BIO *fdb)
+// Next PEM or DER certificate. When `lenient`, a malformed PEM block (bad
+// base64 or DER) is skipped: PEM_read_bio_X509 has consumed it, so reading
+// resumes after it instead of hiding every later certificate in a bundle.
+// DER cannot be resynchronized, so a malformed DER record ends the input.
+// Artifact detection is strict: skipping would walk any file, e.g. an ELF
+// binary with embedded certificates, until it found one.
+static X509 *
+read_next_cert(BIO *fdb, int lenient)
 {
-    int               cur        = BIO_tell(fdb);
-    X509             *cert       = PEM_read_bio_X509(fdb, NULL, NULL, NULL);
-    if (!cert) {
+    for (;;) {
+        int   cur  = BIO_tell(fdb);
+        X509 *cert = PEM_read_bio_X509(fdb, NULL, NULL, NULL);
+        if (cert) {
+            return cert;
+        }
+        int after = BIO_tell(fdb);
+        ERR_clear_error();
         // attempt to rewind to original position to reread as DER cert
-        if (BIO_seek(fdb, cur) < 0) {
+        if (cur < 0 || BIO_seek(fdb, cur) < 0) {
             return NULL;
         }
-        cert                     = d2i_X509_bio(fdb, NULL);
-        if (!cert) {
+        cert = d2i_X509_bio(fdb, NULL);
+        if (cert) {
+            return cert;
+        }
+        ERR_clear_error();
+        if (!lenient || after <= cur || BIO_seek(fdb, after) < 0) {
             return NULL;
         }
+    }
+}
+
+// Algorithm and, for EC, named curve of a public key OpenSSL cannot load, so
+// callers still see what kind of key it is.
+static void
+describe_unloaded_key(X509 *cert, char **keytype, char *group, size_t group_len)
+{
+    ASN1_OBJECT *alg   = NULL;
+    const void  *param = NULL;
+    int          ptype = V_ASN1_UNDEF;
+    X509_ALGOR  *algor = NULL;
+    char         name[200];
+
+    group[0] = 0;
+    if (X509_PUBKEY_get0_param(&alg, NULL, NULL, &algor, X509_get_X509_PUBKEY(cert)) != 1 ||
+        alg == NULL) {
+        *keytype = strdup("");
+        return;
+    }
+    int nid = OBJ_obj2nid(alg);
+    const char *ln = nid == NID_undef ? NULL : OBJ_nid2ln(nid);
+    if (ln == NULL) {
+        name[0] = 0;
+        OBJ_obj2txt(name, sizeof(name), alg, 1);
+        ln = name;
+    }
+    *keytype = strdup(ln);
+    if (algor != NULL) {
+        X509_ALGOR_get0(NULL, &ptype, &param, algor);
+        if (ptype == V_ASN1_OBJECT && param != NULL) {
+            int cnid = OBJ_obj2nid((const ASN1_OBJECT *)param);
+            const char *sn = cnid == NID_undef ? NULL : OBJ_nid2sn(cnid);
+            if (sn != NULL) {
+                snprintf(group, group_len, "%s", sn);
+            } else {
+                OBJ_obj2txt(group, (int)group_len, (const ASN1_OBJECT *)param, 1);
+            }
+        }
+    }
+}
+
+// When not `lenient`, a certificate whose public key OpenSSL cannot load is
+// treated as not a certificate, as artifact detection always did.
+Cert *
+extract_cert_data(BIO *fdb, int lenient)
+{
+    X509             *cert       = read_next_cert(fdb, lenient);
+    if (!cert) {
+        return NULL;
     }
     char              scratch[2000];
     int               version    = ((int)X509_get_version(cert)) + 1;
+    // NULL for a key OpenSSL cannot load (unsupported algorithm or curve,
+    // malformed key); the certificate is still returned, without key data.
     EVP_PKEY         *pub        = X509_get_pubkey(cert);
-    if (pub == NULL) {
-        // Unparseable/unsupported public key. Treat the whole record as not a
-        // certificate rather than dereferencing NULL below.
+    if (pub == NULL && !lenient) {
+        ERR_clear_error();
         X509_free(cert);
         return NULL;
     }
-    int               keynid     = EVP_PKEY_base_id(pub);
-    const char       *keytype_ln = OBJ_nid2ln(keynid);
-    char             *keytype    = strdup(keytype_ln == NULL ? "" : keytype_ln);
-    int               keysize    = EVP_PKEY_get_bits(pub);
+    char              group[80];
+    group[0]                     = 0;
+    int               keynid     = pub == NULL ? NID_undef : EVP_PKEY_base_id(pub);
+    char             *keytype    = NULL;
+    int               keysize    = pub == NULL ? 0 : EVP_PKEY_get_bits(pub);
+    if (pub == NULL) {
+        ERR_clear_error();
+        describe_unloaded_key(cert, &keytype, group, sizeof(group));
+    } else {
+        const char *keytype_ln = OBJ_nid2ln(keynid);
+        keytype = strdup(keytype_ln == NULL ? "" : keytype_ln);
+    }
     int               signid     = X509_get_signature_nid(cert);
     const char       *sigtype_ln = OBJ_nid2ln(signid);
     char             *sigtype    = strdup(sigtype_ln == NULL ? "" : sigtype_ln);
@@ -250,7 +329,7 @@ extract_cert_data(BIO *fdb)
     const char       *key_format = keynid == EVP_PKEY_RSA
                                      ? "PKCS1"
                                      : "SubjectPublicKeyInfo";
-    OSSL_ENCODER_CTX *encoder    = OSSL_ENCODER_CTX_new_for_pkey(
+    OSSL_ENCODER_CTX *encoder    = pub == NULL ? NULL : OSSL_ENCODER_CTX_new_for_pkey(
         pub,
         OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
         "PEM",
@@ -267,7 +346,7 @@ extract_cert_data(BIO *fdb)
 
     char *key_contents = BIO_all(key_bio);
     BIO_free(key_bio);
-    STACK_OF(X509_EXTENSION) *exts = cert->cert_info.extensions;
+    const STACK_OF(X509_EXTENSION) *exts = X509_get0_extensions(cert);
 
     int num_exts = sk_X509_EXTENSION_num(exts);
     if (num_exts < 0) {
@@ -304,6 +383,29 @@ extract_cert_data(BIO *fdb)
     if (sig) {
         key_value[ix++] = strdup("Signature");
         key_value[ix++] = convert_ASN1STRING(sig);
+    }
+    // used by the certificates build policy, not reported by the codec
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int  md_len = 0;
+    if (X509_digest(cert, EVP_sha256(), md, &md_len) == 1 && md_len > 0) {
+        ASN1_OCTET_STRING *fp = ASN1_OCTET_STRING_new();
+        if (fp != NULL && ASN1_OCTET_STRING_set(fp, md, (int)md_len) == 1) {
+            char *hex = convert_ASN1STRING(fp);
+            if (hex != NULL) {
+                key_value[ix++] = strdup("SHA256 Fingerprint");
+                key_value[ix++] = hex;
+            }
+        }
+        ASN1_OCTET_STRING_free(fp);
+    }
+    size_t group_len = 0;
+    if (pub != NULL && keynid == EVP_PKEY_EC &&
+        EVP_PKEY_get_group_name(pub, group, sizeof(group), &group_len) != 1) {
+        group[0] = 0;
+    }
+    if (group[0] != 0) {
+        key_value[ix++] = strdup("Key Group");
+        key_value[ix++] = strdup(group);
     }
 
     for (int i = 0; i < num_exts; i++) {
@@ -357,6 +459,29 @@ extract_cert_data(BIO *fdb)
     result->issuer_short  = convert_NAME(issuer, 1);
     result->version       = version;
     result->key_size      = keysize;
+    result->key_loaded    = pub != NULL;
+    // OpenSSL resolves algorithm parameters, including the default SHA-1
+    // digest and explicit hashes in RSA-PSS AlgorithmIdentifiers.
+    int digest_nid = NID_undef;
+    const char *digest_name = NULL;
+    if (X509_get_signature_info(cert, &digest_nid, NULL, NULL, NULL) == 1) {
+        digest_name = OBJ_nid2sn(digest_nid);
+    }
+    result->signature_digest = strdup(digest_name == NULL ? "" : digest_name);
+    // The Nim iterator copies these bytes before cleanup_cert_info frees
+    // them. Keeping the certificate permits later issuer signature checks.
+    result->der_len = i2d_X509(cert, NULL);
+    result->der = result->der_len > 0 ? malloc((size_t)result->der_len) : NULL;
+    if (result->der != NULL) {
+        unsigned char *cursor = result->der;
+        if (i2d_X509(cert, &cursor) != result->der_len) {
+            free(result->der);
+            result->der = NULL;
+        }
+    }
+    if (result->der == NULL) {
+        result->der_len = 0;
+    }
 
     // subj/issuer point into cert, so this must come after convert_NAME.
     EVP_PKEY_free(pub);
@@ -391,7 +516,33 @@ cleanup_cert_info(Cert *cert)
     cleanup_key_value(cert->subject_short);
     cleanup_key_value(cert->issuer);
     cleanup_key_value(cert->issuer_short);
+    free(cert->signature_digest);
+    free(cert->der);
     free(cert);
+}
+
+// Check the issuing key only; trust stores and chain validation are outside
+// the certificate policy's SHA-256 issuer pin contract.
+int
+verify_cert_issuer(const unsigned char *leaf_der, int leaf_len,
+                   const unsigned char *issuer_der, int issuer_len)
+{
+    if (leaf_der == NULL || issuer_der == NULL || leaf_len <= 0 || issuer_len <= 0) {
+        return 0;
+    }
+    const unsigned char *leaf_cursor = leaf_der;
+    const unsigned char *issuer_cursor = issuer_der;
+    X509 *leaf = d2i_X509(NULL, &leaf_cursor, leaf_len);
+    X509 *issuer = d2i_X509(NULL, &issuer_cursor, issuer_len);
+    EVP_PKEY *pub = issuer == NULL ? NULL : X509_get_pubkey(issuer);
+    int verified = leaf != NULL && pub != NULL &&
+                   leaf_cursor == leaf_der + leaf_len &&
+                   issuer_cursor == issuer_der + issuer_len &&
+                   X509_verify(leaf, pub) == 1;
+    EVP_PKEY_free(pub);
+    X509_free(issuer);
+    X509_free(leaf);
+    return verified;
 }
 
 BIO *

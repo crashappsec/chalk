@@ -9,6 +9,7 @@
 
 import "."/[
   api,
+  rules/certificates,
   rules/custom_check,
   rules/golden_images,
   rules/registries,
@@ -19,4 +20,5 @@ proc loadPolicyRules*() =
     return
   loadGoldenImagesRule()
   loadRegistriesRule()
+  loadCertificatesRule()
   loadCustomCheckRule()
