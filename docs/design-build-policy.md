@@ -968,6 +968,160 @@ grype or OSV.
 The SBOM comes from `policySboms` in `src/policy/sbom.nim`, shared with the
 other rules that read SBOMs (see "Adding rules").
 
+### Licenses
+
+`policy.licenses` reports packages of the build context whose licenses are
+denied or not allowed, e.g. GPL dependencies in a proprietary service.
+
+```con4m
+policy {
+  mode: "enforce"
+  licenses {
+    enabled:    true
+    denied:     ["@strong_copyleft", "SSPL-1.0"]
+    allowed:    []
+    unknown:    "ignore"   # ignore | violation | error
+    exceptions: ["pkg:npm/approved-gpl-tool"]
+    message:    "See https://example.com/license-policy"
+  }
+}
+```
+
+```json
+{
+  "id": "licenses@1",
+  "mode": "enforce",
+  "licenses": {
+    "enabled": true,
+    "denied": ["@strong_copyleft"],
+    "allowed": [],
+    "unknown": "ignore",
+    "exceptions": ["pkg:npm/approved-gpl-tool"],
+    "ignore_types": ["github"],
+    "include_os_packages": false,
+    "message": "See https://example.com/license-policy"
+  }
+}
+```
+
+| Field                                 | Type                                            | Default    |
+| ------------------------------------- | ----------------------------------------------- | ---------- |
+| `policy.licenses.enabled`             | `bool`                                          | `false`    |
+| `policy.licenses.denied`              | `list[string]`                                  | `[]`       |
+| `policy.licenses.allowed`             | `list[string]`                                  | `[]`       |
+| `policy.licenses.unknown`             | `string`, one of `ignore`, `violation`, `error` | `"ignore"` |
+| `policy.licenses.exceptions`          | `list[string]`                                  | `[]`       |
+| `policy.licenses.ignore_types`        | `list[string]`                                  | `[]`       |
+| `policy.licenses.include_os_packages` | `bool`                                          | `false`    |
+| `policy.licenses.message`             | `string`                                        | `""`       |
+
+**Where licenses come from.** The rule reads the SBOM of each local build
+context directory (at most 8), shared with `policy.packages`
+(`src/policy/sbom.nim`). When `run_sbom_tools` is enabled, chalk has already
+generated one of the git repository containing the context before policies
+run; the rule uses it for the context directories inside that repository,
+keeping only the packages found inside each directory. For other
+directories, or without `run_sbom_tools`, the rule runs the enabled SBOM
+tools itself (`syft` by default, see `tool.syft`), once per directory and
+command whatever the number of policies. When no SBOM can be generated (the
+tool cannot be installed or fails, or the context is not a local directory,
+e.g. stdin), the rule reports an evaluation error and `on_error` decides.
+CycloneDX (syft's default, `components[].licenses[]`), SPDX JSON
+(`licenseConcluded`, else `licenseDeclared`) and syft JSON are understood.
+
+**Matching.**
+
+- `denied` and `allowed` entries are
+  [SPDX license ids](https://spdx.org/licenses/), shell-style globs
+  (`GPL-*`), or presets: `@strong_copyleft` (`GPL-*`, `AGPL-*`, `SSPL-1.0`,
+  `OSL-*`, `EUPL-*`, `RPL-*`, `Sleepycat`), `@weak_copyleft` (`LGPL-*`,
+  `MPL-*`, `EPL-*`, `CDDL-*`, `CPL-1.0`, `MS-RL`) and `@network_copyleft`
+  (`AGPL-*`, `SSPL-1.0`, `OSL-3.0`, `RPL-*`). An unknown preset, like a
+  `pkg:` exception that is not a valid purl pattern, is a configuration
+  error: in `policy.config_json` the whole policy is invalid (see
+  [JSON configuration](#json-configuration)); in con4m the rule reports a
+  `config` evaluation error. Either way `on_error` decides.
+- Matching is case-insensitive, as in SPDX. Common non-SPDX names are
+  normalized best effort on both sides (`GPLv2` and `GPL-2.0` are
+  `GPL-2.0-only`, `GPL-2.0+` and `GPL-2.0 or later` are `GPL-2.0-or-later`,
+  `Apache 2.0` is `Apache-2.0`, `The Unlicense` is `Unlicense`); unrecognized
+  names are compared as written. Use globs such as `GPL-2.0*` to match both the
+  `-only` and `-or-later` variants.
+- GNU licenses named without a version (`GPL`, `GNU GPL`,
+  `GNU General Public License`, `LGPL`, `AGPL`) let the recipient pick any
+  version, so they are the first version `-or-later` (`GPL-1.0-or-later`,
+  `LGPL-2.0-or-later`, `AGPL-1.0-or-later`): family globs (`GPL-*`, the
+  presets) match them, version-specific patterns (`GPL-3.0*`) do not.
+- Names that cannot be normalized but start with a copyleft family and a
+  version (`GPL v2+ with notice`, `LGPL 2.1 (see COPYING)`) are also
+  `denied` by globs of that family (`GPL-*`, `LGPL-*`), so free-form names
+  do not slip past a denylist. Families are `GPL`, `LGPL`, `AGPL`, `MPL`,
+  `EPL`, `EUPL`, `CDDL`, `OSL`, `RPL`, `SSPL` and `CPL`; `LGPL` is not
+  `GPL`. This does not apply to `allowed`, where such names match no entry.
+- Deprecated SPDX ids with an exception (`GPL-2.0-with-classpath-exception`,
+  `GPL-2.0-with-GCC-exception`, ...) are the license `WITH` the exception
+  (`GPL-2.0-only WITH Classpath-exception-2.0`).
+- A license is a violation when it matches `denied`, or when `allowed` is
+  not empty and it matches no entry. A pattern without `WITH` matches a
+  license whatever its exception, so `GPL-*` denies
+  `GPL-2.0-only WITH Classpath-exception-2.0`; an `allowed` entry naming the
+  exception (`GPL-2.0-only WITH Classpath-exception-2.0`) overrides it.
+- [SPDX expressions](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/)
+  are evaluated: `MIT OR GPL-2.0-only` passes when either license passes,
+  `AND` requires both. Several licenses listed for one package (e.g.
+  several CycloneDX `licenses[]` entries, whose relationship CycloneDX
+  leaves undefined) must all pass, as if joined with `AND`; an SBOM that
+  lists the alternatives of a dual license as separate entries therefore
+  fails when either is denied. An expression longer than 64 KiB or nesting
+  more than 32 parentheses is not evaluated: unless another license of the
+  package is denied, the package is an evaluation error.
+- Packages without a license, or with `NOASSERTION`, `NONE`, `UNKNOWN`, or
+  npm's `UNLICENSED` and `SEE LICENSE IN <file>` (which name no license),
+  follow `unknown`: ignored (default, as source SBOMs often lack licenses,
+  e.g. for Go modules), violations, or evaluation errors.
+- **`unknown` also applies with `allowed`.** An allowlist only rejects
+  licenses it can read: with the default `unknown: "ignore"`, a package
+  without license information (or with `NOASSERTION`) passes even though it
+  matches no `allowed` entry. Set `unknown: "violation"` (or `"error"`) to
+  require every package to have an allowed license.
+- `exceptions` entries starting with `pkg:` are
+  [package URL](https://github.com/package-url/purl-spec) patterns matched
+  like `src/policy/purl.nim` does: the name is a glob, the version a glob or
+  a range (`pkg:npm/foo@<2`), and matching ignores case, qualifiers and
+  subpaths, decodes percent-encoding (`pkg:npm/@scope/x` matches
+  `pkg:npm/%40scope/x@1.0.0`) and normalizes pypi names; a pattern without
+  version matches every version, and a version that cannot be compared with
+  a range does not exempt the package. Other entries are lowercase globs of
+  the package purl, else `name@version`; without `@` they also match the
+  purl without version.
+- OS packages (purl types `apk`, `alpm`, `deb`, `ebuild`, `rpm`) are mostly
+  GPL and come with the base image, so they are skipped unless
+  `include_os_packages` is set; restrict base images with `golden_images`.
+  `ignore_types` skips more purl or syft package types, e.g. `github` for
+  GitHub Actions referenced by workflows.
+
+Each finding has the package purl (else `name@version`) as `subject`, the
+file that declared it, relative to the build context (e.g.
+`package-lock.json`), as `location`, and the offending licenses and
+expression in `reason`. At most 200 findings are reported per policy,
+followed by one counting the rest.
+
+What the SBOM was made of, i.e. the scanned directory, file or image
+(CycloneDX `metadata.component`, the SPDX root syft writes for it, syft's
+`source`), is not a package and is not checked. A project's own entry in a lock file (e.g. the
+root of `package-lock.json`, typically `UNLICENSED` when private) is listed
+as a package by syft and is checked like any other.
+
+**`docker push`** has no build context. It checks the `SBOM` recorded in the
+chalk mark of the pushed images, which requires both `run_sbom_tools` and
+the `SBOM` key in the mark template (e.g. `mark_template.minimal.key.SBOM.use`
+for `docker build`). That SBOM covers the whole repository chalk scanned
+when it built the image, not just the build context, so push may report
+packages the build did not include. **Images whose mark has no SBOM pass**:
+they are not checked and produce no finding, as licenses are a property of
+the build, which is where the rule applies (see
+[Adding rules](#adding-rules) for how push reads tool output).
+
 ## Reporting
 
 Findings are published to the `policy` topic, which is subscribed to

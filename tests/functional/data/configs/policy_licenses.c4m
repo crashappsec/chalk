@@ -1,0 +1,42 @@
+policy {
+  config_json: env("POLICY_CONFIG_JSON")
+}
+
+sink_config policy_file {
+  enabled:  true
+  sink:     "file"
+  filename: env("POLICY_REPORT_FILE")
+}
+
+subscribe("policy", "policy_file")
+
+# replaces syft with a tool printing a fixed SBOM, so tests neither download
+# syft nor depend on its catalogers
+tool.syft.enabled: false
+
+func fake_sbom_location(path) {
+  return "cat"
+}
+
+func fake_sbom_install(path) {
+  return false
+}
+
+func fake_sbom_args(path) {
+  return env("POLICY_SBOM_FIXTURE")
+}
+
+func fake_sbom_keys(out: string, code) {
+  if code != 0 {
+    return {}
+  }
+  return { "SBOM" : parse_json(out) }
+}
+
+tool fake_sbom {
+  kind:              "sbom"
+  get_tool_location: func fake_sbom_location(string) -> string
+  attempt_install:   func fake_sbom_install(string) -> bool
+  get_command_args:  func fake_sbom_args(string) -> string
+  produce_keys:      func fake_sbom_keys(string, int) -> dict[string, `x]
+}
