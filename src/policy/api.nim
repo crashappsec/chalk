@@ -44,6 +44,8 @@ type
     ## Dockerfile of a build, so rules can honor `<Dockerfile>.dockerignore`;
     ## empty for push or when read from stdin
     dockerfilePath*: string
+    ## the Dockerfile docker reads from stdin (`-f -`), which has no path
+    stdinDockerfile*: string
     ## image references the command pushes, as given on the command line
     pushTargets*: seq[string]
     ## chalk marks of the images `push` pushes, for those that are chalked
