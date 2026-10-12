@@ -2787,7 +2787,8 @@ tuple. The supported kind is `purl`: a package URL whose
 `type/namespace/name` is a shell-style glob, optionally followed by
 `@<version>`, where the version is a glob (`3.3.6`, `1.*`) or a
 comma-separated range (`<4.17.21`, `>=1.0,<1.2`); other range syntaxes
-(`^1.2`, `~1.2`, `1.x`, `[1.0,2.0)`) are rejected. Without a version any
+(`^1.2`, `~1.2`, `1.x`, `[1.0,2.0)`) and version lists (`1.2,1.3`) are
+rejected. Without a version any
 version matches. Matching ignores case, qualifiers and subpaths, and
 normalizes PyPI names (`Django_Rest` is `django-rest`). Ranges compare
 dot-separated numeric versions with an optional `-prerelease` by semver

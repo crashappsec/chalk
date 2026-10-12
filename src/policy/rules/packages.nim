@@ -101,16 +101,16 @@ proc normalizeLanguages(names: seq[string], field: string): seq[string] =
 
 proc parsePackagePattern*(value: string): PurlPattern =
   ## `parsePurlPattern`, also rejecting version ranges of other syntaxes
-  ## (`^1.2`, `~1.2`, `1.x`, `[1.0,2.0)`, `1 - 2`, `1 || 2`), which would
-  ## otherwise be taken as globs matching no version, so a denied entry
-  ## would silently never match.
+  ## (`^1.2`, `~1.2`, `1.x`, `[1.0,2.0)`, `1 - 2`, `1 || 2`) and version
+  ## lists (`1.2,1.3`), which would otherwise be taken as globs matching no
+  ## version, so a denied entry would silently never match.
   result = parsePurlPattern(value)
   let version = value.purlParts(pattern = true).version.strip()
   if version == "" or version[0] in {'<', '>', '=', '!'}:
     return
   var unsupported = version[0] in {'^', '~', '[', '('} or "||" in version
   for c in version:
-    if c in Whitespace:
+    if c in Whitespace or c == ',':
       unsupported = true
   for part in version.split('.'):
     if part in ["x", "X"]:
@@ -249,7 +249,9 @@ proc checkPackages*(settings: PackagesConfig, sboms: PolicySboms): seq[PolicyFin
           languageViolation = true
         elif language == "" and pkg.purlType notin nonLanguagePurlTypes:
           noLanguage.add(id)
-      if not languageViolation and finding.kind == "" and len(allowed.patterns) > 0:
+      # a denied range that cannot be decided must not hide an allowlist
+      # violation, which would then only be an error that on_error can allow
+      if not languageViolation and deniedMatch != pmMatch and len(allowed.patterns) > 0:
         if pkg.purl == "":
           noPurl.add(id)
         else:
@@ -258,7 +260,7 @@ proc checkPackages*(settings: PackagesConfig, sboms: PolicySboms): seq[PolicyFin
             finding = newSubjectFinding(ruleName, "violation", pkg.purl,
               withMessage("package is not in the list of allowed packages", settings.message),
               location = pkg.location)
-          elif allowedMatch == pmUnknown:
+          elif allowedMatch == pmUnknown and finding.kind == "":
             finding = newSubjectFinding(ruleName, "error", pkg.purl, allowedReason,
                                         location = pkg.location)
       if finding.kind != "":

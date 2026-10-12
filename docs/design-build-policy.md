@@ -424,8 +424,9 @@ kind is `purl`: `pkg:<type>/<namespace>/<name>[@<version>]`, where
 a version any version matches; otherwise the version is a glob (`3.3.6`,
 `1.*`) or a comma-separated range of `<`, `<=`, `>`, `>=`, `=`, `!=`
 constraints (`>=1.0,<1.2`). Other range syntaxes (`^1.2`, `~1.2`, `~=1.2`,
-`1.x`, `[1.0,2.0)`, `1 - 2`, `1 || 2`) are rejected rather than taken as
-globs that match nothing. Matching ignores case, qualifiers
+`1.x`, `[1.0,2.0)`, `1 - 2`, `1 || 2`) and version lists (`1.2,1.3`; use
+one entry per version) are rejected rather than taken as globs that match
+nothing. Matching ignores case, qualifiers
 (`?arch=amd64`) and subpaths, percent-decodes both sides
 (`pkg:npm/@angular/core` matches `pkg:npm/%40angular/core`), normalizes
 PyPI names (`Django_Rest` is `django-rest`) and ignores the `v` prefix of
@@ -436,7 +437,8 @@ numbers (missing ones are 0, so `1.2` is `1.2.0` and NuGet's `4.0.0.0` is
 `1.0.0-rc.10` < `1.0.0`); `+build` metadata (e.g. Go's `+incompatible`)
 is ignored. A package whose name matches a range entry but whose version
 cannot be compared (e.g. Debian's `1:2.36-9`, Python's `1.0.post1`, Maven's
-`1.2.3.RELEASE`) is an evaluation error, so `on_error` decides. Unknown
+`1.2.3.RELEASE`) is an evaluation error, so `on_error` decides, unless
+`allowed` or the languages already make it a violation. Unknown
 kinds, invalid patterns and unknown languages are configuration errors.
 
 Findings set `subject` to the package purl (or the language) and

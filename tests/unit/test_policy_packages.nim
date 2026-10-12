@@ -24,7 +24,8 @@ proc testPatterns() =
   # other range syntaxes would be globs matching no version
   for bad in ["pkg:npm/lodash@^4.17.0", "pkg:npm/lodash@~4.17.0", "pkg:pypi/x@~=1.0",
               "pkg:npm/x@4.x", "pkg:maven/a/b@[1.0,2.0)", "pkg:npm/x@1 - 2",
-              "pkg:npm/x@1 || 2", "pkg:npm/lodash@<1.0.post1"]:
+              "pkg:npm/x@1 || 2", "pkg:npm/lodash@<1.0.post1",
+              "pkg:npm/lodash@4.17.20,4.17.19"]:
     try:
       discard parsePackagePattern(bad)
       doAssert false, "accepted " & bad
@@ -125,6 +126,19 @@ proc testCheck() =
   settings = PackagesConfig(denied: @[("purl", "pkg:deb/debian/libc6@<3")])
   findings = settings.checkPackages(fixtureSboms())
   assertEq(findings.subjects("error"), @["pkg:deb/debian/libc6@1:2.36-9?arch=amd64"])
+
+  # an undecidable denied range does not hide an allowlist violation
+  settings = PackagesConfig(denied: @[("purl", "pkg:deb/debian/libc6@<3")],
+                            allowed: @[("purl", "pkg:npm/*")])
+  findings = settings.checkPackages(PolicySboms(sboms: @[Sbom(packages: @[
+    SbomPackage(purl: "pkg:deb/debian/libc6@1:2.36-9", purlType: "deb")])]))
+  assertEq(findings.subjects(), @["pkg:deb/debian/libc6@1:2.36-9"])
+  assertEq(findings.subjects("error"), newSeq[string]())
+  settings.allowed = @[("purl", "pkg:deb/*")]
+  findings = settings.checkPackages(PolicySboms(sboms: @[Sbom(packages: @[
+    SbomPackage(purl: "pkg:deb/debian/libc6@1:2.36-9", purlType: "deb")])]))
+  assertEq(findings.subjects(), newSeq[string]())
+  assertEq(findings.subjects("error"), @["pkg:deb/debian/libc6@1:2.36-9"])
 
   # languages are reported once per language
   settings = PackagesConfig(allowedLanguages: @["Go", "javascript"])
