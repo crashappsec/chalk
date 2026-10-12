@@ -450,8 +450,8 @@ Which files are read:
 - `include_paths` and `exclude_paths` use `.dockerignore` syntax, relative
   to the context; files excluded by `.dockerignore` are skipped
   (`honor_dockerignore`), as they never reach the image. Ignore files are
-  read as docker reads them (UTF-8 BOM, `filepath.Clean`, e.g. `!./a.pem`
-  re-includes `a.pem`). As in BuildKit, a
+  read as docker reads them (shared `src/policy/dockerignore.nim`: UTF-8
+  BOM, `filepath.Clean`, e.g. `!./a.pem` re-includes `a.pem`). As in BuildKit, a
   `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
   the context's `.dockerignore` (main context only). The legacy (non
   BuildKit) builder ignores `<Dockerfile>.dockerignore`, so files it would

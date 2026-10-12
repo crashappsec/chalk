@@ -31,6 +31,8 @@ from ./golden_images import globMatch
 import ".."/[
   api,
   configuration,
+  dockerignore,
+  helpers,
 ]
 
 const
@@ -345,76 +347,6 @@ proc isCaBundle(rel, relDir, entry: string): bool =
     (entry.toLowerAscii() in caBundleNames and relDir != "" and
      isExcluded(relDir, caBundleNameDirs))
 
-proc dockerignorePath(dir, dockerfilePath: string): string =
-  ## `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
-  ## `<context>/.dockerignore`
-  ## https://docs.docker.com/build/concepts/context/#filename-and-location
-  if dockerfilePath != "":
-    let specific = dockerfilePath & ".dockerignore"
-    if fileExists(specific):
-      return specific
-  let root = dir / ".dockerignore"
-  if fileExists(root):
-    return root
-  ""
-
-proc cleanPath(path: string): string =
-  ## Go's `filepath.Clean`: `./a` -> `a`, `a//b` -> `a/b`, `a/../b` -> `b`,
-  ## `..` above a leading `/` dropped
-  ## https://pkg.go.dev/path/filepath#Clean
-  let rooted = path.startsWith('/')
-  var parts: seq[string]
-  for part in path.split('/'):
-    case part
-    of "", ".":
-      discard
-    of "..":
-      if len(parts) > 0 and parts[^1] != "..":
-        discard parts.pop()
-      elif not rooted:
-        parts.add(part)
-    else:
-      parts.add(part)
-  result = parts.join("/")
-  if rooted:
-    result = "/" & result
-  elif result == "":
-    result = "."
-
-proc parseDockerignore*(content: string): seq[string] =
-  ## Patterns as moby's ignorefile.ReadAll reads them, so a re-include such
-  ## as `!./cert.pem` matches what docker sends
-  ## https://github.com/moby/patternmatcher/blob/main/ignorefile/ignorefile.go
-  var first = true
-  for line in content.splitLines():
-    var p = line
-    if first:
-      p.removePrefix("\xEF\xBB\xBF")
-      first = false
-    # a comment only at the very start of the line, as in moby
-    if p.startsWith('#'):
-      continue
-    p = p.strip()
-    if p.len == 0:
-      continue
-    let negate = p.startsWith('!')
-    if negate:
-      p = p[1 .. ^1].strip()
-    if p.len > 0:
-      p = p.cleanPath()
-      if p.len > 1 and p.startsWith('/'):
-        p = p[1 .. ^1]
-    if not isValidPattern(p):
-      warn("policy: certificates: ignoring invalid .dockerignore pattern: " & line)
-      continue
-    result.add((if negate: "!" else: "") & p)
-
-proc readDockerignore(dir: string, dockerfilePath = ""): seq[string] =
-  let path = dir.dockerignorePath(dockerfilePath)
-  if path == "":
-    return
-  readFile(path).parseDockerignore()
-
 proc prunes(rel: string, patterns: seq[string]): bool =
   isExcluded(rel, patterns) and not hasNegationForDir(rel, patterns)
 
@@ -476,12 +408,12 @@ proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
     let ignore =
       if settings.honorDockerignore:
         try:
-          readDockerignore(dir, if isMain: dockerfilePath else: "")
+          loadDockerignore(dir, if isMain: dockerfilePath else: "")
         except CatchableError:
           result.errors.add(newSubjectFinding(ruleName, "error", dir,
                             "could not read .dockerignore: " & getCurrentExceptionMsg()))
           continue
-      else: @[]
+      else: DockerIgnore()
     # (directory, inside a skipped CA bundle directory)
     var stack = @[("", false)]
     while len(stack) > 0:
@@ -496,7 +428,7 @@ proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
         let rel = (if relDir == "": entry else: relDir & "/" & entry)
         case kind
         of pcDir:
-          if entry == ".git" or rel.prunes(ignore) or rel.prunes(settings.excludePaths):
+          if entry == ".git" or ignore.prunes(rel) or rel.prunes(settings.excludePaths):
             continue
           let bundle = bundled or (settings.skipCaBundles and rel.prunes(caBundleDirs))
           if bundle and len(pins) == 0:
@@ -505,7 +437,7 @@ proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
           stack.add((rel, bundle))
         of pcFile:
           if not entry.hasCertExtension(settings.extensions) or
-             isExcluded(rel, ignore) or isExcluded(rel, settings.excludePaths):
+             ignore.isIgnored(rel) or isExcluded(rel, settings.excludePaths):
             continue
           let bundle = bundled or (settings.skipCaBundles and isCaBundle(rel, relDir, entry))
           if bundle:
@@ -639,23 +571,6 @@ proc check*(settings: CertificatesConfig, certs: seq[CertInfo], now: Time,
                                    "certificate not fully checked: " & unchecked.join("; "),
                                    cert.location()))
 
-proc capped*(findings: seq[PolicyFinding], limit = maxFindings): seq[PolicyFinding] =
-  ## The first `limit` findings, violations first, and one finding counting
-  ## the rest. It is a violation when a dropped finding is, so the policy
-  ## result does not change.
-  if len(findings) <= limit:
-    return findings
-  let sorted = findings.sorted(proc(a, b: PolicyFinding): int =
-    cmp(a.kind != "violation", b.kind != "violation"))
-  result = sorted[0 ..< limit]
-  var violations = 0
-  for f in sorted[limit .. ^1]:
-    if f.kind == "violation":
-      inc(violations)
-  result.add(newSubjectFinding(ruleName, (if violations > 0: "violation" else: "error"),
-                               ruleName, $(len(sorted) - limit) &
-                               " more certificate findings not listed"))
-
 proc check*(settings: CertificatesConfig, input: PolicyInput, now = getTime()): seq[PolicyFinding] =
   if len(input.contextDirs) == 0:
     # Push has no build context. For build, the engine reports contexts that
@@ -669,7 +584,7 @@ proc check*(settings: CertificatesConfig, input: PolicyInput, now = getTime()): 
                                             input.mainContextDir)
   var findings = scan.errors.sorted(proc(a, b: PolicyFinding): int = cmp(a.location, b.location))
   findings.add(settings.check(scan.certs.sorted(byLocation), now, scan.issuers))
-  findings.capped()
+  findings.capFindings(ruleName, maxFindings, "certificate findings")
 
 proc nonNegative(path: openArray[string], default: int): int =
   result = policyIntSetting(path, default)

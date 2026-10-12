@@ -441,8 +441,6 @@ proc testScanning() =
   doAssert "a/expired.pem" notin namedFound
 
   # patterns are cleaned as docker does, so `!./cert.pem` re-includes cert.pem
-  assertEq(parseDockerignore("\xEF\xBB\xBF/a//b/\n!./c\n#x\n ! d/../e \n../f\n/..\n./\n"),
-           @["a/b", "!c", "!e", "../f", "/", "."])
   let cleaned = newContext({
     "cert.pem": "expired.pem",
     "b/weak.pem": "expired.pem",
@@ -475,21 +473,10 @@ proc testBudgets() =
   settings.maxFileSize = len(one) * maxCertsPerFile
   let found = settings.findings(@[many])
   assertEq(found.len, maxFindings + 1)
+  # the dropped findings are violations, so the summary one is too
   assertEq(found.locations().len, maxFindings + 1)
   assertEq(found[^1].reason, $(maxCerts + maxCertsPerFile + 1 - maxFindings) &
                              " more certificate findings not listed")
-
-  let errors = @[newSubjectFinding("certificates", "error", "a", "x"),
-                 newSubjectFinding("certificates", "error", "b", "y")]
-  assertEq(errors.capped(5).len, 2)
-  let onlyErrors = errors.capped(1)
-  assertEq(onlyErrors.len, 2)
-  assertEq(onlyErrors[1].kind, "error")
-  assertEq(onlyErrors[1].reason, "1 more certificate findings not listed")
-  let violation = newSubjectFinding("certificates", "violation", "c", "z")
-  let mixed = (errors & violation).capped(1)
-  assertEq(mixed[0].subject, "c")
-  assertEq(mixed[1].kind, "error")
 
 proc rejects(text, reason: string) =
   ## the document is unusable as a whole, or as its only policy
