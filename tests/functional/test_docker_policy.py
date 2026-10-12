@@ -1257,6 +1257,24 @@ def test_step_summary_enforce_blocked(chalk: Chalk, random_hex: str, tmp_path: P
     assert "| (unnamed) | enforce | default mode | blocked | 1 |" in text
 
 
+def test_step_summary_pass_skipped_by_default(
+    chalk: Chalk, random_hex: str, tmp_path: Path
+):
+    summary = tmp_path / "summary.md"
+    summary.write_text("untouched\n")
+    _, result = build(
+        chalk,
+        "FROM alpine\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env=summary_env("enforce", random_hex, summary),
+    )
+    assert result.exit_code == 0
+    assert policy_reports(random_hex) == []
+    assert summary.read_text() == "untouched\n"
+
+
 def test_step_summary_pass(chalk: Chalk, random_hex: str, tmp_path: Path):
     summary = tmp_path / "summary.md"
     _, result = build(
@@ -1265,7 +1283,10 @@ def test_step_summary_pass(chalk: Chalk, random_hex: str, tmp_path: Path):
         "enforce",
         random_hex,
         tag=random_hex,
-        env=summary_env("enforce", random_hex, summary),
+        env={
+            **summary_env("enforce", random_hex, summary),
+            "POLICY_STEP_SUMMARY_ON_PASS": "1",
+        },
     )
     assert result.exit_code == 0
     # nothing is published to the policy topic when all policies pass

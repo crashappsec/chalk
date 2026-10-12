@@ -1400,13 +1400,16 @@ findings on the console.
 ### GitHub Actions job summary
 
 When `GITHUB_STEP_SUMMARY` is set (GitHub Actions), every `chalk docker build`
-or `chalk docker push` that evaluates policies appends a short Markdown section
-to the [job summary](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary),
-including when all policies pass and when the command is blocked:
+or `chalk docker push` whose evaluated policies report findings appends a short
+Markdown section to the [job summary](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary),
+including when the command is blocked. When every policy passes nothing is
+written, so conformant builds don't add a section to every job; set
+`policy.github_step_summary_on_pass = true` to write one anyway. The section has:
 
 - an alert stating the outcome: `CAUTION` when blocked, `WARNING` for audit
   violations that `enforce` would block, `NOTE` when policies could only report
-  evaluation errors, `TIP` when all passed;
+  evaluation errors, `TIP` when all passed (only with
+  `github_step_summary_on_pass`);
 - the command and its first image tag;
 - when there are findings, a table of the offending images (digest shortened),
   how each is used (`FROM`, `COPY --from`, `RUN --mount from` and the stage) and

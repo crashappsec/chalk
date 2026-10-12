@@ -366,11 +366,24 @@ proc stepSummaryEnabled(): bool =
   getEnv("GITHUB_STEP_SUMMARY") != "" and
     attrGetOpt[bool]("policy.github_step_summary").get(true)
 
+proc allPassed(policies: seq[PolicyResult]): bool =
+  for p in policies:
+    if p.result != "pass":
+      return false
+  true
+
 proc recordPolicySummary*(policies: seq[PolicyResult], build: ChalkDict) =
   ## Queues the outcome of one evaluation for `writePolicySummary`.
+  ## A fully conformant evaluation adds nothing unless asked to, so jobs
+  ## only get a section when a policy has something to say.
   try:
-    if stepSummaryEnabled():
-      pendingSummaries.add(PendingSummary(policies: policies, build: build))
+    if not stepSummaryEnabled():
+      return
+    if allPassed(policies) and
+       not attrGetOpt[bool]("policy.github_step_summary_on_pass").get(false):
+      trace("policy: all policies passed; no step summary (github_step_summary_on_pass is off)")
+      return
+    pendingSummaries.add(PendingSummary(policies: policies, build: build))
   except CatchableError:
     warn("policy: could not prepare the GitHub step summary: " & getCurrentExceptionMsg())
 
