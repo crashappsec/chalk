@@ -2,6 +2,7 @@ import std/[json, strutils]
 import ../../src/types
 import ../../src/chalkjson
 import ../../src/policy/api
+import ../../src/plugins/externalTool
 import ../../src/policy/tools
 
 template assertEq(a, b: untyped) =
@@ -52,11 +53,16 @@ const request = ToolRequest(rule: "r", kind: "sbom", key: "SBOM", what: "an SBOM
 proc testContextOutputs() =
   clearPolicyToolCache()
   var scanned: seq[string]
-  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
     scanned.add(dir)
     if dir == "/broken":
       raise newException(ValueError, "syft failed")
-    @[ToolOutput(tool: "syft", root: dir, value: %*{"dir": dir})]
+    if dir == "/partial":
+      return ToolRun(outputs: @[ToolOutput(tool: "b", root: dir, value: %*{})],
+                     failures: @["a: timed out"])
+    if dir == "/none":
+      return ToolRun(failures: @["a: timed out", "b produced no SBOM"])
+    ToolRun(outputs: @[ToolOutput(tool: "syft", root: dir, value: %*{"dir": dir})])
 
   let host = ChalkDict()
   host["SBOM"] = sbomKey("/src")
@@ -82,10 +88,22 @@ proc testContextOutputs() =
   discard input.contextToolOutputs(request, hostOutputs)
   assertEq(scanned, @["/elsewhere", "/broken"])
 
+  # a failed tool is an error even when another produced output
+  outputs = PolicyInput(contextDirs: @["/partial", "/none"]).contextToolOutputs(request, hostOutputs)
+  assertEq(len(outputs.contexts), 1)
+  assertEq(outputs.contexts[0].outputs[0].tool, "b")
+  assertEq(len(outputs.errors), 2)
+  assertEq(outputs.errors[0].subject, "/partial")
+  assertEq(outputs.errors[0].reason,
+           "could not produce an SBOM of the build context with every tool: a: timed out")
+  assertEq(outputs.errors[1].subject, "/none")
+  assertEq(outputs.errors[1].reason,
+           "could not produce an SBOM of the build context: a: timed out; b produced no SBOM")
+
   # output without a known root covers nothing
   discard PolicyInput(contextDirs: @["/src"]).contextToolOutputs(
     request, @[ToolOutput(tool: "syft", value: newJObject())])
-  assertEq(scanned, @["/elsewhere", "/broken", "/src"])
+  assertEq(scanned, @["/elsewhere", "/broken", "/partial", "/none", "/src"])
 
   var off = request
   off.runTools = false
@@ -114,7 +132,54 @@ proc testContextOutputs() =
   bad["SBOM"] = pack("not an object")
   doAssertRaises(ValueError):
     discard bad.toolOutputs("SBOM")
+  # too large to parse
+  let saved = maxToolOutputBytes
+  maxToolOutputBytes = 10
+  doAssertRaises(ValueError):
+    discard host.toolOutputs("SBOM")
+  maxToolOutputBytes = saved
   clearPolicyToolCache()
+
+proc testRunEach() =
+  # tools that produce the key: `ok*`; others fail
+  proc run(tool: string): ChalkDict =
+    if tool == "raises":
+      raise newException(ValueError, "timed out")
+    result = ChalkDict()
+    if tool.startsWith("ok"):
+      result["SBOM"] = sbomKey("/" & tool)
+  proc never(tool: string): bool = false
+  proc stopsAtOk(tool: string): bool = tool == "ok-stop"
+
+  var sast = request
+  sast.firstOnly = false
+  # every tool runs; failures stay reported next to the output
+  var run1 = sast.runEach("/d", ["raises", "ok1", "empty", "ok2"], run, never)
+  assertEq(len(run1.outputs), 2)
+  assertEq(run1.outputs[0].root, "/d")
+  assertEq(run1.failures, @["raises: timed out", "empty produced no SBOM (see the chalk logs)"])
+  # a tool with stop_on_success stands in for those that failed before it
+  run1 = sast.runEach("/d", ["raises", "ok-stop", "ok2"], run, stopsAtOk)
+  assertEq(len(run1.outputs), 1)
+  assertEq(len(run1.failures), 0)
+  # firstOnly: the first output stands in for earlier failures
+  run1 = request.runEach("/d", ["raises", "empty", "ok1", "ok2"], run, never)
+  assertEq(len(run1.outputs), 1)
+  assertEq(run1.outputs[0].tool, "ok1")
+  assertEq(len(run1.failures), 0)
+  run1 = request.runEach("/d", ["raises", "empty"], run, never)
+  assertEq(len(run1.outputs), 0)
+  assertEq(len(run1.failures), 2)
+
+proc testDeadline() =
+  assertEq(toolDeadline("300"), 360)
+  assertEq(toolDeadline(" 5m "), 360)
+  assertEq(toolDeadline("1.5h"), 5460)
+  # no timeout of its own: the policy's
+  for setting in ["", "0", "soon"]:
+    assertEq(toolDeadline(setting), policyToolTimeout)
+  assertEq("PATH=/x:$PATH semgrep scan . 2>/dev/null".withDeadline(60, "/usr/bin/timeout"),
+           "/usr/bin/timeout -s TERM 60 /bin/sh -c 'PATH=/x:$PATH semgrep scan . 2>/dev/null'")
 
 proc testPushedOutputs() =
   let mark = ChalkDict()
@@ -134,4 +199,6 @@ proc testPushedOutputs() =
 testPaths()
 testCapFindings()
 testContextOutputs()
+testRunEach()
+testDeadline()
 testPushedOutputs()

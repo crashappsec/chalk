@@ -709,7 +709,11 @@ Rules that read external tool output (`tool.*`, e.g. syft or semgrep) share
   demand, once per process. Chalk scans the git repository containing the
   first context, so rules keep only what is inside each context directory
   (`contextPath`). Missing output is an evaluation error, so `on_error`
-  decides. Such rules must register with `requiresContext = true`: context
+  decides, and so is a tool that failed when every enabled tool was to run,
+  even if another produced output (not one that a `firstOnly` request or a
+  `stop_on_success` tool's output stands in for). Output larger than
+  `maxToolOutputBytes` (128 MiB of JSON) is an error rather than parsed.
+  Such rules must register with `requiresContext = true`: context
   directories are only collected for them, and contexts that are not local
   directories are reported against them by the engine (so
   `contextToolOutputs` does not repeat them);
@@ -720,11 +724,15 @@ Rules that read external tool output (`tool.*`, e.g. syft or semgrep) share
 On-demand runs ignore `run_sbom_tools`, `run_sast_tools` and
 `run_secret_scanner_tools`: enabling a rule that needs a tool's output runs
 the tool. Like chalk's own runs they may install it first (e.g. download the
-syft installer, or run the `anchore/syft` docker image), and each run is
-bounded by the tool's timeout (`syft_timeout`, `semgrep_timeout`,
-`trufflehog_timeout`, 300s by default), so a build may take up to
-`maxContextDirs` (8) contexts x enabled tools x timeout longer. These runs do not count as chalk's own: when chalk's
-run failed, it still runs the tool again for the chalk mark.
+syft installer, or run the `anchore/syft` docker image); installers are
+bounded by the tool's timeout. Whatever the tool's callbacks do, each scan
+is stopped by the `timeout` command after the tool's own timeout
+(`syft_timeout`, `semgrep_timeout`, `trufflehog_timeout`, 300s by default)
+plus 60s, or after `policyToolTimeout` (300s) when that is empty or 0;
+without a `timeout` command the scan is an evaluation error. A build may
+therefore take up to `maxContextDirs` (8) contexts x enabled tools x
+timeout longer. These runs do not count as chalk's own: when chalk's run
+failed, it still runs the tool again for the chalk mark.
 
 On push the tool output comes only from the pushed images' chalk marks, as
 the build context is gone and the tools cannot run on it. Images whose mark

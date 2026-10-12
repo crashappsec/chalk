@@ -97,14 +97,18 @@ proc add(sbom: var Sbom, pkg: SbomPackage): bool =
   sbom.packages.add(pkg)
   return true
 
-proc packageArray(node: JsonNode, field: string): seq[JsonNode] =
+proc packageArray(sbom: var Sbom, node: JsonNode, field: string): seq[JsonNode] =
   # An omitted optional array denotes an empty SBOM; a present malformed
-  # array or entry must reach the policy's on_error handling.
+  # array or entry must reach the policy's on_error handling. Entries past
+  # what the SBOM can hold are neither validated nor copied.
   if node == nil:
     return @[]
   if node.kind != JArray:
     raise newException(ValueError, field & " must be an array")
-  for item in node.getElems():
+  for item in node.items():
+    if len(result) >= maxSbomPackages - len(sbom.packages):
+      sbom.truncated = true
+      break
     if item.kind != JObject:
       raise newException(ValueError, field & " entries must be objects")
     if item{"name"} == nil or item{"name"}.kind != JString or item{"name"}.getStr() == "":
@@ -146,11 +150,11 @@ proc cyclonedxLicenses(component: JsonNode): seq[string] =
       result.add(license{"name"}.getStr())
 
 proc addComponents(sbom: var Sbom, components: JsonNode, depth: int) =
-  let entries = packageArray(components, "components")
   if depth > maxComponentDepth:
-    if entries.len > 0:
+    if components != nil and components.kind == JArray and len(components) > 0:
       sbom.truncated = true
     return
+  let entries = sbom.packageArray(components, "components")
   for component in entries:
     let purl = component{"purl"}.getStr()
     # files and the scanned source itself are components too
@@ -205,7 +209,7 @@ const sourcePurposes = ["FILE", "CONTAINER", "DIRECTORY"]
 
 proc parseSpdx(doc: JsonNode): Sbom =
   let sourceIds = doc.spdxSourceIds()
-  for item in packageArray(doc{"packages"}, "packages"):
+  for item in result.packageArray(doc{"packages"}, "packages"):
     let purl = item.spdxPurl()
     # The scanned source (syft: the directory, file or image, with the image
     # digest as version) is not a dependency; a described application or
@@ -234,7 +238,7 @@ proc parseSpdx(doc: JsonNode): Sbom =
 # syft JSON
 
 proc parseSyftJson(doc: JsonNode): Sbom =
-  for artifact in packageArray(doc{"artifacts"}, "artifacts"):
+  for artifact in result.packageArray(doc{"artifacts"}, "artifacts"):
     var pkg = SbomPackage(
       name:     artifact{"name"}.getStr(),
       version:  artifact{"version"}.getStr(),

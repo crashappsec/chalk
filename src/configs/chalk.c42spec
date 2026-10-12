@@ -2529,9 +2529,12 @@ the enabled `sbom`, `sast` or `secret_scanner` tools on each local build
 context (at most 8) that chalk's own run did not cover, whatever
 `run_sbom_tools`, `run_sast_tools` and `run_secret_scanner_tools` say.
 Like chalk's own runs, these may install the tool first (e.g. download the
-syft installer or run the `anchore/syft` docker image) and each run is
-bounded by the tool's timeout (300 seconds by default), so a build can take
-up to contexts x tools x timeout longer. SBOM packages found only in
+syft installer or run the `anchore/syft` docker image). Each run is stopped
+after the tool's timeout (300 seconds by default) plus 60 seconds, or after
+300 seconds when the tool has none, using the `timeout` command; without
+it, the run is an evaluation error. A build can therefore take up to
+contexts x tools x timeout longer. A tool that fails is an evaluation
+error even when another tool produced output. SBOM packages found only in
 files the context's `.dockerignore` leaves out are not checked.
 
 On push, these rules read the tool output recorded in the pushed image's
