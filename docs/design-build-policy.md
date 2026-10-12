@@ -649,6 +649,165 @@ images are not checked, as the image does not exist yet when policies run.
 Private keys in the context are not reported by this rule; they belong to
 secret scanning.
 
+### Secrets
+
+`policy.secrets` reports secrets (API keys, tokens, credentials) in the
+files a `docker build` sends to docker, found with
+[trufflehog](https://github.com/trufflesecurity/trufflehog).
+
+```con4m
+policy {
+  mode: "enforce"
+  secrets {
+    enabled:          true
+    verified_only:    true          # only secrets the provider confirmed as live
+    ignore_detectors: ["URI"]
+    exclude_paths:    ["tests", "**/fixtures"]
+    message:          "Move secrets to the vault: https://example.com/secrets"
+  }
+}
+```
+
+```json
+{
+  "id": "secrets@1",
+  "mode": "enforce",
+  "secrets": {
+    "enabled": true,
+    "verify": true,
+    "verified_only": true,
+    "detectors": [],
+    "ignore_detectors": ["URI"],
+    "exclude_paths": ["tests", "**/fixtures"],
+    "check_push": false,
+    "message": "Move secrets to the vault: https://example.com/secrets"
+  }
+}
+```
+
+| Field                             | Type           | Default |
+| --------------------------------- | -------------- | ------- |
+| `policy.secrets.enabled`          | `bool`         | `false` |
+| `policy.secrets.verify`           | `bool`         | `true`  |
+| `policy.secrets.verified_only`    | `bool`         | `true`  |
+| `policy.secrets.detectors`        | `list[string]` | `[]`    |
+| `policy.secrets.ignore_detectors` | `list[string]` | `[]`    |
+| `policy.secrets.exclude_paths`    | `list[string]` | `[]`    |
+| `policy.secrets.check_push`       | `bool`         | `false` |
+| `policy.secrets.message`          | `string`       | `""`    |
+
+What is checked on `docker build`:
+
+- Every local context directory (the main context, the checkout of a git
+  context and local named contexts) is scanned with
+  `trufflehog filesystem --json`, before docker runs. The scan uses the
+  `tool.trufflehog` settings (local binary, else docker, else the installer;
+  `trufflehog_timeout`, 300s by default; `trufflehog_config` for custom
+  detectors) whether or not `run_secret_scanner_tools` is enabled, and is
+  done once per directory and `exclude_paths` however many policies enable
+  the rule. Like on-demand tool scans, it is stopped by the `timeout`
+  command after `trufflehog_timeout` plus 60s, or 300s when that is empty;
+  without a `timeout` command it is an evaluation error. trufflehog >=
+  3.90.9 is required (`--fail-on-scan-errors`); an older one is an
+  evaluation error saying so.
+- The Dockerfile is always scanned, as BuildKit always sends it and secrets
+  in `ENV`/`ARG` defaults end up in the image config: as part of its context
+  directory, or on its own when `.dockerignore` excludes it or it is outside
+  the context (`-f ../Dockerfile`). Its findings are reported once. A
+  Dockerfile read from stdin (`-f -`) is scanned from the content chalk read,
+  reported as `Dockerfile (stdin)`.
+- The rule does not reuse `SECRET_SCANNER`: chalk's own scan runs on the git
+  repository containing the first context, in git mode when it can. Git mode
+  reads committed history (secrets that were since removed) but skips
+  untracked and ignored files such as a `.env` that docker does send, and
+  a failed scan there looks the same as a clean one.
+- Files docker does not send are ignored: those matched by
+  `<Dockerfile>.dockerignore` (when it exists, main context only) or else the
+  context's `.dockerignore` (patterns are cleaned like docker does, e.g.
+  `./a` is `a`). `exclude_paths` ignores more paths, relative to the context
+  directory, in `.dockerignore` syntax (`*` does not cross `/`, `**` does, a
+  directory covers everything under it); negations are rejected. Both are
+  passed to trufflehog as anchored `--exclude-paths` regexes (up to 1000;
+  directories no negation re-includes are skipped whole), so it does not
+  read, unpack or fail on files docker does not send, such as a
+  `node_modules` with broken symlinks; results are filtered again
+  afterwards.
+- A `.git` directory docker sends (not excluded by `.dockerignore`) is not
+  scanned except for its `config`, which can hold credentialed remote URLs
+  or the `http.extraheader` token `actions/checkout` persists. Objects,
+  packs, hooks and logs are not scanned, as reading history is costly.
+- `detectors` keeps only the listed trufflehog detectors and
+  `ignore_detectors` drops some (names are case-insensitive, e.g. `AWS`,
+  `Github`, `URI`).
+- Each result is reported with `subject` = detector, `location` =
+  `path:line` (relative to the main context, absolute for named contexts)
+  and `severity` = `verified`, `unverified` or `unknown`:
+
+  | Result                                                           | `verified_only: true`         | `verified_only: false` |
+  | ---------------------------------------------------------------- | ----------------------------- | ---------------------- |
+  | verified (provider accepted the secret)                          | violation                     | violation              |
+  | unverified (provider rejected it, or the detector cannot verify) | ignored                       | violation              |
+  | unknown (verification failed, e.g. no network)                   | evaluation error (`on_error`) | violation              |
+
+  With the defaults (`verify: true`, `verified_only: true`) only secrets
+  the provider confirmed as live are violations. A detector that cannot
+  verify (no provider API) never yields a violation then, however real the
+  secret looks; set `verified_only: false` to report those. A provider that
+  rate-limits or is unreachable makes the result `unknown`, an evaluation
+  error.
+
+- A `trufflehog:ignore` comment on the line of a secret suppresses it, as
+  trufflehog does natively; such lines are not reported.
+
+- Secret values are never stored, logged or reported. Only the detector,
+  location, verification status and the detector's rotation guide link are
+  kept from trufflehog's output.
+- A build context that is not a local directory (stdin, remote tarball), a
+  missing trufflehog that cannot be installed, a failed scan or a timeout is
+  an evaluation error handled by `on_error`. Secrets trufflehog reported
+  before it failed are still reported, so they are violations whatever
+  `on_error` says.
+- Work is bounded: at most 8 context directories are scanned (more is an
+  evaluation error); at most 32 MiB of trufflehog's results and 4 MiB of
+  its diagnostics are read (trufflehog is stopped past that, an evaluation
+  error that keeps the results read); listing the excluded paths for `-x`
+  stops after 100,000 entries, as it runs before `trufflehog_timeout`
+  applies (the rest is scanned and filtered afterwards).
+- At most 100 findings are reported per policy (violations first); the
+  rest are summarized in one more finding.
+
+Verification (`verify`, on by default) means trufflehog sends each candidate
+secret to its provider's API from the build host, which is what makes
+`verified` findings reliable. For offline builds, or when sending candidates
+to providers is not acceptable, set `verify: false`: trufflehog runs with
+`--no-verification`, every finding is `unverified`, and `verified_only` must
+be `false` (otherwise the policy is a `config` error, as it could never
+report anything). Unverified findings include false positives (examples,
+test keys), so use them with `audit`, or with `exclude_paths` and
+`ignore_detectors`.
+
+On `docker push` the build context is gone, so nothing is checked unless
+`check_push` is set. Then the trufflehog results recorded in each pushed
+image's chalk mark (`SECRET_SCANNER`, present only when the image was built
+with `run_secret_scanner_tools` and a mark template that includes the key)
+are reported with the same `detectors`, `ignore_detectors` and
+`verified_only` settings. These come from chalk's build-time scan: in git
+mode they can include secrets in committed history (the commit is named in
+the reason) and are not filtered by `.dockerignore`; `exclude_paths` only
+applies to their repository-relative (git mode) paths. Images whose mark
+has no `SECRET_SCANNER` pass (e.g. the build did not scan, or only reported
+the run-time `@SECRET_SCANNER`), as do unchalked images: the rule cannot tell an image that was never scanned from a clean
+one, so use it together with a build policy rather than on its own.
+
+Limitations: secrets passed as build arguments or created during the build
+are not scanned; scanning large contexts takes time (bounded by
+`trufflehog_timeout`); a scan error anywhere trufflehog walks (outside the
+excluded paths) fails the scan, as trufflehog does not attribute every
+error to a path. The legacy builder (`DOCKER_BUILDKIT=0`, or docker without
+buildx) ignores `<Dockerfile>.dockerignore` and only applies the context's
+`.dockerignore`, so with it files the Dockerfile's ignore file excludes are
+sent to docker but not scanned.
+
 ## Reporting
 
 Findings are published to the `policy` topic, which is subscribed to
@@ -867,6 +1026,71 @@ Findings about something other than an image (`newSubjectFinding`) set
 and leave `image` empty. The job summary shows `subject` where it would show
 the image.
 
+Rules that read external tool output (`tool.*`, e.g. syft or semgrep) share
+`src/policy/tools.nim` rather than running the tools themselves:
+
+- on build, `contextToolOutputs` gives, per context directory (at most
+  `maxContextDirs`), chalk's own output (`run_*_tools`) when the directory is
+  below the one chalk scanned (`EXTERNAL_TOOL_DURATION` records it), else
+  the output of running the enabled tools of that kind on the directory on
+  demand, once per process. Chalk scans the git repository containing the
+  first context, so rules keep only what is inside each context directory
+  (`contextPath`). Missing output is an evaluation error, so `on_error`
+  decides, and so is a tool that failed when every enabled tool was to run,
+  even if another produced output (not one that a `firstOnly` request or a
+  `stop_on_success` tool's output stands in for). Output larger than
+  `maxToolOutputBytes` (128 MiB of JSON) is an error rather than parsed.
+  Such rules must register with `requiresContext = true`: context
+  directories are only collected for them, and contexts that are not local
+  directories are reported against them by the engine (so
+  `contextToolOutputs` does not repeat them);
+- on push, `pushedToolOutputs` reads the output recorded in the pushed
+  images' chalk marks;
+- `capFindings` bounds the findings a rule reports.
+
+On-demand runs ignore `run_sbom_tools`, `run_sast_tools` and
+`run_secret_scanner_tools`: enabling a rule that needs a tool's output runs
+the tool. Like chalk's own runs they may install it first (e.g. download the
+syft installer, or run the `anchore/syft` docker image); installers are
+bounded by the tool's timeout. Whatever the tool's callbacks do, each scan
+is stopped by the `timeout` command after the tool's own timeout
+(`syft_timeout`, `semgrep_timeout`, `trufflehog_timeout`, 300s by default)
+plus 60s, or after `policyToolTimeout` (300s) when that is empty or 0;
+without a `timeout` command the scan is an evaluation error. A build may
+therefore take up to `maxContextDirs` (8) contexts x enabled tools x
+timeout longer. These runs do not count as chalk's own: when chalk's run
+failed, it still runs the tool again for the chalk mark.
+
+On push the tool output comes only from the pushed images' chalk marks, as
+the build context is gone and the tools cannot run on it. Images whose mark
+does not record the output pass: the default mark templates do not include
+`SBOM`, `SAST` or `SECRET_SCANNER`, unchalked images have no mark, and a
+mark may keep the key in an object store (`@SBOM`, logged at trace level).
+Checking pushes requires mark templates that record the key. The recorded
+output covers everything chalk scanned when it built the image (the git
+repository of the first build context), not just the build context, as push
+cannot tell which part was the context.
+
+`src/policy/sbom.nim` builds on it for rules that read SBOMs (CycloneDX, SPDX
+or syft JSON): `policySboms` returns the packages of each build context, or
+of each pushed image. On build it keeps the packages found within each
+context directory, dropping those whose every location the context's
+`.dockerignore` leaves out of the build (the Dockerfile's
+`<Dockerfile>.dockerignore` for the main context).
+
+Shared helpers for rules:
+
+- `src/policy/dockerignore.nim`: `loadDockerignore(dir, dockerfilePath)`
+  reads the ignore file docker applies to a context
+  (`mainContextDockerfile(input, dir)` gives the Dockerfile path for the main
+  context only), `isIgnored(relPath)` and `prunes(relDir)` match paths with
+  the moby-compatible matcher of `src/docker/tar.nim`;
+- `src/policy/purl.nim`: `purlParts`, `purlType`, `parsePurlPattern` and
+  `matches`/`firstMatch` for purl patterns with globs and version ranges
+  (e.g. `pkg:npm/lodash@<4.17.21`, `pkg:npm/@angular/*`), ignoring case,
+  qualifiers and subpaths, decoding percent-encoding and normalizing pypi
+  names and go `v` versions.
+
 A rule with settings in `policy.config_json` registers its section at module
 initialization with `registerPolicyJsonSection(name, validate)`, as
 configurations can be read before rules are loaded. `validate` receives the
@@ -903,3 +1127,29 @@ the `policy*Setting` accessors, which read the same path from con4m when
   reported as an evaluation error of those rules, as their contents are not
   checked. In both cases a branch or tag that moves between the policy check
   and the build is built at its new commit.
+
+Secrets policy scans enable TruffleHog `--fail-on-scan-errors` and also inspect
+stderr for filesystem traversal/chunk failures that the scanner logs without
+failing its exit status. Such scans produce an evaluation error governed by
+`on_error`, keeping the results trufflehog printed, and are cached like
+completed scans so several policies do not wait for a timeout again.
+Diagnostic values are never
+included in findings or logs. Verification failures retain their existing
+`verified_only` behavior, and native `trufflehog:ignore` suppressions remain
+respected. Exclusions are anchored at the scanned directory, so ordinary
+directories such as `app.git` (or a context below one) remain scanned.
+
+SBOM policy parsing retains every package occurrence. A repository scan keeps a
+package in a build context when any recorded location belongs to that context;
+findings use an in-context location. Packages without locations remain eligible.
+SPDX dependencies do not need optional version or purl metadata. The row
+the document describes (`documentDescribes`, `DESCRIBES` or `DESCRIBED_BY`) is
+the scanned source and excluded, whatever its version or purl, when its
+`primaryPackagePurpose` is `FILE`, `CONTAINER` or `DIRECTORY`, or it is
+syft's `SPDXRef-DocumentRoot-*` (syft gives a scanned image its digest as
+version). Described applications and libraries remain checked. syft JSON
+licenses may be objects or, in older schemas, plain strings; empty values are
+skipped. Optional omitted package arrays and empty arrays
+are valid; present arrays must contain package objects with nonempty names.
+Malformed arrays/entries and content omitted by package-count or nesting limits
+produce evaluation errors governed by `on_error`.
