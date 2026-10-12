@@ -133,6 +133,9 @@ proc usedAs(f: PolicyFinding): string =
     of "from":       "FROM"
     of "copy_from":  "COPY --from"
     of "mount_from": "RUN --mount from"
+    of "push":       "push target"
+    of "syntax":     "BuildKit frontend"
+    of "cache_from": "--cache-from"
     else:            f.source
   # unnamed stages are numbered
   if f.stage != "" and not f.stage.allCharsInSet(Digits):

@@ -309,6 +309,168 @@ docker does (`alpine` → `docker.io/library/alpine:latest`).
 Unknown kinds are reported as evaluation errors and handled per `on_error`,
 so configurations written for newer chalk versions fail safe on older ones.
 
+### Registries
+
+`policy.registries` restricts the registries a build pulls images from and
+the registries images are pushed to. It works at the level of registry
+hosts and repository namespaces, while `golden_images` allowlists exact
+images; both can be enabled in the same policy, and an image must then
+satisfy both (e.g. `registries` allows only `ghcr.io/acme/*` while
+`golden_images` picks the approved base images within it).
+
+```con4m
+policy {
+  mode: "enforce"
+  registries {
+    enabled:        true
+    pull_allowed:   [("glob", "docker.io/library/*"), ("glob", "cgr.dev"),
+                     ("glob", "ghcr.io/acme/*")]
+    pull_denied:    [("glob", "ghcr.io/acme/untrusted/*")]
+    push_allowed:   [("glob", "ghcr.io/acme/*"), ("glob", "*.dkr.ecr.*.amazonaws.com")]
+    push_denied:    [("glob", "docker.io")]
+    require_digest: false
+    message:        "Use approved registries: https://example.com/registries"
+  }
+}
+```
+
+```json
+{
+  "id": "registries@1",
+  "mode": "enforce",
+  "registries": {
+    "enabled": true,
+    "pull_allowed": [
+      ["glob", "docker.io/library/*"],
+      ["glob", "cgr.dev"],
+      ["glob", "ghcr.io/acme/*"]
+    ],
+    "pull_denied": [["glob", "ghcr.io/acme/untrusted/*"]],
+    "push_allowed": [
+      ["glob", "ghcr.io/acme/*"],
+      ["glob", "*.dkr.ecr.*.amazonaws.com"]
+    ],
+    "push_denied": [["glob", "docker.io"]],
+    "require_digest": false,
+    "message": "Use approved registries: https://example.com/registries"
+  }
+}
+```
+
+| Field                              | Type                                        | Default |
+| ---------------------------------- | ------------------------------------------- | ------- |
+| `policy.registries.enabled`        | `bool`                                      | `false` |
+| `policy.registries.pull_allowed`   | `list[tuple[string, string]]` (kind, value) | `[]`    |
+| `policy.registries.pull_denied`    | `list[tuple[string, string]]` (kind, value) | `[]`    |
+| `policy.registries.push_allowed`   | `list[tuple[string, string]]` (kind, value) | `[]`    |
+| `policy.registries.push_denied`    | `list[tuple[string, string]]` (kind, value) | `[]`    |
+| `policy.registries.require_digest` | `bool`                                      | `false` |
+| `policy.registries.message`        | `string`                                    | `""`    |
+
+Entries use the kind `glob`; other kinds are evaluation errors (a denylist
+entry of an unknown kind could have denied the image, so it is an error
+unless a known entry already denied it):
+
+- a value without `/` is a glob over the registry host: `docker.io`,
+  `ghcr.io`, `*.dkr.ecr.*.amazonaws.com`, `localhost:*`;
+- a value with `/` is a glob over `registry/repository`, e.g.
+  `ghcr.io/acme/*` (`*` also matches `/`, so nested repositories match).
+  `ghcr.io/acme` alone matches only that repository. As in docker, a first
+  component without `.` or `:` that is not `localhost` is a Docker Hub
+  namespace (`acme/*` is `docker.io/acme/*`), unless it contains a glob
+  character (`*/acme/*` matches `acme` on any registry).
+
+Both sides are normalized like docker references: `alpine` is
+`docker.io/library/alpine`, `docker.io/alpine` is
+`docker.io/library/alpine`, and `docker.io`, `index.docker.io` and
+`registry-1.docker.io` are the same registry (a host glob such as
+`docker.*` matches any of the three). Hosts are compared in lower case and the default HTTPS port is dropped, so `GHCR.io:443/acme/app` is
+`ghcr.io/acme/app` and `docker.io:443/alpine` is
+`docker.io/library/alpine`; other ports are part of the host
+(`ghcr.io:8443` is not `ghcr.io`). Tags and digests in entries are
+ignored.
+
+Writing entries:
+
+- patterns are globs over the whole name, not prefixes: `ghcr.io/acme`
+  matches only the repository `ghcr.io/acme`, not `ghcr.io/acme/app`. Use
+  `ghcr.io/acme/*` for a namespace, and a bare host (`ghcr.io`) for a
+  whole registry;
+- prefer allowlists. A denylist only blocks the spellings it matches;
+  references are normalized as above, but the same content can still be
+  reached through another name (a mirror, a pull-through cache, a
+  different host or IP for the same registry). `pull_denied` and
+  `push_denied` are best effort, `pull_allowed` and `push_allowed` fail
+  closed.
+
+What is checked:
+
+- pulls: every image in `subjects` (see [What is checked](#what-is-checked):
+  `FROM`, `COPY --from`, `RUN --mount=from`, image named contexts) must not
+  match `pull_denied` and, when `pull_allowed` is not empty, must match one
+  of its entries. An empty allowlist allows every registry that is not
+  denied. With `require_digest`, every pulled image must also be referenced
+  by digest (`alpine@sha256:...`) as written in the Dockerfile or named
+  context; chalk pinning a tag to a digest for its own metadata does not
+  count, as it does not pin what the next build pulls;
+- other build pulls (`pullRefs`, only checked by this rule since they are
+  not part of the built image, so `golden_images` ignores them): the
+  BuildKit frontend from `# syntax=<image>` and
+  `--build-arg BUILDKIT_SYNTAX=<image>` (both are checked, as either may
+  be used; source `syntax`) and registry cache imports
+  (`--cache-from <ref>` or `--cache-from type=registry,ref=<ref>`; source
+  `cache_from`; `local`, `gha` and other cache types are not registry
+  pulls). `require_digest` applies to the frontend but not to cache
+  imports, whose tags every `--cache-to` export rewrites. A
+  `--cache-from` that cannot be parsed is an error finding;
+- pushes: every push target must satisfy `push_denied` and `push_allowed`
+  the same way. For `docker build`, the targets are the `--tag`s when the
+  build pushes (`--push`, `--output type=registry` or
+  `--output type=image,push=true`, as buildx replaces exporter names with
+  `--tag`), else the `name`s of the pushing exporters, plus an exporter's
+  `dangling-name-prefix` unless BuildKit's `danging-name-empty-only` (sic)
+  suppresses it, plus registry cache exports
+  (`--cache-to type=registry,ref=<ref>`; `type=inline` cache goes with the
+  image). For `docker push`, the pushed reference, or every local tag of
+  the repository with `--all-tags`.
+
+On `docker push` the pull checks apply to the images recorded in the
+image's chalk mark, as for `golden_images`; the frontend and cache imports
+are not recorded and are only checked at build time. Those references
+include the base image digests chalk pinned during the build, so
+`require_digest` passes on push for any chalked image and is effectively a
+build-time check. A policy with pull checks
+(`pull_allowed`, `pull_denied` or `require_digest`) needs every pulled
+image, so subject collection errors are reported against it and
+`on_error` decides: pushing an unchalked image (whose base images are
+unknown) under such a policy is an error, and with `on_error: block` in
+enforce mode it is blocked. A push-only policy does not need them and
+only reports an error when the push targets themselves could not be
+determined (e.g. `--all-tags` could not list the tags).
+
+Violations are reported with `image` set to the image or push target and
+`source` set to `from`, `copy_from`, `mount_from`, `syntax`, `cache_from`
+or `push`.
+
+Not covered:
+
+- `ONBUILD` instructions of a base image run in the build but are not in
+  the Dockerfile chalk parses, so images they pull (`ONBUILD COPY --from`)
+  are not checked. The base image itself is;
+- commands chalk does not wrap: `docker buildx bake`,
+  `docker compose build`, `docker compose push` and other tools that push
+  (crane, skopeo, `buildctl`) are not checked at all;
+- registry mirrors (`registry-mirrors` in the docker daemon, buildkitd
+  `mirrors`) and pull-through caches: the reference as written is checked,
+  not the mirror that serves it;
+- extra tags chalk itself pushes via `docker.docker_registry`, as they are
+  operator configuration rather than part of the command;
+- insecure or plain HTTP registries: whether docker uses HTTP or skips TLS
+  verification depends on daemon (`insecure-registries`, implicitly
+  `127.0.0.0/8`) and buildkitd configuration and on DNS resolution, so it is
+  not reliably known before the command runs. Deny such registries by host
+  instead (e.g. `localhost:*`).
+
 ### Custom checks
 
 `custom_check` is called once per checked image with:
@@ -996,7 +1158,13 @@ Rules that need more than the referenced images register with
 - `stdinDockerfile`: the content of a Dockerfile read from stdin (`-f -`),
   which has no path but is sent to the builder like any other;
 - `pushTargets`: the image references the command pushes (`build --push` tags,
-  or the `docker push` reference and, with `--all-tags`, every local tag);
+  exporter names and `--cache-to type=registry` refs, or the `docker push`
+  reference and, with `--all-tags`, every local tag);
+- `pullRefs`: `build` only, images the build pulls that are not part of the
+  built image (BuildKit frontend from `# syntax=`/`BUILDKIT_SYNTAX`, registry
+  `--cache-from` refs), kept out of `subjects` so image rules such as
+  `golden_images` do not check them; `pullRefErrors` holds those that could
+  not be parsed, which rules checking `pullRefs` must report;
 - `pushMarks`: chalk marks of the images `push` pushes, for those that are
   chalked;
 - `host`: `build` only, a copy of the chalk-time host info collected before

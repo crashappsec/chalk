@@ -532,7 +532,7 @@ proc collectBeforeBuild*(chalk: ChalkObj, ctx: DockerInvocation) =
 
 proc isPushByDigest(ctx: DockerInvocation): bool =
   let output = ctx.lastImageOutput()
-  return output != nil and output.getOrDefault("push-by-digest") == "true"
+  return output != nil and output.exporterBool("push-by-digest")
 
 proc collectAfterBuild(ctx: DockerInvocation, chalksByPlatform: TableRef[DockerPlatform, ChalkObj]) =
   let

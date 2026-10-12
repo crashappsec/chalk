@@ -239,8 +239,13 @@ docker {
         flag_multi_arg build_arg { }
         flag_multi_arg build_context { }
         flag_multi_arg builder { }
-        flag_multi_arg cache_from { }
-        flag_multi_arg cache_to { }
+        flag_multi_arg cache_from {
+          # CSV attributes, e.g. type=registry,ref=<image>
+          comma_delimited: false
+        }
+        flag_multi_arg cache_to {
+          comma_delimited: false
+        }
         flag_multi_arg cgroup_parent { }
         flag_multi_arg file {
           aliases: ["f"]
@@ -348,8 +353,13 @@ docker {
       flag_multi_arg build_arg { }
       flag_multi_arg build_context { }
       flag_multi_arg builder { }
-      flag_multi_arg cache_from { }
-      flag_multi_arg cache_to { }
+      flag_multi_arg cache_from {
+        # CSV attributes, e.g. type=registry,ref=<image>
+        comma_delimited: false
+      }
+      flag_multi_arg cache_to {
+        comma_delimited: false
+      }
       flag_multi_arg cgroup_parent { }
       flag_multi_arg file {
         aliases: ["f"]

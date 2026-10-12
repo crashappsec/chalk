@@ -21,7 +21,7 @@ type
     image*:    string
     digest*:   string
     stage*:    string
-    source*:   string # "from", "copy_from" or "mount_from"
+    source*:   string # "from", "copy_from", "mount_from" or "push"
     reason*:   string
     ## what the finding is about when it is not an image, e.g. a package
     ## purl, a certificate's file or a registry
