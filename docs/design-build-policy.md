@@ -543,8 +543,11 @@ What is checked on `docker build`:
   `trufflehog_timeout`, 300s by default; `trufflehog_config` for custom
   detectors) whether or not `run_secret_scanner_tools` is enabled, and is
   done once per directory and `exclude_paths` however many policies enable
-  the rule. trufflehog >= 3.90.9 is required (`--fail-on-scan-errors`);
-  an older one is an evaluation error saying so.
+  the rule. Like on-demand tool scans, it is stopped by the `timeout`
+  command after `trufflehog_timeout` plus 60s, or 300s when that is empty;
+  without a `timeout` command it is an evaluation error. trufflehog >=
+  3.90.9 is required (`--fail-on-scan-errors`); an older one is an
+  evaluation error saying so.
 - The Dockerfile is always scanned, as BuildKit always sends it and secrets
   in `ENV`/`ARG` defaults end up in the image config: as part of its context
   directory, or on its own when `.dockerignore` excludes it or it is outside

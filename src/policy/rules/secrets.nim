@@ -35,6 +35,7 @@ import "../.."/[
   types,
   utils/files,
 ]
+from "../.."/plugins/externalTool import withDeadline
 from "../.."/docker/tar import isExcluded, isValidPattern
 import ".."/[
   api,
@@ -42,7 +43,7 @@ import ".."/[
   dockerignore,
   helpers,
 ]
-from ".."/tools import maxContextDirs
+from ".."/tools import maxContextDirs, toolDeadline
 
 const
   ruleName    = "secrets"
@@ -50,8 +51,9 @@ const
   # trufflehog exits with 183 when `--fail` is set and it found results
   # https://github.com/trufflesecurity/trufflehog#exit-codes
   trufflehogFoundExit = 183
-  # exit codes of `timeout`, see `with_timeout` in base_callbacks.c4m
-  timeoutExits = [124, 137]
+  # exit codes of `timeout`, see `with_timeout` in base_callbacks.c4m;
+  # busybox's exits with the signal's code (143 for TERM) instead of 124
+  timeoutExits = [124, 137, 143]
   # https://github.com/trufflesecurity/trufflehog/pull/4476
   scanErrorsFlag    = "--fail-on-scan-errors"
   scanErrorsVersion = "3.90.9"
@@ -470,9 +472,13 @@ proc boundedCommand*(cmd: string, maxStdout = maxOutputBytes,
 
 proc trufflehogCommand(path: string, verify: bool, excludes: seq[string]): string =
   ## Reuses the trufflehog tool configuration (docker or local binary,
-  ## installer, timeout, `trufflehog_config`) but always in filesystem mode.
+  ## installer, timeout, `trufflehog_config`) but always in filesystem mode,
+  ## stopped by a deadline as the on-demand scans of policy/tools.nim are.
   if not sectionExists("tool.trufflehog"):
     raise newException(ValueError, "the trufflehog tool is not configured")
+  # checked before installing anything, which would be wasted work then
+  if len(findAllExePaths("timeout")) == 0:
+    raise newException(ValueError, "the timeout command, needed to bound the scan, was not found")
   var exe = toolCallback[string]("get_tool_location", path)
   if exe == "":
     if not toolCallback[bool]("attempt_install", path):
@@ -485,7 +491,8 @@ proc trufflehogCommand(path: string, verify: bool, excludes: seq[string]): strin
                 else: writeNewTempFile(excludes.join("\n") & "\n", suffix = ".txt")
   let config = attrGetOpt[string]("tool.trufflehog.trufflehog_config").get("")
   let args = trufflehogArguments(path, verify, exclude, config)
-  return exe & " " & args.join(" ")
+  let timeout = attrGetOpt[string]("tool.trufflehog.trufflehog_timeout").get("")
+  return (exe & " " & args.join(" ")).withDeadline(toolDeadline(timeout))
 
 var scanned = initTable[string, TrufflehogScan]()
 

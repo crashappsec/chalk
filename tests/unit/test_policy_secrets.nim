@@ -305,11 +305,12 @@ proc testScanErrorsAndPrivacy() =
                                      @[scanRule], PolicyInput())
       assertEq(evaluated.result, (if onError == "block": "blocked" else: "error"))
       evaluated.findings.assertNoSecret()
-  for code in [1, 124, 137, 141]:
+  for code in [1, 124, 137, 141, 143]:
     checkedTrufflehogOutput(code, rawValue, rawValue).assertIncomplete(0, "trufflehog")
     checkedTrufflehogOutput(code, stdout, "").assertIncomplete(8, "trufflehog")
-  checkedTrufflehogOutput(124, "", "", timeout = "300").assertIncomplete(
-    0, "trufflehog timed out after 300s (tool.trufflehog.trufflehog_timeout)")
+  for code in [124, 137, 143]:
+    checkedTrufflehogOutput(code, "", "", timeout = "300").assertIncomplete(
+      0, "trufflehog timed out after 300s (tool.trufflehog.trufflehog_timeout)")
   checkedTrufflehogOutput(0, "", "{invalid " & rawValue).assertIncomplete(0, "scan errors")
   checkedTrufflehogOutput(1, "", "trufflehog: error: unknown long flag " &
                           "'--fail-on-scan-errors', try --help").assertIncomplete(
