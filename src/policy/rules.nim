@@ -13,12 +13,14 @@ import "."/[
   rules/custom_check,
   rules/golden_images,
   rules/packages,
+  rules/secrets,
 ]
 
 proc loadPolicyRules*() =
   if hasPolicyRules():
     return
   loadGoldenImagesRule()
-  loadPackagesRule()
   loadCertificatesRule()
+  loadSecretsRule()
+  loadPackagesRule()
   loadCustomCheckRule()
