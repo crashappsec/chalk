@@ -10,6 +10,7 @@
 
 import std/[
   algorithm,
+  os,
   sequtils,
   uri,
 ]
@@ -41,10 +42,28 @@ proc ensureRunCallback[T](cb: CallbackObj, args: seq[Box]): T =
     raise newException(ValueError, "missing implementation of " & $(cb))
   return unpack[T](value.get())
 
-proc runTool*(tool: string, path: string, force = false): ChalkDict =
+proc timeoutExe(): string =
+  let found = findAllExePaths("timeout")
+  if len(found) == 0:
+    raise newException(ValueError, "the timeout command, needed to bound the run, was not found")
+  return found[0]
+
+proc withDeadline*(cmd: string, seconds: int, timeout = timeoutExe()): string =
+  ## `cmd` stopped after `seconds` by `timeout`. Through `sh -c`, as tool
+  ## commands may start with variable assignments (semgrep's `PATH=`).
+  timeout & " -s TERM " & $seconds & " /bin/sh -c " & quoteShell(cmd)
+
+proc runTool*(tool: string, path: string, force = false, record = true,
+              deadline = 0): ChalkDict =
+  ## `force` runs `tool` even if it already ran on `path`; without `record`
+  ## the run does not count as one, so chalk's own run can still follow.
+  ## With `deadline`, the scan is stopped after that many seconds whatever
+  ## the tool's own timeout setting; raises `ValueError` up front when the
+  ## `timeout` command is missing.
   let key = tool & ":" & path
   if not force and key in alreadyRan:
     raise newException(AlreadyRanError, "")
+  let timeout = if deadline > 0: timeoutExe() else: ""
 
   trace("Running tool: " & tool & " - " & path)
   result = ChalkDict()
@@ -63,9 +82,10 @@ proc runTool*(tool: string, path: string, force = false): ChalkDict =
     trace(tool & ": could not be found. skipping")
     return
 
-  let
-    argv = ensureRunCallback[string](attrGet[CallbackObj](base & ".get_command_args"), args)
-    cmd  = exe & " " & argv.strip()
+  let argv = ensureRunCallback[string](attrGet[CallbackObj](base & ".get_command_args"), args)
+  var cmd = exe & " " & argv.strip()
+  if deadline > 0:
+    cmd = cmd.withDeadline(deadline, timeout)
   trace(cmd)
   let
     outs = unpack[seq[Box]](c4mSystem(@[pack(cmd)]).get())
@@ -85,7 +105,8 @@ proc runTool*(tool: string, path: string, force = false): ChalkDict =
     d.del("info")
 
   trace(tool & ": produced keys " & $(d.keys().toSeq()))
-  alreadyRan.incl(key)
+  if record:
+    alreadyRan.incl(key)
   return d
 
 proc runOneTool(tool: string, path: string): ChalkDict =

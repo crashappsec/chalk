@@ -112,7 +112,7 @@ func install_syft(path) {
   trace("Downloaded syft installer script successfully.")
 
   installer := to_tmp_file(contents, ".sh")
-  cmdline   := "sh " + installer + " -b " + tool.syft.syft_exe_dir
+  cmdline   := with_timeout("sh " + installer + " -b " + tool.syft.syft_exe_dir, tool.syft.syft_timeout, "KILL")
 
   trace("Running: " + cmdline)
 

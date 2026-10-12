@@ -1,0 +1,564 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.7.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "serialNumber": "urn:uuid:83037c8f-443c-4bc5-834e-2d8b9bacc006",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-09T14:18:30Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "author": "anchore",
+          "name": "syft",
+          "version": "1.54.1"
+        }
+      ]
+    },
+    "component": {
+      "bom-ref": "5c92c013d6d437d9",
+      "type": "file",
+      "name": "/src"
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "deb1",
+      "type": "library",
+      "name": "libc6",
+      "version": "1:2.36-9",
+      "purl": "pkg:deb/debian/libc6@1:2.36-9?arch=amd64",
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-2.1"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "syft:package:type",
+          "value": "deb"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/var/lib/dpkg/status"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/%40angular/core@16.0.0?package-id=4f43e0163623b38f",
+      "type": "library",
+      "name": "@angular/core",
+      "version": "16.0.0",
+      "cpe": "cpe:2.3:a:angular:angular:16.0.0:*:*:*:*:node.js:*:*",
+      "purl": "pkg:npm/%40angular/core@16.0.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:angularjs:angularjs:16.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/web/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:pypi/colourama@0.1.0?package-id=412ac756fe651e57",
+      "type": "library",
+      "name": "colourama",
+      "version": "0.1.0",
+      "cpe": "cpe:2.3:a:python-colourama:python-colourama:0.1.0:*:*:*:*:*:*:*",
+      "purl": "pkg:pypi/colourama@0.1.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "python-package-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "python"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "python"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "python-pip-requirements-entry"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-colourama:python_colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_colourama:python-colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_colourama:python_colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:colourama:python-colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:colourama:python_colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-colourama:colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_colourama:colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python:python-colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python:python_colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:colourama:colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python:colourama:0.1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/py/requirements.txt"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:pypi/django-rest@1.0?package-id=83c97dd4e118357a",
+      "type": "library",
+      "name": "django-rest",
+      "version": "1.0",
+      "cpe": "cpe:2.3:a:python-django-rest:python-django-rest:1.0:*:*:*:*:*:*:*",
+      "purl": "pkg:pypi/django-rest@1.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "python-package-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "python"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "python"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "python-pip-requirements-entry"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-django-rest:python_django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_django_rest:python-django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_django_rest:python_django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-django:python-django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-django:python_django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_django:python-django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_django:python_django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django-rest:python-django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django-rest:python_django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django_rest:python-django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django_rest:python_django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-django-rest:django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-django-rest:django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_django_rest:django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_django_rest:django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django:python-django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django:python_django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-django:django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python-django:django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python:python-django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python:python_django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_django:django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python_django:django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django-rest:django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django-rest:django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django_rest:django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django_rest:django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django:django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:django:django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python:django-rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:python:django_rest:1.0:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/py/requirements.txt"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/event-stream@3.3.6?package-id=a0bb8da094b1edc4",
+      "type": "library",
+      "name": "event-stream",
+      "version": "3.3.6",
+      "cpe": "cpe:2.3:a:event-stream:event-stream:3.3.6:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/event-stream@3.3.6",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:event-stream:event_stream:3.3.6:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:event_stream:event-stream:3.3.6:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:event_stream:event_stream:3.3.6:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:event:event-stream:3.3.6:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:event:event_stream:3.3.6:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/web/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:golang/github.com/google/uuid@v1.6.0?package-id=b509ff5bfc4d89e4",
+      "type": "library",
+      "name": "github.com/google/uuid",
+      "version": "v1.6.0",
+      "cpe": "cpe:2.3:a:google:uuid:v1.6.0:*:*:*:*:*:*:*",
+      "purl": "pkg:golang/github.com/google/uuid@v1.6.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "go-module-file-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "go"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "go-module"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "go-module-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/go.mod"
+        },
+        {
+          "name": "syft:metadata:h1Digest",
+          "value": "h1:abc="
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/lodash@4.17.20?package-id=a9a1b61b890caeb0",
+      "type": "library",
+      "name": "lodash",
+      "version": "4.17.20",
+      "cpe": "cpe:2.3:a:lodash:lodash:4.17.20:*:*:*:*:node.js:*:*",
+      "purl": "pkg:npm/lodash@4.17.20",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/web/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:pypi/requests@2.31.0?package-id=e48f840ac9d7d4f9",
+      "type": "library",
+      "name": "requests",
+      "version": "2.31.0",
+      "cpe": "cpe:2.3:a:python:requests:2.31.0:*:*:*:*:*:*:*",
+      "purl": "pkg:pypi/requests@2.31.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "python-package-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "python"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "python"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "python-pip-requirements-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/py/requirements.txt"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:npm/web@1.0.0?package-id=f15f49ababc6539c",
+      "type": "library",
+      "name": "web",
+      "version": "1.0.0",
+      "cpe": "cpe:2.3:a:web:web:1.0.0:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/web@1.0.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "javascript-lock-cataloger"
+        },
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "npm"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "javascript-npm-package-lock-entry"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/web/package-lock.json"
+        }
+      ]
+    },
+    {
+      "bom-ref": "3fc5a8d3d86e9790",
+      "type": "file",
+      "name": "/src/go.mod",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "74c932425fbc46f05ae8ace2a58168974a202501"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "e163dd62fb7735e8a64f18a7a09bb593e1a41bbaa51a892fc613d806de1274e4"
+        }
+      ]
+    },
+    {
+      "bom-ref": "7c140661ba12b5a6",
+      "type": "file",
+      "name": "/src/py/requirements.txt",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "4cd5f56d2d5b347b5d0360aa72280b996deadadd"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "5a7f392745750894544f265257f0dd1ed2f50c97b31e46f8ac1632dcaa1b5604"
+        }
+      ]
+    },
+    {
+      "bom-ref": "fe1e53952344593b",
+      "type": "file",
+      "name": "/src/web/package-lock.json",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "23165aa21c9ebd80403475cdc741706ae6df0e34"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "ea64da04fb60ee1d49f672b9c2d3dd0e3ba9529de1036b0287ed65d08524d7e9"
+        }
+      ]
+    },
+    {
+      "bom-ref": "outside",
+      "type": "library",
+      "name": "left-pad",
+      "version": "1.3.0",
+      "purl": "pkg:npm/left-pad@1.3.0",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "properties": [
+        {
+          "name": "syft:package:language",
+          "value": "javascript"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/other/package-lock.json"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:npm/web@1.0.0?package-id=f15f49ababc6539c",
+      "dependsOn": [
+        "pkg:npm/%40angular/core@16.0.0?package-id=4f43e0163623b38f",
+        "pkg:npm/event-stream@3.3.6?package-id=a0bb8da094b1edc4",
+        "pkg:npm/lodash@4.17.20?package-id=a9a1b61b890caeb0"
+      ]
+    }
+  ]
+}

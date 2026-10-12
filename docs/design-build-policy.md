@@ -705,6 +705,71 @@ Findings about something other than an image (`newSubjectFinding`) set
 and leave `image` empty. The job summary shows `subject` where it would show
 the image.
 
+Rules that read external tool output (`tool.*`, e.g. syft or semgrep) share
+`src/policy/tools.nim` rather than running the tools themselves:
+
+- on build, `contextToolOutputs` gives, per context directory (at most
+  `maxContextDirs`), chalk's own output (`run_*_tools`) when the directory is
+  below the one chalk scanned (`EXTERNAL_TOOL_DURATION` records it), else
+  the output of running the enabled tools of that kind on the directory on
+  demand, once per process. Chalk scans the git repository containing the
+  first context, so rules keep only what is inside each context directory
+  (`contextPath`). Missing output is an evaluation error, so `on_error`
+  decides, and so is a tool that failed when every enabled tool was to run,
+  even if another produced output (not one that a `firstOnly` request or a
+  `stop_on_success` tool's output stands in for). Output larger than
+  `maxToolOutputBytes` (128 MiB of JSON) is an error rather than parsed.
+  Such rules must register with `requiresContext = true`: context
+  directories are only collected for them, and contexts that are not local
+  directories are reported against them by the engine (so
+  `contextToolOutputs` does not repeat them);
+- on push, `pushedToolOutputs` reads the output recorded in the pushed
+  images' chalk marks;
+- `capFindings` bounds the findings a rule reports.
+
+On-demand runs ignore `run_sbom_tools`, `run_sast_tools` and
+`run_secret_scanner_tools`: enabling a rule that needs a tool's output runs
+the tool. Like chalk's own runs they may install it first (e.g. download the
+syft installer, or run the `anchore/syft` docker image); installers are
+bounded by the tool's timeout. Whatever the tool's callbacks do, each scan
+is stopped by the `timeout` command after the tool's own timeout
+(`syft_timeout`, `semgrep_timeout`, `trufflehog_timeout`, 300s by default)
+plus 60s, or after `policyToolTimeout` (300s) when that is empty or 0;
+without a `timeout` command the scan is an evaluation error. A build may
+therefore take up to `maxContextDirs` (8) contexts x enabled tools x
+timeout longer. These runs do not count as chalk's own: when chalk's run
+failed, it still runs the tool again for the chalk mark.
+
+On push the tool output comes only from the pushed images' chalk marks, as
+the build context is gone and the tools cannot run on it. Images whose mark
+does not record the output pass: the default mark templates do not include
+`SBOM`, `SAST` or `SECRET_SCANNER`, unchalked images have no mark, and a
+mark may keep the key in an object store (`@SBOM`, logged at trace level).
+Checking pushes requires mark templates that record the key. The recorded
+output covers everything chalk scanned when it built the image (the git
+repository of the first build context), not just the build context, as push
+cannot tell which part was the context.
+
+`src/policy/sbom.nim` builds on it for rules that read SBOMs (CycloneDX, SPDX
+or syft JSON): `policySboms` returns the packages of each build context, or
+of each pushed image. On build it keeps the packages found within each
+context directory, dropping those whose every location the context's
+`.dockerignore` leaves out of the build (the Dockerfile's
+`<Dockerfile>.dockerignore` for the main context).
+
+Shared helpers for rules:
+
+- `src/policy/dockerignore.nim`: `loadDockerignore(dir, dockerfilePath)`
+  reads the ignore file docker applies to a context
+  (`mainContextDockerfile(input, dir)` gives the Dockerfile path for the main
+  context only), `isIgnored(relPath)` and `prunes(relDir)` match paths with
+  the moby-compatible matcher of `src/docker/tar.nim`;
+- `src/policy/purl.nim`: `purlParts`, `purlType`, `parsePurlPattern` and
+  `matches`/`firstMatch` for purl patterns with globs and version ranges
+  (e.g. `pkg:npm/lodash@<4.17.21`, `pkg:npm/@angular/*`), ignoring case,
+  qualifiers and subpaths, decoding percent-encoding and normalizing pypi
+  names and go `v` versions.
+
 A rule with settings in `policy.config_json` registers its section at module
 initialization with `registerPolicyJsonSection(name, validate)`, as
 configurations can be read before rules are loaded. `validate` receives the
@@ -741,3 +806,18 @@ the `policy*Setting` accessors, which read the same path from con4m when
   reported as an evaluation error of those rules, as their contents are not
   checked. In both cases a branch or tag that moves between the policy check
   and the build is built at its new commit.
+
+SBOM policy parsing retains every package occurrence. A repository scan keeps a
+package in a build context when any recorded location belongs to that context;
+findings use an in-context location. Packages without locations remain eligible.
+SPDX dependencies do not need optional version or purl metadata. The row
+the document describes (`documentDescribes`, `DESCRIBES` or `DESCRIBED_BY`) is
+the scanned source and excluded, whatever its version or purl, when its
+`primaryPackagePurpose` is `FILE`, `CONTAINER` or `DIRECTORY`, or it is
+syft's `SPDXRef-DocumentRoot-*` (syft gives a scanned image its digest as
+version). Described applications and libraries remain checked. syft JSON
+licenses may be objects or, in older schemas, plain strings; empty values are
+skipped. Optional omitted package arrays and empty arrays
+are valid; present arrays must contain package objects with nonempty names.
+Malformed arrays/entries and content omitted by package-count or nesting limits
+produce evaluation errors governed by `on_error`.
