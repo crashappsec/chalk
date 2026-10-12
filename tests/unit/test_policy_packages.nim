@@ -237,9 +237,9 @@ proc testEngine() =
   # the rule only produces an SBOM when it has something to check
   clearPolicyToolCache()
   var scans = 0
-  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
     inc(scans)
-    @[ToolOutput(tool: "syft", root: dir, value: parseJson(readFile(fixture)))]
+    ToolRun(outputs: @[ToolOutput(tool: "syft", root: dir, value: parseJson(readFile(fixture)))])
   setPolicyJson("""{"policies": [
     {"id": "noop", "mode": "audit", "packages": {"enabled": true}},
     {"id": "deny", "mode": "enforce", "packages": {"enabled": true, "denied": [["purl", "pkg:npm/lodash"]]}},

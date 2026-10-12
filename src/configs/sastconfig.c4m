@@ -126,7 +126,7 @@ func find_semgrep(path) {
 func install_semgrep(path) {
   # perfer pipx for installation
   trace("attempting to install semgrep via pipx...")
-  output, code := system("pipx install semgrep")
+  output, code := system(with_timeout("pipx install semgrep", tool.semgrep.semgrep_timeout, "KILL"))
   if code == 0 {
     return true
   }
@@ -135,9 +135,9 @@ func install_semgrep(path) {
   trace("pipx installation unsuccessful, attempting to install semgrep to python3 venv...")
 
   # venv is only compatible with python3
-  output, code := system("python3 -m venv /tmp/semgrep.env")
+  output, code := system(with_timeout("python3 -m venv /tmp/semgrep.env", tool.semgrep.semgrep_timeout, "KILL"))
   if code == 0 {
-    output, code := system("/tmp/semgrep.env/bin/python3 -m pip install 'semgrep>=1.48'")
+    output, code := system(with_timeout("/tmp/semgrep.env/bin/python3 -m pip install 'semgrep>=1.48'", tool.semgrep.semgrep_timeout, "KILL"))
     if code == 0 {
       trace("semgrep successfully installed")
       return true
