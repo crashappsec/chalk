@@ -472,10 +472,12 @@ Which files are read:
   evaluation error when its extension is one of `extensions` or its first
   64 KiB look like a certificate; at most 1000 certificates are read per
   file (more is an evaluation error); a context with more than `max_files`
-  entries, or more than 10000 certificates (CA bundles read for `sha256`
-  pins included), stops the scan with an evaluation error. At most 100
-  findings are listed; one more finding counts the rest, and is a violation
-  when any of them is. Issuer signatures are only verified against pinned
+  entries, more than 10000 kept certificates (checked ones plus pinned ones
+  from CA bundles), or more than 100000 certificates read from CA bundles for
+  `sha256` pins, stops the scan with an evaluation error. At most 100
+  certificate findings and 100 scan errors are listed, so an incomplete scan
+  is always shown; for each, one more finding counts the rest, and is a
+  violation when any of them is. Issuer signatures are only verified against pinned
   candidates, so that work is bounded by the number of pins.
 - not supported (not checked): PKCS#7 (`.p7b`), PKCS#12 (`.p12`, `.pfx`)
   and Java keystores; PEM `TRUSTED CERTIFICATE` blocks are evaluation

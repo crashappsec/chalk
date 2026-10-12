@@ -472,11 +472,40 @@ proc testBudgets() =
   var settings = defaultCertificatesConfig()
   settings.maxFileSize = len(one) * maxCertsPerFile
   let found = settings.findings(@[many])
-  assertEq(found.len, maxFindings + 1)
+  # the incomplete-scan error is listed although violations fill the cap
+  assertEq(found.len, maxFindings + 2)
+  assertEq(found[0].kind, "error")
+  doAssert "certificate scan is incomplete" in found[0].reason, found[0].reason
   # the dropped findings are violations, so the summary one is too
-  assertEq(found.locations().len, maxFindings + 1)
-  assertEq(found[^1].reason, $(maxCerts + maxCertsPerFile + 1 - maxFindings) &
+  assertEq(found[^1].kind, "violation")
+  assertEq(found[^1].reason, $(maxCerts + maxCertsPerFile - maxFindings) &
                              " more certificate findings not listed")
+
+proc testBundleBudget() =
+  # certificates of CA bundles only count toward `maxCerts` when they are
+  # kept for a pin, so vendored bundles do not stop the scan early; they have
+  # their own, larger budget
+  let one = fixture("expired.pem")
+  var files = @[("leaf.pem", "leaf.pem"), ("rootfs/etc/ssl/certs/ca.pem", "ca.pem")]
+  for i in 0 .. maxCerts div maxCertsPerFile:
+    files.add(("vendor" & $i & "/certifi/cacert.pem", "=" & one.repeat(maxCertsPerFile)))
+  let vendored = newContext(files)
+  defer: removeDir(vendored)
+  var settings = defaultCertificatesConfig()
+  settings.maxFileSize = len(one) * maxCertsPerFile
+  settings.allowedIssuers = @[("sha256", caSha256)]
+  let found = settings.findings(@[vendored])
+  assertEq(found.locations("error"), newSeq[string]())
+  assertEq(found.locations(), newSeq[string]())
+
+  for i in 0 .. maxBundleCerts div maxCertsPerFile:
+    files.add(("more" & $i & "/certifi/cacert.pem", "=" & one.repeat(maxCertsPerFile)))
+  let huge = newContext(files)
+  defer: removeDir(huge)
+  let capped = settings.findings(@[huge])
+  assertEq(capped.len, 1)
+  assertEq(capped[0].kind, "error")
+  doAssert "CA bundles in the build context have more than" in capped[0].reason, capped[0].reason
 
 proc rejects(text, reason: string) =
   ## the document is unusable as a whole, or as its only policy
@@ -587,6 +616,7 @@ proc main() =
   testSignatureSecurity()
   testScanning()
   testBudgets()
+  testBundleBudget()
   testJson()
 
 main()

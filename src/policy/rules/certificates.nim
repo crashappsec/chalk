@@ -69,9 +69,13 @@ const
   ]
   maxCertsPerFile* = 1000
   ## bounds over all contexts, so a hostile context cannot exhaust memory or
-  ## time: certificates parsed (CA bundles included), and findings listed
-  ## (the rest are counted in one finding)
+  ## time: certificates kept (checked ones and pinned CA bundle ones),
+  ## certificates parsed from CA bundles, and findings listed (the rest are
+  ## counted in one finding). Bundles get their own, larger budget because
+  ## only their pinned certificates are kept, and vendored copies of
+  ## `cacert.pem` (~150 certificates each) are common.
   maxCerts* = 10_000
+  maxBundleCerts* = 100_000
   maxFindings* = 100
   pemMarkers = ["-----BEGIN CERTIFICATE-----", "-----BEGIN X509 CERTIFICATE-----"]
   trustedMarker = "-----BEGIN TRUSTED CERTIFICATE-----"
@@ -131,7 +135,8 @@ type
     ## pinned certificates of skipped CA bundles, only candidates for
     ## `sha256` issuer pins
     issuers*: seq[CertInfo]
-    parsed:   int # certificates parsed, for `maxCerts`
+    parsed:   int # certificates kept, for `maxCerts`
+    bundleParsed: int # certificates parsed from CA bundles, for `maxBundleCerts`
 
   ## candidates for `sha256` issuer pins by subject DN, one per fingerprint:
   ## only a pinned candidate can allow an issuer, so signature checks are
@@ -382,12 +387,14 @@ proc scanFile(scan: var CertScan, full, report, entry: string,
     if not data.looksLikeCert():
       return
     let parsed = data.parseCertFile(report)
-    scan.parsed += len(parsed.certs)
     if bundle:
+      scan.bundleParsed += len(parsed.certs)
       for cert in parsed.certs:
         if cert.sha256 in pins:
           scan.issuers.add(cert)
+          inc(scan.parsed)
     else:
+      scan.parsed += len(parsed.certs)
       scan.certs.add(parsed.certs)
       scan.errors.add(parsed.errors)
   except CatchableError:
@@ -452,6 +459,11 @@ proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
             result.errors.add(newSubjectFinding(ruleName, "error", dir,
                               "build context has more than " & $maxCerts &
                               " certificates, certificate scan is incomplete"))
+            return
+          if result.bundleParsed > maxBundleCerts:
+            result.errors.add(newSubjectFinding(ruleName, "error", dir,
+                              "CA bundles in the build context have more than " &
+                              $maxBundleCerts & " certificates, certificate scan is incomplete"))
             return
         of pcLinkToFile, pcLinkToDir:
           # docker sends symlinks as links: a target inside the context is
@@ -582,9 +594,14 @@ proc check*(settings: CertificatesConfig, input: PolicyInput, now = getTime()): 
     return
   let scan = input.contextDirs.scanContexts(settings, input.dockerfilePath,
                                             input.mainContextDir)
-  var findings = scan.errors.sorted(proc(a, b: PolicyFinding): int = cmp(a.location, b.location))
-  findings.add(settings.check(scan.certs.sorted(byLocation), now, scan.issuers))
-  findings.capFindings(ruleName, maxFindings, "certificate findings")
+  # Capped apart from the certificate findings: capFindings lists violations
+  # first, which would push scan errors such as an incomplete scan out of the
+  # list and into the "more" count.
+  let
+    errors = scan.errors.sorted(proc(a, b: PolicyFinding): int = cmp(a.location, b.location))
+    certs  = settings.check(scan.certs.sorted(byLocation), now, scan.issuers)
+  result = errors.capFindings(ruleName, maxFindings, "certificate scan errors")
+  result.add(certs.capFindings(ruleName, maxFindings, "certificate findings"))
 
 proc nonNegative(path: openArray[string], default: int): int =
   result = policyIntSetting(path, default)
