@@ -64,10 +64,13 @@ proc cleanPattern(pattern: string): string =
     result &= "/"
 
 proc parseDockerignore*(content: string, path = ""): DockerIgnore =
+  ## As moby's ignorefile.ReadAll: a UTF-8 BOM is dropped and only lines
+  ## starting with `#` are comments, ` #x` is a pattern
   result.path = path
+  let content = if content.startsWith("\xEF\xBB\xBF"): content[3 .. ^1] else: content
   for line in content.splitLines():
     let p = line.strip()
-    if p.len == 0 or p.startsWith('#'):
+    if p.len == 0 or line.startsWith('#'):
       continue
     let negate = p.startsWith('!')
     let pattern = (if negate: p[1 .. ^1] else: p).strip().cleanPattern()

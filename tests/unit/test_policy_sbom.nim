@@ -122,11 +122,11 @@ proc testPolicySboms() =
   # EXTERNAL_TOOL_DURATION records what chalk scanned
   host["EXTERNAL_TOOL_DURATION"] = nimJsonToBox(%*{"syft": {"/repo": 10}})
   var scanned: seq[string]
-  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
     scanned.add(dir)
     if dir == "/broken":
       raise newException(ValueError, "syft failed")
-    @[ToolOutput(tool: "syft", root: dir, value: fixture("licenses_cyclonedx"))]
+    ToolRun(outputs: @[ToolOutput(tool: "syft", root: dir, value: fixture("licenses_cyclonedx"))])
   sboms = input(@["/repo/py", "/elsewhere", "/broken"], host).policySboms("r")
   assertEq(scanned, @["/elsewhere", "/broken"])
   assertEq(len(sboms.sboms), 2)
@@ -213,8 +213,8 @@ proc testDockerignore() =
   writeFile(dir / "Dockerfile.dockerignore", "py\n")
   writeFile(dir / "named" / ".dockerignore", "web\n")
   clearPolicyToolCache()
-  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
-    @[ToolOutput(tool: "syft", root: dir, value: fixture("cyclonedx"))]
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
+    ToolRun(outputs: @[ToolOutput(tool: "syft", root: dir, value: fixture("cyclonedx"))])
   let sboms = PolicyInput(command: "build", contextDirs: @[dir / "main", dir / "named"],
                           mainContextDir: dir / "main",
                           dockerfilePath: dir / "Dockerfile").policySboms("r")

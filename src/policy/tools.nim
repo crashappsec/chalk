@@ -13,11 +13,14 @@
 ## the git repository containing the first build context before policies
 ## run. A context directory below a directory chalk scanned uses that output;
 ## any other is scanned on demand, once per process, as several policies may
-## enable rules reading the same output.
+## enable rules reading the same output. On-demand scans are stopped after
+## the tool's own timeout (plus a grace period) or `policyToolTimeout`, even
+## when the tool's callbacks do not bound them.
 
 import std/[
   algorithm,
   json,
+  math,
   strutils,
   tables,
 ]
@@ -62,11 +65,66 @@ type
     ## tool runs unless one with `stop_on_success` produced it.
     firstOnly*: bool
 
-  ## Runs the tools of `request` on `dir`, raising `ValueError` when none
-  ## produced the key. Replaced by unit tests.
-  PolicyToolRunner* = proc(request: ToolRequest, dir: string): seq[ToolOutput]
+  ToolRun* = object
+    outputs*:  seq[ToolOutput]
+    ## tools that did not produce the key, e.g. `semgrep: timed out`, when
+    ## the request needed them: not the ones a later tool stood in for
+    ## (`firstOnly`, `stop_on_success`)
+    failures*: seq[string]
 
-const maxContextDirs* = 8
+  ## Runs the tools of `request` on `dir`. Raises `ValueError` when no tool
+  ## can run. Replaced by unit tests.
+  PolicyToolRunner* = proc(request: ToolRequest, dir: string): ToolRun
+
+const
+  maxContextDirs*    = 8
+  # seconds an on-demand scan may take when the tool has no timeout setting
+  policyToolTimeout* = 300
+  # over the tool's own timeout, so that one stops it first
+  timeoutGrace       = 60
+
+# Tool output larger than this, as JSON, is an error rather than parsed, to
+# bound the memory a policy takes. A var so unit tests can lower it.
+var maxToolOutputBytes* = 128 * 1024 * 1024
+
+proc parseToolJson(value: Box, what: string): JsonNode =
+  let raw = value.boxToJson()
+  if len(raw) > maxToolOutputBytes:
+    raise newException(ValueError, what & " is larger than " &
+                                   $(maxToolOutputBytes div (1024 * 1024)) & " MiB")
+  return parseJson(raw)
+
+proc timeoutSeconds(value: string): int =
+  ## `timeout`'s duration syntax (`300`, `5m`, `1.5h`); 0 when not one
+  var s = value.strip().toLowerAscii()
+  var unit = 1.0
+  if len(s) > 0 and s[^1] in {'s', 'm', 'h', 'd'}:
+    unit = case s[^1]
+           of 'm': 60.0
+           of 'h': 3600.0
+           of 'd': 86400.0
+           else:   1.0
+    s = s[0 ..< ^1]
+  try:
+    return max(0, int(ceil(parseFloat(s) * unit)))
+  except ValueError:
+    return 0
+
+proc toolDeadline*(timeoutSetting: string): int =
+  ## How long an on-demand scan may take: the tool's own timeout setting
+  ## (e.g. `syft_timeout`) plus a grace period, else `policyToolTimeout`, as
+  ## an empty or 0 setting means no timeout
+  let own = timeoutSetting.timeoutSeconds()
+  if own > 0:
+    return own + timeoutGrace
+  return policyToolTimeout
+
+proc timeoutSetting(tool: string): string =
+  # builtin tools name it `<tool>_timeout`, e.g. `syft_timeout`
+  try:
+    return attrGetOpt[string]("tool." & tool & "." & tool & "_timeout").get("")
+  except CatchableError:
+    return ""
 
 proc enabledTools(kind: string): seq[string] =
   ## by priority, as `run_*_tools` orders them
@@ -78,42 +136,59 @@ proc enabledTools(kind: string): seq[string] =
   for (_, name) in tools.sorted():
     result.add(name)
 
-proc runTools(request: ToolRequest, dir: string): seq[ToolOutput] =
+proc runEach*(request: ToolRequest, dir: string, tools: openArray[string],
+              run: proc(tool: string): ChalkDict,
+              stops: proc(tool: string): bool): ToolRun =
+  ## `tools` in order, until one that produced the key stops the run
+  ## (`firstOnly`, else when `stops`); failures before it are then dropped,
+  ## as it stands in for them
+  for tool in tools:
+    try:
+      let keys = run(tool)
+      if request.key notin keys:
+        result.failures.add(tool & " produced no " & request.key & " (see the chalk logs)")
+        continue
+      result.outputs.add(ToolOutput(tool: tool, root: dir,
+                                    value: keys[request.key].parseToolJson(tool & " output")))
+      if request.firstOnly or stops(tool):
+        result.failures = @[]
+        return
+    except CatchableError:
+      result.failures.add(tool & ": " & getCurrentExceptionMsg())
+
+proc runTools(request: ToolRequest, dir: string): ToolRun =
   let tools = enabledTools(request.kind)
   if len(tools) == 0:
     raise newException(ValueError, "no " & request.kind & " tool is enabled")
-  var failures: seq[string]
-  for tool in tools:
-    try:
-      # force: chalk's own run may have scanned `dir` already. Not recorded,
-      # so a failed chalk run can still retry it for the chalk mark.
-      let keys = runTool(tool, dir, force = true, record = false)
-      if request.key notin keys:
-        failures.add(tool & " produced no " & request.key)
-        continue
-      result.add(ToolOutput(tool: tool, root: dir,
-                            value: parseJson(keys[request.key].boxToJson())))
-      if request.firstOnly or attrGet[bool]("tool." & tool & ".stop_on_success"):
-        return
-    except CatchableError:
-      failures.add(tool & ": " & getCurrentExceptionMsg())
-  if len(result) == 0:
-    raise newException(ValueError, failures.join("; ") & " (see the chalk logs)")
+  # force: chalk's own run may have scanned `dir` already. Not recorded, so
+  # a failed chalk run can still retry it for the chalk mark.
+  proc run(tool: string): ChalkDict =
+    runTool(tool, dir, force = true, record = false,
+            deadline = toolDeadline(timeoutSetting(tool)))
+  proc stops(tool: string): bool =
+    attrGet[bool]("tool." & tool & ".stop_on_success")
+  return request.runEach(dir, tools, run, stops)
 
 var
   policyToolRunner*: PolicyToolRunner = runTools
-  scanned = initTable[string, tuple[outputs: seq[ToolOutput], error: string]]()
+  scanned = initTable[string, tuple[run: ToolRun, error: string]]()
 
 proc clearPolicyToolCache*() =
   scanned.clear()
 
-proc scanDir(request: ToolRequest, dir: string): tuple[outputs: seq[ToolOutput], error: string] =
+proc scanDir(request: ToolRequest, dir: string): tuple[run: ToolRun, error: string] =
   let key = request.kind & "\0" & request.key & "\0" & $request.firstOnly & "\0" & dir
   if key notin scanned:
     try:
-      scanned[key] = (policyToolRunner(request, dir), "")
+      let run = policyToolRunner(request, dir)
+      if len(run.outputs) > 0:
+        scanned[key] = (run, "")
+      elif len(run.failures) > 0:
+        scanned[key] = (run, run.failures.join("; "))
+      else:
+        scanned[key] = (run, "no tool produced " & request.key)
     except CatchableError:
-      scanned[key] = (@[], getCurrentExceptionMsg())
+      scanned[key] = (ToolRun(), getCurrentExceptionMsg())
   return scanned[key]
 
 proc scannedRoot(dict: ChalkDict, tool: string): string =
@@ -135,7 +210,7 @@ proc toolOutputs*(dict: ChalkDict, key: string, image = ""): seq[ToolOutput] =
   ## Raises `ValueError` when it is not an object of tool outputs.
   if dict == nil or key notin dict:
     return
-  let tools = parseJson(dict[key].boxToJson())
+  let tools = dict[key].parseToolJson(key)
   if tools.kind != JObject:
     raise newException(ValueError, key & " is not an object of tool outputs")
   for tool, value in tools.pairs():
@@ -217,11 +292,17 @@ proc contextToolOutputs*(input: PolicyInput, request: ToolRequest,
                      else: request.what & " of the build context was not collected"
         result.errors.add(newSubjectFinding(request.rule, "error", dir, reason))
         continue
-      let (outputs, error) = request.scanDir(dir)
+      let (run, error) = request.scanDir(dir)
       if error != "":
         result.errors.add(newSubjectFinding(request.rule, "error", dir,
                                             "could not produce " & request.what &
                                             " of the build context: " & error))
         continue
-      context.outputs = outputs
+      # a tool that failed leaves what it checks unchecked, whatever the others found
+      for failure in run.failures:
+        result.errors.add(newSubjectFinding(request.rule, "error", dir,
+                                            "could not produce " & request.what &
+                                            " of the build context with every tool: " &
+                                            failure))
+      context.outputs = run.outputs
     result.contexts.add(context)

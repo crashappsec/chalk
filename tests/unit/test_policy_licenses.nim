@@ -313,11 +313,11 @@ proc testFormats() =
 proc testCollection() =
   let settings = config("""{"enabled": true, "denied": ["GPL-3.0-only"]}""")
   var runs = 0
-  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
     inc(runs)
     if dir != "/ctx":
       raise newException(ValueError, "syft produced no SBOM")
-    @[ToolOutput(tool: "syft", root: dir, value: fixture("cyclonedx"))]
+    ToolRun(outputs: @[ToolOutput(tool: "syft", root: dir, value: fixture("cyclonedx"))])
   clearPolicyToolCache()
   # generated on demand when the SBOM tools did not run, once per directory
   let input = PolicyInput(command: "build", contextDirs: @["/ctx"], host: ChalkDict())
