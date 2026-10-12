@@ -45,6 +45,8 @@ type
     ## Dockerfile of a build, so rules can honor `<Dockerfile>.dockerignore`;
     ## empty for push or when read from stdin
     dockerfilePath*: string
+    ## the Dockerfile docker reads from stdin (`-f -`), which has no path
+    stdinDockerfile*: string
     ## build only: images the build pulls that are not part of the built
     ## image, i.e. the BuildKit frontend (`# syntax=`, `BUILDKIT_SYNTAX`,
     ## source "syntax") and registry cache imports (`--cache-from`, source

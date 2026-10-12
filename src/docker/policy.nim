@@ -147,6 +147,11 @@ proc policyDockerfilePath*(ctx: DockerInvocation): string =
   if ctx.dockerFileLoc != "":
     return ctx.dockerFileLoc.resolvePath()
 
+proc addPolicyDockerfile*(input: var PolicyInput, ctx: DockerInvocation) =
+  input.dockerfilePath = ctx.policyDockerfilePath()
+  if ctx.dockerFileLoc == stdinIndicator:
+    input.stdinDockerfile = ctx.inDockerFile
+
 proc addCommandInput(input: var PolicyInput, command: string, pushTargets: seq[string]) =
   input.command     = command
   input.pushTargets = pushTargets
@@ -169,7 +174,7 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
     result.host = hostInfo.copy()
   let collectContext = proc(input: var PolicyInput) =
     input.addPolicyContexts(ctx)
-    input.dockerfilePath = ctx.policyDockerfilePath()
+    input.addPolicyDockerfile(ctx)
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver(), collectContext)
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =
