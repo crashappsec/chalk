@@ -1411,7 +1411,8 @@ def test_cert_policy_skips_ignored_files_and_ca_bundles(
         {
             "certs/leaf.pem": "leaf.pem",
             "certs/ca.pem": "ca.pem",
-            "certs/ca-certificates.crt": "expired.pem",
+            # bundle names are only skipped in CA directories
+            "rootfs/etc/ssl/certs/ca-certificates.crt": "expired.pem",
             "testdata/expired.pem": "expired.pem",
             "vendor/sha1.pem": "sha1.pem",
             ".dockerignore": "=testdata\n",

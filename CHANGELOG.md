@@ -70,11 +70,6 @@
 
 ### Bug Fixes
 
-- The certs codec no longer stops at a malformed PEM block or a certificate
-  whose public key OpenSSL cannot load: later certificates of a bundle are
-  now reported too, and certificates with unsupported keys are reported
-  without key data.
-
 - Component variable parameters (`parameter var`) now use configured values,
   including values supplied via `chalk load --params`. Previously parameters
   with defaults always used them (e.g. a custom heartbeat interval from

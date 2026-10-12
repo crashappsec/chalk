@@ -136,6 +136,12 @@ proc testParsing() =
   assertEq(unknownCurve.curve, "1.2.840.10045.3.1.99")
   # and does not end the bundle
   assertEq(parseCertInfos(fixture("unknown-key.pem") & fixture("leaf.pem")).len, 2)
+  # artifact detection (the certs codec) stays strict, so a file such as an
+  # ELF binary with embedded certificates is not claimed as a certificate
+  assertEq(parseX509(fixture("unknown-key.pem") & fixture("leaf.pem")).len, 0)
+  assertEq(parseX509(fixture("leaf.pem") & bad & fixture("expired.pem")).len, 1)
+  assertEq(parseX509(bad & fixture("leaf.pem")).len, 0)
+  assertEq(parseX509(bad & fixture("leaf.pem"), lenient = true).len, 1)
 
 proc testHelpers() =
   for weak in ["sha1WithRSAEncryption", "ecdsa-with-SHA1", "md5WithRSAEncryption",

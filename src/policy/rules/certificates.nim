@@ -285,7 +285,7 @@ proc parseCertFile*(data: string, path = ""): CertScan =
   ## checked: malformed or unsupported blocks, more than `maxCertsPerFile`
   ## certificates or `TRUSTED CERTIFICATE` blocks.
   let
-    certs = parseX509(data, limit = maxCertsPerFile + 1)
+    certs = parseX509(data, limit = maxCertsPerFile + 1, lenient = true)
     count = min(len(certs), maxCertsPerFile)
   for i in 0 ..< count:
     result.certs.add(certs[i].toCertInfo(path, i + 1, count))

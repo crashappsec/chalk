@@ -196,12 +196,14 @@ typedef struct {
     int key_loaded;
 } Cert;
 
-// Next PEM or DER certificate. A malformed PEM block (bad base64 or DER) is
-// skipped: PEM_read_bio_X509 has consumed it, so reading resumes after it
-// instead of hiding every later certificate in the bundle. DER cannot be
-// resynchronized, so a malformed DER record ends the input.
+// Next PEM or DER certificate. When `lenient`, a malformed PEM block (bad
+// base64 or DER) is skipped: PEM_read_bio_X509 has consumed it, so reading
+// resumes after it instead of hiding every later certificate in a bundle.
+// DER cannot be resynchronized, so a malformed DER record ends the input.
+// Artifact detection is strict: skipping would walk any file, e.g. an ELF
+// binary with embedded certificates, until it found one.
 static X509 *
-read_next_cert(BIO *fdb)
+read_next_cert(BIO *fdb, int lenient)
 {
     for (;;) {
         int   cur  = BIO_tell(fdb);
@@ -220,7 +222,7 @@ read_next_cert(BIO *fdb)
             return cert;
         }
         ERR_clear_error();
-        if (after <= cur || BIO_seek(fdb, after) < 0) {
+        if (!lenient || after <= cur || BIO_seek(fdb, after) < 0) {
             return NULL;
         }
     }
@@ -265,10 +267,12 @@ describe_unloaded_key(X509 *cert, char **keytype, char *group, size_t group_len)
     }
 }
 
+// When not `lenient`, a certificate whose public key OpenSSL cannot load is
+// treated as not a certificate, as artifact detection always did.
 Cert *
-extract_cert_data(BIO *fdb)
+extract_cert_data(BIO *fdb, int lenient)
 {
-    X509             *cert       = read_next_cert(fdb);
+    X509             *cert       = read_next_cert(fdb, lenient);
     if (!cert) {
         return NULL;
     }
@@ -277,6 +281,11 @@ extract_cert_data(BIO *fdb)
     // NULL for a key OpenSSL cannot load (unsupported algorithm or curve,
     // malformed key); the certificate is still returned, without key data.
     EVP_PKEY         *pub        = X509_get_pubkey(cert);
+    if (pub == NULL && !lenient) {
+        ERR_clear_error();
+        X509_free(cert);
+        return NULL;
+    }
     char              group[80];
     group[0]                     = 0;
     int               keynid     = pub == NULL ? NID_undef : EVP_PKEY_base_id(pub);

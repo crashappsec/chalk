@@ -49,7 +49,7 @@ type
 proc open_cert*(fd: FileHandle): CertBIO {.importc.}
 proc read_cert*(data: cstring, c: cint): CertBIO {.importc.}
 proc close_cert*(c: CertBIO) {.importc.}
-proc extract_cert_data(c: CertBIO): Cert {.importc.}
+proc extract_cert_data(c: CertBIO, lenient: cint): Cert {.importc.}
 proc cleanup_cert_info(cert: Cert) {.importc.}
 proc verify_cert_issuer(leaf: cstring, leafLen: cint,
                         issuer: cstring, issuerLen: cint): cint {.importc.}
@@ -75,11 +75,13 @@ proc toTable(pairs: seq[(string, string)]): TableRef[string, string] =
   for (key, value) in pairs:
     result[key] = value
 
-iterator x509Certs*(bio: CertBIO): X509Cert =
-  ## every certificate (PEM or DER) readable from `bio`, in order. Malformed
-  ## PEM blocks are skipped, see `read_next_cert` in certs.c.
+iterator x509Certs*(bio: CertBIO, lenient = false): X509Cert =
+  ## every certificate (PEM or DER) readable from `bio`, in order. Strict by
+  ## default, for artifact detection: reading stops at the first record that
+  ## is not a certificate with a loadable key. `lenient` skips malformed PEM
+  ## blocks and keeps certificates with unloadable keys, see certs.c.
   while true:
-    let output = extract_cert_data(bio)
+    let output = extract_cert_data(bio, cint(lenient))
     if output == nil:
       break
     var cert: X509Cert
@@ -107,7 +109,7 @@ iterator x509Certs*(bio: CertBIO): X509Cert =
       cleanup_cert_info(output)
     yield cert
 
-proc parseX509*(data: string, limit = 0): seq[X509Cert] =
+proc parseX509*(data: string, limit = 0, lenient = false): seq[X509Cert] =
   ## certificates in `data`, at most `limit` of them when it is positive
   if len(data) == 0:
     return
@@ -115,7 +117,7 @@ proc parseX509*(data: string, limit = 0): seq[X509Cert] =
   if bio == nil:
     return
   try:
-    for cert in bio.x509Certs():
+    for cert in bio.x509Certs(lenient):
       result.add(cert)
       if limit > 0 and len(result) >= limit:
         break
