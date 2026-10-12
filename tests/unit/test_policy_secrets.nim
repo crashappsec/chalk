@@ -1,0 +1,392 @@
+import std/[json, os, re, strutils]
+import ../../src/types
+import ../../src/chalkjson
+import ../../src/policy/engine
+import ../../src/policy/dockerignore
+import ../../src/policy/rules
+import ../../src/policy/helpers
+import ../../src/policy/rules/secrets
+
+const
+  fixture = currentSourcePath().parentDir() / "fixtures" / "trufflehog_filesystem.jsonl"
+  # also compiled by campaigns, keep in sync
+  configFixture = currentSourcePath().parentDir() / "fixtures" / "policy_config_secrets.json"
+  # stands in for every secret value in the fixture
+  rawValue = "FAKE-RAW-VALUE"
+
+template assertEq(a, b: untyped) =
+  doAssert a == b, $a & " != " & $b
+
+proc settings(json: string): SecretsConfig =
+  setPolicyJson(json)
+  selectPolicy(policyConfigs()[0])
+  loadSecretsConfig().get()
+
+proc rejects(json, reason: string) =
+  setPolicyJson(json)
+  let policy = policyConfigs()[0]
+  doAssert reason in policy.configError, json & ": " & policy.configError
+
+proc locations(findings: seq[PolicyFinding]): seq[string] =
+  for f in findings:
+    result.add(f.kind & " " & f.subject & " " & f.location & " " & f.severity)
+
+proc assertNoSecret(findings: seq[PolicyFinding]) =
+  for f in findings:
+    for field in [f.subject, f.location, f.reason, f.severity, f.image]:
+      doAssert rawValue notin field, field
+
+proc testParse() =
+  let results = parseTrufflehogOutput("trufflehog 3.99 starting\n" & readFile(fixture))
+  assertEq(len(results), 8)
+  assertEq(results[^1].commit, "abc")
+  let first = results[0]
+  assertEq(first.detector, "Github")
+  assertEq(first.file, "/ctx/app/.env")
+  assertEq(first.line, 1)
+  assertEq(first.severity(), "verified")
+  assertEq(first.rotationGuide, "https://howtorotate.com/docs/tutorials/github/")
+  assertEq(results[1].severity(), "unverified")
+  assertEq(results[2].severity(), "unknown")
+  assertEq(parseTrufflehogOutput("").len, 0)
+  try:
+    discard parseTrufflehogOutput("{\"Raw\": \"" & rawValue & "\"")
+    doAssert false
+  except ValueError:
+    doAssert rawValue notin getCurrentExceptionMsg()
+
+proc testValidation() =
+  rejects("""{"secrets": {"enabeld": true}}""", "unknown field policy.secrets.enabeld")
+  rejects("""{"secrets": {"verify": "no"}}""", "policy.secrets.verify must be a boolean")
+  rejects("""{"secrets": {"detectors": [1]}}""", "policy.secrets.detectors entries must be strings")
+  rejects("""{"secrets": {"exclude_paths": ["!keep"]}}""", "cannot start with '!'")
+  rejects("""{"secrets": {"exclude_paths": ["[a"]}}""", "invalid pattern")
+  rejects("""{"secrets": {"verify": false}}""", "verify = false requires policy.secrets.verified_only = false")
+  rejects("""{"secrets": []}""", "policy.secrets must be an object")
+  rejects("""{"secrets": {"check_push": 1}}""", "policy.secrets.check_push must be a boolean")
+  setPolicyJson("""{"secrets": {"verify": false, "verified_only": false}}""")
+  assertEq(policyConfigs()[0].configError, "")
+
+proc testConfigFixture() =
+  let s = settings(readFile(configFixture))
+  doAssert not s.verify and not s.verifiedOnly and s.checkPush
+  assertEq(s.detectors, @["github", "aws"])
+  assertEq(s.ignoreDetectors, @["uri"])
+  assertEq(s.excludePaths, @["tests", "**/fixtures"])
+  assertEq(s.message, "Move secrets to the vault")
+
+proc testDefaults() =
+  setPolicyJson("""{"mode": "audit"}""")
+  selectPolicy(policyConfigs()[0])
+  doAssert loadSecretsConfig().isNone()
+  let s = settings("""{"mode": "audit", "secrets": {"enabled": true}}""")
+  doAssert s.verify and s.verifiedOnly
+  doAssert s.detectors.len == 0 and s.excludePaths.len == 0
+
+proc testCheck() =
+  let results = parseTrufflehogOutput(readFile(fixture))
+  var s = settings("""{"secrets": {"enabled": true, "message": "See go/secrets"}}""")
+  var findings = s.check(results, "/ctx", parseDockerignore("node_modules"))
+  findings.assertNoSecret()
+  # unverified ones are ignored, unknown ones are left to on_error,
+  # duplicates and .dockerignore'd files are dropped
+  assertEq(findings.locations(), @[
+    "violation Github app/.env:1 verified",
+    "error AWS app/deploy.sh:3 unknown",
+    "violation Stripe tests/fixtures/keys.txt:2 verified",
+  ])
+  assertEq(findings[0].rule, "secrets")
+  assertEq(findings[0].reason,
+           "verified Github secret in the build context. " &
+           "Rotate it: https://howtorotate.com/docs/tutorials/github/. See go/secrets")
+  assertEq(findings[1].reason, "AWS secret in the build context could not be verified. See go/secrets")
+
+  s = settings("""{"secrets": {"enabled": true, "verified_only": false,
+                   "ignore_detectors": ["uri"], "exclude_paths": ["tests"]}}""")
+  findings = s.check(results, "/ctx", DockerIgnore())
+  findings.assertNoSecret()
+  assertEq(findings.locations(), @[
+    "violation Github app/.env:1 verified",
+    "violation Slack app/config.yml:7 unverified",
+    "violation AWS app/deploy.sh:3 unknown",
+    "violation Github node_modules/pkg/index.js:9 verified",
+  ])
+  assertEq(findings[1].reason,
+           "unverified Slack secret in the build context (may be a false positive)")
+
+  s = settings("""{"secrets": {"enabled": true, "detectors": ["GITHUB"],
+                   "exclude_paths": ["**/index.js"]}}""")
+  assertEq(s.check(results, "/ctx", DockerIgnore()).locations(), @[
+    "violation Github app/.env:1 verified",
+  ])
+  # other context directories are reported with absolute paths
+  assertEq(s.check(results, "/ctx/app", DockerIgnore(), relative = false).locations(), @[
+    "violation Github /ctx/app/.env:1 verified",
+  ])
+  # `*` does not cross directories, as in .dockerignore
+  s = settings("""{"secrets": {"enabled": true, "exclude_paths": ["*.env", "app/*.env"]}}""")
+  assertEq(s.check(results, "/ctx", parseDockerignore("*/index.js")).locations(), @[
+    "error AWS app/deploy.sh:3 unknown",
+    "violation Stripe tests/fixtures/keys.txt:2 verified",
+    "violation Github node_modules/pkg/index.js:9 verified",
+  ])
+
+proc testCap() =
+  var findings: seq[PolicyFinding]
+  for i in 0 ..< 105:
+    findings.add(newSubjectFinding("secrets", (if i < 3: "error" else: "violation"),
+                                   "Github", "x", location = "f:" & $i))
+  let capped = findings.capFindings("secrets", 100, "secrets")
+  assertEq(len(capped), 101)
+  assertEq(capped[0].kind, "violation")
+  # 2 of the 5 left out are violations
+  assertEq(capped[^1].kind, "violation")
+  assertEq(capped[^1].subject, "secrets")
+  assertEq(capped[^1].reason, "5 more secrets not listed")
+  assertEq(findings[0 ..< 10].capFindings("secrets", 100, "secrets").len, 10)
+
+proc touch(path: string) =
+  createDir(path.parentDir())
+  writeFile(path, "")
+
+proc matched(excludes: seq[string], path: string): bool =
+  for e in excludes:
+    if path.contains(re(e)):
+      return true
+
+proc testExcludes() =
+  let dir = getTempDir() / "chalk-test-policy-secrets"
+  removeDir(dir)
+  defer: removeDir(dir)
+  for f in ["node_modules/pkg/index.js", "vendor/drop.txt", "vendor/keep/k.txt",
+            "dist.zip", "src/app.js", "src/.env", "tests/key.txt",
+            ".git/config", ".git/HEAD", ".git/objects/ab/cd", "sub/.git/config",
+            "sub/.git/packed-refs", "a+b/x.txt", "Dockerfile"]:
+    touch(dir / f)
+  let ignore = parseDockerignore("node_modules\nvendor\n!vendor/keep\n*.zip\na+b\n")
+  let excludes = trufflehogExcludes(dir, ignore, @["tests"])
+  # pruned directories are one regex, not walked
+  doAssert ("^" & dir.replace(".", "\\.") & "/node_modules(/|$)") in excludes, $excludes
+  for path in ["node_modules", "node_modules/pkg/index.js", "vendor/drop.txt",
+               "dist.zip", "tests/key.txt", "a+b/x.txt",
+               ".git/HEAD", ".git/objects/ab/cd", "sub/.git/packed-refs"]:
+    doAssert excludes.matched(dir / path), path
+  # a negation below vendor keeps it walked; .git/config may hold credentials
+  for path in ["vendor/keep/k.txt", "src/app.js", "src/.env", ".git/config",
+               "sub/.git/config", "Dockerfile", "node_modules2/x", "dist.zip2"]:
+    doAssert not excludes.matched(dir / path), path
+  doAssert not excludes.matched(dir)
+  # an ignored .git is skipped whole
+  let ignored = trufflehogExcludes(dir, parseDockerignore(".git\n"), @[])
+  doAssert ignored.matched(dir / ".git/config")
+  doAssert not ignored.matched(dir / "sub/.git/config")
+  # listing stops after maxVisits entries; the rest is filtered afterwards
+  let bounded = trufflehogExcludes(dir, ignore, @["tests"], maxVisits = 2)
+  doAssert len(bounded) <= 2, $bounded
+  doAssert len(bounded) < len(excludes)
+
+proc testDockerfile() =
+  let s = SecretsConfig(verifiedOnly: true)
+  let r = SecretResult(detector: "AWS", file: "/elsewhere/Dockerfile", line: 4, verified: true)
+  assertEq(s.checkDockerfile(@[r], "/elsewhere/Dockerfile").locations(),
+           @["violation AWS /elsewhere/Dockerfile:4 verified"])
+  doAssert "in the Dockerfile" in s.checkDockerfile(@[r], "Dockerfile")[0].reason
+  # the context scan covers a Dockerfile in the context docker does not ignore
+  doAssert "/ctx/Dockerfile".scannedWith("/ctx", DockerIgnore())
+  doAssert not "/ctx/Dockerfile".scannedWith("/ctx", parseDockerignore("Dockerfile"))
+  doAssert not "/ctx/build/Dockerfile".scannedWith("/ctx", parseDockerignore("build"))
+  doAssert not "/other/Dockerfile".scannedWith("/ctx", DockerIgnore())
+  doAssert not "".scannedWith("/ctx", DockerIgnore())
+
+proc mark(scanner: JsonNode): ChalkDict =
+  result = ChalkDict()
+  result["SECRET_SCANNER"] = nimJsonToBox(scanner)
+
+proc testMark() =
+  let item = %*{
+    "SourceMetadata": {"Data": {"Git": {"commit": "0123456789abcdef", "file": "app/.env", "line": 4}}},
+    "DetectorName": "Github", "Verified": true, "RawHash": "ab", "Redacted": "ghp_",
+  }
+  let fsItem = %*{
+    "SourceMetadata": {"Data": {"Filesystem": {"file": "/src/tests/key.txt", "line": 1}}},
+    "DetectorName": "Slack", "Verified": false,
+  }
+  doAssert markSecretResults(ChalkDict()).len == 0
+  let results = markSecretResults(mark(%*{"trufflehog": [item, fsItem]}))
+  assertEq(len(results), 2)
+  # canonicalized marks key results by hash
+  assertEq(markSecretResults(mark(%*{"trufflehog": {"h1": item}})).len, 1)
+  var s = settings("""{"secrets": {"enabled": true, "verified_only": false,
+                   "exclude_paths": ["tests"]}}""")
+  let findings = s.checkMark(results)
+  assertEq(findings.locations(), @[
+    "violation Github app/.env:4 verified",
+    "violation Slack /src/tests/key.txt:1 unverified",
+  ])
+  assertEq(findings[0].reason,
+           "verified Github secret recorded in the image's chalk mark (commit 0123456789ab)")
+  s = settings("""{"secrets": {"enabled": true, "exclude_paths": ["app"]}}""")
+  assertEq(s.checkMark(results).len, 0)
+
+proc testRule() =
+  setPolicyJson("""{"mode": "enforce", "secrets": {"enabled": true}}""")
+  let policy = policyConfigs()[0]
+  selectPolicy(policy)
+  loadPolicyRules()
+  var rule: PolicyRule
+  for r in policyRules():
+    if r.name == "secrets":
+      rule = r
+  doAssert rule != nil and rule.checkInput != nil
+  # without it the engine collects no contextDirs and the rule would pass
+  doAssert rule.requiresContext
+  doAssert rule.load()
+  doAssert rule.hint().rule == ""
+  let secretMark = mark(%*{"trufflehog": [{
+    "SourceMetadata": {"Data": {"Git": {"file": "a.txt", "line": 1}}},
+    "DetectorName": "AWS", "Verified": true}]})
+  # push is only checked with check_push
+  assertEq(rule.checkInput(PolicyInput(command: "push", pushMarks: @[secretMark])).len, 0)
+  let findings = rule.checkInput(PolicyInput(command: "build"))
+  assertEq(findings.locations(), @["error build context  "])
+  # contexts the engine reports are not repeated
+  let notLocal = newSubjectFinding("", "error", "-", "stdin")
+  assertEq(rule.checkInput(PolicyInput(command: "build", contextErrors: @[notLocal])).len, 0)
+  # a Dockerfile with neither a path nor stdin content cannot be scanned
+  assertEq(PolicyInput(command: "build", contextDirs: @["/ctx"], mainContextDir: "/ctx").unscannable().locations(),
+           @["error Dockerfile  "])
+  assertEq(PolicyInput(command: "build", contextDirs: @["/ctx"], mainContextDir: "/ctx",
+                       stdinDockerfile: "FROM alpine\n").unscannable().len, 0)
+  assertEq(PolicyInput(command: "build", contextDirs: @["/ctx"], mainContextDir: "/ctx",
+                       dockerfilePath: "/ctx/Dockerfile").unscannable().len, 0)
+  # only named contexts are local: no Dockerfile is expected with them
+  assertEq(PolicyInput(command: "build", contextDirs: @["/named"]).unscannable().len, 0)
+  let result = evaluatePolicy(policy, @[rule], PolicyInput(command: "build"))
+  # an evaluation error only blocks with on_error = "block"
+  assertEq(result.result, "error")
+  setPolicyJson("""{"mode": "enforce", "secrets": {"enabled": true, "check_push": true}}""")
+  selectPolicy(policyConfigs()[0])
+  doAssert rule.load()
+  assertEq(rule.checkInput(PolicyInput(command: "push", pushMarks: @[secretMark, ChalkDict()])).locations(),
+           @["violation AWS a.txt:1 verified"])
+  setPolicyJson("""{"mode": "enforce", "secrets": {"enabled": false}}""")
+  selectPolicy(policyConfigs()[0])
+  doAssert not rule.load()
+
+proc assertComplete(scan: TrufflehogScan, results: int) =
+  assertEq(scan.error, "")
+  assertEq(len(scan.results), results)
+
+proc assertIncomplete(scan: TrufflehogScan, results: int, error: string) =
+  doAssert error in scan.error, scan.error
+  doAssert rawValue notin scan.error
+  assertEq(len(scan.results), results)
+
+proc testScanErrorsAndPrivacy() =
+  let stdout = readFile(fixture)
+  let notice = """{"level":"info-0","msg":"finished scanning"}"""
+  checkedTrufflehogOutput(0, "", notice).assertComplete(0)
+  checkedTrufflehogOutput(0, stdout, notice).assertComplete(8)
+  checkedTrufflehogOutput(183, stdout, notice).assertComplete(8)
+  # Verifier errors retain their existing per-result/verified_only semantics.
+  let verification = $(%*{"level": "error", "msg": "error verifying result", "error": rawValue})
+  checkedTrufflehogOutput(0, stdout, verification).assertComplete(8)
+  for message in ["unable to get file info", "error scanning filesystem", "error scanning file",
+                  "error scanning directory", "error scanning symlink", "encountered errors during scan"]:
+    let stderr = $(%*{"level": "error", "msg": message, "error": rawValue, "path": rawValue})
+    # what the incomplete scan found is still reported
+    checkedTrufflehogOutput(0, "", stderr).assertIncomplete(0, "scan errors")
+    checkedTrufflehogOutput(0, stdout, stderr).assertIncomplete(8, "scan errors")
+    let scanRule = PolicyRule(name: "secrets", checkInput: proc(input: PolicyInput): seq[PolicyFinding] =
+      @[newSubjectFinding("secrets", "error", "/ctx",
+                          "could not scan for secrets: " & checkedTrufflehogOutput(0, "", stderr).error)])
+    for onError in ["allow", "block"]:
+      let evaluated = evaluatePolicy(PolicyConfig(mode: "enforce", onError: onError),
+                                     @[scanRule], PolicyInput())
+      assertEq(evaluated.result, (if onError == "block": "blocked" else: "error"))
+      evaluated.findings.assertNoSecret()
+  for code in [1, 124, 137, 141, 143]:
+    checkedTrufflehogOutput(code, rawValue, rawValue).assertIncomplete(0, "trufflehog")
+    checkedTrufflehogOutput(code, stdout, "").assertIncomplete(8, "trufflehog")
+  for code in [124, 137, 143]:
+    checkedTrufflehogOutput(code, "", "", timeout = "300").assertIncomplete(
+      0, "trufflehog timed out after 300s (tool.trufflehog.trufflehog_timeout)")
+  checkedTrufflehogOutput(0, "", "{invalid " & rawValue).assertIncomplete(0, "scan errors")
+  checkedTrufflehogOutput(1, "", "trufflehog: error: unknown long flag " &
+                          "'--fail-on-scan-errors', try --help").assertIncomplete(
+    0, "trufflehog >= 3.90.9 is required (--fail-on-scan-errors is not supported)")
+  # stdout that is not trufflehog's JSON is an error of its own unless the
+  # run already failed
+  try:
+    discard checkedTrufflehogOutput(0, "{\"Raw\": \"" & rawValue, "")
+    doAssert false, "accepted invalid JSON"
+  except ValueError:
+    doAssert rawValue notin getCurrentExceptionMsg()
+  checkedTrufflehogOutput(1, "{\"Raw\": \"" & rawValue, "").assertIncomplete(0, "exited with code 1")
+
+proc testOutputLimits() =
+  let stdout = readFile(fixture)
+  doAssert stdout.endsWith("\n")
+  # trufflehog is stopped mid-line past the limit: the complete lines count
+  let cut = checkedTrufflehogOutput(141, stdout, "", maxOutput = len(stdout) - 5)
+  cut.assertIncomplete(7, "bytes of results; the rest were not checked")
+  checkedTrufflehogOutput(141, stdout[0 ..< 10], "", maxOutput = 10).assertIncomplete(0, "bytes of results")
+  checkedTrufflehogOutput(141, stdout, "x".repeat(10), maxDiagnostics = 10).assertIncomplete(
+    8, "bytes of diagnostics; the scan cannot be confirmed complete")
+
+  proc run(script: string): ExecOutput =
+    runCmdGetEverything("/bin/sh", @["-c", script])
+  let ok = run(boundedCommand("printf 'ab\\ncd'; printf err >&2; exit 7"))
+  assertEq(ok.getStdout(), "ab\ncd")
+  assertEq(ok.getStderr(), "err")
+  assertEq(ok.getExit(), 7)
+  let results = run(boundedCommand("yes x", maxStdout = 10))
+  assertEq(results.getStdout(), "x\n".repeat(5))
+  doAssert results.getExit() != 0
+  let diagnostics = run(boundedCommand("yes e >&2", maxStderr = 6))
+  assertEq(diagnostics.getStdout(), "")
+  assertEq(diagnostics.getStderr(), "e\n".repeat(3))
+
+proc testContextLimit() =
+  var dirs: seq[string]
+  for i in 0 ..< 10:
+    dirs.add("/ctx" & $i)
+  var findings: seq[PolicyFinding]
+  assertEq(PolicyInput(contextDirs: dirs).scannedContexts(findings), dirs[0 ..< 8])
+  assertEq(findings.locations(), @["error   "])
+  assertEq(findings[0].reason, "only the first 8 build contexts were scanned for secrets")
+  findings = @[]
+  assertEq(PolicyInput(contextDirs: dirs[0 ..< 8]).scannedContexts(findings), dirs[0 ..< 8])
+  assertEq(len(findings), 0)
+
+proc testFilesystemArgumentsAndGitBoundary() =
+  for verify in [false, true]:
+    let args = trufflehogArguments("/work/app.git/context", verify, "/tmp/exclude")
+    doAssert "--fail-on-scan-errors" in args
+    doAssert "--json" in args
+    doAssert "-x" in args
+    doAssert "--no-ignore-tag" notin args
+    doAssert ("--no-verification" in args) == not verify
+  doAssert "-x" notin trufflehogArguments("/work/Dockerfile", true)
+  let ordinary = SecretResult(detector: "Github", file: "/work/app.git/context/token.env", line: 1, verified: true)
+  let findings = SecretsConfig(verifiedOnly: true).check(@[ordinary], "/work/app.git/context", DockerIgnore())
+  assertEq(findings.len, 1)
+  assertEq(findings[0].location, "token.env:1")
+
+proc main() =
+  testParse()
+  testValidation()
+  testConfigFixture()
+  testDefaults()
+  testCheck()
+  testCap()
+  testExcludes()
+  testDockerfile()
+  testMark()
+  testRule()
+  testScanErrorsAndPrivacy()
+  testOutputLimits()
+  testContextLimit()
+  testFilesystemArgumentsAndGitBoundary()
+
+main()
