@@ -248,9 +248,11 @@ proc testRule() =
   # contexts the engine reports are not repeated
   let notLocal = newSubjectFinding("", "error", "-", "stdin")
   assertEq(rule.checkInput(PolicyInput(command: "build", contextErrors: @[notLocal])).len, 0)
-  # BuildKit sends a Dockerfile from stdin, which cannot be scanned
+  # a Dockerfile with neither a path nor stdin content cannot be scanned
   assertEq(PolicyInput(command: "build", contextDirs: @["/ctx"], mainContextDir: "/ctx").unscannable().locations(),
            @["error Dockerfile  "])
+  assertEq(PolicyInput(command: "build", contextDirs: @["/ctx"], mainContextDir: "/ctx",
+                       stdinDockerfile: "FROM alpine\n").unscannable().len, 0)
   assertEq(PolicyInput(command: "build", contextDirs: @["/ctx"], mainContextDir: "/ctx",
                        dockerfilePath: "/ctx/Dockerfile").unscannable().len, 0)
   # only named contexts are local: no Dockerfile is expected with them

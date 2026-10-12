@@ -1404,6 +1404,30 @@ def test_secrets_enforce_blocks_secret_in_context(
     assert token not in result.logs
 
 
+def test_secrets_enforce_blocks_secret_in_stdin_dockerfile(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+):
+    token = fake_github_token()
+    _, result = build_json(
+        chalk,
+        f"FROM alpine\nENV TOKEN={token}\n",
+        secrets_json("enforce"),
+        random_hex,
+        context=tmp_data_dir,
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_ID="secrets@1", _POLICY_RESULT="blocked")
+    assert [
+        (f["kind"], f["subject"], f["location"]) for f in report["_POLICY_FINDINGS"]
+    ] == [("violation", "Github", "Dockerfile (stdin):2")]
+    assert token not in report_file(random_hex).read_text()
+    assert token not in result.logs
+
+
 def test_secrets_audit_reports_without_blocking(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path
 ):

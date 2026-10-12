@@ -2767,9 +2767,9 @@ Secret values are never reported, only the detector, `path:line` and
 verification status. A `trufflehog:ignore` comment on a line suppresses
 its secret.
 
-A build context that is not a local directory, a Dockerfile from stdin, or
-a scan that fails or times out, is an evaluation error handled by
-`on_error`. `docker push` is only checked with `check_push`.
+The Dockerfile is always scanned, including one read from stdin (`-f -`).
+A build context that is not a local directory, or a scan that fails or
+times out, is an evaluation error handled by `on_error`. `docker push` is only checked with `check_push`.
 """
 
   field enabled {

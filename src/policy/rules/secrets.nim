@@ -467,8 +467,8 @@ proc unscannable*(input: PolicyInput): seq[PolicyFinding] =
     if len(input.contextErrors) == 0:
       result.add(newSubjectFinding(ruleName, "error", "build context",
                                    "the build context is not a local directory and cannot be scanned for secrets"))
-  elif input.mainContextDir != "" and input.dockerfilePath == "":
-    # BuildKit sends it like any Dockerfile, but only docker reads stdin
+  elif input.mainContextDir != "" and input.dockerfilePath == "" and
+       input.stdinDockerfile == "":
     result.add(newSubjectFinding(ruleName, "error", "Dockerfile",
                                  "the Dockerfile from stdin cannot be scanned for secrets"))
 
@@ -515,6 +515,15 @@ proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
         findings.add(newSubjectFinding(ruleName, "error", dockerfile,
                                        "could not scan the Dockerfile for secrets: " &
                                        getCurrentExceptionMsg()))
+  if input.stdinDockerfile != "":
+    const location = "Dockerfile (stdin)"
+    try:
+      let path = writeNewTempFile(input.stdinDockerfile, suffix = ".Dockerfile")
+      findings.add(loaded.checkDockerfile(scanPath(path, loaded.verify), location))
+    except CatchableError:
+      findings.add(newSubjectFinding(ruleName, "error", location,
+                                     "could not scan the Dockerfile for secrets: " &
+                                     getCurrentExceptionMsg()))
   return findings.capFindings(ruleName, maxFindings, "secrets")
 
 proc secretsHint(): PolicyHint =

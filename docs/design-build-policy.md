@@ -393,8 +393,8 @@ What is checked on `docker build`:
   in `ENV`/`ARG` defaults end up in the image config: as part of its context
   directory, or on its own when `.dockerignore` excludes it or it is outside
   the context (`-f ../Dockerfile`). Its findings are reported once. A
-  Dockerfile read from stdin (`-f -`) cannot be scanned and is an evaluation
-  error (`on_error`), so with `on_error: block` such builds are blocked.
+  Dockerfile read from stdin (`-f -`) is scanned from the content chalk read,
+  reported as `Dockerfile (stdin)`.
 - The rule does not reuse `SECRET_SCANNER`: chalk's own scan runs on the git
   repository containing the first context, in git mode when it can. Git mode
   reads committed history (secrets that were since removed) but skips
