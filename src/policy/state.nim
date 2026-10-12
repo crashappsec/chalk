@@ -23,6 +23,11 @@ type
     stage*:    string
     source*:   string # "from", "copy_from" or "mount_from"
     reason*:   string
+    ## what the finding is about when it is not an image, e.g. a package
+    ## purl, a certificate's file or a registry
+    subject*:  string
+    location*: string # e.g. `path:line` within the build context
+    severity*: string # as reported by the tool that produced the finding
 
   PolicyHint* = object
     ## how a rule explains itself in the GitHub step summary, not reported
@@ -76,6 +81,9 @@ proc asDict(self: PolicyFinding): TableRef[string, string] =
   result["stage"]     = self.stage
   result["source"]    = self.source
   result["reason"]    = self.reason
+  result["subject"]   = self.subject
+  result["location"]  = self.location
+  result["severity"]  = self.severity
 
 proc asDict(self: PolicyResult): TableRef[string, string] =
   result = newTable[string, string]()
@@ -114,5 +122,10 @@ proc `$`*(self: PolicyFinding): string =
     result &= self.image
     if self.stage != "":
       result &= " (stage " & self.stage & ", " & self.source & ")"
+    result &= " - "
+  elif self.subject != "":
+    result &= self.subject
+    if self.location != "":
+      result &= " (" & self.location & ")"
     result &= " - "
   result &= self.reason
