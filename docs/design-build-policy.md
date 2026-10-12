@@ -410,8 +410,13 @@ run when they cover the directory (semgrep scans the git repository of the
 first build context), keeping only results inside the directory with
 paths relative to it. Otherwise, with `run_tools`, the policy runs the
 enabled `sast` tools on the directory, once per directory however many
-policies enable the rule, bounded by `tool.semgrep.semgrep_timeout`.
-Results it collects this way are not added to chalk reports or marks. A
+policies enable the rule, bounded by `tool.semgrep.semgrep_timeout`. These
+scans run semgrep with `--json` (whatever `tool.semgrep.semgrep_format` is)
+and `--no-git-ignore` added to `tool.semgrep.semgrep_other_flags`, see
+below. Results it collects this way are not added to chalk reports or
+marks. With `run_tools`, directories whose `run_sast_tools` SARIF has
+`Syntax error` warnings in them are scanned this way too, as SARIF cannot
+tell those apart from files semgrep did not scan at all. A
 build with no local context (stdin or a remote tarball), `run_tools: false`
 for a directory `run_sast_tools` did not cover (including `run_sast_tools`
 producing no results), or tools that fail or cannot be installed are
@@ -425,12 +430,17 @@ files:
 - paths in `.semgrepignore`, or, without one, semgrep's default ignore
   list, which includes `build/`, `dist/`, `vendor/`, `node_modules/`,
   `.venv/`, `test/`, `tests/`, `testsuite/`, `*_test.go` and `*.min.js`;
-- files ignored by git (`.gitignore`) inside a git repository;
+- with results of `run_sast_tools`, files ignored by git (`.gitignore`)
+  inside a git repository, unless `tool.semgrep.semgrep_other_flags` has
+  `--no-git-ignore`. The policy's own scans include them, as docker sends
+  them, at the cost of scanning git-ignored build output too;
 - files larger than semgrep's `--max-target-bytes` (1 MB by default);
 - code suppressed with `# nosemgrep` comments.
 
-The scan does not apply `.dockerignore`: results in files that are not sent
-to the builder still count (exclude them with `ignore_paths`).
+Results and scan errors in files docker does not send, per the
+`.dockerignore` of the context (`<Dockerfile>.dockerignore` for the main
+context when it exists), do not count. semgrep still scans those files, so
+they count toward its timeout.
 
 **On `docker push`** there is no source to scan, so only results recorded
 in the image's chalk mark count (`SAST` is not in the default docker mark
@@ -788,16 +798,20 @@ blocks an enforced policy. Valid matches from a partial scan still count.
   parse at all). `PartialParsing` warnings (only some spans of a file could
   not be parsed; the rest was scanned) are ignored, as semgrep emits them
   routinely on real codebases. `info` and `debug` diagnostics are ignored.
-- SARIF (the default): `runs[].invocations[].toolExecutionNotifications` (and
+- SARIF (the default for `run_sast_tools`):
+  `runs[].invocations[].toolExecutionNotifications` (and
   `toolConfigurationNotifications`) with level `error` or `warning` (the
   default), plus `executionSuccessful: false`. semgrep's SARIF names partial
   parses `Syntax error` like whole-file parse failures, so `Syntax error`
-  warnings are ignored; set `tool.semgrep.semgrep_format: "json"` to treat
-  files semgrep could not parse at all as errors.
+  warnings count as errors too, as the file may not have been scanned at
+  all. With `run_tools` the rule avoids that by scanning such directories
+  itself (in semgrep JSON); without it, set
+  `tool.semgrep.semgrep_format: "json"`.
 
-Errors scoped to files outside the evaluated build context do not count;
-errors without a path (all of semgrep's SARIF notifications) apply to the
-scan.
+Errors scoped to files outside the evaluated build context, or to files
+`.dockerignore` leaves out of it, do not count; errors without a path apply
+to the scan. semgrep's SARIF notifications have no locations, so the path
+is read from their message (`<id> at line <path>:<line>:`).
 
 SBOM policy parsing retains every package occurrence. A repository scan keeps a
 package in a build context when any recorded location belongs to that context;

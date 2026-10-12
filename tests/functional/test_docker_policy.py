@@ -1467,6 +1467,44 @@ def test_sast_enforce_passes(
     assert policy_reports(random_hex) == []
 
 
+def test_sast_scans_what_docker_sends(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, semgrep
+):
+    # docker sends git-ignored files and leaves out what .dockerignore lists
+    (tmp_data_dir / ".gitignore").write_text("generated.py\n")
+    (tmp_data_dir / ".dockerignore").write_text("unused.py\n")
+    (tmp_data_dir / "generated.py").write_text(SAST_APP)
+    (tmp_data_dir / "unused.py").write_text(SAST_APP)
+    Git(tmp_data_dir).init().add().commit("init")
+    config = {"id": "sast@1", "mode": "enforce", "sast": {"enabled": True}}
+    _, result = chalk.docker_build(
+        content=Docker.dockerfile("FROM alpine\nCOPY generated.py /app.py\n"),
+        context=tmp_data_dir,
+        tag=random_hex,
+        config=CONFIGS / "policy_sast.c4m",
+        env={
+            "POLICY_CONFIG_JSON": json.dumps(config),
+            "POLICY_REPORT_FILE": str(report_file(random_hex)),
+            "SEMGREP_RULES": str(SEMGREP_RULES),
+        },
+        run_docker=False,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_RESULT="blocked",
+        _POLICY_FINDINGS=[
+            {
+                "rule": "sast",
+                "kind": "violation",
+                "subject": re.compile(r"\.shell-true$"),
+                "location": "generated.py:5",
+            }
+        ],
+    )
+
+
 def test_sast_without_results_honors_on_error(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path
 ):

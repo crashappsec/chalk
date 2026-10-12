@@ -1,7 +1,9 @@
 import std/[json, os, strutils, tables]
+from std/unicode import validateUtf8
 import ../../src/types
 import ../../src/chalkjson
 import ../../src/policy/api
+import ../../src/policy/dockerignore
 import ../../src/policy/engine
 import ../../src/policy/tools
 import ../../src/policy/rules/sast
@@ -375,16 +377,15 @@ proc testSemgrepScanErrors() =
 proc testSarifScanErrors() =
   var doc = parseFile(sarifFile)
   let notifications = doc["runs"][0]["invocations"][0]["toolExecutionNotifications"]
-  let source = SastSource(tool: "semgrep", roots: @["/src"], dir: "/src", doc: doc)
-  # partial parses and notes do not make the scan incomplete
-  notifications.add(%*{"descriptor": {"id": "Syntax error"}, "level": "warning",
-                       "message": {"text": "Syntax error at line src/app.py:4"}})
+  var source = SastSource(tool: "semgrep", roots: @["/src"], dir: "/src", doc: doc)
+  # notes do not make the scan incomplete
   notifications.add(%*{"descriptor": {"id": "Info"}, "level": "note",
                        "message": {"text": "x"}})
   assertEq(defaults().check(@[source]).ids(), @[shellTrue])
+  doAssert not source.hasAmbiguousParse()
   for (id, level) in [("Timeout", "warning"), ("Fatal error", "error"),
                       ("Syntax error", "error"), ("Rule parse error", "")]:
-    notifications.elems.setLen(2)
+    notifications.elems.setLen(1)
     var notification = %*{"descriptor": {"id": id}, "message": {"text": "x"}}
     if level != "":
       notification["level"] = %level
@@ -396,14 +397,133 @@ proc testSarifScanErrors() =
     # matches are still reported
     assertEq(findings[1].subject, shellTrue)
   # located outside the build context of a monorepo
-  notifications.elems.setLen(2)
+  notifications.elems.setLen(1)
   notifications.add(%*{"descriptor": {"id": "Timeout"}, "level": "warning",
                        "locations": [{"physicalLocation": {"artifactLocation": {"uri": "/web/a.py"}}}]})
   assertEq(defaults().check(@[source]).ids(), @[shellTrue])
-  notifications[2]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] = %"/src/a.py"
+  notifications[1]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] = %"/src/a.py"
   assertEq(defaults().check(@[source])[0].location, "a.py")
+
+  # semgrep's notifications have no locations, the message has the path
+  notifications.elems.setLen(1)
+  notifications.add(%*{"descriptor": {"id": "Other syntax error"}, "level": "warning",
+                       "message": {"text": "Other syntax error at line /web/chart.yaml:3:\n (approximate error location)"}})
+  assertEq(defaults().check(@[source]).ids(), @[shellTrue])
+  notifications[1]["message"]["text"] = %"Other syntax error at line src/chart.yaml:3:\n x"
+  assertEq(defaults().check(@[source])[0].location, "src/chart.yaml")
+  # or none that can be read: the error applies to the scan
+  notifications[1]["message"]["text"] = %"Other syntax error in chart.yaml"
+  let unlocated = defaults().check(@[source])
+  assertEq(unlocated[0].kind, "error")
+  assertEq(unlocated[0].location, "")
+
+  # SARIF names partial parses `Syntax error` like files semgrep could not
+  # parse at all, so both count, saying why
+  notifications.elems.setLen(1)
+  notifications.add(%*{"descriptor": {"id": "Syntax error"}, "level": "warning",
+                       "message": {"text": "Syntax error at line /src/app.py:4:\n `x` was unexpected"}})
+  let ambiguous = defaults().check(@[source])
+  assertEq(ambiguous.len, 2)
+  assertEq(ambiguous[0].kind, "error")
+  assertEq(ambiguous[0].location, "app.py")
+  doAssert "partial parses" in ambiguous[0].reason, ambiguous[0].reason
+  doAssert source.hasAmbiguousParse()
+  # unless docker does not send the file, or it is outside the context
+  source.ignore = parseDockerignore("app.py\n")
+  assertEq(defaults().check(@[source]).ids(), @[shellTrue])
+  doAssert not source.hasAmbiguousParse()
+  source.ignore = DockerIgnore()
+  notifications[1]["message"]["text"] = %"Syntax error at line /web/app.py:4:"
+  doAssert not source.hasAmbiguousParse()
+  # semgrep JSON tells them apart, see testSemgrepScanErrors
+  doAssert not SastSource(tool: "semgrep", dir: "/src",
+                          doc: %*{"results": [], "errors": []}).hasAmbiguousParse()
+
   doc["runs"][0]["invocations"][0]["toolExecutionNotifications"] = %"bad"
   assertEq(defaults().check(@[source])[0].kind, "error")
+
+proc testDockerignore() =
+  # results and scan errors in files docker does not send do not count
+  var source = SastSource(tool: "semgrep", roots: @["/src"], dir: "/src",
+                          doc: parseFile(jsonFile),
+                          ignore: parseDockerignore("src/app.py\n"))
+  assertEq(len(source.parseSastSource()), 0)
+  source.ignore = parseDockerignore("src/*\n!src/app.py\n")
+  assertEq(defaults().check(@[source])[0].location, "src/app.py:8")
+  source.ignore = parseDockerignore("src/app.py\n")
+  source.doc = %*{"results": [], "errors": [
+    {"level": "warn", "type": "Syntax error", "path": "/src/src/app.py"}]}
+  assertEq(defaults().check(@[source]).len, 0)
+  source.ignore = DockerIgnore()
+  assertEq(defaults().check(@[source]).len, 1)
+
+  # collected per context: `<Dockerfile>.dockerignore` for the main one
+  let dir = getTempDir() / "chalk-sast-dockerignore"
+  removeDir(dir)
+  createDir(dir / "main")
+  createDir(dir / "named")
+  writeFile(dir / "main" / ".dockerignore", "ignored-by-main.py\n")
+  writeFile(dir / "Dockerfile", "FROM alpine\n")
+  writeFile(dir / "Dockerfile.dockerignore", "ignored-by-dockerfile.py\n")
+  writeFile(dir / "named" / ".dockerignore", "ignored-by-named.py\n")
+  clearPolicyToolCache()
+  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+    @[ToolOutput(tool: "semgrep", root: dir, value: %*{"results": [], "errors": []})]
+  let input = PolicyInput(command: "build", contextDirs: @[dir / "main", dir / "named"],
+                          mainContextDir: dir / "main", dockerfilePath: dir / "Dockerfile",
+                          host: ChalkDict())
+  let (sources, errors) = input.collectSources(runTools = true, toolsRan = false)
+  assertEq(len(errors), 0)
+  assertEq(len(sources), 2)
+  doAssert sources[0].ignore.isIgnored("ignored-by-dockerfile.py")
+  doAssert not sources[0].ignore.isIgnored("ignored-by-main.py")
+  doAssert sources[1].ignore.isIgnored("ignored-by-named.py")
+  clearPolicyToolCache()
+  removeDir(dir)
+
+proc testAmbiguousHostSarif() =
+  # with run_tools, contexts whose run_sast_tools SARIF has ambiguous parse
+  # errors are scanned by the rule, whose semgrep JSON tells them apart
+  var doc = parseFile(sarifFile)
+  doc["runs"][0]["invocations"][0]["toolExecutionNotifications"] = %*[
+    {"descriptor": {"id": "Syntax error"}, "level": "warning",
+     "message": {"text": "Syntax error at line /repo/app/x.js:1:"}}]
+  var host = ChalkDict()
+  host["SAST"] = nimJsonToBox(%*{"semgrep": doc})
+  host["EXTERNAL_TOOL_DURATION"] = nimJsonToBox(%*{"semgrep": {"/repo": 1200}})
+  clearPolicyToolCache()
+  var calls: seq[string]
+  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+    calls.add(dir)
+    @[ToolOutput(tool: "semgrep", root: dir, value: %*{"results": [], "errors": []})]
+  var input = PolicyInput(command: "build", contextDirs: @["/repo/app"], host: host)
+  var (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
+  assertEq(calls, @["/repo/app"])
+  assertEq(len(errors), 0)
+  assertEq(len(sources), 1)
+  assertEq(len(defaults().check(sources)), 0)
+  # in another context of the repository: run_sast_tools' output is used
+  input.contextDirs = @["/repo/web"]
+  (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
+  assertEq(calls, @["/repo/app"])
+  assertEq(sources[0].roots, @["/repo"])
+  # without run_tools it is reported as unchecked
+  input.contextDirs = @["/repo/app"]
+  (sources, errors) = input.collectSources(runTools = false, toolsRan = true)
+  assertEq(calls, @["/repo/app"])
+  let findings = defaults().check(sources)
+  assertEq(findings[0].kind, "error")
+  doAssert "partial parses" in findings[0].reason, findings[0].reason
+  clearPolicyToolCache()
+
+proc testTruncateRunes() =
+  # a long message is cut by characters, never inside a UTF-8 sequence
+  let message = repeat("é", 400)
+  let json = %*{"results": [{"check_id": "r", "path": "a.py", "start": {"line": 1},
+                             "extra": {"severity": "ERROR", "message": message}}]}
+  let reason = defaults().check(@[SastSource(tool: "semgrep", doc: json)])[0].reason
+  doAssert validateUtf8(reason) == -1, reason
+  doAssert reason.endsWith("...")
 
 proc testSecretMessages() =
   let secret = "hunter2supersecret"
@@ -463,5 +583,8 @@ testCollectSources()
 testConfig()
 testSemgrepScanErrors()
 testSarifScanErrors()
+testDockerignore()
+testAmbiguousHostSarif()
+testTruncateRunes()
 testSecretMessages()
 testRequiresContext()

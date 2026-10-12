@@ -16,12 +16,14 @@ import std/[
   strutils,
   tables,
 ]
+from std/unicode import runeLen, runeSubStr
 import "../.."/[
   types,
 ]
 import ".."/[
   api,
   configuration,
+  dockerignore,
   tools,
 ]
 import "."/[
@@ -64,6 +66,8 @@ type
     ## build context directory: results outside it are dropped and paths are
     ## relative to it; empty on push
     dir*:   string
+    ## what docker leaves out of `dir`: results there are dropped too
+    ignore*: DockerIgnore
 
   SastConfig* = object
     minSeverity*:   string
@@ -160,6 +164,12 @@ proc resultPath(source: SastSource, path: string): Option[string] =
     else: ""
   path.contextPath(root, source.dir)
 
+proc contextFile(source: SastSource, path: string): Option[string] =
+  ## `resultPath`, `none` too when docker does not send the file
+  result = source.resultPath(path)
+  if result.isSome() and source.ignore.isIgnored(result.get()):
+    return none(string)
+
 proc isSecretRule(ruleId: string, cwes, labels: seq[string]): bool =
   for cwe in cwes:
     if cwe in secretCwes:
@@ -174,9 +184,10 @@ proc isSecretRule(ruleId: string, cwes, labels: seq[string]): bool =
 
 proc truncate(s: string): string =
   let flat = s.strip().replace('\n', ' ')
-  if len(flat) <= maxMessageLen:
+  if flat.runeLen() <= maxMessageLen:
     return flat
-  flat[0 ..< maxMessageLen] & "..."
+  # by runes, so a multi-byte character is not cut into invalid UTF-8
+  flat.runeSubStr(0, maxMessageLen) & "..."
 
 proc parseSarif(source: SastSource): seq[SastResult] =
   for run in source.doc["runs"].getElems():
@@ -203,7 +214,7 @@ proc parseSarif(source: SastSource): seq[SastResult] =
         rule     = rules.getOrDefault(ruleId, newJObject())
         location = item{"locations"}.getElems()
         physical = if len(location) > 0: location[0]{"physicalLocation"} else: nil
-      let path = source.resultPath(physical{"artifactLocation", "uri"}.getStr())
+      let path = source.contextFile(physical{"artifactLocation", "uri"}.getStr())
       if path.isNone():
         continue
       var r = SastResult(
@@ -245,7 +256,7 @@ proc parseSemgrepJson(source: SastSource): seq[SastResult] =
     let extra = item{"extra"}
     if extra{"is_ignored"}.getBool(false):
       continue
-    let path = source.resultPath(item{"path"}.getStr())
+    let path = source.contextFile(item{"path"}.getStr())
     if path.isNone():
       continue
     let metadata = extra{"metadata"}
@@ -335,21 +346,25 @@ proc location(r: SastResult): string =
   r.path
 
 type ScanErrors = object
-  found:    bool
-  location: string
-  kinds:    seq[string]
+  found:     bool
+  location:  string
+  kinds:     seq[string]
+  ambiguous: bool # see `isAmbiguousParse`
 
-proc add(errors: var ScanErrors, source: SastSource, kind, path: string) =
+proc add(errors: var ScanErrors, source: SastSource, kind, path: string): bool {.discardable.} =
+  ## whether the error counts
   if path != "":
-    let relative = source.resultPath(path)
-    # errors elsewhere in a monorepo do not affect the build context
+    let relative = source.contextFile(path)
+    # errors elsewhere in a monorepo, or in files docker does not send, do
+    # not affect the build
     if relative.isNone():
-      return
+      return false
     if errors.location == "":
       errors.location = relative.get()
   errors.found = true
   if kind != "" and kind notin errors.kinds:
     errors.kinds.add(kind)
+  return true
 
 proc semgrepJsonErrors(source: SastSource, errors: var ScanErrors) =
   let node = source.doc{"errors"}
@@ -375,9 +390,32 @@ proc semgrepJsonErrors(source: SastSource, errors: var ScanErrors) =
       continue
     errors.add(source, name, error{"path"}.getStr())
 
-proc sarifErrors(source: SastSource, errors: var ScanErrors) =
+proc messagePath(text, name: string): string =
+  ## semgrep's SARIF notifications have no `locations`; their message starts
+  ## with `<descriptor id> at line <path>:<line>:`
+  let prefix = name & " at line "
+  if name == "" or not text.startsWith(prefix):
+    return ""
+  let rest = text[len(prefix) .. ^1].splitLines()[0]
+  for i, c in rest:
+    if c != ':' or i == 0:
+      continue
+    var j = i + 1
+    while j < len(rest) and rest[j] in Digits:
+      inc(j)
+    if j > i + 1 and (j == len(rest) or rest[j] == ':'):
+      return rest[0 ..< i]
+  return ""
+
+proc isAmbiguousParse(name, level: string): bool =
+  ## semgrep's SARIF names partial parses (only some spans of a file were
+  ## skipped) `Syntax error` warnings, like files it could not parse at all
+  name == "Syntax error" and level == "warning"
+
+iterator sarifNotifications(source: SastSource, errors: var ScanErrors):
+    tuple[name, level, path: string] =
   ## semgrep reports scan errors as `toolExecutionNotifications` while
-  ## keeping `executionSuccessful` true
+  ## keeping `executionSuccessful` true; notes are skipped
   for run in source.doc["runs"].getElems():
     for invocation in run{"invocations"}.getElems():
       for field in ["toolExecutionNotifications", "toolConfigurationNotifications"]:
@@ -394,16 +432,29 @@ proc sarifErrors(source: SastSource, errors: var ScanErrors) =
           if level notin ["error", "warning"]:
             continue
           let name = notification{"descriptor", "id"}.getStr()
-          # semgrep's SARIF names partial parses `Syntax error` too, so they
-          # cannot be told apart from files it could not parse at all
-          if name == "Syntax error" and level == "warning":
-            continue
           let locations = notification{"locations"}.getElems()
           let path =
             if len(locations) > 0:
               locations[0]{"physicalLocation", "artifactLocation", "uri"}.getStr()
-            else: ""
-          errors.add(source, name, path)
+            else:
+              notification{"message", "text"}.getStr().messagePath(name)
+          yield (name, level, path)
+
+proc sarifErrors(source: SastSource, errors: var ScanErrors) =
+  for (name, level, path) in source.sarifNotifications(errors):
+    # a partial parse cannot be told apart from a file semgrep did not scan
+    # at all, so either counts
+    if errors.add(source, name, path) and isAmbiguousParse(name, level):
+      errors.ambiguous = true
+
+proc hasAmbiguousParse*(source: SastSource): bool =
+  ## SARIF `Syntax error` warnings in files of the build context
+  if source.doc == nil or source.doc{"runs"} == nil or source.doc{"runs"}.kind != JArray:
+    return false
+  var errors: ScanErrors
+  for (name, level, path) in source.sarifNotifications(errors):
+    if isAmbiguousParse(name, level) and (path == "" or source.contextFile(path).isSome()):
+      return true
 
 proc scanErrors(source: SastSource): seq[PolicyFinding] =
   ## Scan failures are independent of matches: valid matches are kept and
@@ -419,6 +470,8 @@ proc scanErrors(source: SastSource): seq[PolicyFinding] =
   if len(errors.kinds) > 0:
     reason &= " (" & errors.kinds.join(", ") & ")"
   reason &= "; SAST analysis is incomplete"
+  if errors.ambiguous:
+    reason &= " (SARIF does not tell partial parses apart from files not parsed at all; semgrep JSON does)"
   if source.image != "":
     reason &= " (mark of " & source.image & ")"
   result.add(newSubjectFinding(ruleName, "error", source.tool, reason, location = errors.location))
@@ -458,12 +511,35 @@ proc check*(settings: SastConfig, sources: seq[SastSource]): seq[PolicyFinding] 
                                      location = r.location(), severity = r.severity))
   result.add(violations.capFindings(ruleName, maxReportedFindings, "SAST findings"))
 
-proc sources(outputs: seq[ToolOutput], dir = ""): seq[SastSource] =
+proc sources(outputs: seq[ToolOutput], dir = "", ignore = DockerIgnore()): seq[SastSource] =
   for output in outputs:
-    var source = SastSource(tool: output.tool, doc: output.value, image: output.image, dir: dir)
+    var source = SastSource(tool: output.tool, doc: output.value, image: output.image,
+                            dir: dir, ignore: ignore)
     if output.root != "":
       source.roots = @[output.root]
     result.add(source)
+
+proc setStringAttr(fqn, value: string): bool =
+  con4mRuntime.configState.attrSet(fqn, pack(value)).code == errOk
+
+proc useSemgrepPolicyFlags(): seq[(string, string)] =
+  ## For the policy's own scans: semgrep JSON, as SARIF names partial parses
+  ## like files semgrep could not parse at all (see `isAmbiguousParse`), and
+  ## `--no-git-ignore`, as docker sends git-ignored files unless
+  ## `.dockerignore` leaves them out. Returns the values to restore.
+  if con4mRuntime == nil: # unit tests
+    return
+  let format = attrGetOpt[string]("tool.semgrep.semgrep_format")
+  if format.isSome() and setStringAttr("tool.semgrep.semgrep_format", "json"):
+    result.add(("tool.semgrep.semgrep_format", format.get()))
+  let flags = attrGetOpt[string]("tool.semgrep.semgrep_other_flags")
+  if flags.isSome() and
+     setStringAttr("tool.semgrep.semgrep_other_flags", flags.get() & " --no-git-ignore"):
+    result.add(("tool.semgrep.semgrep_other_flags", flags.get()))
+
+proc restoreAttrs(saved: seq[(string, string)]) =
+  for (fqn, value) in saved:
+    discard setStringAttr(fqn, value)
 
 proc collectSources*(input: PolicyInput, runTools, toolsRan: bool): tuple[sources: seq[SastSource], errors: seq[PolicyFinding]] =
   ## `toolsRan`: `run_sast_tools` already ran the tools before policies
@@ -483,6 +559,32 @@ proc collectSources*(input: PolicyInput, runTools, toolsRan: bool): tuple[source
     result.errors.add(newSubjectFinding(ruleName, "error", "sast",
                                         "SAST tools produced no results, see the chalk logs"))
     return
+  var ignores = initTable[string, DockerIgnore]()
+  for dir in input.contextDirs:
+    try:
+      ignores[dir] = loadDockerignore(dir, input.mainContextDockerfile(dir))
+    except CatchableError:
+      # docker cannot read it either; results are not filtered
+      result.errors.add(newSubjectFinding(ruleName, "error", dir,
+                                          "could not read the .dockerignore of the build context: " &
+                                          getCurrentExceptionMsg()))
+      ignores[dir] = DockerIgnore()
+  if runTools:
+    # The rule's own scans are unambiguous, so contexts with ambiguous SARIF
+    # parse errors are scanned again rather than reported as unchecked
+    var kept: seq[ToolOutput]
+    for output in host:
+      var ambiguous = false
+      for dir in input.contextDirs:
+        if output.root != "" and dir.isWithin(output.root) and
+           @[output].sources(dir, ignores[dir])[0].hasAmbiguousParse():
+          ambiguous = true
+          break
+      if ambiguous:
+        trace("policy: " & output.tool & " SARIF has ambiguous parse errors, scanning the build contexts")
+      else:
+        kept.add(output)
+    host = kept
   let request = ToolRequest(
     rule:         ruleName,
     kind:         "sast",
@@ -491,10 +593,15 @@ proc collectSources*(input: PolicyInput, runTools, toolsRan: bool): tuple[source
     runTools:     runTools,
     notCollected: "SAST results were not collected; enable run_sast_tools or policy.sast.run_tools",
   )
-  let outputs = input.contextToolOutputs(request, host)
-  result.errors = outputs.errors
+  let saved = useSemgrepPolicyFlags()
+  var outputs: ToolOutputs
+  try:
+    outputs = input.contextToolOutputs(request, host)
+  finally:
+    restoreAttrs(saved)
+  result.errors.add(outputs.errors)
   for context in outputs.contexts:
-    result.sources.add(context.outputs.sources(context.dir))
+    result.sources.add(context.outputs.sources(context.dir, ignores.getOrDefault(context.dir)))
 
 proc loadSastConfig*(): Option[SastConfig] =
   if not policyBoolSetting([ruleName, "enabled"], false):

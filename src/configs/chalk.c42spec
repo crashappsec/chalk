@@ -2765,11 +2765,13 @@ mark (not recorded by default), as there is no source code to scan; an
 image whose mark has no `SAST` (or `@SAST`) passes.
 
 Scan errors (e.g. timeouts) are evaluation errors and `on_error` decides;
-semgrep partial-parse warnings are ignored, and in SARIF output all
-`Syntax error` warnings are. Files semgrep skips are not checked:
-`.semgrepignore` paths (or its default list, including `build/`, `dist/`,
-`vendor/`, `test/`, `tests/` and `*_test.go`), git-ignored and large files,
-and `# nosemgrep` code. `.dockerignore` is not applied to the scan.
+semgrep JSON partial-parse warnings are ignored, while SARIF `Syntax error`
+warnings count as SARIF cannot tell them apart from files semgrep did not
+parse at all. Results and errors in files `.dockerignore` leaves out of the
+context do not count. Files semgrep skips are not checked: `.semgrepignore`
+paths (or its default list, including `build/`, `dist/`, `vendor/`,
+`test/`, `tests/` and `*_test.go`), large files, `# nosemgrep` code and,
+in `run_sast_tools` results, git-ignored files.
 Violations of rules detecting secrets omit the rule's message, which may
 contain the secret.
 
@@ -2882,9 +2884,11 @@ The policy is violated when more findings count than this.
     shortdoc: "Run SAST tools when results were not collected"
     doc: """
 Run the enabled `sast` tools on the build context directories
-`run_sast_tools` did not scan, or produced no results for, while
-evaluating the policy. When false, or when the tools cannot run, the
-policy reports an evaluation error and `on_error` decides.
+`run_sast_tools` did not scan, or produced no results for, or whose SARIF
+has `Syntax error` warnings in them, while evaluating the policy. These
+scans run semgrep with `--json` and `--no-git-ignore`. When false, or when
+the tools cannot run, the policy reports an evaluation error and `on_error`
+decides.
 """
   }
 
