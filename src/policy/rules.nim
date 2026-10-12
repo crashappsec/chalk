@@ -12,6 +12,7 @@ import "."/[
   rules/certificates,
   rules/custom_check,
   rules/golden_images,
+  rules/packages,
   rules/registries,
   rules/secrets,
 ]
@@ -23,4 +24,5 @@ proc loadPolicyRules*() =
   loadRegistriesRule()
   loadCertificatesRule()
   loadSecretsRule()
+  loadPackagesRule()
   loadCustomCheckRule()

@@ -2554,6 +2554,7 @@ See `docs/design-build-policy.md` in the chalk repository for details.
   allow registries
   allow certificates
   allow secrets
+  allow packages
 
   field mode {
     type:     string
@@ -3208,6 +3209,111 @@ history and are not filtered by `.dockerignore`. Images whose mark has no
     doc: """
 Additional guidance shown to the user and included in the report when a
 secret is found, e.g. a link to the secret handling guidelines.
+"""
+  }
+}
+
+singleton packages {
+  user_def_ok:   false
+  doc: """
+Restricts the languages and packages a `docker build` depends on, as
+listed by the SBOM of each local build context (the one chalk collects
+with `run_sbom_tools`, else one produced on demand by the enabled `sbom`
+tools, `tool.syft` by default). `docker push` checks the SBOM recorded in
+the image's chalk mark, when the mark template includes `SBOM`, covering
+all of the repository chalk scanned at build time; images without it
+pass on push.
+
+Packages are identified by their package URL (purl), e.g.
+`pkg:npm/lodash@4.17.21`, and languages as syft reports them for the
+dependencies the SBOM lists, e.g. `go`, `javascript`, `python`, `java`,
+`rust`.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable the packages policy"
+    doc: """
+When enabled without any of `denied`, `allowed`, `allowed_languages` or
+`denied_languages`, nothing is checked and no SBOM is produced.
+"""
+  }
+
+  field denied {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Denied packages as (kind, value) tuples"
+    doc: """
+Packages the build must not depend on. Each entry is a `(kind, value)`
+tuple. The supported kind is `purl`: a package URL whose
+`type/namespace/name` is a shell-style glob, optionally followed by
+`@<version>`, where the version is a glob (`3.3.6`, `1.*`) or a
+comma-separated range (`<4.17.21`, `>=1.0,<1.2`); other range syntaxes
+(`^1.2`, `~1.2`, `1.x`, `[1.0,2.0)`) and version lists (`1.2,1.3`) are
+rejected. Without a version any
+version matches. Matching ignores case, qualifiers and subpaths, and
+normalizes PyPI names (`Django_Rest` is `django-rest`). Ranges compare
+dot-separated numeric versions with an optional `-prerelease` by semver
+precedence, ignoring `+build` metadata; a package whose version cannot be
+compared (e.g. `1:2.36-9`, `1.0.post1`) is an evaluation error.
+
+```
+denied: [
+  ("purl", "pkg:npm/event-stream@3.3.6"),
+  ("purl", "pkg:pypi/*colourama*"),
+  ("purl", "pkg:npm/lodash@<4.17.21"),
+]
+```
+
+Unknown kinds and invalid patterns are configuration errors.
+"""
+  }
+
+  field allowed {
+    type:     list[tuple[string, string]]
+    default:  []
+    shortdoc: "Allowed packages as (kind, value) tuples"
+    doc: """
+When not empty, every package must match one of these entries (same
+format as `denied`), e.g. `("purl", "pkg:golang/github.com/acme/*")`.
+Packages without a purl are an evaluation error.
+"""
+  }
+
+  field allowed_languages {
+    type:     list[string]
+    default:  []
+    shortdoc: "Languages packages may be written in"
+    doc: """
+When not empty, a package of any other language is a violation, reported
+once per language. Names are syft's (`c++`, `dart`, `dotnet`, `elixir`,
+`erlang`, `go`, `haskell`, `java`, `javascript`, `lua`, `ocaml`, `perl`,
+`php`, `python`, `r`, `ruby`, `rust`, `swift`, `swipl`) or aliases
+(`golang`, `node`, `js`, `typescript`, `csharp`, `c#`, `py`, `rb`, `cpp`,
+...); others are configuration errors. OS, CI and container packages
+(e.g. `deb`, `rpm`, `apk`, GitHub Actions) are not checked; other packages
+whose language cannot be determined are an evaluation error.
+"""
+  }
+
+  field denied_languages {
+    type:     list[string]
+    default:  []
+    shortdoc: "Languages packages must not be written in"
+    doc: """
+A package of one of these languages is a violation, reported once per
+language. Same names as `allowed_languages`.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance shown to the user and included in the report when a
+package or language is not allowed.
 """
   }
 }
