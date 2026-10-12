@@ -91,6 +91,15 @@ proc testMatching() =
     assertEq(decide(image, @[], hub), mrDenied)
     assertEq(decide(image, official), mrAllowed)
   assertEq(decide("ghcr.io:8443/acme/app", @[], ghcr), mrAllowed)
+  # host globs also match Docker Hub's familiar names, not only its API host
+  for pattern in ["docker.*", "docker.i?", "docker.*/library/*", "index.docker.*"]:
+    let glob: seq[RegistryEntry] = @[("glob", pattern)]
+    assertEq(decide("alpine", @[], glob), mrDenied)
+    assertEq(decide("alpine", glob), mrAllowed)
+  let dockerGlob: seq[RegistryEntry] = @[("glob", "docker.*")]
+  assertEq(decide("ghcr.io/acme/app", @[], dockerGlob), mrAllowed)
+  let officialGlob: seq[RegistryEntry] = @[("glob", "docker.*/library/*")]
+  assertEq(decide("acme/app", @[], officialGlob), mrAllowed)
 
   let ports: seq[RegistryEntry] = @[("glob", "localhost:*")]
   assertEq(decide("localhost:5000/app", ports), mrAllowed)

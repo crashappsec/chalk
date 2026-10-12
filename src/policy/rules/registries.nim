@@ -119,9 +119,16 @@ proc matchesRegistry*(image: DockerImage, pattern: string): bool =
     normalized   = normalizeRegistryPattern(pattern)
   if host == "":
     return false
-  if '/' notin normalized:
-    return globMatch(normalized, host)
-  return globMatch(normalized, repo)
+  # literal Docker Hub aliases normalize to its canonical host, but a glob
+  # such as `docker.*` is written against the name users know
+  let hosts =
+    if host == dockerHub: @[dockerHub, "docker.io", "index.docker.io"]
+    else: @[host]
+  for alias in hosts:
+    let value = if '/' notin normalized: alias else: alias & repo[len(host) .. ^1]
+    if globMatch(normalized, value):
+      return true
+  return false
 
 proc checkRegistry*(image:   DockerImage,
                     allowed: seq[RegistryEntry],

@@ -383,8 +383,8 @@ unless a known entry already denied it):
 Both sides are normalized like docker references: `alpine` is
 `docker.io/library/alpine`, `docker.io/alpine` is
 `docker.io/library/alpine`, and `docker.io`, `index.docker.io` and
-`registry-1.docker.io` are the same registry. Hosts are compared in lower
-case and the default HTTPS port is dropped, so `GHCR.io:443/acme/app` is
+`registry-1.docker.io` are the same registry (a host glob such as
+`docker.*` matches any of the three). Hosts are compared in lower case and the default HTTPS port is dropped, so `GHCR.io:443/acme/app` is
 `ghcr.io/acme/app` and `docker.io:443/alpine` is
 `docker.io/library/alpine`; other ports are part of the host
 (`ghcr.io:8443` is not `ghcr.io`). Tags and digests in entries are
