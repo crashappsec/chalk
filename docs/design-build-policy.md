@@ -671,6 +671,10 @@ Rules that need more than the referenced images register with
   (`docker-image://`, `oci-layout://`, `target:`) are left to image rules. The
   engine reports these against rules registered with `requiresContext`, so a
   context-scanning rule cannot pass a context it never saw;
+- `dockerfilePath`: the Dockerfile of a build, so rules can honor
+  `<Dockerfile>.dockerignore`; empty for `push` and for `-f -`;
+- `stdinDockerfile`: the content of a Dockerfile read from stdin (`-f -`),
+  which has no path but is sent to the builder like any other;
 - `pushTargets`: the image references the command pushes (`build --push` tags,
   or the `docker push` reference and, with `--all-tags`, every local tag);
 - `pushMarks`: chalk marks of the images `push` pushes, for those that are

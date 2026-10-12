@@ -677,23 +677,31 @@ def test_config_json_allows_golden_image(chalk: Chalk, random_hex: str):
     assert policy_reports(random_hex) == []
 
 
-def test_config_json_invalid_never_blocks(chalk: Chalk, random_hex: str):
+@pytest.mark.parametrize("on_error", ["allow", "block"])
+def test_config_json_invalid_honors_on_error(
+    chalk: Chalk, random_hex: str, on_error: str
+):
     config = json.loads(POLICY_CONFIG.read_text())
-    config["on_error"] = "block"
+    config["on_error"] = on_error
     config["golden_images"]["enabled"] = "yes"
+    blocks = on_error == "block"
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
         json.dumps(config),
         random_hex,
         tag=random_hex,
+        expected_success=not blocks,
         # the broken configuration is logged as an error
         ignore_errors=True,
     )
-    assert result.exit_code == 0
-    assert image_exists(random_hex)
+    assert result.exit_code == (1 if blocks else 0)
+    assert image_exists(random_hex) != blocks
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_RESULT="error", _POLICY_ID=MISSING)
+    assert report.has(
+        _POLICY_RESULT="blocked" if blocks else "error",
+        _POLICY_ID=config["id"],
+    )
     assert report.contains(
         {
             "_POLICY_FINDINGS": [
@@ -1088,12 +1096,15 @@ def test_enforce_repos_with_mode_off_only_enforces_listed_repos(
     assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
 
 
-def test_enforce_repos_invalid_never_blocks(
-    chalk: Chalk, random_hex: str, tmp_data_dir: Path
+@pytest.mark.parametrize("on_error", ["allow", "block"])
+def test_enforce_repos_invalid_honors_on_error(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, on_error: str
 ):
     config = rollout_policy(mode="enforce")
-    config["on_error"] = "block"
+    config["on_error"] = on_error
+    # dropped as invalid, so the declared enforce mode applies everywhere
     config["enforce_repos"] = ENFORCED_REPO
+    blocks = on_error == "block"
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
@@ -1102,11 +1113,12 @@ def test_enforce_repos_invalid_never_blocks(
         tag=random_hex,
         context=git_context(tmp_data_dir, f"https://{ENFORCED_REPO}.git"),
         env=NO_CI_REPO,
+        expected_success=not blocks,
         ignore_errors=True,
     )
-    assert result.exit_code == 0
+    assert result.exit_code == (1 if blocks else 0)
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_RESULT="error")
+    assert report.has(_POLICY_RESULT="blocked" if blocks else "error")
     assert report.contains(
         {"_POLICY_FINDINGS": [{"rule": "config", "kind": "error", "reason": ANY}]}
     )
