@@ -955,10 +955,10 @@ the `policy*Setting` accessors, which read the same path from con4m when
   rules inspected. The checkout has no git submodules and no `.git`
   directory, which BuildKit's git source provides, so when the repository has
   a `.gitmodules` file or the build arg `BUILDKIT_CONTEXT_KEEP_GIT_DIR` is
-  set, docker fetches the git context itself instead. With submodules this is
-  reported as an evaluation error of those rules, as their contents are not
-  checked. In both cases a branch or tag that moves between the policy check
-  and the build is built at its new commit.
+  set, docker fetches the git context itself instead. This is reported as an
+  evaluation error of those rules, as the submodules or `.git` are not
+  checked, and a branch or tag that moves between the policy check and the
+  build is built at its new commit.
 
 Secrets policy scans enable TruffleHog `--fail-on-scan-errors` and also inspect
 stderr for filesystem traversal/chunk failures that the scanner logs without

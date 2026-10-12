@@ -98,7 +98,12 @@ proc buildsCheckout(ctx: DockerInvocation, input: var PolicyInput): bool =
       "git submodules of " & git.context & " cannot be checked by build context rules"))
     return false
   if ctx.buildArgIsTrue("BUILDKIT_CONTEXT_KEEP_GIT_DIR"):
-    trace("policy: BUILDKIT_CONTEXT_KEEP_GIT_DIR is set, docker fetches " & git.context)
+    # docker sends .git too (and a moved ref builds a newer commit), which the
+    # checkout the rules scanned lacks
+    input.contextErrors.add(newSubjectFinding(
+      "", "error", git.context,
+      "the .git directory of " & git.context &
+      " (BUILDKIT_CONTEXT_KEEP_GIT_DIR) cannot be checked by build context rules"))
     return false
   return true
 
