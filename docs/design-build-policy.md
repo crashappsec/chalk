@@ -443,7 +443,15 @@ What is checked on `docker build`:
   kept from trufflehog's output.
 - A build context that is not a local directory (stdin, remote tarball), a
   missing trufflehog that cannot be installed, a failed scan or a timeout is
-  an evaluation error handled by `on_error`.
+  an evaluation error handled by `on_error`. Secrets trufflehog reported
+  before it failed are still reported, so they are violations whatever
+  `on_error` says.
+- Work is bounded: at most 8 context directories are scanned (more is an
+  evaluation error); at most 32 MiB of trufflehog's results and 4 MiB of
+  its diagnostics are read (trufflehog is stopped past that, an evaluation
+  error that keeps the results read); listing the excluded paths for `-x`
+  stops after 100,000 entries, as it runs before `trufflehog_timeout`
+  applies (the rest is scanned and filtered afterwards).
 - At most 100 findings are reported per policy (violations first); the
   rest are summarized in one more finding.
 
@@ -788,7 +796,9 @@ the `policy*Setting` accessors, which read the same path from con4m when
 Secrets policy scans enable TruffleHog `--fail-on-scan-errors` and also inspect
 stderr for filesystem traversal/chunk failures that the scanner logs without
 failing its exit status. Such scans produce an evaluation error governed by
-`on_error` and are not cached as completed scans. Diagnostic values are never
+`on_error`, keeping the results trufflehog printed, and are cached like
+completed scans so several policies do not wait for a timeout again.
+Diagnostic values are never
 included in findings or logs. Verification failures retain their existing
 `verified_only` behavior, and native `trufflehog:ignore` suppressions remain
 respected. Exclusions are anchored at the scanned directory, so ordinary

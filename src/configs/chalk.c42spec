@@ -2762,14 +2762,16 @@ whether or not `run_secret_scanner_tools` is enabled; trufflehog >= 3.90.9
 is required. Files excluded by `.dockerignore` (or
 `<Dockerfile>.dockerignore`, which the legacy builder ignores) are not
 scanned. Of a `.git` directory docker sends, only `config` is scanned. The
-Dockerfile is always scanned, even when ignored or outside the context.
-Secret values are never reported, only the detector, `path:line` and
-verification status. A `trufflehog:ignore` comment on a line suppresses
-its secret.
+Dockerfile is always scanned, even when ignored, outside the context or
+read from stdin (`-f -`). Secret values are never reported, only the
+detector, `path:line` and verification status. A `trufflehog:ignore`
+comment on a line suppresses its secret.
 
-The Dockerfile is always scanned, including one read from stdin (`-f -`).
-A build context that is not a local directory, or a scan that fails or
-times out, is an evaluation error handled by `on_error`. `docker push` is only checked with `check_push`.
+A build context that is not a local directory, more than 8 context
+directories, or a scan that fails, times out or prints more output than
+chalk reads is an evaluation error handled by `on_error`; secrets such a
+scan did report are still violations. `docker push` is only checked with
+`check_push`.
 """
 
   field enabled {

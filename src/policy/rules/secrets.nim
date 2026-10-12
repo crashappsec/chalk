@@ -42,6 +42,7 @@ import ".."/[
   dockerignore,
   helpers,
 ]
+from ".."/tools import maxContextDirs
 
 const
   ruleName    = "secrets"
@@ -57,6 +58,13 @@ const
   # trufflehog matches every path against each `-x` regex, so past this many
   # the rest of the ignored paths is scanned and only filtered afterwards
   maxExcludes* = 1000
+  # entries `trufflehogExcludes` walks: preparing the scan runs before
+  # `trufflehog_timeout` applies, so it must stay bounded on huge contexts
+  maxExcludeVisits* = 100_000
+  # what is read of trufflehog's stdout (results) and stderr (diagnostics),
+  # so a scan cannot exhaust memory with output
+  maxOutputBytes*      = 32 * 1024 * 1024
+  maxDiagnosticsBytes* = 4 * 1024 * 1024
 
 type
   SecretsConfig* = object
@@ -77,6 +85,12 @@ type
     verified*:          bool
     verificationError*: bool
     rotationGuide*:     string
+
+  TrufflehogScan* = object
+    ## The results trufflehog printed, also when the scan did not complete,
+    ## so secrets it found are violations whatever `on_error` says.
+    results*: seq[SecretResult]
+    error*:   string # why the scan is incomplete, empty when it completed
 
 const
   secretsJsonFields = [
@@ -211,18 +225,43 @@ proc hasScanDiagnostics(diagnostics: string): bool =
     # by verified_only; it is not a filesystem scan failure.
   false
 
-proc checkedTrufflehogOutput*(code: int, output, diagnostics: string): seq[SecretResult] =
-  ## The same validation used before caching an actual filesystem scan.
-  ## Failure messages are fixed text; either stream may contain a secret.
-  if code != 0 and code != trufflehogFoundExit:
+proc checkedTrufflehogOutput*(code: int, output, diagnostics: string,
+                              timeout = "",
+                              maxOutput = maxOutputBytes,
+                              maxDiagnostics = maxDiagnosticsBytes): TrufflehogScan =
+  ## Results and completeness of a filesystem scan, from the output of
+  ## `boundedCommand`. Messages are fixed text; either stream may contain a
+  ## secret. Raises `ValueError` when stdout is not trufflehog's JSON.
+  var output = output
+  if len(output) >= maxOutput:
+    # cut off mid-line by `boundedCommand`, and trufflehog died writing the
+    # rest (SIGPIPE): only complete lines are results
+    output = output[0 ..< maxOutput]
+    output.setLen(max(0, output.rfind('\n')))
+    result.error = "trufflehog printed more than " & $maxOutput &
+                   " bytes of results; the rest were not checked"
+  elif len(diagnostics) >= maxDiagnostics:
+    result.error = "trufflehog printed more than " & $maxDiagnostics &
+                   " bytes of diagnostics; the scan cannot be confirmed complete"
+  elif code in timeoutExits:
+    result.error = "trufflehog timed out" &
+                   (if timeout == "": "" else: " after " & timeout & "s") &
+                   " (tool.trufflehog.trufflehog_timeout)"
+  elif code != 0 and code != trufflehogFoundExit:
     # kingpin's error for an unknown flag
     if ("unknown long flag '" & scanErrorsFlag & "'") in diagnostics & output:
-      raise newException(ValueError, "trufflehog >= " & scanErrorsVersion &
-                         " is required (" & scanErrorsFlag & " is not supported)")
-    raise newException(ValueError, "trufflehog exited with code " & $code)
-  if diagnostics.hasScanDiagnostics():
-    raise newException(ValueError, "trufflehog reported scan errors; filesystem analysis is incomplete")
-  parseTrufflehogOutput(output)
+      result.error = "trufflehog >= " & scanErrorsVersion & " is required (" &
+                     scanErrorsFlag & " is not supported)"
+    else:
+      result.error = "trufflehog exited with code " & $code
+  elif diagnostics.hasScanDiagnostics():
+    result.error = "trufflehog reported scan errors; filesystem analysis is incomplete"
+  try:
+    result.results = parseTrufflehogOutput(output)
+  except ValueError:
+    # a failed run may print anything; its own error explains it better
+    if result.error == "":
+      raise
 
 proc markSecretResults*(mark: ChalkDict): seq[SecretResult] =
   ## trufflehog results recorded in a chalk mark's `SECRET_SCANNER`
@@ -364,12 +403,14 @@ proc reQuote(s: string): string =
     result.add(c)
 
 proc trufflehogExcludes*(dir: string, ignore: DockerIgnore,
-                         excludePaths: seq[string]): seq[string] =
+                         excludePaths: seq[string],
+                         maxVisits = maxExcludeVisits): seq[string] =
   ## trufflehog `-x` regexes, matched against the absolute paths it walks,
   ## for what docker does not send or `exclude_paths` drops, so trufflehog
   ## neither reads (or unpacks) those files nor fails the scan on them.
   ## Directories are skipped whole when no negation can re-include anything
-  ## below them. `check` still filters results, so this only saves work.
+  ## below them. `check` still filters results, so this only saves work,
+  ## and it stops after `maxExcludes` regexes or `maxVisits` entries.
   ##
   ## A `.git` directory docker sends is history rather than build files, and
   ## scanning its objects is costly: only its `config` is scanned, which may
@@ -380,10 +421,13 @@ proc trufflehogExcludes*(dir: string, ignore: DockerIgnore,
   proc excluded(rel: string): bool =
     ignore.isIgnored(rel) or rel.isExcluded(excludePaths)
   var pending = @[""]
+  var visits = 0
   while len(pending) > 0:
     let rel = pending.pop()
     for kind, name in walkDir(if rel == "": dir else: dir / rel, relative = true):
-      if len(result) >= maxExcludes:
+      inc(visits)
+      if len(result) >= maxExcludes or visits > maxVisits:
+        trace("policy: secrets: stopped listing excluded paths of " & dir)
         return
       let path = if rel == "": name else: rel & "/" & name
       if kind == pcDir:
@@ -391,6 +435,7 @@ proc trufflehogExcludes*(dir: string, ignore: DockerIgnore,
           result.add(regex(path, true))
         elif name == ".git":
           for entryKind, entry in walkDir(dir / path, relative = true):
+            inc(visits)
             let entryPath = path & "/" & entry
             if entry != "config" or excluded(entryPath):
               result.add(regex(entryPath, entryKind == pcDir))
@@ -412,6 +457,17 @@ proc trufflehogArguments*(path: string, verify: bool, exclude = "", config = "")
     result.add("--config=" & config.quoteShell())
   result.add(path.quoteShell())
 
+proc boundedCommand*(cmd: string, maxStdout = maxOutputBytes,
+                     maxStderr = maxDiagnosticsBytes): string =
+  ## A `/bin/sh` script running `cmd` with its stdout and stderr cut after
+  ## the given number of bytes (`cmd` then gets SIGPIPE), exiting with
+  ## `cmd`'s exit code. `cmd` runs in a subshell so an `exit` in it cannot
+  ## skip reporting the code, which fd 3 carries out of the pipelines; 4 and
+  ## 5 are the original stdout and stderr.
+  "exec 4>&1 5>&2; code=$({ { { ( " & cmd & "\n) 3>&- 4>&- 5>&-; echo $? >&3; } | " &
+    "head -c " & $maxStdout & " >&4; } 2>&1 | head -c " & $maxStderr & " >&5; } 3>&1); " &
+    "exit ${code:-1}"
+
 proc trufflehogCommand(path: string, verify: bool, excludes: seq[string]): string =
   ## Reuses the trufflehog tool configuration (docker or local binary,
   ## installer, timeout, `trufflehog_config`) but always in filesystem mode.
@@ -431,10 +487,11 @@ proc trufflehogCommand(path: string, verify: bool, excludes: seq[string]): strin
   let args = trufflehogArguments(path, verify, exclude, config)
   return exe & " " & args.join(" ")
 
-var scanned = initTable[string, seq[SecretResult]]()
+var scanned = initTable[string, TrufflehogScan]()
 
-proc scanPath(path: string, verify: bool, excludes: seq[string] = @[]): seq[SecretResult] =
-  ## cached as every policy enabling the rule scans the same directories;
+proc scanPath(path: string, verify: bool, excludes: seq[string] = @[]): TrufflehogScan =
+  ## cached as every policy enabling the rule scans the same directories,
+  ## including a failed scan, so a timeout is not waited for again;
   ## `exclude_paths` differs between policies, so it is part of the key
   let key = $verify & "\0" & path & "\0" & excludes.join("\n")
   if key in scanned:
@@ -443,14 +500,10 @@ proc scanPath(path: string, verify: bool, excludes: seq[string] = @[]): seq[Secr
   trace("policy: secrets: " & cmd)
   var output: ExecOutput
   unprivileged:
-    output = runCmdGetEverything("/bin/sh", @["-c", cmd])
-  let code = output.getExit()
-  if code in timeoutExits:
-    raise newException(ValueError, "trufflehog timed out after " &
-                       attrGetOpt[string]("tool.trufflehog.trufflehog_timeout").get("") &
-                       "s (tool.trufflehog.trufflehog_timeout)")
+    output = runCmdGetEverything("/bin/sh", @["-c", boundedCommand(cmd)])
   # stdout holds the secrets, so neither output is logged
-  result = checkedTrufflehogOutput(code, output.getStdout(), output.stderr)
+  result = checkedTrufflehogOutput(output.getExit(), output.getStdout(), output.stderr,
+                                   attrGetOpt[string]("tool.trufflehog.trufflehog_timeout").get(""))
   scanned[key] = result
 
 var loaded: SecretsConfig
@@ -472,6 +525,15 @@ proc unscannable*(input: PolicyInput): seq[PolicyFinding] =
     result.add(newSubjectFinding(ruleName, "error", "Dockerfile",
                                  "the Dockerfile from stdin cannot be scanned for secrets"))
 
+proc scannedContexts*(input: PolicyInput, findings: var seq[PolicyFinding]): seq[string] =
+  ## the context directories to scan, reporting those past `maxContextDirs`
+  result = input.contextDirs
+  if len(result) > maxContextDirs:
+    findings.add(newSubjectFinding(ruleName, "error", "",
+                                   "only the first " & $maxContextDirs &
+                                   " build contexts were scanned for secrets"))
+    result.setLen(maxContextDirs)
+
 proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
   var findings: seq[PolicyFinding]
   if input.command == "push":
@@ -479,6 +541,8 @@ proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
     if not loaded.checkPush:
       return
     for mark in input.pushMarks:
+      if mark == nil:
+        continue
       try:
         findings.add(loaded.checkMark(mark.markSecretResults()))
       except CatchableError:
@@ -489,14 +553,17 @@ proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
   findings.add(input.unscannable())
   let dockerfile = input.dockerfilePath
   var dockerfileScanned = false
-  for dir in input.contextDirs:
+  for dir in input.scannedContexts(findings):
     let main = dir == input.mainContextDir
     try:
       let ignore = loadDockerignore(dir, input.mainContextDockerfile(dir))
-      let results = scanPath(dir, loaded.verify,
-                             trufflehogExcludes(dir, ignore, loaded.excludePaths))
-      findings.add(loaded.check(results, dir, ignore, relative = main))
-      if dockerfile.scannedWith(dir, ignore):
+      let scan = scanPath(dir, loaded.verify,
+                          trufflehogExcludes(dir, ignore, loaded.excludePaths))
+      findings.add(loaded.check(scan.results, dir, ignore, relative = main))
+      if scan.error != "":
+        findings.add(newSubjectFinding(ruleName, "error", dir,
+                                       "could not scan for secrets: " & scan.error))
+      elif dockerfile.scannedWith(dir, ignore):
         dockerfileScanned = true
     except CatchableError:
       findings.add(newSubjectFinding(ruleName, "error", dir,
@@ -509,8 +576,11 @@ proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
               else: dockerfile.contextPath("/", input.mainContextDir)
     if rel.isNone() or not rel.get().isExcluded(loaded.excludePaths):
       try:
-        let results = scanPath(dockerfile, loaded.verify)
-        findings.add(loaded.checkDockerfile(results, rel.get(dockerfile)))
+        let scan = scanPath(dockerfile, loaded.verify)
+        findings.add(loaded.checkDockerfile(scan.results, rel.get(dockerfile)))
+        if scan.error != "":
+          findings.add(newSubjectFinding(ruleName, "error", dockerfile,
+                                         "could not scan the Dockerfile for secrets: " & scan.error))
       except CatchableError:
         findings.add(newSubjectFinding(ruleName, "error", dockerfile,
                                        "could not scan the Dockerfile for secrets: " &
@@ -519,7 +589,11 @@ proc checkSecrets(input: PolicyInput): seq[PolicyFinding] =
     const location = "Dockerfile (stdin)"
     try:
       let path = writeNewTempFile(input.stdinDockerfile, suffix = ".Dockerfile")
-      findings.add(loaded.checkDockerfile(scanPath(path, loaded.verify), location))
+      let scan = scanPath(path, loaded.verify)
+      findings.add(loaded.checkDockerfile(scan.results, location))
+      if scan.error != "":
+        findings.add(newSubjectFinding(ruleName, "error", location,
+                                       "could not scan the Dockerfile for secrets: " & scan.error))
     except CatchableError:
       findings.add(newSubjectFinding(ruleName, "error", location,
                                      "could not scan the Dockerfile for secrets: " &

@@ -180,6 +180,10 @@ proc testExcludes() =
   let ignored = trufflehogExcludes(dir, parseDockerignore(".git\n"), @[])
   doAssert ignored.matched(dir / ".git/config")
   doAssert not ignored.matched(dir / "sub/.git/config")
+  # listing stops after maxVisits entries; the rest is filtered afterwards
+  let bounded = trufflehogExcludes(dir, ignore, @["tests"], maxVisits = 2)
+  doAssert len(bounded) <= 2, $bounded
+  doAssert len(bounded) < len(excludes)
 
 proc testDockerfile() =
   let s = SecretsConfig(verifiedOnly: true)
@@ -269,48 +273,90 @@ proc testRule() =
   selectPolicy(policyConfigs()[0])
   doAssert not rule.load()
 
+proc assertComplete(scan: TrufflehogScan, results: int) =
+  assertEq(scan.error, "")
+  assertEq(len(scan.results), results)
+
+proc assertIncomplete(scan: TrufflehogScan, results: int, error: string) =
+  doAssert error in scan.error, scan.error
+  doAssert rawValue notin scan.error
+  assertEq(len(scan.results), results)
+
 proc testScanErrorsAndPrivacy() =
   let stdout = readFile(fixture)
   let notice = """{"level":"info-0","msg":"finished scanning"}"""
-  assertEq(checkedTrufflehogOutput(0, "", notice).len, 0)
-  assertEq(checkedTrufflehogOutput(0, stdout, notice).len, 8)
-  assertEq(checkedTrufflehogOutput(183, stdout, notice).len, 8)
+  checkedTrufflehogOutput(0, "", notice).assertComplete(0)
+  checkedTrufflehogOutput(0, stdout, notice).assertComplete(8)
+  checkedTrufflehogOutput(183, stdout, notice).assertComplete(8)
   # Verifier errors retain their existing per-result/verified_only semantics.
   let verification = $(%*{"level": "error", "msg": "error verifying result", "error": rawValue})
-  assertEq(checkedTrufflehogOutput(0, stdout, verification).len, 8)
+  checkedTrufflehogOutput(0, stdout, verification).assertComplete(8)
   for message in ["unable to get file info", "error scanning filesystem", "error scanning file",
                   "error scanning directory", "error scanning symlink", "encountered errors during scan"]:
     let stderr = $(%*{"level": "error", "msg": message, "error": rawValue, "path": rawValue})
-    for output in ["", stdout]:
-      try:
-        discard checkedTrufflehogOutput(0, output, stderr)
-        doAssert false, "accepted incomplete scan"
-      except ValueError:
-        doAssert rawValue notin getCurrentExceptionMsg()
-        doAssert "scan errors" in getCurrentExceptionMsg()
+    # what the incomplete scan found is still reported
+    checkedTrufflehogOutput(0, "", stderr).assertIncomplete(0, "scan errors")
+    checkedTrufflehogOutput(0, stdout, stderr).assertIncomplete(8, "scan errors")
     let scanRule = PolicyRule(name: "secrets", checkInput: proc(input: PolicyInput): seq[PolicyFinding] =
-      discard checkedTrufflehogOutput(0, "", stderr)
-      @[])
+      @[newSubjectFinding("secrets", "error", "/ctx",
+                          "could not scan for secrets: " & checkedTrufflehogOutput(0, "", stderr).error)])
     for onError in ["allow", "block"]:
       let evaluated = evaluatePolicy(PolicyConfig(mode: "enforce", onError: onError),
                                      @[scanRule], PolicyInput())
       assertEq(evaluated.result, (if onError == "block": "blocked" else: "error"))
       evaluated.findings.assertNoSecret()
-  for code in [1, 124, 137]:
-    try:
-      discard checkedTrufflehogOutput(code, rawValue, rawValue)
-      doAssert false, "accepted failed scan"
-    except ValueError:
-      doAssert rawValue notin getCurrentExceptionMsg()
-  doAssertRaises(ValueError):
-    discard checkedTrufflehogOutput(0, "", "{invalid " & rawValue)
+  for code in [1, 124, 137, 141]:
+    checkedTrufflehogOutput(code, rawValue, rawValue).assertIncomplete(0, "trufflehog")
+    checkedTrufflehogOutput(code, stdout, "").assertIncomplete(8, "trufflehog")
+  checkedTrufflehogOutput(124, "", "", timeout = "300").assertIncomplete(
+    0, "trufflehog timed out after 300s (tool.trufflehog.trufflehog_timeout)")
+  checkedTrufflehogOutput(0, "", "{invalid " & rawValue).assertIncomplete(0, "scan errors")
+  checkedTrufflehogOutput(1, "", "trufflehog: error: unknown long flag " &
+                          "'--fail-on-scan-errors', try --help").assertIncomplete(
+    0, "trufflehog >= 3.90.9 is required (--fail-on-scan-errors is not supported)")
+  # stdout that is not trufflehog's JSON is an error of its own unless the
+  # run already failed
   try:
-    discard checkedTrufflehogOutput(1, "", "trufflehog: error: unknown long flag " &
-                                    "'--fail-on-scan-errors', try --help")
-    doAssert false
+    discard checkedTrufflehogOutput(0, "{\"Raw\": \"" & rawValue, "")
+    doAssert false, "accepted invalid JSON"
   except ValueError:
-    assertEq(getCurrentExceptionMsg(),
-             "trufflehog >= 3.90.9 is required (--fail-on-scan-errors is not supported)")
+    doAssert rawValue notin getCurrentExceptionMsg()
+  checkedTrufflehogOutput(1, "{\"Raw\": \"" & rawValue, "").assertIncomplete(0, "exited with code 1")
+
+proc testOutputLimits() =
+  let stdout = readFile(fixture)
+  doAssert stdout.endsWith("\n")
+  # trufflehog is stopped mid-line past the limit: the complete lines count
+  let cut = checkedTrufflehogOutput(141, stdout, "", maxOutput = len(stdout) - 5)
+  cut.assertIncomplete(7, "bytes of results; the rest were not checked")
+  checkedTrufflehogOutput(141, stdout[0 ..< 10], "", maxOutput = 10).assertIncomplete(0, "bytes of results")
+  checkedTrufflehogOutput(141, stdout, "x".repeat(10), maxDiagnostics = 10).assertIncomplete(
+    8, "bytes of diagnostics; the scan cannot be confirmed complete")
+
+  proc run(script: string): ExecOutput =
+    runCmdGetEverything("/bin/sh", @["-c", script])
+  let ok = run(boundedCommand("printf 'ab\\ncd'; printf err >&2; exit 7"))
+  assertEq(ok.getStdout(), "ab\ncd")
+  assertEq(ok.getStderr(), "err")
+  assertEq(ok.getExit(), 7)
+  let results = run(boundedCommand("yes x", maxStdout = 10))
+  assertEq(results.getStdout(), "x\n".repeat(5))
+  doAssert results.getExit() != 0
+  let diagnostics = run(boundedCommand("yes e >&2", maxStderr = 6))
+  assertEq(diagnostics.getStdout(), "")
+  assertEq(diagnostics.getStderr(), "e\n".repeat(3))
+
+proc testContextLimit() =
+  var dirs: seq[string]
+  for i in 0 ..< 10:
+    dirs.add("/ctx" & $i)
+  var findings: seq[PolicyFinding]
+  assertEq(PolicyInput(contextDirs: dirs).scannedContexts(findings), dirs[0 ..< 8])
+  assertEq(findings.locations(), @["error   "])
+  assertEq(findings[0].reason, "only the first 8 build contexts were scanned for secrets")
+  findings = @[]
+  assertEq(PolicyInput(contextDirs: dirs[0 ..< 8]).scannedContexts(findings), dirs[0 ..< 8])
+  assertEq(len(findings), 0)
 
 proc testFilesystemArgumentsAndGitBoundary() =
   for verify in [false, true]:
@@ -338,6 +384,8 @@ proc main() =
   testMark()
   testRule()
   testScanErrorsAndPrivacy()
+  testOutputLimits()
+  testContextLimit()
   testFilesystemArgumentsAndGitBoundary()
 
 main()
