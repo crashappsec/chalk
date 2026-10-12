@@ -434,6 +434,7 @@ What is checked on `docker build`:
   secret looks; set `verified_only: false` to report those. A provider that
   rate-limits or is unreachable makes the result `unknown`, an evaluation
   error.
+
 - A `trufflehog:ignore` comment on the line of a secret suppresses it, as
   trufflehog does natively; such lines are not reported.
 
