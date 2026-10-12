@@ -64,8 +64,16 @@ try:
   doAssert ctx.policyDockerfilePath() == dirs[0] / "Dockerfile"
   ctx.foundFileArg = "Dockerfile.prod"
   doAssert ctx.policyDockerfilePath() == dirs[0] / "Dockerfile.prod"
+  var fromFile: PolicyInput
+  fromFile.addPolicyDockerfile(ctx)
+  doAssert fromFile.stdinDockerfile == ""
   ctx.dockerFileLoc = stdinIndicator
+  ctx.inDockerFile = "FROM alpine\n"
   doAssert ctx.policyDockerfilePath() == ""
+  var fromStdin: PolicyInput
+  fromStdin.addPolicyDockerfile(ctx)
+  doAssert fromStdin.dockerfilePath == ""
+  doAssert fromStdin.stdinDockerfile == "FROM alpine\n"
   # An existing checkout is reused with its selected subdirectory intact.
   let worktree = ctx.gitContext.tmpWorkTree
   var again: PolicyInput
