@@ -611,7 +611,9 @@ Which files are read:
   `.dockerignore` entry. FIFOs, sockets and devices are skipped;
 - `include_paths` and `exclude_paths` use `.dockerignore` syntax, relative
   to the context; files excluded by `.dockerignore` are skipped
-  (`honor_dockerignore`), as they never reach the image. As in BuildKit, a
+  (`honor_dockerignore`), as they never reach the image. Ignore files are
+  read as docker reads them (shared `src/policy/dockerignore.nim`: UTF-8
+  BOM, `filepath.Clean`, e.g. `!./a.pem` re-includes `a.pem`). As in BuildKit, a
   `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
   the context's `.dockerignore` (main context only). The legacy (non
   BuildKit) builder ignores `<Dockerfile>.dockerignore`, so files it would
@@ -632,7 +634,13 @@ Which files are read:
   evaluation error when its extension is one of `extensions` or its first
   64 KiB look like a certificate; at most 1000 certificates are read per
   file (more is an evaluation error); a context with more than `max_files`
-  entries stops the scan with an evaluation error.
+  entries, more than 10000 kept certificates (checked ones plus pinned ones
+  from CA bundles), or more than 100000 certificates read from CA bundles for
+  `sha256` pins, stops the scan with an evaluation error. At most 100
+  certificate findings and 100 scan errors are listed, so an incomplete scan
+  is always shown; for each, one more finding counts the rest, and is a
+  violation when any of them is. Issuer signatures are only verified against pinned
+  candidates, so that work is bounded by the number of pins.
 - not supported (not checked): PKCS#7 (`.p7b`), PKCS#12 (`.p12`, `.pfx`)
   and Java keystores; PEM `TRUSTED CERTIFICATE` blocks are evaluation
   errors.
