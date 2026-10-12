@@ -406,9 +406,9 @@ CycloneDX (syft's default, `components[].licenses[]`), SPDX JSON
   `config` evaluation error. Either way `on_error` decides.
 - Matching is case-insensitive, as in SPDX. Common non-SPDX names are
   normalized best effort on both sides (`GPLv2` and `GPL-2.0` are
-  `GPL-2.0-only`, `GPL-2.0+` is `GPL-2.0-or-later`, `Apache 2.0` is
-  `Apache-2.0`, `The Unlicense` is `Unlicense`); unrecognized names are
-  compared as written. Use globs such as `GPL-2.0*` to match both the
+  `GPL-2.0-only`, `GPL-2.0+` and `GPL-2.0 or later` are `GPL-2.0-or-later`,
+  `Apache 2.0` is `Apache-2.0`, `The Unlicense` is `Unlicense`); unrecognized
+  names are compared as written. Use globs such as `GPL-2.0*` to match both the
   `-only` and `-or-later` variants.
 - GNU licenses named without a version (`GPL`, `GNU GPL`,
   `GNU General Public License`, `LGPL`, `AGPL`) let the recipient pick any
@@ -435,7 +435,9 @@ CycloneDX (syft's default, `components[].licenses[]`), SPDX JSON
   several CycloneDX `licenses[]` entries, whose relationship CycloneDX
   leaves undefined) must all pass, as if joined with `AND`; an SBOM that
   lists the alternatives of a dual license as separate entries therefore
-  fails when either is denied.
+  fails when either is denied. An expression longer than 64 KiB or nesting
+  more than 32 parentheses is not evaluated: unless another license of the
+  package is denied, the package is an evaluation error.
 - Packages without a license, or with `NOASSERTION`, `NONE`, `UNKNOWN`, or
   npm's `UNLICENSED` and `SEE LICENSE IN <file>` (which name no license),
   follow `unknown`: ignored (default, as source SBOMs often lack licenses,

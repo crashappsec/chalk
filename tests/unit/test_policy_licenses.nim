@@ -114,6 +114,17 @@ proc testExpressions() =
   var offending: seq[string]
   discard denied.licenseVerdict(parseLicenseExpression("MIT AND (GPL-2.0 OR AGPL-3.0)"), offending)
   assertEq(offending, @["GPL-2.0-only", "AGPL-3.0-only"])
+  # `or later` continues a license rather than offering `later` as an alternative
+  for name in ["GPL-2.0 or later", "GPLv3 or later", "GPL-2.0 OR later", "(GPL-2.0 or newer)",
+               "LGPL-2.1 or greater AND GPL-3.0 or later"]:
+    doAssert denied.verdict(name) == vDenied, name
+  assertEq(parseLicenseExpression("GPL-2.0 or later").id, "GPL-2.0-or-later")
+  assertEq(parseLicenseExpression("LGPL-2.1 or newer").id, "LGPL-2.1-or-later")
+  assertEq(denied.verdict("MIT or GPL-2.0 or later"), vAllowed)
+  let orLater = parseLicenseExpression("MIT OR GPL-2.0 or later WITH Classpath-exception-2.0")
+  doAssert orLater.kind == lnOr and len(orLater.children) == 2
+  assertEq(orLater.children[1].id, "GPL-2.0-or-later")
+  assertEq(orLater.children[1].exception, "Classpath-exception-2.0")
 
   # an explicitly allowed exception overrides a broader denial
   let classpath = config("""{"enabled": true, "denied": ["GPL-*"],
@@ -130,6 +141,31 @@ proc testExpressions() =
   assertEq(allowed.verdict("MIT"), vAllowed)
   assertEq(allowed.verdict("ISC"), vDenied)
   assertEq(allowed.verdict("Custom license"), vDenied)
+
+proc testExpressionLimits() =
+  ## SBOM strings are untrusted: nesting would exhaust the stack while parsing
+  let denied = config("""{"enabled": true, "denied": ["GPL-*"]}""")
+  let nested = repeat('(', 100_000) & "MIT" & repeat(')', 100_000)
+  doAssertRaises(LicenseExpressionError):
+    discard parseLicenseExpression(nested)
+  doAssertRaises(LicenseExpressionError):
+    discard parseLicenseExpression(repeat("MIT AND ", 10_000) & "MIT")
+  doAssert parseLicenseExpression(repeat('(', 32) & "MIT" & repeat(')', 32)).id == "MIT"
+  # unbalanced parentheses still are a license name, not an error
+  doAssert parseLicenseExpression(repeat(')', 100) & "MIT").kind == lnLicense
+  proc checked(licenses: seq[string]): (string, string) =
+    let pkg = SbomPackage(name: "x", version: "1", purl: "pkg:npm/x@1", licenses: licenses)
+    let f = denied.checkPackage(pkg)
+    if f.isNone(): ("", "") else: (f.get().kind, f.get().reason)
+  # an expression that cannot be evaluated is an error, not a license name
+  let deep = repeat('(', 1000) & "GPL-3.0-only" & repeat(')', 1000)
+  assertEq(checked(@[deep]), ("error", "license expression nests more than 32 parentheses"))
+  assertEq(checked(@[nested]), ("error", "license expression is longer than 65536 bytes"))
+  assertEq(checked(@["MIT", deep])[0], "error")
+  # unless another license is denied
+  let (kind, reason) = checked(@[nested, "GPL-3.0-only"])
+  assertEq(kind, "violation")
+  doAssert len(reason) < 1200, $len(reason)
 
 proc testUnrecognizedCopyleft() =
   let strong = config("""{"enabled": true, "denied": ["@strong_copyleft"]}""")
@@ -184,6 +220,11 @@ proc testExceptions() =
   # other patterns are globs of the package name (`name@version`)
   doAssert exempt("", "legacy-tool")
   doAssert not exempt("", "tool")
+  # and of the purl without version, an unencoded npm scope included
+  let globs = config("""{"enabled": true, "denied": ["GPL-*"], "exceptions": ["*/@scope/x"]}""")
+  for purl in ["pkg:npm/@scope/x@1.0.0", "pkg:npm/@scope/x@1.0.0#lib", "pkg:npm/@scope/x"]:
+    let pkg = SbomPackage(name: "x", version: "1.0.0", purl: purl, licenses: @["GPL-3.0-only"])
+    doAssert globs.checkPackage(pkg).isNone(), purl
 
 proc testSourceIsNotAPackage() =
   ## the scanned project itself, as an SBOM describes it, is not a dependency
@@ -333,6 +374,7 @@ proc testJsonValidation() =
 
 testNormalize()
 testExpressions()
+testExpressionLimits()
 testUnrecognizedCopyleft()
 testNpmNonLicenses()
 testExceptions()

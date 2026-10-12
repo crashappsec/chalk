@@ -42,6 +42,12 @@ const
   osPackageTypes = ["apk", "alpm", "deb", "ebuild", "rpm"]
   unknownChoices = ["ignore", "violation", "error"]
   maxFindings    = 200
+  # parsing recurses per parenthesis and SBOM strings are untrusted
+  maxExpressionLen   = 65536
+  maxExpressionDepth = 32
+  maxReasonLen       = 512
+  # `GPL-2.0 or later` is one license, not `GPL-2.0 OR later`
+  laterWords = ["later", "newer", "greater"]
 
 type
   LicenseNodeKind* = enum
@@ -56,6 +62,10 @@ type
 
   Verdict* = enum
     vAllowed, vUnknown, vDenied
+
+  LicenseExpressionError* = object of CatchableError
+    ## too long or nested to evaluate; not a ValueError, which makes the
+    ## parser read the expression as a license name
 
   LicensesConfig* = object
     denied*:            seq[string] # lowercase, presets expanded
@@ -106,7 +116,8 @@ proc compactName(name: string): string =
                         ("european union public", "eupl"),
                         ("common development and distribution", "cddl"),
                         ("apache software", "apache"),
-                        ("or later", ""), ("or-later", ""), ("-only", ""), (" only", ""),
+                        ("or later", ""), ("or newer", ""), ("or greater", ""),
+                        ("or-later", ""), ("-only", ""), (" only", ""),
                         (" the ", " ")]:
     result = result.replace(long, short)
   for word in ["licenses", "license", "licence", "version"]:
@@ -198,7 +209,8 @@ proc normalizeTerm(name: string): NormalizedLicense =
     name = alias
   let
     lower   = name.toLowerAscii()
-    orLater = lower.endsWith("+") or "or later" in lower or "or-later" in lower
+    orLater = lower.endsWith("+") or "or-later" in lower or
+              laterWords.anyIt(("or " & it) in lower)
     compact = compactName(name)
   if result.family == "":
     result.family = licenseFamily(compact)
@@ -248,8 +260,21 @@ proc isOperator(token: string): bool =
 proc parseLicenseExpression*(expression: string): LicenseNode =
   ## Parses an SPDX license expression where `WITH` binds tighter than `AND`,
   ## which binds tighter than `OR`. Text that is not a valid expression (e.g.
-  ## `Apache License 2.0`) is a single license name.
+  ## `Apache License 2.0`) is a single license name. Raises
+  ## LicenseExpressionError for expressions too long or nested to evaluate.
+  if len(expression) > maxExpressionLen:
+    raise newException(LicenseExpressionError, "license expression is longer than " &
+                                               $maxExpressionLen & " bytes")
   let tokens = tokenize(expression)
+  var depth = 0
+  for token in tokens:
+    if token == "(":
+      inc(depth)
+      if depth > maxExpressionDepth:
+        raise newException(LicenseExpressionError, "license expression nests more than " &
+                                                   $maxExpressionDepth & " parentheses")
+    elif token == ")":
+      depth = max(depth - 1, 0)
   var pos = 0
 
   proc peek(): string =
@@ -267,8 +292,15 @@ proc parseLicenseExpression*(expression: string): LicenseNode =
       return
     if pos >= len(tokens) or tokens[pos] == ")" or tokens[pos].isOperator():
       raise newException(ValueError, "expected a license id")
-    result = licenseNode(tokens[pos])
+    let id = tokens[pos]
     inc(pos)
+    if peek() == "OR" and pos + 1 < len(tokens) and
+       tokens[pos + 1].toLowerAscii() in laterWords and
+       (pos + 2 == len(tokens) or tokens[pos + 2] == ")" or tokens[pos + 2].isOperator()):
+      result = licenseNode(id & " or " & tokens[pos + 1])
+      pos += 2
+    else:
+      result = licenseNode(id)
     if peek() == "WITH":
       inc(pos)
       if pos >= len(tokens) or tokens[pos] in ["(", ")"] or tokens[pos].isOperator():
@@ -383,13 +415,22 @@ proc expandPatterns(values: seq[string], path: string): seq[string] =
     for pattern in licensePresets[preset]:
       result.add(pattern.toLowerAscii())
 
+proc versionAt(s: string): int =
+  ## index of the `@` starting a version, -1 without one; an unencoded npm
+  ## scope (`pkg:npm/@scope/x`) does not start a version
+  let at = s.rfind('@')
+  if at > 0 and s[at - 1] != '/': at else: -1
+
 proc purlBase(purl: string): string =
   ## the purl without version, qualifiers and subpath
   result = purl
-  for sep in ['#', '?', '@']:
+  for sep in ['#', '?']:
     let i = result.find(sep)
     if i >= 0:
       result = result[0 ..< i]
+  let at = result.versionAt()
+  if at >= 0:
+    result.setLen(at)
 
 proc subject*(pkg: SbomPackage): string =
   if pkg.purl != "":
@@ -409,7 +450,7 @@ proc isException(settings: LicensesConfig, pkg: SbomPackage): bool =
     if globMatch(pattern, subject):
       return true
     # a pattern without version matches every version
-    if '@' notin pattern and base != "" and globMatch(pattern, base):
+    if pattern.versionAt() < 0 and base != "" and globMatch(pattern, base):
       return true
   return false
 
@@ -424,30 +465,42 @@ proc isIgnoredType(settings: LicensesConfig, pkg: SbomPackage): bool =
       return true
   return false
 
+proc shorten(text: string): string =
+  if len(text) <= maxReasonLen: text else: text[0 ..< maxReasonLen] & "..."
+
 proc checkPackage*(settings: LicensesConfig, pkg: SbomPackage): Option[PolicyFinding] =
   if settings.isIgnoredType(pkg) or settings.isException(pkg):
     return none(PolicyFinding)
   var
-    verdict   = vAllowed
-    offending = newSeq[string]()
-    written   = newSeq[string]()
+    verdict    = vAllowed
+    offending  = newSeq[string]()
+    written    = newSeq[string]()
+    tooComplex = ""
   for license in pkg.licenses:
     if license.strip() == "":
       continue
     written.add(license)
-    verdict = max(verdict, settings.licenseVerdict(parseLicenseExpression(license), offending))
+    try:
+      verdict = max(verdict, settings.licenseVerdict(parseLicenseExpression(license), offending))
+    except LicenseExpressionError:
+      tooComplex = getCurrentExceptionMsg()
   if len(written) == 0:
     verdict = vUnknown
-  let expression = written.join(" AND ")
+  let expression = written.join(" AND ").shorten()
+  # a denied license still is a violation; otherwise the package is unchecked
+  if tooComplex != "" and verdict != vDenied:
+    return some(newSubjectFinding(ruleName, "error", pkg.subject(), tooComplex, pkg.location))
   case verdict
   of vAllowed:
     return none(PolicyFinding)
   of vDenied:
-    var unique: seq[string]
+    var
+      unique: seq[string]
+      seen = initHashSet[string]()
     for license in offending:
-      if license notin unique:
+      if not seen.containsOrIncl(license):
         unique.add(license)
-    var reason = "license " & unique.join(", ") & " is not allowed"
+    var reason = "license " & unique.join(", ").shorten() & " is not allowed"
     if len(unique) != 1 or unique[0] != expression:
       reason &= " (" & expression & ")"
     if settings.message != "":
