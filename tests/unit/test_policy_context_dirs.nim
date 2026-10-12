@@ -96,12 +96,19 @@ try:
   doAssert legacy.newCmdLine == @["buildx", "build", url]
   removeDir(legacy.gitContext.tmpWorkTree)
 
-  # BuildKit keeps .git in the context only when it fetches the URL itself.
+  # BuildKit keeps .git in the context only when it fetches the URL itself,
+  # and the scanned checkout has no .git, so that is reported as unchecked.
   for (value, rewritten) in [("1", false), ("true", false), ("0", true), ("false", true)]:
     let keep = gitInvocation(repo, sha, {"BUILDKIT_CONTEXT_KEEP_GIT_DIR": value})
     var keepInput: PolicyInput
     keepInput.addPolicyContexts(keep)
-    doAssert keepInput.contextErrors.len == 0
+    if rewritten:
+      doAssert keepInput.contextErrors.len == 0, value
+    else:
+      doAssert keepInput.contextErrors.len == 1, value
+      doAssert keepInput.contextErrors[0].kind == "error"
+      doAssert keepInput.contextErrors[0].subject == url
+      doAssert ".git directory" in keepInput.contextErrors[0].reason
     doAssert keepInput.contextDirs == @[keep.gitContext.contextPath()]
     let built = if rewritten: keepInput.contextDirs[0] else: url
     doAssert keep.newCmdLine == @["buildx", "build", built], value
@@ -111,6 +118,7 @@ try:
   var envInput: PolicyInput
   envInput.addPolicyContexts(fromEnv)
   doAssert fromEnv.newCmdLine == @["buildx", "build", url]
+  doAssert envInput.contextErrors.len == 1
   delEnv("BUILDKIT_CONTEXT_KEEP_GIT_DIR")
   removeDir(fromEnv.gitContext.tmpWorkTree)
 
