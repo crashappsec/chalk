@@ -1,0 +1,111 @@
+{
+  "errors": [],
+  "results": [
+    {
+      "check_id": "python.lang.security.audit.subprocess-shell-true.subprocess-shell-true",
+      "end": {
+        "col": 43,
+        "line": 8,
+        "offset": 115
+      },
+      "extra": {
+        "message": "Found 'subprocess' function 'call' with 'shell=True'. This is dangerous because this call will spawn the command using a shell process. Doing so propagates current shell settings and variables, which makes it much easier for a malicious actor to execute commands. Use 'shell=False' instead.",
+        "metadata": {
+          "category": "security",
+          "confidence": "MEDIUM",
+          "cwe": [
+            "CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+          ],
+          "cwe2021-top25": true,
+          "cwe2022-top25": true,
+          "impact": "LOW",
+          "likelihood": "HIGH",
+          "source-rule-url": "https://bandit.readthedocs.io/en/latest/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+          "subcategory": [
+            "secure default"
+          ],
+          "vulnerability_class": [
+            "Command Injection"
+          ]
+        },
+        "severity": "ERROR"
+      },
+      "path": "/src/src/app.py",
+      "start": {
+        "col": 39,
+        "line": 8,
+        "offset": 111
+      }
+    },
+    {
+      "check_id": "python.lang.security.deserialization.pickle.avoid-pickle",
+      "end": {
+        "col": 30,
+        "line": 16,
+        "offset": 225
+      },
+      "extra": {
+        "message": "Avoid using `pickle`, which is known to lead to code execution vulnerabilities. When unpickling, the serialized data could be manipulated to run arbitrary code. Instead, consider serializing the relevant data as JSON or a similar text-based serialization format.",
+        "metadata": {
+          "category": "security",
+          "confidence": "LOW",
+          "cwe": [
+            "CWE-502: Deserialization of Untrusted Data"
+          ],
+          "cwe2021-top25": true,
+          "cwe2022-top25": true,
+          "impact": "MEDIUM",
+          "likelihood": "LOW",
+          "subcategory": [
+            "audit"
+          ],
+          "vulnerability_class": [
+            "Insecure Deserialization "
+          ]
+        },
+        "severity": "WARNING"
+      },
+      "path": "/src/src/app.py",
+      "start": {
+        "col": 12,
+        "line": 16,
+        "offset": 207
+      }
+    },
+    {
+      "check_id": "python.lang.security.audit.eval-detected.eval-detected",
+      "end": {
+        "col": 22,
+        "line": 20,
+        "offset": 269
+      },
+      "extra": {
+        "message": "Detected the use of eval(). eval() can be dangerous if used to evaluate dynamic content. If this content can be input from outside the program, this may be a code injection vulnerability. Ensure evaluated content is not definable by external sources.",
+        "metadata": {
+          "category": "security",
+          "confidence": "LOW",
+          "cwe": [
+            "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')"
+          ],
+          "impact": "HIGH",
+          "likelihood": "LOW",
+          "source-rule-url": "https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html#b307-eval",
+          "subcategory": [
+            "audit"
+          ],
+          "vulnerability_class": [
+            "Code Injection"
+          ]
+        },
+        "severity": "WARNING"
+      },
+      "path": "/src/src/app.py",
+      "start": {
+        "col": 12,
+        "line": 20,
+        "offset": 259
+      }
+    }
+  ],
+  "version": "1.178.0"
+}

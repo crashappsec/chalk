@@ -15,6 +15,7 @@ import "."/[
   rules/licenses,
   rules/packages,
   rules/registries,
+  rules/sast,
   rules/secrets,
 ]
 
@@ -26,5 +27,6 @@ proc loadPolicyRules*() =
   loadCertificatesRule()
   loadSecretsRule()
   loadPackagesRule()
+  loadSastRule()
   loadLicensesRule()
   loadCustomCheckRule()
