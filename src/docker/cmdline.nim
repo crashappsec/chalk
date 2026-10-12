@@ -20,6 +20,7 @@ import ".."/[
 ]
 import "."/[
   ids,
+  util,
 ]
 
 proc extractBuildx(ctx: DockerInvocation) =
@@ -162,6 +163,7 @@ proc extractLoad(ctx: DockerInvocation) =
     ctx.foundLoad = target
 
 proc extractOutputs(ctx: DockerInvocation) =
+  let explicitPush = ctx.foundPush
   if "output" in ctx.processedFlags:
     for i in unpack[seq[string]](ctx.processedFlags["output"].getValue()):
       var
@@ -174,14 +176,15 @@ proc extractOutputs(ctx: DockerInvocation) =
           for field in p.row:
             let (k, v) = field.splitBy("=")
             kv[k] = v
+          kv.normalizeExporterPush(explicitPush)
           ctx.foundOutputs.add(kv)
           case kv.getOrDefault("type")
           of "registry":
             trace("docker: found --push equivalent with --output=" & i)
             ctx.foundPush = true
           of "image":
-            let pushByDigest = kv.getOrDefault("push-by-digest") == "true"
-            if kv.getOrDefault("push") == "true" or pushByDigest:
+            let pushByDigest = kv.exporterBool("push-by-digest")
+            if kv.exporterBool("push"):
               trace("docker: found --push equivalent with --output=" & i)
               ctx.foundPush = true
             if kv.getOrDefault("name") != "":
@@ -198,6 +201,12 @@ proc extractOutputs(ctx: DockerInvocation) =
       finally:
         p.close()
         s.close()
+
+proc extractCache(ctx: DockerInvocation) =
+  if "cache-from" in ctx.processedFlags:
+    ctx.foundCacheFrom = unpack[seq[string]](ctx.processedFlags["cache-from"].getValue())
+  if "cache-to" in ctx.processedFlags:
+    ctx.foundCacheTo = unpack[seq[string]](ctx.processedFlags["cache-to"].getValue())
 
 proc extractContext(ctx: DockerInvocation) =
   # Con4m "ignoring unknown flags" jams them into the command line.
@@ -328,6 +337,7 @@ proc extractDockerCommand*(self: DockerInvocation): DockerCmd =
     self.extractPush()
     self.extractLoad()
     self.extractOutputs()
+    self.extractCache()
     # set any other non-automatically initialized attributes to avoid segfaults
     self.addedPlatform = newOrderedTable[string, seq[string]]()
     self.dfDirectives  = newOrderedTable[string, string]()
