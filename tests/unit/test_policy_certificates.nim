@@ -440,6 +440,17 @@ proc testScanning() =
   doAssert ctx / "a/expired.pem" in namedFound
   doAssert "a/expired.pem" notin namedFound
 
+  # patterns are cleaned as docker does, so `!./cert.pem` re-includes cert.pem
+  assertEq(parseDockerignore("\xEF\xBB\xBF/a//b/\n!./c\n#x\n ! d/../e \n../f\n/..\n./\n"),
+           @["a/b", "!c", "!e", "../f", "/", "."])
+  let cleaned = newContext({
+    "cert.pem": "expired.pem",
+    "b/weak.pem": "expired.pem",
+    ".dockerignore": "=\xEF\xBB\xBFcert.pem\n!./cert.pem\nb/../b//weak.pem\n",
+  })
+  defer: removeDir(cleaned)
+  assertEq(settings.findings(@[cleaned]).locations(), @["cert.pem"])
+
   # push has no build context
   assertEq(settings.check(PolicyInput(command: "push", pushTargets: @["app:1"]), now).len, 0)
   # a build without a local context is an error, reported once
@@ -450,6 +461,35 @@ proc testScanning() =
   let remote = PolicyInput(command: "build", contextErrors: @[PolicyFinding(
     kind: "error", subject: "-", reason: "the build context from stdin cannot be checked")])
   assertEq(settings.check(remote, now).len, 0)
+
+proc testBudgets() =
+  # parsing stops past `maxCerts` certificates; listed findings are capped
+  # and the rest counted in one violation
+  let one = fixture("expired.pem")
+  var files: seq[(string, string)]
+  for i in 0 .. maxCerts div maxCertsPerFile:
+    files.add(("bundle" & $i & ".pem", "=" & one.repeat(maxCertsPerFile)))
+  let many = newContext(files)
+  defer: removeDir(many)
+  var settings = defaultCertificatesConfig()
+  settings.maxFileSize = len(one) * maxCertsPerFile
+  let found = settings.findings(@[many])
+  assertEq(found.len, maxFindings + 1)
+  assertEq(found.locations().len, maxFindings + 1)
+  assertEq(found[^1].reason, $(maxCerts + maxCertsPerFile + 1 - maxFindings) &
+                             " more certificate findings not listed")
+
+  let errors = @[newSubjectFinding("certificates", "error", "a", "x"),
+                 newSubjectFinding("certificates", "error", "b", "y")]
+  assertEq(errors.capped(5).len, 2)
+  let onlyErrors = errors.capped(1)
+  assertEq(onlyErrors.len, 2)
+  assertEq(onlyErrors[1].kind, "error")
+  assertEq(onlyErrors[1].reason, "1 more certificate findings not listed")
+  let violation = newSubjectFinding("certificates", "violation", "c", "z")
+  let mixed = (errors & violation).capped(1)
+  assertEq(mixed[0].subject, "c")
+  assertEq(mixed[1].kind, "error")
 
 proc rejects(text, reason: string) =
   ## the document is unusable as a whole, or as its only policy
@@ -559,6 +599,7 @@ proc main() =
   testKeys()
   testSignatureSecurity()
   testScanning()
+  testBudgets()
   testJson()
 
 main()
