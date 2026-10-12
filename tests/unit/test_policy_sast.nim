@@ -232,12 +232,12 @@ proc testCollectSources() =
 
   clearPolicyToolCache()
   var calls: seq[string]
-  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
     assertEq(request.kind, "sast")
     calls.add(dir)
     if dir != "/src":
       raise newException(ValueError, "semgrep produced no SAST")
-    @[ToolOutput(tool: "semgrep", root: dir, value: parseFile(sarifFile))]
+    ToolRun(outputs: @[ToolOutput(tool: "semgrep", root: dir, value: parseFile(sarifFile))])
 
   input = PolicyInput(command: "build", contextDirs: @["/src", "/other"], host: ChalkDict())
   (sources, errors) = input.collectSources(runTools = false, toolsRan = true)
@@ -266,6 +266,18 @@ proc testCollectSources() =
   assertEq(len(errors), 0)
   assertEq(len(sources), 2)
   assertEq(len(calls), 2)
+
+  # a tool that failed leaves the context partly unchecked, whatever the
+  # others found
+  clearPolicyToolCache()
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
+    ToolRun(outputs: @[ToolOutput(tool: "semgrep", root: dir, value: %*{"results": [], "errors": []})],
+            failures: @["other: timed out"])
+  input = PolicyInput(command: "build", contextDirs: @["/src"], host: ChalkDict())
+  (sources, errors) = input.collectSources(runTools = true, toolsRan = false)
+  assertEq(len(sources), 1)
+  assertEq(len(errors), 1)
+  doAssert "other: timed out" in errors[0].reason, errors[0].reason
 
   input = PolicyInput(command: "build", host: ChalkDict())
   (sources, errors) = input.collectSources(runTools = true, toolsRan = false)
@@ -467,8 +479,8 @@ proc testDockerignore() =
   writeFile(dir / "Dockerfile.dockerignore", "ignored-by-dockerfile.py\n")
   writeFile(dir / "named" / ".dockerignore", "ignored-by-named.py\n")
   clearPolicyToolCache()
-  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
-    @[ToolOutput(tool: "semgrep", root: dir, value: %*{"results": [], "errors": []})]
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
+    ToolRun(outputs: @[ToolOutput(tool: "semgrep", root: dir, value: %*{"results": [], "errors": []})])
   let input = PolicyInput(command: "build", contextDirs: @[dir / "main", dir / "named"],
                           mainContextDir: dir / "main", dockerfilePath: dir / "Dockerfile",
                           host: ChalkDict())
@@ -493,9 +505,9 @@ proc testAmbiguousHostSarif() =
   host["EXTERNAL_TOOL_DURATION"] = nimJsonToBox(%*{"semgrep": {"/repo": 1200}})
   clearPolicyToolCache()
   var calls: seq[string]
-  policyToolRunner = proc(request: ToolRequest, dir: string): seq[ToolOutput] =
+  policyToolRunner = proc(request: ToolRequest, dir: string): ToolRun =
     calls.add(dir)
-    @[ToolOutput(tool: "semgrep", root: dir, value: %*{"results": [], "errors": []})]
+    ToolRun(outputs: @[ToolOutput(tool: "semgrep", root: dir, value: %*{"results": [], "errors": []})])
   var input = PolicyInput(command: "build", contextDirs: @["/repo/app"], host: host)
   var (sources, errors) = input.collectSources(runTools = true, toolsRan = true)
   assertEq(calls, @["/repo/app"])
