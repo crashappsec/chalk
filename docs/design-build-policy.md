@@ -808,6 +808,158 @@ buildx) ignores `<Dockerfile>.dockerignore` and only applies the context's
 `.dockerignore`, so with it files the Dockerfile's ignore file excludes are
 sent to docker but not scanned.
 
+## Packages and languages
+
+`policy.packages` restricts the languages and packages a build depends on,
+as listed by the SBOM of its build context
+([CycloneDX](https://cyclonedx.org/docs/1.6/json/), SPDX or syft JSON).
+
+```con4m
+policy {
+  mode: "enforce"
+  packages {
+    enabled: true
+    denied: [
+      ("purl", "pkg:npm/event-stream@3.3.6"),
+      ("purl", "pkg:pypi/*colourama*"),
+      ("purl", "pkg:npm/lodash@<4.17.21"),
+    ]
+    allowed_languages: ["go", "javascript"]
+    message: "See https://example.com/approved-packages"
+  }
+}
+```
+
+```json
+{
+  "id": "packages@1",
+  "mode": "enforce",
+  "packages": {
+    "enabled": true,
+    "denied": [
+      ["purl", "pkg:npm/event-stream@3.3.6"],
+      ["purl", "pkg:pypi/*colourama*"],
+      ["purl", "pkg:npm/lodash@<4.17.21"]
+    ],
+    "allowed": [
+      ["purl", "pkg:npm/*"],
+      ["purl", "pkg:golang/*"]
+    ],
+    "allowed_languages": ["go", "javascript"],
+    "denied_languages": ["python"],
+    "message": "See https://example.com/approved-packages"
+  }
+}
+```
+
+| Field                               | Type                                        | Default |
+| ----------------------------------- | ------------------------------------------- | ------- |
+| `policy.packages.enabled`           | `bool`                                      | `false` |
+| `policy.packages.denied`            | `list[tuple[string, string]]` (kind, value) | `[]`    |
+| `policy.packages.allowed`           | `list[tuple[string, string]]` (kind, value) | `[]`    |
+| `policy.packages.allowed_languages` | `list[string]`                              | `[]`    |
+| `policy.packages.denied_languages`  | `list[string]`                              | `[]`    |
+| `policy.packages.message`           | `string`                                    | `""`    |
+
+What is checked, for every package of the SBOM:
+
+- `denied`: a package whose
+  [package URL](https://github.com/package-url/purl-spec) (purl) matches
+  any entry is a violation.
+- `allowed`: when not empty, a package matching no entry is a violation.
+- `allowed_languages`: when not empty, packages of any other language are a
+  violation. `denied_languages`: packages of these languages are a
+  violation. Language violations are reported once per language (subject
+  is the language, e.g. `python`, with the number of packages and a few
+  examples), not once per package.
+
+Languages are those of the dependencies the SBOM lists, not of the build
+context's own source files: a Go service with no third-party modules has no
+`go` packages. They are syft's `syft:package:language` (`c++`, `dart`,
+`dotnet`, `elixir`, `erlang`, `go`, `haskell`, `java`, `javascript`, `lua`,
+`ocaml`, `perl`, `php`, `python`, `r`, `ruby`, `rust`, `swift`, `swipl`),
+or, for SBOMs without it, derived from the purl type (`npm` →
+`javascript`, `pypi` → `python`, `golang` → `go`, `maven` → `java`,
+`cargo` → `rust`, `cocoapods` → `swift`, ...). Configured languages may
+also be common aliases (`golang`, `node`, `js`, `typescript`, `csharp`,
+`c#`, `py`, `rb`, `cpp`, ...), which are normalized to syft's names; any
+other name is a configuration error.
+
+Allowlists fail closed: when `allowed` is not empty, a package without a
+purl is an evaluation error, and when `allowed_languages` is not empty, a
+package whose language cannot be determined (no purl and no language, or
+a purl type that maps to no single language, such as `generic` or `hex`)
+is an evaluation error, reported once with a few examples, so `on_error`
+decides. OS, CI and container packages (purl types `deb`, `rpm`, `apk`,
+`alpm`, `github`, `githubactions`, `docker`, `oci`, `bitnami`, `qpkg`) are
+not dependencies in any language and are only checked against `denied` and
+`allowed`. Denylists only report what they can identify.
+
+`denied` and `allowed` entries are `(kind, value)` tuples. The supported
+kind is `purl`: `pkg:<type>/<namespace>/<name>[@<version>]`, where
+`type/namespace/name` is a shell-style glob (`*` also matches `/`). Without
+a version any version matches; otherwise the version is a glob (`3.3.6`,
+`1.*`) or a comma-separated range of `<`, `<=`, `>`, `>=`, `=`, `!=`
+constraints (`>=1.0,<1.2`). Other range syntaxes (`^1.2`, `~1.2`, `~=1.2`,
+`1.x`, `[1.0,2.0)`, `1 - 2`, `1 || 2`) and version lists (`1.2,1.3`; use
+one entry per version) are rejected rather than taken as globs that match
+nothing. Matching ignores case, qualifiers
+(`?arch=amd64`) and subpaths, percent-decodes both sides
+(`pkg:npm/@angular/core` matches `pkg:npm/%40angular/core`), normalizes
+PyPI names (`Django_Rest` is `django-rest`) and ignores the `v` prefix of
+Go versions. Ranges compare versions made of any number of dot-separated
+numbers (missing ones are 0, so `1.2` is `1.2.0` and NuGet's `4.0.0.0` is
+`4`) with an optional `-prerelease`, ordered by
+[semver 2.0 precedence](https://semver.org/#spec-item-11) (`1.0.0-rc.9` <
+`1.0.0-rc.10` < `1.0.0`); `+build` metadata (e.g. Go's `+incompatible`)
+is ignored. A package whose name matches a range entry but whose version
+cannot be compared (e.g. Debian's `1:2.36-9`, Python's `1.0.post1`, Maven's
+`1.2.3.RELEASE`) is an evaluation error, so `on_error` decides, unless
+`allowed` or the languages already make it a violation. Unknown
+kinds, invalid patterns and unknown languages are configuration errors.
+
+Findings set `subject` to the package purl (or the language) and
+`location` to the manifest or lock file the package was found in, relative
+to the build context (e.g. `web/package-lock.json`). Each package is
+reported once, and at most 200 package findings are reported per policy.
+
+Where the SBOM comes from:
+
+- `chalk docker build`: for every local build context directory (the main
+  context, including the checkout of a git context, and local named
+  contexts; at most 8), the `SBOM` chalk collected with `run_sbom_tools`
+  when it covers the directory. Chalk scans the git repository containing
+  the build context, so only packages found inside the context directory
+  are checked; packages without a location are kept. Otherwise chalk runs
+  the enabled `sbom` tools (`tool.syft`, `-o cyclonedx-json`, by default) on
+  the directory on demand, by priority and once per directory, honoring
+  their settings such as `syft_timeout` (300s by default) and
+  `syft_prefer_docker`. If no SBOM tool is enabled, none can be found or
+  installed, they fail, or the build has no local context (a remote or
+  stdin context), it is an evaluation error. Nothing is scanned when no
+  check is configured. SBOMs are read as CycloneDX (syft's default here),
+  SPDX or syft JSON.
+- `chalk docker push`: the `SBOM` recorded in the chalk mark of each pushed
+  image. The default mark templates do not include `SBOM` (enable it with
+  `mark_template.<template>.key.SBOM.use` and `run_sbom_tools`), and
+  images without it, unchalked images, or images with it stored in an
+  object store (`@SBOM`) are not checked and pass on push: this is
+  deliberate, as the build is where the context is checked and the build
+  context is gone on push. The mark's SBOM covers all of what chalk
+  scanned when it built the image (the git repository of its first build
+  context), not just the build context, so packages elsewhere in a
+  monorepo are checked too. Locations are relative to the directory chalk
+  scanned when it built the image.
+
+The SBOM describes the build context (manifests and lock files), not the
+built image, so OS packages installed by `RUN apk add` and dependencies
+fetched during the build without a lock file are not seen. Vulnerability
+(CVE) checks are not supported; they need a vulnerability scanner such as
+grype or OSV.
+
+The SBOM comes from `policySboms` in `src/policy/sbom.nim`, shared with the
+other rules that read SBOMs (see "Adding rules").
+
 ### Licenses
 
 `policy.licenses` reports packages of the build context whose licenses are
@@ -1292,6 +1444,14 @@ included in findings or logs. Verification failures retain their existing
 `verified_only` behavior, and native `trufflehog:ignore` suppressions remain
 respected. Exclusions are anchored at the scanned directory, so ordinary
 directories such as `app.git` (or a context below one) remain scanned.
+
+Package policy name and version globs support `?` for one character. A final
+raw `?` begins ignored purl qualifiers only when its suffix is a nonempty
+`key=value` list separated by `&`, with ASCII letters, digits, `_`, `.`, or `-`
+in each key and nonempty values. Earlier `?` characters remain wildcards.
+Structural separators are recognized before percent decoding, so encoded `?`
+can express a wildcard and encoded `@` can occur within a package name.
+Qualifiers on concrete SBOM purls remain ignored as before.
 
 SBOM policy parsing retains every package occurrence. A repository scan keeps a
 package in a build context when any recorded location belongs to that context;
