@@ -16,6 +16,7 @@ import std/[
   algorithm,
   json,
   os,
+  sets,
   strutils,
   tables,
   times,
@@ -30,6 +31,8 @@ from ./golden_images import globMatch
 import ".."/[
   api,
   configuration,
+  dockerignore,
+  helpers,
 ]
 
 const
@@ -65,6 +68,15 @@ const
     "**/usr/local/share/ca-certificates",
   ]
   maxCertsPerFile* = 1000
+  ## bounds over all contexts, so a hostile context cannot exhaust memory or
+  ## time: certificates kept (checked ones and pinned CA bundle ones),
+  ## certificates parsed from CA bundles, and findings listed (the rest are
+  ## counted in one finding). Bundles get their own, larger budget because
+  ## only their pinned certificates are kept, and vendored copies of
+  ## `cacert.pem` (~150 certificates each) are common.
+  maxCerts* = 10_000
+  maxBundleCerts* = 100_000
+  maxFindings* = 100
   pemMarkers = ["-----BEGIN CERTIFICATE-----", "-----BEGIN X509 CERTIFICATE-----"]
   trustedMarker = "-----BEGIN TRUSTED CERTIFICATE-----"
   issuerKinds* = ["cn", "dn", "sha256"]
@@ -120,9 +132,16 @@ type
   CertScan* = object
     certs*:  seq[CertInfo]
     errors*: seq[PolicyFinding]
-    ## certificates of skipped CA bundles, only candidates for `sha256`
-    ## issuer pins
+    ## pinned certificates of skipped CA bundles, only candidates for
+    ## `sha256` issuer pins
     issuers*: seq[CertInfo]
+    parsed:   int # certificates kept, for `maxCerts`
+    bundleParsed: int # certificates parsed from CA bundles, for `maxBundleCerts`
+
+  ## candidates for `sha256` issuer pins by subject DN, one per fingerprint:
+  ## only a pinned candidate can allow an issuer, so signature checks are
+  ## bounded by the number of pins
+  PinnedIssuers* = Table[string, seq[CertInfo]]
 
 proc defaultCertificatesConfig*(): CertificatesConfig =
   CertificatesConfig(
@@ -322,46 +341,16 @@ proc readHead(path: string): string =
   result = newString(headSize)
   result.setLen(f.readBuffer(addr result[0], headSize))
 
-proc hasPins(settings: CertificatesConfig): bool =
-  for (kind, _) in settings.allowedIssuers:
-    if kind == "sha256":
-      return true
-  false
+proc pins(settings: CertificatesConfig): HashSet[string] =
+  for (kind, value) in settings.allowedIssuers:
+    let pin = value.normalizeHex()
+    if kind == "sha256" and pin != "":
+      result.incl(pin)
 
 proc isCaBundle(rel, relDir, entry: string): bool =
   isExcluded(rel, caBundleDirs) or
     (entry.toLowerAscii() in caBundleNames and relDir != "" and
      isExcluded(relDir, caBundleNameDirs))
-
-proc dockerignorePath(dir, dockerfilePath: string): string =
-  ## `<Dockerfile>.dockerignore` next to the Dockerfile takes precedence over
-  ## `<context>/.dockerignore`
-  ## https://docs.docker.com/build/concepts/context/#filename-and-location
-  if dockerfilePath != "":
-    let specific = dockerfilePath & ".dockerignore"
-    if fileExists(specific):
-      return specific
-  let root = dir / ".dockerignore"
-  if fileExists(root):
-    return root
-  ""
-
-proc readDockerignore(dir: string, dockerfilePath = ""): seq[string] =
-  let path = dir.dockerignorePath(dockerfilePath)
-  if path == "":
-    return
-  for line in readFile(path).splitLines():
-    let p = line.strip()
-    if p.len == 0 or p.startsWith('#'):
-      continue
-    let negate = p.startsWith('!')
-    var pattern = (if negate: p[1 .. ^1] else: p).strip()
-    while pattern.startsWith('/'):
-      pattern = pattern[1 .. ^1]
-    if not isValidPattern(pattern):
-      warn("policy: certificates: ignoring invalid .dockerignore pattern: " & p)
-      continue
-    result.add((if negate: "!" else: "") & pattern)
 
 proc prunes(rel: string, patterns: seq[string]): bool =
   isExcluded(rel, patterns) and not hasNegationForDir(rel, patterns)
@@ -372,7 +361,7 @@ proc byLocation(a, b: CertInfo): int =
     result = cmp(a.index, b.index)
 
 proc scanFile(scan: var CertScan, full, report, entry: string,
-              settings: CertificatesConfig, bundle: bool) =
+              settings: CertificatesConfig, pins: HashSet[string], bundle: bool) =
   ## Files of skipped CA bundles only supply issuer candidates, so they
   ## report nothing: a missing candidate fails the pin rather than passing.
   var st: Stat
@@ -399,8 +388,13 @@ proc scanFile(scan: var CertScan, full, report, entry: string,
       return
     let parsed = data.parseCertFile(report)
     if bundle:
-      scan.issuers.add(parsed.certs)
+      scan.bundleParsed += len(parsed.certs)
+      for cert in parsed.certs:
+        if cert.sha256 in pins:
+          scan.issuers.add(cert)
+          inc(scan.parsed)
     else:
+      scan.parsed += len(parsed.certs)
       scan.certs.add(parsed.certs)
       scan.errors.add(parsed.errors)
   except CatchableError:
@@ -414,19 +408,19 @@ proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
   ## the main context `mainDir`; certificates of other (named) contexts are
   ## reported with absolute paths. `dockerfilePath` only selects the
   ## ignore file of the main context, as BuildKit does.
-  let pins = settings.hasPins()
+  let pins = settings.pins()
   var visited = 0
   for dir in dirs:
     let isMain = mainDir != "" and dir == mainDir
     let ignore =
       if settings.honorDockerignore:
         try:
-          readDockerignore(dir, if isMain: dockerfilePath else: "")
+          loadDockerignore(dir, if isMain: dockerfilePath else: "")
         except CatchableError:
           result.errors.add(newSubjectFinding(ruleName, "error", dir,
                             "could not read .dockerignore: " & getCurrentExceptionMsg()))
           continue
-      else: @[]
+      else: DockerIgnore()
     # (directory, inside a skipped CA bundle directory)
     var stack = @[("", false)]
     while len(stack) > 0:
@@ -441,49 +435,60 @@ proc scanContexts*(dirs: seq[string], settings: CertificatesConfig,
         let rel = (if relDir == "": entry else: relDir & "/" & entry)
         case kind
         of pcDir:
-          if entry == ".git" or rel.prunes(ignore) or rel.prunes(settings.excludePaths):
+          if entry == ".git" or ignore.prunes(rel) or rel.prunes(settings.excludePaths):
             continue
           let bundle = bundled or (settings.skipCaBundles and rel.prunes(caBundleDirs))
-          if bundle and not pins:
+          if bundle and len(pins) == 0:
             trace("policy: certificates: skipping CA bundle directory " & rel)
             continue
           stack.add((rel, bundle))
         of pcFile:
           if not entry.hasCertExtension(settings.extensions) or
-             isExcluded(rel, ignore) or isExcluded(rel, settings.excludePaths):
+             ignore.isIgnored(rel) or isExcluded(rel, settings.excludePaths):
             continue
           let bundle = bundled or (settings.skipCaBundles and isCaBundle(rel, relDir, entry))
           if bundle:
             trace("policy: certificates: skipping CA bundle " & rel)
-            if not pins:
+            if len(pins) == 0:
               continue
           elif len(settings.includePaths) > 0 and not isExcluded(rel, settings.includePaths):
             continue
           let full = dir / rel
-          result.scanFile(full, if isMain: rel else: full, entry, settings, bundle)
+          result.scanFile(full, if isMain: rel else: full, entry, settings, pins, bundle)
+          if result.parsed > maxCerts:
+            result.errors.add(newSubjectFinding(ruleName, "error", dir,
+                              "build context has more than " & $maxCerts &
+                              " certificates, certificate scan is incomplete"))
+            return
+          if result.bundleParsed > maxBundleCerts:
+            result.errors.add(newSubjectFinding(ruleName, "error", dir,
+                              "CA bundles in the build context have more than " &
+                              $maxBundleCerts & " certificates, certificate scan is incomplete"))
+            return
         of pcLinkToFile, pcLinkToDir:
           # docker sends symlinks as links: a target inside the context is
           # scanned on its own and one outside it never reaches the image
           continue
 
-proc issuerCerts(cert: CertInfo, all: seq[CertInfo]): seq[CertInfo] =
+proc pinnedIssuers*(candidates: seq[CertInfo], settings: CertificatesConfig): PinnedIssuers =
+  let pins = settings.pins()
+  var seen: HashSet[string]
+  for c in candidates:
+    if c.sha256 in pins and not seen.containsOrIncl(c.sha256):
+      result.mgetOrPut(c.subjectDn, @[]).add(c)
+
+proc pinnedIssuer(cert: CertInfo, issuers: PinnedIssuers): bool =
   ## Candidate names and identifiers are untrusted; verify the issuing key
   ## before using the candidate's fingerprint as an issuer pin.
-  for other in all:
-    if other.subjectDn == cert.issuerDn and (cert.aki == "" or cert.aki == other.ski) and
-       cert.der.signedBy(other.der):
-      result.add(other)
-
-proc pinned(certs: seq[CertInfo], settings: CertificatesConfig): bool =
-  for (kind, value) in settings.allowedIssuers:
-    if kind != "sha256":
-      continue
-    for c in certs:
-      if c.sha256 != "" and c.sha256 == value.normalizeHex():
-        return true
+  for other in issuers.getOrDefault(cert.issuerDn):
+    if (cert.aki == "" or cert.aki == other.ski) and cert.der.signedBy(other.der):
+      return true
   false
 
-proc issuerAllowed(cert: CertInfo, all: seq[CertInfo], settings: CertificatesConfig): bool =
+proc pinned(cert: CertInfo, settings: CertificatesConfig): bool =
+  cert.sha256 != "" and cert.sha256 in settings.pins()
+
+proc issuerAllowed(cert: CertInfo, issuers: PinnedIssuers, settings: CertificatesConfig): bool =
   for (kind, value) in settings.allowedIssuers:
     case kind
     of "cn":
@@ -494,12 +499,12 @@ proc issuerAllowed(cert: CertInfo, all: seq[CertInfo], settings: CertificatesCon
         return true
     else:
       discard
-  cert.issuerCerts(all).pinned(settings)
+  cert.pinnedIssuer(issuers)
 
 proc formatDate(t: Time): string =
   t.utc().format("yyyy-MM-dd")
 
-proc violations*(cert: CertInfo, all: seq[CertInfo], settings: CertificatesConfig,
+proc violations*(cert: CertInfo, issuers: PinnedIssuers, settings: CertificatesConfig,
                  now: Time): seq[string] =
   if cert.notAfter.isSome():
     let notAfter = cert.notAfter.get()
@@ -512,7 +517,7 @@ proc violations*(cert: CertInfo, all: seq[CertInfo], settings: CertificatesConfi
                  $settings.expiresWithinDays & " days")
   if settings.denyNotYetValid and cert.notBefore.isSome() and cert.notBefore.get() > now:
     result.add("not valid before " & cert.notBefore.get().formatDate())
-  if settings.denySelfSigned and cert.selfSigned and not @[cert].pinned(settings):
+  if settings.denySelfSigned and cert.selfSigned and not cert.pinned(settings):
     result.add("self-signed")
   if settings.denyCa and cert.isCa:
     result.add("CA certificate")
@@ -538,7 +543,7 @@ proc violations*(cert: CertInfo, all: seq[CertInfo], settings: CertificatesConfi
     if not allowed:
       let curve = if cert.curve != "": cert.curve else: "unknown"
       result.add("EC curve " & curve & " is not allowed")
-  if len(settings.allowedIssuers) > 0 and not cert.issuerAllowed(all, settings):
+  if len(settings.allowedIssuers) > 0 and not cert.issuerAllowed(issuers, settings):
     result.add("issuer " & cert.issuerDn & " is not allowed")
 
 proc unchecked*(cert: CertInfo, settings: CertificatesConfig): seq[string] =
@@ -564,9 +569,9 @@ proc location*(cert: CertInfo): string =
 proc check*(settings: CertificatesConfig, certs: seq[CertInfo], now: Time,
             issuers: seq[CertInfo] = @[]): seq[PolicyFinding] =
   ## `issuers` are additional `sha256` pin candidates, not checked themselves
-  let candidates = certs & issuers
+  let pinned = pinnedIssuers(certs & issuers, settings)
   for cert in certs:
-    let reasons = cert.violations(candidates, settings, now)
+    let reasons = cert.violations(pinned, settings, now)
     if len(reasons) > 0:
       var reason = "certificate " & reasons.join("; ")
       if settings.message != "":
@@ -589,8 +594,14 @@ proc check*(settings: CertificatesConfig, input: PolicyInput, now = getTime()): 
     return
   let scan = input.contextDirs.scanContexts(settings, input.dockerfilePath,
                                             input.mainContextDir)
-  result.add(scan.errors.sorted(proc(a, b: PolicyFinding): int = cmp(a.location, b.location)))
-  result.add(settings.check(scan.certs.sorted(byLocation), now, scan.issuers))
+  # Capped apart from the certificate findings: capFindings lists violations
+  # first, which would push scan errors such as an incomplete scan out of the
+  # list and into the "more" count.
+  let
+    errors = scan.errors.sorted(proc(a, b: PolicyFinding): int = cmp(a.location, b.location))
+    certs  = settings.check(scan.certs.sorted(byLocation), now, scan.issuers)
+  result = errors.capFindings(ruleName, maxFindings, "certificate scan errors")
+  result.add(certs.capFindings(ruleName, maxFindings, "certificate findings"))
 
 proc nonNegative(path: openArray[string], default: int): int =
   result = policyIntSetting(path, default)
