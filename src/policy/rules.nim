@@ -12,6 +12,7 @@ import "."/[
   rules/certificates,
   rules/custom_check,
   rules/golden_images,
+  rules/registries,
   rules/sast,
   rules/secrets,
 ]
@@ -20,6 +21,7 @@ proc loadPolicyRules*() =
   if hasPolicyRules():
     return
   loadGoldenImagesRule()
+  loadRegistriesRule()
   loadCertificatesRule()
   loadSecretsRule()
   loadSastRule()
