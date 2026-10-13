@@ -45,8 +45,10 @@
   appended to the job summary as a short Markdown section: an alert with the
   outcome, the offending images and how to fix them, and collapsed per-policy
   details including the uploaded policy report location when the `policy`
-  topic uses a `presign` sink. Written even when the command is blocked, never
-  affects the command, and can be turned off with
+  topic uses a `presign` sink. Written only when a policy has findings
+  (violations or evaluation errors), including when the command is blocked;
+  set `policy.github_step_summary_on_pass = true` to also write it when every
+  policy passes. Never affects the command, and can be turned off with
   `policy.github_step_summary = false`.
 
 - New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`

@@ -2667,9 +2667,24 @@ are still evaluated.
     doc: """
 When chalk runs in GitHub Actions (`GITHUB_STEP_SUMMARY` is set), append a
 short Markdown section with the outcome of every evaluated policy and its
-findings to the job summary, including when the command is blocked. Errors
+findings to the job summary, including when the command is blocked. Only
+evaluations with findings get a section unless `github_step_summary_on_pass`
+is true. Errors
 writing it are logged as warnings and never affect the command. Not part of
 `config_json`.
+"""
+  }
+
+  field github_step_summary_on_pass {
+    type:     bool
+    default:  false
+    shortdoc: "Also write the job summary when every policy passes"
+    doc: """
+By default the job summary section is only written when at least one
+evaluated policy has findings (a violation, an evaluation error, or a block),
+so conformant builds add nothing to the job summary. Set to true to also
+write it when every policy passes. Has no effect when `github_step_summary`
+is false. Not part of `config_json`.
 """
   }
 
