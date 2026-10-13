@@ -57,3 +57,4 @@ log
 .nimcache
 strace-*
 nimbledeps
+localhost*.pem
