@@ -59,6 +59,25 @@ proc commandRepo(ctx: DockerInvocation): string =
 proc repoResolver(ctx: DockerInvocation): PolicyRepoResolver =
   return proc(): string = ctx.commandRepo()
 
+proc repoPathResolver(): proc(dir: string): Option[string] =
+  ## `PolicyInput.repoPath`: a directory within the git work tree it is in,
+  ## unless that is a checkout of another repository than the CI job's
+  var paths = initTable[string, Option[string]]()
+  let ciRepo = repoFromEnv()
+  return proc(dir: string): Option[string] =
+    if dir in paths:
+      return paths[dir]
+    result = none(string)
+    let worktree = gitDiscoverWorkTree(dir)
+    if worktree != "":
+      let origin = gitOriginRepo(worktree)
+      if ciRepo == "" or origin == "" or origin == ciRepo:
+        let path = dir.relativePath(worktree)
+        result = some(if path == ".": "" else: path)
+      else:
+        trace("policy: " & dir & " is in a checkout of " & origin & ", not " & ciRepo)
+    paths[dir] = result
+
 proc isImageContext(value: string): bool =
   ## named contexts that are images or other stages, which image rules check
   value.startsWith("docker-image://") or value.startsWith("oci-layout://") or
@@ -180,6 +199,7 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
   let collectContext = proc(input: var PolicyInput) =
     input.addPolicyContexts(ctx)
     input.addPolicyDockerfile(ctx)
+    input.repoPath = repoPathResolver()
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver(), collectContext)
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =

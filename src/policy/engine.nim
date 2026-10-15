@@ -87,6 +87,7 @@ proc evaluatePolicy*(settings: PolicyConfig,
       findings.add(PolicyFinding(rule:   rule.name,
                                  kind:   "error",
                                  reason: "could not evaluate: " & getCurrentExceptionMsg()))
+    result.notices.add(takePolicyNotices())
 
   if not attributed:
     for e in input.errors:

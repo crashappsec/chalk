@@ -42,6 +42,11 @@ type
     ## build contexts that are not local directories (stdin, URLs, git named
     ## contexts); the engine attributes them to rules that require the context
     contextErrors*: seq[PolicyFinding]
+    ## build only: the path of a `contextDirs` entry within the git work tree
+    ## of the CI job's repository, e.g. `services/api` (empty for its root),
+    ## as repository-relative paths name it; none when the directory is not
+    ## part of it. Nil when unknown.
+    repoPath*: proc(dir: string): Option[string]
     ## Dockerfile of a build, so rules can honor `<Dockerfile>.dockerignore`;
     ## empty for push or when read from stdin
     dockerfilePath*: string
@@ -84,7 +89,9 @@ type
     ## optional, describes the loaded configuration for the step summary
     hint*:  proc(): PolicyHint
 
-var registeredRules: seq[PolicyRule]
+var
+  registeredRules: seq[PolicyRule]
+  pendingNotices:  seq[PolicyNotice]
 
 proc newPolicyRule*(name: string,
                     load: proc(): bool,
@@ -115,6 +122,15 @@ iterator policyRules*(): PolicyRule =
 
 proc hasPolicyRules*(): bool =
   len(registeredRules) > 0
+
+proc addPolicyNotice*(rule, message: string) =
+  ## Reports `message` for the policy being evaluated without affecting its
+  ## result, see `PolicyNotice`
+  pendingNotices.add(PolicyNotice(rule: rule, message: message))
+
+proc takePolicyNotices*(): seq[PolicyNotice] =
+  result = pendingNotices
+  pendingNotices = @[]
 
 proc collectionError*(reason: string, image = ""): PolicyFinding =
   ## the engine attributes it to each rule that requires all subjects

@@ -13,6 +13,15 @@ import ".."/[
   types,
 ]
 
+proc policyGetChalkTimeArtifactInfo*(self: Plugin,
+                                     obj:  ChalkObj):
+                                    ChalkDict {.cdecl.} =
+  ## build policies run before chalk-time artifact collection, so marks
+  ## record the dependency review they did, see `dependencyReviewMark`
+  result = ChalkDict()
+  if dependencyReviewMark != nil:
+    result["DEPENDENCY_REVIEW"] = pack(dependencyReviewMark)
+
 proc policyGetRunTimeHostInfo*(self: Plugin,
                                objs: seq[ChalkObj]):
                               ChalkDict {.cdecl.} =
@@ -20,4 +29,5 @@ proc policyGetRunTimeHostInfo*(self: Plugin,
 
 proc loadPolicy*() =
   newPlugin("policy",
+            ctArtCallback  = ChalkTimeArtifactCb(policyGetChalkTimeArtifactInfo),
             rtHostCallback = RunTimeHostCb(policyGetRunTimeHostInfo))

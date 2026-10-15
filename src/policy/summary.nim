@@ -256,6 +256,18 @@ proc callout(policies: seq[PolicyResult], command: string): seq[string] =
     "> " & (if golden: "All base images are approved golden images"
             else: "All images passed the build policy") & " (" & checked & " checked)."]
 
+proc notices(policies: seq[PolicyResult]): seq[string] =
+  ## every distinct notice, as each policy enabling a rule repeats it
+  var seen: seq[string]
+  for p in policies:
+    for n in p.notices:
+      if n.message in seen:
+        continue
+      seen.add(n.message)
+      result.add("")
+      result.add("> [!WARNING]")
+      result.add("> " & mdText(n.message.sentence(), 500))
+
 proc howToFix(policies: seq[PolicyResult]): seq[string] =
   for p in policies:
     var rules: seq[string]
@@ -302,6 +314,7 @@ proc renderPolicySummary*(policies:        seq[PolicyResult],
     command = buildCommand(build)
     tags    = buildTags(build)
   var lines = callout(policies, command)
+  lines.add(notices(policies))
   lines.add("")
   var heading = "#### Chalk build policy · docker " & mdText(command, 20)
   if len(tags) > 0:
@@ -367,8 +380,9 @@ proc stepSummaryEnabled(): bool =
     attrGetOpt[bool]("policy.github_step_summary").get(true)
 
 proc allPassed(policies: seq[PolicyResult]): bool =
+  ## and nothing to say, as notices are only shown in the summary
   for p in policies:
-    if p.result != "pass":
+    if p.result != "pass" or len(p.notices) > 0:
       return false
   true
 

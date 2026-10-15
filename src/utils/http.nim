@@ -68,3 +68,22 @@ proc addForwardedHeaders*(headers: HttpHeaders, response: Response): HttpHeaders
     if response.headers.hasKey(name):
       headers[name] = response.headers[name]
   return headers
+
+proc nextLink*(link: string): string =
+  ## The `rel="next"` URL of a `Link` header, empty when there is none.
+  ## https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api
+  ## https://www.rfc-editor.org/rfc/rfc8288#section-3
+  for entry in link.split(','):
+    let parts = entry.split(';')
+    let target = parts[0].strip()
+    if len(parts) < 2 or not target.startsWith('<') or not target.endsWith('>'):
+      continue
+    for param in parts[1 .. ^1]:
+      let pair = param.split('=', maxsplit = 1)
+      if len(pair) != 2 or pair[0].strip().toLowerAscii() != "rel":
+        continue
+      # `rel` may list several relation types
+      for rel in pair[1].strip().strip(chars = {'"'}).splitWhitespace():
+        if rel.toLowerAscii() == "next":
+          return target[1 .. ^2]
+  return ""
