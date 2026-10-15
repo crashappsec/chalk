@@ -1378,7 +1378,7 @@ policies above and `FROM busybox`:
 
 plus host-level operation and CI keys (`_OPERATION`, `_ACTION_ID`,
 `_OP_CHALKER_VERSION`, `_OP_EXIT_CODE`, `_OP_ERRORS`, `BUILD_*`) and
-`_COMMIT_ID` and `_AUTHOR`, the HEAD commit and its author of the first local
+`_COMMIT_ID` and `_AUTHOR`, the HEAD commit and its author from the first local
 git worktree found among the build's context directories. `_AUTHOR` is what
 Crash Override reports as the contributor of a policy event, which webhook
 filters on `contributor.email` match on; since only the policy report carries
