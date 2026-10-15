@@ -15,7 +15,7 @@ import pytest
 import requests
 
 from .chalk.runner import Chalk
-from .conf import CONFIGS, DATA, REGISTRY
+from .conf import CONFIGS, DATA, REGISTRY, REPO
 from .utils.docker import Docker
 from .utils.dict import ANY, MISSING, Contains, ContainsDict
 from .utils.git import Git
@@ -34,6 +34,15 @@ def policy_reports(random_hex: str) -> list[ContainsDict]:
         if line.strip():
             reports += [ContainsDict(i) for i in json.loads(line)]
     return reports
+
+
+def passed_report(random_hex: str) -> ContainsDict:
+    # every evaluation is published, including when all policies pass
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="pass", _POLICY_FINDINGS=[])
+    assert report["_POLICY_RESULTS"]
+    assert all(r["result"] == "pass" and r["rules"] for r in report["_POLICY_RESULTS"])
+    return report
 
 
 def image_exists(tag: str) -> bool:
@@ -109,7 +118,83 @@ def test_enforce_allows_golden_image(chalk: Chalk, random_hex: str):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    report = passed_report(random_hex)
+    assert report.has(
+        _POLICY_MODE="enforce",
+        _OP_EXIT_CODE=0,
+        _POLICY_BUILD=Contains({"tags": [f"{random_hex}:latest"]}),
+    )
+    assert report["_POLICY_RESULTS"] == [
+        {
+            "id": "",
+            "mode": "enforce",
+            "on_error": "allow",
+            "result": "pass",
+            "effective_mode": "enforce",
+            "mode_source": "default",
+            "repo": "",
+            "rules": ["golden_images", "custom_check"],
+        }
+    ]
+    assert report["_ACTION_ID"] != result.report["_ACTION_ID"]
+
+
+@pytest.mark.parametrize(
+    "base, policy_result", [("alpine", "pass"), ("busybox", "violation")]
+)
+def test_policy_keys_only_in_policy_report(
+    chalk: Chalk, random_hex: str, tmp_path: Path, base: str, policy_result: str
+):
+    # backends derive one policy event per policy report; _POLICY_* in the
+    # build report Crash Override receives would duplicate and misattribute it
+    co_report = tmp_path / "co-build.jsonl"
+    config = tmp_path / "policy_co_build.c4m"
+    config.write_text((CONFIGS / "policy.c4m").read_text() + f"""
+sink_config co_build_file {{
+  enabled:  true
+  sink:     "file"
+  filename: "{co_report}"
+}}
+
+custom_report co_build {{
+  report_template: "crashoverride"
+  sink_configs:    ["co_build_file"]
+  use_when:        ["build"]
+}}
+""")
+    _, result = chalk.docker_build(
+        content=Docker.dockerfile(f"FROM {base}\nCMD true\n"),
+        config=config,
+        env=policy_env("audit", random_hex),
+        tag=random_hex,
+        run_docker=False,
+    )
+    assert result.exit_code == 0
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT=policy_result)
+    (build_report,) = [
+        r
+        for line in co_report.read_text().splitlines()
+        if line.strip()
+        for r in json.loads(line)
+    ]
+    assert build_report["_OPERATION"] == "build"
+    assert [k for k in build_report if k.startswith("_POLICY_")] == []
+    assert [k for k in result.report if k.startswith("_POLICY_")] == []
+
+
+def test_only_policy_report_template_has_policy_keys():
+    templates = set()
+    for config in (REPO / "src" / "configs").glob("*.c4m"):
+        template = None
+        for line in config.read_text().splitlines():
+            if line.startswith("report_template "):
+                template = line.split()[1]
+            elif line.startswith("}"):
+                template = None
+            elif template and re.match(r"\s*~?key\._POLICY_\w+\.use\s*=\s*true", line):
+                templates.add(template)
+    assert templates == {"policy_report"}
 
 
 def test_audit_reports_without_blocking(chalk: Chalk, random_hex: str):
@@ -354,7 +439,7 @@ def test_unbuilt_stage_is_not_checked(chalk: Chalk, random_hex: str):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def test_enforce_blocks_stage_used_by_run_mount(chalk: Chalk, random_hex: str):
@@ -612,7 +697,7 @@ def test_enforce_allows_named_image_context(chalk: Chalk, random_hex: str, sourc
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 # same document an external policy authoring system produces (shared with unit tests)
@@ -661,6 +746,7 @@ def test_config_json_enforces(chalk: Chalk, random_hex: str):
             "effective_mode": "enforce",
             "mode_source": "default",
             "repo": "",
+            "rules": ["golden_images"],
         }
     ]
     assert report["_POLICY_FINDINGS"][0]["policy_id"] == "golden-images@3"
@@ -676,7 +762,7 @@ def test_config_json_allows_golden_image(chalk: Chalk, random_hex: str):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 @pytest.mark.parametrize("on_error", ["allow", "block"])
@@ -745,6 +831,7 @@ def test_config_json_multi_audit_violation_does_not_block(
             "effective_mode": "enforce",
             "mode_source": "default",
             "repo": "",
+            "rules": ["golden_images"],
         },
         {
             "id": "chainguard-only@1",
@@ -754,6 +841,7 @@ def test_config_json_multi_audit_violation_does_not_block(
             "effective_mode": "audit",
             "mode_source": "default",
             "repo": "",
+            "rules": ["golden_images"],
         },
     ]
     assert report.contains(
@@ -915,6 +1003,7 @@ def test_enforce_repos_blocks_listed_repo(
             "effective_mode": "enforce",
             "mode_source": "enforce_repos",
             "repo": ENFORCED_REPO,
+            "rules": ["golden_images"],
         }
     ]
 
@@ -945,6 +1034,7 @@ def test_enforce_repos_audits_other_repos(
             "effective_mode": "audit",
             "mode_source": "default",
             "repo": "github.com/crashappsec/chalk",
+            "rules": ["golden_images"],
         }
     ]
 
@@ -976,6 +1066,7 @@ def test_enforce_repos_unknown_repo_never_enforces(
         "effective_mode": "audit",
         "mode_source": "default",
         "repo": "",
+        "rules": ["golden_images"],
     }
 
 
@@ -999,7 +1090,7 @@ def push_json(chalk: Chalk, image: str, config_json: str, random_hex: str, **kwa
     [
         ("busybox", f"https://{ENFORCED_REPO}.git", 1, "enforce"),
         ("busybox", "https://github.com/crashappsec/chalk.git", 0, "audit"),
-        # passes every policy: no policy report
+        # passes every policy: still reported
         ("alpine", f"https://{ENFORCED_REPO}.git", 0, None),
     ],
 )
@@ -1027,7 +1118,7 @@ def test_enforce_repos_docker_push(
     assert result.exit_code == expected_exit
     assert (registry_tags(random_hex) != []) == (expected_exit == 0)
     if effective_mode is None:
-        assert policy_reports(random_hex) == []
+        passed_report(random_hex)
         return
     (report,) = policy_reports(random_hex)
     assert report["_POLICY_RESULTS"][0]["effective_mode"] == effective_mode
@@ -1182,11 +1273,12 @@ def test_config_json_audit_from_only(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    reports = policy_reports(random_hex)
     if not violations:
-        assert reports == []
+        assert passed_report(random_hex)["_POLICY_RESULTS"][0]["rules"] == [
+            "golden_images"
+        ]
         return
-    (report,) = reports
+    (report,) = policy_reports(random_hex)
     assert report.has(_POLICY_RESULT="violation", _POLICY_MODE="audit")
     assert [f["image"] for f in report["_POLICY_FINDINGS"]] == violations
 
@@ -1271,7 +1363,7 @@ def test_step_summary_pass_skipped_by_default(
         env=summary_env("enforce", random_hex, summary),
     )
     assert result.exit_code == 0
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
     assert summary.read_text() == "untouched\n"
 
 
@@ -1289,8 +1381,7 @@ def test_step_summary_pass(chalk: Chalk, random_hex: str, tmp_path: Path):
         },
     )
     assert result.exit_code == 0
-    # nothing is published to the policy topic when all policies pass
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
     text = summary.read_text()
     assert (
         "> [!TIP]\n> All base images are approved golden images (1 policy checked)."
@@ -1452,7 +1543,7 @@ def test_cert_policy_skips_ignored_files_and_ca_bundles(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def test_cert_policy_con4m_audit(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
@@ -1616,7 +1707,7 @@ def test_secrets_ignores_files_outside_the_image_context(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def registries_json(
@@ -1694,7 +1785,7 @@ def test_registries_allows_pull(chalk: Chalk, random_hex: str):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 # the build is blocked before docker runs, so nothing reaches the registry
@@ -1879,7 +1970,7 @@ def test_packages_allows_clean_context(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def test_packages_audits_languages(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
@@ -1998,7 +2089,7 @@ def test_licenses_pass(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 @pytest.mark.parametrize("on_error, expected_exit", [("allow", 0), ("block", 1)])
@@ -2157,7 +2248,7 @@ def test_sast_enforce_passes(
     _, result = build_sast(chalk, tmp_data_dir, random_hex, sast)
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def test_sast_scans_what_docker_sends(
