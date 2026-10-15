@@ -80,6 +80,9 @@ type
     ## the rule scans `contextDirs`, so a build context it cannot scan is an
     ## error rather than a silent pass
     requiresContext*: bool
+    ## Collects context information when available, with a rule-specific
+    ## fallback rather than automatically treating context errors as findings.
+    usesContext*: bool
     ## Reads the rule's configuration for this evaluation and returns whether
     ## the rule is enabled. Raising reports a configuration error.
     load*:  proc(): bool
@@ -110,11 +113,13 @@ proc newPolicyInputRule*(name: string,
                          check: proc(input: PolicyInput): seq[PolicyFinding],
                          requiresAllSubjects = false,
                          requiresContext = false,
-                         hint: proc(): PolicyHint = nil) =
+                         hint: proc(): PolicyHint = nil,
+                         usesContext = false) =
   ## A rule that sees the whole `PolicyInput`, not just its image subjects.
   newPolicyRule(name, load, nil, requiresAllSubjects, hint)
   registeredRules[^1].checkInput      = check
   registeredRules[^1].requiresContext = requiresContext
+  registeredRules[^1].usesContext     = usesContext
 
 iterator policyRules*(): PolicyRule =
   for rule in registeredRules:

@@ -306,6 +306,49 @@ proc testCache() =
   removeDir(temp)
   clearEnv()
 
+proc testIncompleteCache() =
+  # A later policy's wait must still run, including in the same process.
+  for newProcess in [false, true]:
+    github()
+    let temp = createTempDir("chalk-incomplete-cache-", "")
+    putEnv("RUNNER_TEMP", temp)
+    let warning = {"x-github-dependency-graph-snapshot-warnings": "UGVuZGluZyBzbmFwc2hvdA=="}
+    responses = @[respond(200, "[]", warning)]
+    assertEq(dependencyReview(refs()).snapshotWarnings, "Pending snapshot")
+    if newProcess:
+      reset()
+    responses = @[respond(200, "[]", warning), respond(200, readFile(page2))]
+    let complete = dependencyReview(refs(), waitSeconds = 30)
+    assertEq(complete.snapshotWarnings, "")
+    assertEq(complete.changes.len, 3)
+    assertEq(len(calls), if newProcess: 2 else: 3)
+    assertEq(sleeps, @[10_000])
+    removeDir(temp)
+  clearEnv()
+
+proc testCacheCredentials() =
+  # A missing or insufficient token in an earlier step must not disable
+  # review after credentials change, in memory or on disk.
+  for newProcess in [false, true]:
+    for (token, code) in [("", 0), ("bad-token", 401), ("restricted-token", 403)]:
+      github(token = token)
+      let temp = createTempDir("chalk-auth-cache-", "")
+      putEnv("RUNNER_TEMP", temp)
+      if code != 0:
+        responses = @[respond(code)]
+      assertEq(dependencyReview(refs()).status, rsUnavailable)
+      putEnv("GITHUB_TOKEN", "working-token")
+      if newProcess:
+        reset()
+      let before = len(calls)
+      responses = pages()
+      let complete = dependencyReview(refs())
+      assertEq(complete.status, rsReviewed)
+      assertEq(complete.changes.len, 7)
+      assertEq(len(calls) - before, 2)
+      removeDir(temp)
+  clearEnv()
+
 proc rejects(json, reason: string) =
   let configs = parsePolicyJson("""{"policies": [{"id": "a", "vulnerabilities": """ & json & "}]}")
   doAssert reason in configs[0].configError, configs[0].configError
@@ -516,10 +559,9 @@ proc testCheckReview() =
   assertEq(len(defaults().checkReview(push)), 0)
   assertEq(len(calls), 0)
   doAssert dependencyReviewMark == nil
-  push.pushMarks[0] = mark(%*{"repo": "acme/app", "base": base, "head": head, "result": "unavailable"})
-  assertEq(len(defaults().checkReview(push)), 0)
-  assertEq(len(calls), 0)
   for other in [%*{"repo": "acme/app", "base": base, "head": "3333", "result": "reviewed"},
+                %*{"repo": "acme/app", "base": base, "head": head, "result": "unavailable"},
+                %*{"repo": "acme/app", "base": base, "head": head, "result": "incomplete"},
                 %*{"repo": "acme/app", "base": base, "head": head, "result": "failed"},
                 nil]:
     github()
@@ -536,6 +578,41 @@ proc testCheckReview() =
     # push reviews the whole repository
     assertEq(len(defaults().checkReview(push)), 3)
     doAssert dependencyReviewMark == nil
+  clearEnv()
+
+proc testPushRetriesIncompleteBuild() =
+  github()
+  let temp = createTempDir("chalk-partial-build-", "")
+  putEnv("RUNNER_TEMP", temp)
+  responses = @[respond(200, "[]", {
+    "x-github-dependency-graph-snapshot-warnings": "UGVuZGluZyBzbmFwc2hvdA=="})]
+  assertEq(defaults().checkReview(PolicyInput(command: "build")).len, 0)
+  assertEq(dependencyReviewMark["result"], "incomplete")
+  let built = ChalkDict()
+  built[markKey] = pack(dependencyReviewMark)
+  reset() # a separate chalk push after the snapshots are complete
+  responses = pages()
+  let push = PolicyInput(command: "push", pushTargets: @["app:1"], pushMarks: @[built])
+  assertEq(defaults().checkReview(push).len, 3)
+  assertEq(len(calls), 2)
+  removeDir(temp)
+  clearEnv()
+
+proc testPushRetriesUnavailableBuild() =
+  github(token = "")
+  let temp = createTempDir("chalk-unavailable-build-", "")
+  putEnv("RUNNER_TEMP", temp)
+  assertEq(defaults().checkReview(PolicyInput(command: "build")).len, 0)
+  assertEq(dependencyReviewMark["result"], "unavailable")
+  let built = ChalkDict()
+  built[markKey] = pack(dependencyReviewMark)
+  reset()
+  putEnv("GITHUB_TOKEN", "working-token")
+  responses = pages()
+  let push = PolicyInput(command: "push", pushTargets: @["app:1"], pushMarks: @[built])
+  assertEq(defaults().checkReview(push).len, 3)
+  assertEq(len(calls), 2)
+  removeDir(temp)
   clearEnv()
 
 proc testEngine() =
@@ -555,15 +632,65 @@ proc testEngine() =
   assertEq(md.count("Dependency review is unavailable."), 1)
   doAssert "> [!WARNING]\n> Dependency review is unavailable." in md, md
 
-proc testRequiresContext() =
+proc testUsesContext() =
   loadDependencyReviewRule()
   var found = false
   for rule in policyRules():
     if rule.name == "dependency_review":
       found = true
-      doAssert rule.requiresContext
+      doAssert rule.usesContext
+      doAssert not rule.requiresContext
       doAssert rule.checkInput != nil
   doAssert found
+
+proc testContextFallback() =
+  var rules: seq[PolicyRule]
+  for rule in policyRules():
+    if rule.name == "dependency_review":
+      rules.add(rule)
+  let build = ChalkDict()
+  build["command"] = pack("build")
+  let collect = proc(): PolicyInput = PolicyInput(command: "build")
+  var contexts = 0
+  let collectContext = proc(input: var PolicyInput) =
+    inc(contexts)
+    # Even a partially known context must fall back to the full repository.
+    input.contextDirs = @["/known"]
+    input.repoPath = proc(dir: string): Option[string] = some("services/web")
+    input.contextErrors.add(newSubjectFinding("", "error", "-", "stdin context"))
+  setPolicyJson("""{"mode":"enforce","on_error":"block",
+                    "vulnerabilities":{"enabled":true}}""")
+  # Ineligible events do not collect contexts or acquire context errors.
+  for event in ["local", "push"]:
+    github(event)
+    if event == "local":
+      delEnv("GITHUB_ACTIONS")
+    policyOutcome = nil
+    evaluatePolicies(build, collect, rules, collectContext = collectContext)
+    doAssert policyOutcome == nil
+    assertEq(contexts, 0)
+    assertEq(len(calls), 0)
+  # Unavailable review is a notice, even when context collection fails.
+  for token in ["", "restricted-token"]:
+    github(token = token)
+    responses = @[respond(403)]
+    policyOutcome = nil
+    evaluatePolicies(build, collect, rules, collectContext = collectContext)
+    doAssert policyOutcome == nil
+    assertEq(takePolicyNotices().len, 0) # consumed by the engine
+  # With an available review, uncertain contexts broaden the check and
+  # still block real vulnerabilities, rather than creating context errors.
+  github()
+  responses = pages()
+  policyOutcome = nil
+  doAssertRaises(PolicyViolation):
+    evaluatePolicies(build, collect, rules, collectContext = collectContext)
+  assertEq(policyOutcome.findings.len, 3)
+  for finding in policyOutcome.findings:
+    assertEq(finding.kind, "violation")
+  doAssert contexts > 0
+  setPolicyJson("")
+  clearEnv()
 
 testNextLink()
 testEventRefs()
@@ -572,9 +699,14 @@ testParse()
 testCompare()
 testSnapshotWarnings()
 testCache()
+testIncompleteCache()
+testCacheCredentials()
 testConfig()
 testCheck()
 testContexts()
 testCheckReview()
+testPushRetriesIncompleteBuild()
+testPushRetriesUnavailableBuild()
 testEngine()
-testRequiresContext()
+testUsesContext()
+testContextFallback()

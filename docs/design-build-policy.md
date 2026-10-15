@@ -1381,19 +1381,23 @@ the context within its git work tree; a context in a checkout of another
 repository than `GITHUB_REPOSITORY` is not part of the comparison. When no
 build context is part of the repository (e.g. a remote context), every
 manifest counts and chalk logs a warning, so a vulnerable dependency is never
-let through for not being located. Like other build context rules, a context
-from stdin or a URL is an evaluation error.
+let through for not being located. If any context cannot be collected (e.g.
+stdin or a URL), dependency review checks the whole repository instead.
+Skipped or unavailable dependency reviews never create context findings.
 
 **Scan once.** A job usually builds and then pushes, sometimes several
 images, so the comparison is fetched once per job: per process, and in
-`RUNNER_TEMP` for the job's other chalk commands (not when GitHub reported
-snapshot warnings). Builds record the review in the chalk mark as
+`RUNNER_TEMP` for the job's other chalk commands, with separate entries for
+different credentials. Comparisons with snapshot warnings are never cached,
+so another policy can wait for complete snapshots. Builds record the review
+in the chalk mark as
 `DEPENDENCY_REVIEW` (`repo`, `event`, `base`, `head`, `result`), and
 `docker push` does not review the commits again when the marks of all
-pushed images record a `reviewed` or `unavailable` review of the same
-commits. Otherwise (pulled images, images built for other commits,
-unchalked images) push reviews every manifest of the repository, as there is
-no build context.
+pushed images record a complete `reviewed` review of the same commits.
+`incomplete`, `unavailable` and `failed` reviews are retried on push: the
+snapshots or credentials may have changed. Otherwise (pulled images,
+images built for other commits, unchalked images) push also reviews every
+manifest of the repository, as there is no build context.
 
 **When the review is unavailable.** GitHub answers HTTP 403 when the
 repository has no dependency graph, or is private without GitHub Code

@@ -239,6 +239,10 @@ proc reviewContexts*(input: PolicyInput, refs: ReviewRefs): Option[seq[ReviewCon
   ## none, to review every manifest, when none of them is part of it, e.g.
   ## a remote context or a checkout of another repository, so a vulnerable
   ## dependency is never let through for not being located
+  if len(input.contextErrors) > 0:
+    warnOnce("policy: dependency review: some build contexts could not be located, so " &
+             refs.repo & "'s dependency changes are reviewed outside them too")
+    return none(seq[ReviewContext])
   if input.repoPath == nil:
     return none(seq[ReviewContext])
   var contexts: seq[ReviewContext]
@@ -368,7 +372,8 @@ proc loadDependencyReview(): bool =
   let settings = loadVulnerabilitiesConfig()
   if settings.isSome():
     loaded = settings.get()
-  return settings.isSome()
+  return settings.isSome() and getEnv("GITHUB_ACTIONS") == "true" and
+         getEnv("GITHUB_EVENT_NAME") in loaded.events
 
 proc checkDependencyReview(input: PolicyInput): seq[PolicyFinding] =
   loaded.checkReview(input)
@@ -379,7 +384,6 @@ proc dependencyReviewHint(): PolicyHint =
     result = PolicyHint(rule: ruleName, message: loaded.message)
 
 proc loadDependencyReviewRule*() =
-  # manifests are filtered to the build contexts, which the engine only
-  # collects for rules that require them
+  # Contexts narrow the review when available; otherwise review the repository.
   newPolicyInputRule(ruleName, loadDependencyReview, checkDependencyReview,
-                     requiresContext = true, hint = dependencyReviewHint)
+                     usesContext = true, hint = dependencyReviewHint)

@@ -28,7 +28,7 @@ type
   PolicyCollector* = proc(): PolicyInput {.closure.}
   ## Adds the build context to the input. Separate from `PolicyCollector` as
   ## it may check out a git context, which changes what docker builds, so it
-  ## runs only when an enabled rule `requiresContext`.
+  ## runs only when an enabled rule requires or uses context information.
   PolicyContextCollector* = proc(input: var PolicyInput) {.closure.}
   ## normalized repository the command builds, empty when unknown
   PolicyRepoResolver* = proc(): string {.closure.}
@@ -263,7 +263,7 @@ proc evaluatePolicies*(build:          ChalkDict,
                                          getCurrentExceptionMsg()))
     if collectContext != nil and not contextCollected and not input.collectionFailed:
       for rule in enabled:
-        if rule.requiresContext:
+        if rule.requiresContext or rule.usesContext:
           contextCollected = true
           try:
             collectContext(input)

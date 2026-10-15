@@ -3638,7 +3638,7 @@ and lock files, and which GitHub security advisories affect them, like
 `actions/dependency-review-action`. Only dependencies added in the build
 contexts count (see `dependency_review.context_only`). `chalk docker push`
 reviews the whole repository, unless the pushed images' chalk marks
-record a review of the same commits (`DEPENDENCY_REVIEW`).
+record a complete review of the same commits (`DEPENDENCY_REVIEW`).
 
 Other events, other CI systems and local runs are not reviewed. When the
 repository cannot use dependency review (no dependency graph, a private
@@ -3768,8 +3768,8 @@ deleting a branch). Empty means the default.
     doc: """
 On `chalk docker build`, only dependencies added in manifests inside the
 local build contexts, and not left out by their `.dockerignore`, count.
-When no build context is part of the job's repository, every manifest
-counts.
+When no build context is part of the job's repository, or any context
+cannot be collected, every manifest counts.
 """
   }
 

@@ -352,7 +352,10 @@ proc compareDependencies*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
     reviewSleeper(snapshotRetrySeconds * 1000)
 
 proc cacheKey(refs: ReviewRefs): string =
-  sha256Hex(refs.api & "\0" & refs.repo & "\0" & refs.base & "..." & refs.head)
+  # Availability depends on the credentials of the current step. Keep the
+  # token inside the digest so it is never written to the cache or its path.
+  sha256Hex(refs.api & "\0" & refs.repo & "\0" & refs.base & "..." & refs.head &
+            "\0" & getEnv("GITHUB_TOKEN"))
 
 proc cachePath(key: string): string =
   ## GitHub deletes RUNNER_TEMP at the end of the job, so the comparison is
@@ -398,8 +401,8 @@ proc writeCached(path: string, review: DependencyReview) =
 proc dependencyReview*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
   ## `compareDependencies`, once per process and, in GitHub Actions, once
   ## per job: several builds of a job compare the same commits. Failures are
-  ## only kept for the process, and comparisons with snapshot warnings not
-  ## at all across processes, as a later command may get a complete one.
+  ## only kept for the process. Comparisons with snapshot warnings are never
+  ## cached, so another policy can wait for a complete one.
   let key = refs.cacheKey()
   if key in reviews:
     return reviews[key]
@@ -409,14 +412,16 @@ proc dependencyReview*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
     reviews[key] = cached.get()
     return cached.get()
   result = refs.compareDependencies(waitSeconds)
-  reviews[key] = result
+  if result.snapshotWarnings == "":
+    reviews[key] = result
   if result.status != rsFailed and result.snapshotWarnings == "":
     path.writeCached(result)
 
 proc reviewMark*(refs: ReviewRefs, review: DependencyReview): TableRef[string, string] =
   ## `DEPENDENCY_REVIEW` for an image built after `review`
   let status = case review.status
-               of rsReviewed:    "reviewed"
+               of rsReviewed:
+                 if review.snapshotWarnings == "": "reviewed" else: "incomplete"
                of rsUnavailable: "unavailable"
                of rsFailed:      "failed"
   newTable({"repo": refs.repo, "event": refs.event, "base": refs.base,
@@ -424,14 +429,15 @@ proc reviewMark*(refs: ReviewRefs, review: DependencyReview): TableRef[string, s
 
 proc isReviewedIn*(refs: ReviewRefs, mark: ChalkDict): bool =
   ## whether the build of the image whose chalk mark is `mark` already
-  ## reviewed the same commits; a review that failed is retried
+  ## completely reviewed the same commits; incomplete, unavailable and failed
+  ## reviews are retried, as snapshots and credentials may have changed
   if mark == nil or markKey notin mark:
     return false
   try:
     let node = parseJson(mark[markKey].boxToJson())
     return node{"repo"}.getStr().toLowerAscii() == refs.repo.toLowerAscii() and
            node{"base"}.getStr() == refs.base and node{"head"}.getStr() == refs.head and
-           node{"result"}.getStr() in ["reviewed", "unavailable"]
+           node{"result"}.getStr() == "reviewed"
   except CatchableError:
     trace("policy: could not read " & markKey & " of the chalk mark: " & getCurrentExceptionMsg())
     return false

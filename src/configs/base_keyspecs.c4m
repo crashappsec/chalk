@@ -2142,11 +2142,12 @@ with `policy.vulnerabilities` or `policy.sast`. Fields:
 * `repo` - the `owner/name` repository reviewed
 * `event` - the GitHub event, e.g. `pull_request`
 * `base`, `head` - the commits compared
-* `result` - `reviewed`, `unavailable` (e.g. the repository has no GitHub
-  Code Security) or `failed`
+* `result` - `reviewed`, `incomplete` (GitHub reported snapshot warnings),
+  `unavailable` (e.g. the repository has no GitHub Code Security) or `failed`
 
 `chalk docker push` does not review the commits again for images whose
-mark records a `reviewed` or `unavailable` review of the same commits.
+mark records a complete `reviewed` review of the same commits. Incomplete,
+unavailable and failed reviews are retried.
 """
 }
 
