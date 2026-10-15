@@ -935,7 +935,8 @@ def git_context(path: Path, remote: str) -> Path:
 
 
 def test_report_has_commit_id(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
-    # _COMMIT_ID links the policy report to a PR, as it does for builds
+    # _COMMIT_ID links the policy report to a PR, as it does for builds;
+    # _AUTHOR is the contributor of the policy event, as only this report carries _POLICY_*
     context = git_context(tmp_data_dir, "git@github.com:crashappsec/chalk.git")
     _, result = build(
         chalk,
@@ -948,7 +949,9 @@ def test_report_has_commit_id(chalk: Chalk, random_hex: str, tmp_data_dir: Path)
     )
     assert result.exit_code == 1
     (report,) = policy_reports(random_hex)
-    assert report.has(_COMMIT_ID=Git(context).latest_commit)
+    assert report.has(
+        _COMMIT_ID=Git(context).latest_commit, _AUTHOR=Git(context).author
+    )
 
 
 def test_report_no_commit_id_outside_git(
@@ -966,7 +969,7 @@ def test_report_no_commit_id_outside_git(
     )
     assert result.exit_code == 1
     (report,) = policy_reports(random_hex)
-    assert report.has(_COMMIT_ID=MISSING)
+    assert report.has(_COMMIT_ID=MISSING, _AUTHOR=MISSING)
 
 
 @pytest.mark.parametrize("form", ["single", "list"])

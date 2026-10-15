@@ -32,8 +32,9 @@
   report carries these keys; the Crash Override `build` and `push` reports do
   not. Each policy report carries its
   own `_ACTION_ID`, like every chalk report; correlate it with the build or
-  push report via `BUILD_URI` and `_POLICY_BUILD`. It also carries `_COMMIT_ID` so it
-  can be linked to the pull request that introduced the violation. See
+  push report via `BUILD_URI` and `_POLICY_BUILD`. It also carries `_COMMIT_ID` and
+  `_AUTHOR` so it can be linked to the pull request and contributor that
+  introduced the violation. See
   `docs/design-build-policy.md`.
   A policy can be enforced in selected repositories only via `enforce_repos`
   (glob entries over the normalized `host/owner/name` of the git origin of the

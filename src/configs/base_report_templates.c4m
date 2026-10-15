@@ -2310,6 +2310,7 @@ evaluation for consumers of both reports.
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_URI.use                    = true
   key._COMMIT_ID.use                          = true
+  key._AUTHOR.use                             = true
 }
 
 report_template heartbeat {
