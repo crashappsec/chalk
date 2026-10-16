@@ -3,9 +3,10 @@
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
 import json
+from typing import Optional
 
 from fastapi import HTTPException, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from ..utils.log import get_logger
 from .app import app
@@ -630,3 +631,118 @@ def endpoint(url: str, value: str):
 
 for key, value in RESPONSES.items():
     endpoint(f"{key}", value)
+
+
+# GitHub dependency review (dependency graph comparison), see
+# test_docker_policy.py. The owner selects the behavior and the repository
+# name, unique per test, keys the call counts.
+# https://docs.github.com/en/rest/dependency-graph/dependency-review
+
+
+def dependency_change(
+    manifest: str,
+    name: str,
+    version: str,
+    scope: str = "runtime",
+    change_type: str = "added",
+    vulnerabilities: Optional[list[tuple[str, str, str]]] = None,
+    ecosystem: str = "npm",
+) -> dict:
+    purl_type = "pypi" if ecosystem == "pip" else ecosystem
+    return {
+        "change_type": change_type,
+        "manifest": manifest,
+        "ecosystem": ecosystem,
+        "name": name,
+        "version": version,
+        "package_url": f"pkg:{purl_type}/{name}@{version}",
+        "license": "MIT",
+        "source_repository_url": None,
+        "scope": scope,
+        "vulnerabilities": [
+            {
+                "severity": severity,
+                "advisory_ghsa_id": ghsa,
+                "advisory_summary": summary,
+                "advisory_url": f"https://github.com/advisories/{ghsa}",
+            }
+            for severity, ghsa, summary in vulnerabilities or []
+        ],
+    }
+
+
+DEPENDENCY_CHANGES = [
+    [
+        dependency_change(
+            "svc/package-lock.json",
+            "lodash",
+            "4.17.20",
+            vulnerabilities=[
+                ("high", "GHSA-35jh-r3h4-6jhm", "Command Injection in lodash"),
+                ("moderate", "GHSA-29mw-wpgm-hmr9", "ReDoS in lodash"),
+            ],
+        ),
+        dependency_change(
+            "svc/package-lock.json",
+            "minimist",
+            "1.2.5",
+            scope="development",
+            vulnerabilities=[
+                ("critical", "GHSA-xvch-5gv4-984h", "Prototype Pollution in minimist")
+            ],
+        ),
+    ],
+    [
+        dependency_change(
+            "other/requirements.txt",
+            "pyyaml",
+            "5.3",
+            ecosystem="pip",
+            vulnerabilities=[
+                (
+                    "critical",
+                    "GHSA-8q59-q68h-6hv4",
+                    "Improper Input Validation in PyYAML",
+                )
+            ],
+        ),
+        dependency_change(
+            "svc/package-lock.json",
+            "lodash",
+            "4.17.19",
+            change_type="removed",
+            vulnerabilities=[
+                ("high", "GHSA-p6mc-m468-83gw", "Prototype Pollution in lodash")
+            ],
+        ),
+        dependency_change("svc/package-lock.json", "express", "4.21.2"),
+    ],
+]
+DEPENDENCY_REVIEWS: dict[str, int] = {}
+
+
+@app.get("/repos/{owner}/{repo}/dependency-graph/compare/{basehead}")
+def dependency_graph_compare(
+    owner: str, repo: str, basehead: str, request: Request, page: int = 1
+):
+    key = f"{owner}/{repo}"
+    if page == 1:
+        DEPENDENCY_REVIEWS[key] = DEPENDENCY_REVIEWS.get(key, 0) + 1
+    if request.headers.get("authorization") != "Bearer test-token":
+        return JSONResponse({"message": "Bad credentials"}, status_code=401)
+    if owner == "forbidden":
+        return JSONResponse({"message": "Forbidden"}, status_code=403)
+    if owner == "broken":
+        return JSONResponse({"message": "Server Error"}, status_code=503)
+    if "..." not in basehead:
+        return JSONResponse({"message": "Not Found"}, status_code=404)
+    headers = {}
+    if page < len(DEPENDENCY_CHANGES):
+        url = request.url.include_query_params(page=page + 1)
+        headers["Link"] = f'<{url}>; rel="next"'
+    return JSONResponse(DEPENDENCY_CHANGES[page - 1], headers=headers)
+
+
+@app.get("/dependency-reviews/{owner}/{repo}")
+def dependency_reviews(owner: str, repo: str):
+    return {"calls": DEPENDENCY_REVIEWS.get(f"{owner}/{repo}", 0)}

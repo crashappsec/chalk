@@ -964,9 +964,10 @@ Where the SBOM comes from:
 
 The SBOM describes the build context (manifests and lock files), not the
 built image, so OS packages installed by `RUN apk add` and dependencies
-fetched during the build without a lock file are not seen. Vulnerability
-(CVE) checks are not supported; they need a vulnerability scanner such as
-grype or OSV.
+fetched during the build without a lock file are not seen. Known
+vulnerabilities of dependencies a pull request adds are checked by
+`policy.vulnerabilities` (see "Vulnerable dependencies"); a vulnerability
+scan of every package (e.g. grype or OSV) is not supported yet.
 
 The SBOM comes from `policySboms` in `src/policy/sbom.nim`, shared with the
 other rules that read SBOMs (see "Adding rules").
@@ -1277,6 +1278,134 @@ Set `tool.semgrep.semgrep_format: "json"` for exact `CRITICAL` severities
 and `subcategory`, at the cost of the `SAST` key holding semgrep JSON rather
 than SARIF.
 
+### Vulnerable dependencies
+
+`policy.vulnerabilities` blocks pull requests that add dependencies with
+known vulnerabilities. In a GitHub Actions job for a pull request
+(`pull_request`, `pull_request_target`) or merge queue (`merge_group`), chalk
+asks GitHub's [dependency review API](https://docs.github.com/en/rest/dependency-graph/dependency-review)
+which dependencies the head commit adds over the base commit, read from the
+manifests and lock files GitHub's dependency graph supports, and which GitHub
+security advisories affect them, the same comparison
+[`actions/dependency-review-action`](https://github.com/actions/dependency-review-action)
+makes. It is one layer of several: `sast` checks code, `packages` and
+`licenses` the packages of the build context, `secrets` committed secrets,
+and none of them replaces another.
+
+```json
+{
+  "id": "vulnerabilities@1",
+  "mode": "enforce",
+  "vulnerabilities": {
+    "enabled": true,
+    "min_severity": "high",
+    "scopes": ["runtime"],
+    "ignore_advisories": ["GHSA-35jh-r3h4-6jhm"],
+    "ignore_packages": ["pkg:npm/lodash@<4.17.21"],
+    "ignore_paths": ["test/*"],
+    "max_findings": 0,
+    "message": "Upgrade vulnerable dependencies: https://example.com/appsec",
+    "dependency_review": {
+      "events": ["pull_request", "pull_request_target", "merge_group"],
+      "context_only": true
+    }
+  }
+}
+```
+
+```con4m
+policy {
+  mode: "enforce"
+  vulnerabilities {
+    enabled:      true
+    min_severity: "high"
+    dependency_review {
+      events: ["pull_request", "merge_group"]
+    }
+  }
+}
+```
+
+| Field                                                   | Type           | Default        | Meaning                                                                             |
+| ------------------------------------------------------- | -------------- | -------------- | ----------------------------------------------------------------------------------- |
+| `policy.vulnerabilities.enabled`                        | `bool`         | `false`        | review added dependencies                                                           |
+| `policy.vulnerabilities.min_severity`                   | `string`       | `"high"`       | `low`, `medium` (or `moderate`), `high` or `critical`; lower advisories are ignored |
+| `policy.vulnerabilities.scopes`                         | `list[string]` | `["runtime"]`  | `runtime`, `development`, `unknown`, as GitHub determines them (empty: the default) |
+| `policy.vulnerabilities.ignore_advisories`              | `list[string]` | `[]`           | GitHub advisory id globs to ignore, e.g. `GHSA-35jh-r3h4-6jhm`                      |
+| `policy.vulnerabilities.ignore_packages`                | `list[string]` | `[]`           | purl patterns to ignore, as in `policy.packages.denied`                             |
+| `policy.vulnerabilities.ignore_paths`                   | `list[string]` | `[]`           | repository-relative manifest path globs to ignore                                   |
+| `policy.vulnerabilities.max_findings`                   | `int`          | `0`            | violation only when more vulnerable dependencies count                              |
+| `policy.vulnerabilities.message`                        | `string`       | `""`           | guidance appended to every violation                                                |
+| `policy.vulnerabilities.dependency_review.events`       | `list[string]` | PRs and queues | GitHub events whose jobs are reviewed; `push` is opt-in (empty: the default)        |
+| `policy.vulnerabilities.dependency_review.context_only` | `bool`         | `true`         | only manifests docker sends from the build contexts count                           |
+
+GitHub rates advisories `low`, `moderate`, `high` or `critical`; `moderate`
+is reported as `medium`, the SAST and catalog scale. Each added dependency
+with an advisory that counts is one violation per package and advisory, with
+`subject` its purl, `location` the manifest that adds it (others are listed in
+the reason), `severity` the advisory's and `reason`
+`<severity> <GHSA id>: <summary> (<advisory URL>)` plus `message`, most severe
+first, up to 100 plus one summarizing the rest. Removed and unchanged
+dependencies never count, so a pull request is not blocked for
+vulnerabilities its base branch already has. A version an `ignore_packages`
+range cannot compare is not ignored.
+
+**When it runs.** Only on `chalk docker build`, in GitHub Actions
+(`GITHUB_ACTIONS=true`) for one of `dependency_review.events`. `docker push`
+is not reviewed: it has no build context to narrow the review to, and which
+commits its images were built from is not known reliably (a chalk mark is
+unsigned and inherited through `FROM`), so a push-side review would either
+block on manifests the build ignored or skip images it should not.
+Pull requests compare `pull_request.base.sha`
+and `pull_request.head.sha` of the event payload (`GITHUB_EVENT_PATH`),
+merge groups `merge_group.base_sha` and `head_sha`, and pushes (when listed)
+`before` and `after`; a push creating or deleting a branch has nothing to
+compare. Other events, other CI systems and local runs skip the rule
+silently (trace log). The repository is `GITHUB_REPOSITORY`, the API
+`GITHUB_API_URL` (GitHub Enterprise Server too), and the token
+`GITHUB_TOKEN`, which needs `contents: read` (setup-chalk-action exports the
+job's token). The API version `2026-03-10` is requested from `api.github.com`.
+
+**Build contexts.** With `context_only`, only dependencies added in
+manifests inside a local build context count, and not those its
+`.dockerignore` leaves out, so a monorepo pull request only blocks the
+services whose manifests it changes. Manifests are matched by the path of
+the context within its git work tree, with symlinks resolved on both sides;
+a context in a checkout of another repository than `GITHUB_REPOSITORY`, or
+of a repository without an origin while `GITHUB_REPOSITORY` is set, is not
+part of the comparison. When any
+build context cannot be located in the repository (e.g. a remote context),
+every manifest counts and chalk logs a warning, even if other contexts were
+located, so a vulnerable dependency is never let through for not being
+located. If any context cannot be collected (e.g.
+stdin or a URL), dependency review checks the whole repository instead.
+Skipped or unavailable dependency reviews never create context findings.
+
+The comparison is fetched once per process, as every policy enabling the
+review compares the same commits.
+
+**When the review is unavailable.** GitHub answers HTTP 403 when the
+repository has no dependency graph, or is private without GitHub Code
+Security (or Advanced Security), and 401 for a bad token. Then, and without
+`GITHUB_TOKEN`, chalk logs a warning and adds it to the job summary but the
+policy is not affected: no finding, never `on_error`. Rate limits (429, or
+403 with the limit exhausted; the primary limit resets minutes later, so
+chalk does not retry), server errors, network failures, a 404 (unknown
+commits), malformed responses and comparisons over 10,000 changes are an
+evaluation error that `on_error` decides. GitHub reports incomplete
+snapshots (e.g. a pending
+[dependency submission](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/using-the-dependency-submission-api))
+in the `x-github-dependency-graph-snapshot-warnings` header: chalk logs them
+and evaluates what GitHub returned.
+
+**Not covered.** Dependencies GitHub's dependency graph does not see
+(packages installed by `RUN`, vendored code, ecosystems without supported
+manifests), vulnerabilities of dependencies that are not new in the pull
+request, and builds outside GitHub Actions pull requests. A full vulnerability
+scan of every package, in any CI, needs a vulnerability scanner (e.g. grype
+or OSV) and is not supported yet. Deny or allow lists of packages and
+licenses are the `packages` and `licenses` rules, which read the SBOM.
+
 ## Reporting
 
 Every evaluation is published to the `policy` topic, which is subscribed to
@@ -1423,12 +1552,16 @@ or `chalk docker push` whose evaluated policies report findings appends a short
 Markdown section to the [job summary](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary),
 including when the command is blocked. When every policy passes nothing is
 written, so conformant builds don't add a section to every job; set
-`policy.github_step_summary_on_pass = true` to write one anyway. The section has:
+`policy.github_step_summary_on_pass = true` to write one anyway. Notices, i.e.
+what a rule could not check without it being an evaluation error (e.g. GitHub
+dependency review being unavailable, see "Vulnerable dependencies"), are only
+shown here and also make chalk write the section. The section has:
 
 - an alert stating the outcome: `CAUTION` when blocked, `WARNING` for audit
   violations that `enforce` would block, `NOTE` when policies could only report
   evaluation errors, `TIP` when all passed (only with
   `github_step_summary_on_pass`);
+- a `WARNING` alert per distinct notice;
 - the command and its first image tag;
 - when there are findings, a table of the offending images (digest shortened),
   how each is used (`FROM`, `COPY --from`, `RUN --mount from` and the stage) and

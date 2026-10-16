@@ -35,6 +35,13 @@ type
     message*: string      # configured remediation message
     allowed*: seq[string] # configured allowlist
 
+  PolicyNotice* = object
+    ## something a rule could not check that is neither a finding nor an
+    ## evaluation error, e.g. a GitHub feature the repository lacks; logged
+    ## and shown in the GitHub step summary, not reported
+    rule*:    string
+    message*: string
+
   PolicyResult* = object
     ## outcome of one evaluated policy
     id*:       string
@@ -47,6 +54,7 @@ type
     hasEnforceRepos*: bool
     rules*:    seq[string] # rules it evaluated, named as `rule` in findings
     hints*:    seq[PolicyHint]
+    notices*:  seq[PolicyNotice]
     findings*: seq[PolicyFinding]
 
   PolicyOutcome* = ref object

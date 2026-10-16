@@ -55,6 +55,18 @@
   policy passes. Never affects the command, and can be turned off with
   `policy.github_step_summary = false`.
 
+- New `policy.vulnerabilities` build policy: in GitHub Actions pull request
+  and merge group jobs, chalk asks GitHub's dependency review API which
+  dependencies the pull request adds and blocks (or audits) those with GitHub
+  security advisories at or above `min_severity`, like
+  `actions/dependency-review-action`, with `scopes`, `ignore_advisories`,
+  `ignore_packages`, `ignore_paths`, `max_findings` and `message`. Only
+  manifests inside the build contexts count
+  (`dependency_review.context_only`); `docker push` is not reviewed.
+  Repositories without the dependency graph or GitHub Code Security, or jobs
+  without `GITHUB_TOKEN`, only get a warning in the log and the job summary.
+  See `docs/design-build-policy.md`.
+
 - New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`
   chalk-time host key, which records AI coding agent involvement in a build as
   newline-separated `field=value` records: `build_agent=` (the agent harness

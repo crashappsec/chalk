@@ -2315,3 +2315,374 @@ def test_sast_without_results_honors_on_error(
             }
         ],
     )
+
+
+# GitHub dependency review of pull requests, served by the imds server, whose
+# comparison adds lodash (high, svc/), minimist (critical, development scope,
+# svc/) and pyyaml (critical, other/)
+REVIEW_BASE = "1" * 40
+REVIEW_HEAD = "2" * 40
+LODASH = "pkg:npm/lodash@4.17.20"
+MINIMIST = "pkg:npm/minimist@1.2.5"
+PYYAML = "pkg:pypi/pyyaml@5.3"
+
+
+def review_env(
+    tmp_path: Path,
+    server_imds: str,
+    repo: str,
+    event: str = "pull_request",
+    head: str = REVIEW_HEAD,
+    token: str = "test-token",
+) -> dict[str, str]:
+    payload = {"pull_request": {"base": {"sha": REVIEW_BASE}, "head": {"sha": head}}}
+    if event == "push":
+        payload = {"before": REVIEW_BASE, "after": head}
+    path = tmp_path / f"event-{event}-{head[:8]}.json"
+    path.write_text(json.dumps(payload))
+    return {
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_EVENT_NAME": event,
+        "GITHUB_EVENT_PATH": str(path),
+        "GITHUB_REPOSITORY": repo,
+        "GITHUB_SERVER_URL": "https://github.com",
+        "GITHUB_API_URL": server_imds,
+        "GITHUB_TOKEN": token,
+    }
+
+
+def dependency_reviews(server_imds: str, repo: str) -> int:
+    response = requests.get(f"{server_imds}/dependency-reviews/{repo}")
+    response.raise_for_status()
+    return response.json()["calls"]
+
+
+def monorepo(path: Path, repo: str) -> Path:
+    """a checkout of the GitHub repository `repo` whose svc/ directory is built"""
+    for manifest in ["svc/package-lock.json", "other/requirements.txt"]:
+        (path / manifest).parent.mkdir(parents=True, exist_ok=True)
+        (path / manifest).write_text("{}\n")
+    Git(path).init(remote=f"https://github.com/{repo}.git").add().commit("init")
+    return path / "svc"
+
+
+def build_review(
+    chalk: Chalk,
+    random_hex: str,
+    context: Path,
+    env: dict[str, str],
+    mode: str = "enforce",
+    vulnerabilities: Optional[dict] = None,
+    on_error: str = "allow",
+    **kwargs,
+):
+    config: dict = {"id": "vulns@1", "mode": mode, "on_error": on_error}
+    if vulnerabilities is not None:
+        config["vulnerabilities"] = {"enabled": True, **vulnerabilities}
+    return build_json(
+        chalk,
+        "FROM alpine\nCMD true\n",
+        json.dumps(config),
+        random_hex,
+        context=context,
+        env=env,
+        **kwargs,
+    )
+
+
+def test_dependency_review_enforce_blocks(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    repo = f"vulnerable/{random_hex}"
+    summary = tmp_path / "summary.md"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        {
+            **review_env(tmp_path, server_imds, repo),
+            "GITHUB_STEP_SUMMARY": str(summary),
+        },
+        vulnerabilities={"message": "Upgrade it"},
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    assert dependency_reviews(server_imds, repo) == 1
+    (report,) = policy_reports(random_hex)
+    # only svc/ is built, and minimist is a development dependency
+    assert report.has(
+        _POLICY_RESULT="blocked",
+        _POLICY_FINDINGS=[
+            {
+                "policy_id": "vulns@1",
+                "rule": "dependency_review",
+                "kind": "violation",
+                "subject": LODASH,
+                "location": "svc/package-lock.json",
+                "severity": "high",
+                "reason": "high GHSA-35jh-r3h4-6jhm: Command Injection in lodash "
+                "(https://github.com/advisories/GHSA-35jh-r3h4-6jhm). Upgrade it",
+            }
+        ],
+    )
+    text = summary.read_text()
+    assert f"| `{LODASH}` svc/package-lock.json | - | vulns@1 |" in text
+    assert "**How to fix:** Upgrade it." in text
+
+
+def test_dependency_review_audit_reviews_repository(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    repo = f"vulnerable/{random_hex}"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        review_env(tmp_path, server_imds, repo),
+        mode="audit",
+        vulnerabilities={
+            "min_severity": "critical",
+            "scopes": ["runtime", "development"],
+            "dependency_review": {"context_only": False},
+        },
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="violation")
+    assert sorted(f["subject"] for f in report["_POLICY_FINDINGS"]) == [
+        MINIMIST,
+        PYYAML,
+    ]
+    assert result.mark.has(DEPENDENCY_REVIEW=MISSING)
+
+
+def test_dependency_review_other_checkout_reviews_repository(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    # a context in a checkout of another repository than the job's (or of
+    # one without an origin) cannot be located in the comparison, so every
+    # manifest counts rather than none
+    repo = f"vulnerable/{random_hex}"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, f"acme/{random_hex}"),
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert sorted(f["subject"] for f in report["_POLICY_FINDINGS"]) == [LODASH, PYYAML]
+
+
+@pytest.mark.parametrize("unmapped_main", [False, True])
+def test_dependency_review_mixed_contexts_review_repository(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    unmapped_main: bool,
+):
+    repo = f"vulnerable/{random_hex}"
+    known = monorepo(tmp_data_dir, repo)
+    unmapped = tmp_path / "copied-context"
+    unmapped.mkdir()
+    (unmapped / "requirements.txt").write_text("pyyaml==5.3\n")
+    main, extra = (unmapped, known) if unmapped_main else (known, unmapped)
+    _, result = build_review(
+        chalk,
+        random_hex,
+        main,
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        tag=random_hex,
+        named_contexts={"extra": extra},
+        buildx=True,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="blocked")
+    assert sorted(f["subject"] for f in report["_POLICY_FINDINGS"]) == [LODASH, PYYAML]
+    assert "some build contexts could not be located" in result.logs
+
+
+def test_dependency_review_symlinked_context(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    # the context is located in its work tree with symlinks resolved, as
+    # libgit2 reports the work tree; otherwise no manifest matches and the
+    # build passes with zero findings
+    repo = f"vulnerable/{random_hex}"
+    monorepo(tmp_data_dir, repo)
+    link = tmp_path / "workspace"
+    link.symlink_to(tmp_data_dir, target_is_directory=True)
+    _, result = build_review(
+        chalk,
+        random_hex,
+        link / "svc",
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="blocked")
+    assert [f["subject"] for f in report["_POLICY_FINDINGS"]] == [LODASH]
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        # push is not reviewed by default
+        {"GITHUB_EVENT_NAME": "push"},
+        {"GITHUB_ACTIONS": ""},
+    ],
+)
+def test_dependency_review_skipped_outside_pull_requests(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    env: dict[str, str],
+):
+    repo = f"vulnerable/{random_hex}"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        {**review_env(tmp_path, server_imds, repo), **env},
+        vulnerabilities={},
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_RESULT="pass",
+        _POLICY_FINDINGS=[],
+        _POLICY_RESULTS=[{"id": "vulns@1", "result": "pass", "rules": []}],
+    )
+    assert dependency_reviews(server_imds, repo) == 0
+
+
+@pytest.mark.parametrize(
+    "owner, token", [("forbidden", "test-token"), ("vulnerable", "")]
+)
+def test_dependency_review_unavailable_only_warns(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    owner: str,
+    token: str,
+):
+    repo = f"{owner}/{random_hex}"
+    summary = tmp_path / "summary.md"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        {
+            **review_env(tmp_path, server_imds, repo, token=token),
+            "GITHUB_STEP_SUMMARY": str(summary),
+        },
+        vulnerabilities={},
+        on_error="block",
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_RESULT="pass",
+        _POLICY_FINDINGS=[],
+        _POLICY_RESULTS=[
+            {"id": "vulns@1", "result": "pass", "rules": ["dependency_review"]}
+        ],
+    )
+    assert dependency_reviews(server_imds, repo) == (1 if token else 0)
+    text = summary.read_text()
+    assert (
+        f"> [!WARNING]\n> Dependency review of {repo} is unavailable, so "
+        "policy.vulnerabilities cannot check the dependencies this pull request "
+        "adds for vulnerabilities: " in text
+    )
+    assert "| vulns@1 | enforce | default mode | pass | 0 |" in text
+
+
+@pytest.mark.parametrize("on_error, exit_code", [("allow", 0), ("block", 1)])
+def test_dependency_review_failure_honors_on_error(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    on_error: str,
+    exit_code: int,
+):
+    repo = f"broken/{random_hex}"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        on_error=on_error,
+        tag=random_hex,
+        ignore_errors=True,
+        expected_success=exit_code == 0,
+    )
+    assert result.exit_code == exit_code
+    # one request, no retries
+    assert dependency_reviews(server_imds, repo) == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_FINDINGS=[
+            {
+                "rule": "dependency_review",
+                "kind": "error",
+                "subject": repo,
+                "reason": re.compile(
+                    r"^dependency review failed: GitHub returned HTTP 503"
+                ),
+            }
+        ],
+    )
+
+
+def test_dependency_review_push_not_reviewed(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    # only builds are reviewed: a push has no build context, and what its
+    # images were built from is not known reliably
+    repo = f"vulnerable/{random_hex}"
+    tag = f"{REGISTRY}/{random_hex}"
+    env = review_env(tmp_path, server_imds, repo)
+    build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        env,
+        mode="audit",
+        vulnerabilities={},
+        tag=tag,
+    )
+    assert dependency_reviews(server_imds, repo) == 1
+    config = json.dumps(
+        {"id": "vulns@1", "mode": "enforce", "vulnerabilities": {"enabled": True}}
+    )
+    _, result = push_json(chalk, tag, config, random_hex, env=env)
+    assert result.exit_code == 0
+    assert dependency_reviews(server_imds, repo) == 1
+    pushed = policy_reports(random_hex)[-1]
+    assert pushed.has(_OPERATION="push", _POLICY_RESULT="pass", _POLICY_FINDINGS=[])

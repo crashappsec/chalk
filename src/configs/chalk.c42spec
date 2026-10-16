@@ -2558,6 +2558,7 @@ See `docs/design-build-policy.md` in the chalk repository for details.
   allow packages
   allow licenses
   allow sast
+  allow vulnerabilities
 
   field mode {
     type:     string
@@ -3609,6 +3610,142 @@ decides.
     shortdoc: "Message shown on violation"
     doc: """
 Additional guidance shown to the user and included in the report.
+"""
+  }
+
+}
+
+singleton vulnerabilities {
+  user_def_ok:   false
+  allow dependency_review
+  doc: """
+Blocks builds that add dependencies with known vulnerabilities. In GitHub
+Actions jobs for the `dependency_review.events` (pull requests and merge
+groups by default), chalk asks GitHub's dependency graph which
+dependencies the head commit adds over the base commit, from manifests
+and lock files, and which GitHub security advisories affect them, like
+`actions/dependency-review-action`. Only dependencies added in the build
+contexts count (see `dependency_review.context_only`). Only `chalk docker
+build` is reviewed, not `docker push`.
+
+Other events, other CI systems and local runs are not reviewed. When the
+repository cannot use dependency review (no dependency graph, a private
+repository without GitHub Code Security, or no `GITHUB_TOKEN`), chalk
+logs a warning and adds it to the job summary but the policy is not
+affected. Other API failures are evaluation errors and `on_error`
+decides.
+
+See `docs/design-build-policy.md` in the chalk repository for details.
+"""
+
+  field enabled {
+    type:     bool
+    default:  false
+    shortdoc: "Enable the vulnerabilities policy"
+    doc: """
+Review the dependencies pull requests add for known vulnerabilities.
+"""
+  }
+
+  field min_severity {
+    type:     string
+    default:  "high"
+    choices:  ["low", "moderate", "medium", "high", "critical"]
+    shortdoc: "Lowest advisory severity that is a violation"
+    doc: """
+Vulnerabilities of lower severity are ignored. GitHub's `moderate` is
+`medium`.
+"""
+  }
+
+  field scopes {
+    type:     list[string]
+    default:  ["runtime"]
+    shortdoc: "Dependency scopes that count"
+    doc: """
+`runtime`, `development` and/or `unknown`, as GitHub determines them from
+the manifest. Empty means `["runtime"]`.
+"""
+  }
+
+  field ignore_advisories {
+    type:     list[string]
+    default:  []
+    shortdoc: "Advisory ids (globs) to ignore"
+    doc: """
+Vulnerabilities whose GitHub advisory id matches one of these globs are
+ignored, e.g. `GHSA-35jh-r3h4-6jhm`.
+"""
+  }
+
+  field ignore_packages {
+    type:     list[string]
+    default:  []
+    shortdoc: "Packages (purl patterns) to ignore"
+    doc: """
+Packages matching one of these purl patterns, as in
+`policy.packages.denied`, are ignored, e.g. `pkg:npm/lodash@<4.17.21`.
+"""
+  }
+
+  field ignore_paths {
+    type:     list[string]
+    default:  []
+    shortdoc: "Manifest paths (globs) to ignore"
+    doc: """
+Dependencies added in manifests whose repository-relative path matches one
+of these globs are ignored, e.g. `test/*`. `*` matches across `/`.
+"""
+  }
+
+  field max_findings {
+    type:     int
+    default:  0
+    shortdoc: "Number of vulnerable dependencies tolerated"
+    doc: """
+The policy is violated when more vulnerable dependencies (one per package
+and advisory) count than this.
+"""
+  }
+
+  field message {
+    type:     string
+    default:  ""
+    shortdoc: "Message shown on violation"
+    doc: """
+Additional guidance shown to the user and included in the report.
+"""
+  }
+}
+
+singleton dependency_review {
+  user_def_ok:   false
+  doc: """
+How `policy.vulnerabilities` reviews dependency changes with GitHub's
+dependency review API.
+"""
+
+  field events {
+    type:     list[string]
+    default:  ["pull_request", "pull_request_target", "merge_group"]
+    shortdoc: "GitHub events whose jobs are reviewed"
+    doc: """
+`pull_request`, `pull_request_target`, `merge_group` and/or `push`. Pull
+requests compare their base and head commits, merge groups theirs, and
+pushes the commits before and after the push (not a push creating or
+deleting a branch). Empty means the default.
+"""
+  }
+
+  field context_only {
+    type:     bool
+    default:  true
+    shortdoc: "Only count manifests in the build contexts"
+    doc: """
+Only dependencies added in manifests inside the local build contexts, and
+not left out by their `.dockerignore`, count. When any build context cannot
+be located in the job's repository or cannot be collected, every manifest
+counts.
 """
   }
 }
