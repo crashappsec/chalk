@@ -9,6 +9,7 @@
 
 import ".."/[
   plugin_api,
+  policy/github,
   policy/state,
   types,
 ]
@@ -20,7 +21,7 @@ proc policyGetChalkTimeArtifactInfo*(self: Plugin,
   ## record the dependency review they did, see `dependencyReviewMark`
   result = ChalkDict()
   if dependencyReviewMark != nil:
-    result["DEPENDENCY_REVIEW"] = pack(dependencyReviewMark)
+    result[markKey] = pack(dependencyReviewMark)
 
 proc policyGetRunTimeHostInfo*(self: Plugin,
                                objs: seq[ChalkObj]):

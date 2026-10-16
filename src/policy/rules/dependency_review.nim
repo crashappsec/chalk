@@ -177,9 +177,12 @@ proc counts*(settings: VulnerabilitiesConfig, change: DependencyChange,
              vulnerability: DependencyVulnerability): bool =
   ## whether `vulnerability` of `change` is a violation under `settings`;
   ## see `check` for the build context
+  let severity = vulnerability.severity.rank()
   change.changeType == "added" and
     change.scope.toLowerAscii() in settings.scopes and
-    vulnerability.severity.rank() >= settings.minSeverity.rank() and
+    # a rating chalk does not know, e.g. a level GitHub adds later, always
+    # counts rather than silently passing
+    (severity < 0 or severity >= settings.minSeverity.rank()) and
     not settings.ignoreAdvisories.matchesAny(vulnerability.ghsaId) and
     not settings.ignorePaths.matchesAny(change.manifest) and
     not settings.isIgnoredPackage(change)

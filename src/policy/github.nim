@@ -91,22 +91,24 @@ type
   ReviewSleeper* = proc(ms: int)
 
 proc fetch(url: string, headers: HttpHeaders): GithubResponse =
-  # status codes are handled by `fetchPage`, which knows which to retry
-  let response = safeRequest(url            = url,
-                             httpMethod     = HttpGet,
-                             headers        = headers,
-                             connectRetries = 2,
-                             timeout        = requestTimeoutMs)
+  # status codes and connection errors are handled by `fetchPage`, the one
+  # retry authority, so retry layers do not multiply
+  let response = safeRequest(url        = url,
+                             httpMethod = HttpGet,
+                             headers    = headers,
+                             timeout    = requestTimeoutMs)
   GithubResponse(code: int(response.code()), body: response.body(), headers: response.headers)
 
 var
   githubFetcher*: GithubFetcher = fetch
   reviewSleeper*: ReviewSleeper = proc(ms: int) = sleep(ms)
   reviews = initTable[string, DependencyReview]()
+  incomplete = initTable[string, tuple[review: DependencyReview, waitSeconds: int]]()
   warned: seq[string]
 
 proc clearDependencyReviewCache*() =
   reviews.clear()
+  incomplete.clear()
   warned = @[]
 
 proc warnOnce*(message: string) =
@@ -193,6 +195,11 @@ proc parseChanges*(body: string): seq[DependencyChange] =
   for item in doc:
     if item.kind != JObject:
       raise newException(ValueError, "the dependency graph comparison lists a non-object")
+    var scope = item{"scope"}.getStr()
+    if scope == "":
+      # GitHub Enterprise Server may omit it; runtime, as the action assumes:
+      # https://github.com/actions/dependency-review-action/blob/main/src/filter.ts
+      scope = "runtime"
     var change = DependencyChange(
       changeType: item{"change_type"}.getStr(),
       manifest:   item{"manifest"}.getStr(),
@@ -200,7 +207,7 @@ proc parseChanges*(body: string): seq[DependencyChange] =
       name:       item{"name"}.getStr(),
       version:    item{"version"}.getStr(),
       packageUrl: item{"package_url"}.getStr(),
-      scope:      item{"scope"}.getStr(),
+      scope:      scope,
     )
     for v in item{"vulnerabilities"}.getElems():
       if v.kind != JObject:
@@ -240,11 +247,20 @@ proc requestHeaders(api, token: string): HttpHeaders =
   if parseUri(api).hostname.toLowerAscii() == "api.github.com":
     result["X-GitHub-Api-Version"] = apiVersion
 
+proc portOf(u: Uri): string =
+  ## an explicit scheme-default port and none are the same origin
+  if u.port != "":
+    return u.port
+  case u.scheme.toLowerAscii()
+  of "http":  "80"
+  of "https": "443"
+  else:       ""
+
 proc sameOrigin(a, b: string): bool =
   ## so the token is never sent to a host a `Link` header names
   let (x, y) = (parseUri(a), parseUri(b))
   x.scheme.toLowerAscii() == y.scheme.toLowerAscii() and
-    x.hostname.toLowerAscii() == y.hostname.toLowerAscii() and x.port == y.port
+    x.hostname.toLowerAscii() == y.hostname.toLowerAscii() and x.portOf() == y.portOf()
 
 proc isRateLimited(response: GithubResponse): bool =
   # https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#exceeding-the-rate-limit
@@ -337,7 +353,11 @@ proc compareDependencies*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
   let token = getEnv("GITHUB_TOKEN")
   if token == "":
     return unavailable("GITHUB_TOKEN is not set")
+  # both the sleeps asked for and the wall clock count toward the deadline,
+  # so a `snapshot_wait_seconds` of one retry interval still retries once
+  # and slow fetches do not extend the wait
   let deadline = epochTime() + float(waitSeconds)
+  var waited = 0
   while true:
     try:
       result = fetchComparison(refs, token)
@@ -345,11 +365,12 @@ proc compareDependencies*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
       return failed("could not compare the dependencies of " & $refs & ": " &
                     getCurrentExceptionMsg())
     if result.status != rsReviewed or result.snapshotWarnings.strip() == "" or
-       epochTime() + float(snapshotRetrySeconds) > deadline:
+       waited >= waitSeconds or epochTime() >= deadline:
       return
     trace("policy: dependency graph snapshot warnings, retrying in " & $snapshotRetrySeconds &
           "s: " & result.snapshotWarnings)
     reviewSleeper(snapshotRetrySeconds * 1000)
+    waited += snapshotRetrySeconds
 
 proc cacheKey(refs: ReviewRefs): string =
   # Availability depends on the credentials of the current step. Keep the
@@ -375,7 +396,11 @@ proc readCached(path: string): Option[DependencyReview] =
     of "reviewed":    review.status = rsReviewed
     of "unavailable": review.status = rsUnavailable
     else: return none(DependencyReview)
-    review.changes = parseChanges($doc{"changes"})
+    let changes = doc{"changes"}
+    # a truncated or foreign file: `$nil` would be a Defect, not catchable
+    if changes == nil or changes.kind != JArray:
+      return none(DependencyReview)
+    review.changes = parseChanges($changes)
     trace("policy: dependency review read from " & path)
     return some(review)
   except CatchableError:
@@ -402,10 +427,14 @@ proc dependencyReview*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
   ## `compareDependencies`, once per process and, in GitHub Actions, once
   ## per job: several builds of a job compare the same commits. Failures are
   ## only kept for the process. Comparisons with snapshot warnings are never
-  ## cached, so another policy can wait for a complete one.
+  ## written to the job cache, and are only reused in-process for an equal
+  ## or shorter wait, so another policy configuring a longer
+  ## snapshot_wait_seconds can still wait for a complete one.
   let key = refs.cacheKey()
   if key in reviews:
     return reviews[key]
+  if key in incomplete and waitSeconds <= incomplete[key].waitSeconds:
+    return incomplete[key].review
   let path = key.cachePath()
   let cached = path.readCached()
   if cached.isSome():
@@ -414,8 +443,10 @@ proc dependencyReview*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
   result = refs.compareDependencies(waitSeconds)
   if result.snapshotWarnings == "":
     reviews[key] = result
-  if result.status != rsFailed and result.snapshotWarnings == "":
-    path.writeCached(result)
+    if result.status != rsFailed:
+      path.writeCached(result)
+  else:
+    incomplete[key] = (review: result, waitSeconds: waitSeconds)
 
 proc reviewMark*(refs: ReviewRefs, review: DependencyReview): TableRef[string, string] =
   ## `DEPENDENCY_REVIEW` for an image built after `review`

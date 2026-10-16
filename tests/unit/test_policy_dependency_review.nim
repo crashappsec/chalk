@@ -104,6 +104,13 @@ proc testNextLink() =
   assertEq(nextLink("<https://a/x?page=2>;rel=next"), "https://a/x?page=2")
   assertEq(nextLink(""), "")
   assertEq(nextLink("https://a/x; rel=\"next\""), "")
+  # a target URL may contain commas, e.g. a branch name in the basehead
+  assertEq(nextLink("<https://a/compare/x,y...z?page=2>; rel=\"next\""),
+           "https://a/compare/x,y...z?page=2")
+  assertEq(nextLink("<https://a/x?v=1,2>; rel=\"prev\", <https://a/x?v=2,3>; rel=\"next\""),
+           "https://a/x?v=2,3")
+  assertEq(nextLink("<https://a/x?v=1,2>; rel=\"next\", <https://a/x?v=2,3>; rel=\"last\""),
+           "https://a/x?v=1,2")
 
 proc testEventRefs() =
   assertEq(eventRefs("pull_request", prPayload()), (base, head))
@@ -160,6 +167,10 @@ proc testParse() =
   assertEq(len(changes[0].vulnerabilities), 2)
   assertEq(changes[0].vulnerabilities[1].severity, "moderate")
   assertEq(changes[0].vulnerabilities[0].ghsaId, "GHSA-35jh-r3h4-6jhm")
+  # GHES may omit the scope; runtime, as actions/dependency-review-action assumes
+  let unscoped = parseChanges("""[{"change_type": "added", "manifest": "go.mod",
+                                   "ecosystem": "go", "name": "x", "vulnerabilities": []}]""")
+  assertEq(unscoped[0].scope, "runtime")
   for bad in ["{}", "[1]", "not json"]:
     try:
       discard parseChanges(bad)
@@ -190,6 +201,14 @@ proc testCompare() =
   assertEq(compareDependencies(ghes).status, rsReviewed)
   doAssert not calls[0].headers.hasKey("X-GitHub-Api-Version")
   doAssert calls[0].url.startsWith("https://ghe.example.com/api/v3/repos/acme/app/")
+
+  # an explicit scheme-default port and none are the same origin
+  reset()
+  ghes.api = "https://ghe.example.com:443/api/v3"
+  responses = @[respond(200, "[]", {"Link": "<https://ghe.example.com/api/v3/x?page=2>; rel=\"next\""}),
+                respond(200)]
+  assertEq(compareDependencies(ghes).status, rsReviewed)
+  assertEq(len(calls), 2)
 
   # no Code Security, dependency graph off or a token that cannot read it
   for code in [401, 403]:
@@ -265,6 +284,20 @@ proc testSnapshotWarnings() =
   assertEq(len(review.changes), 3)
   assertEq(len(calls), 2)
   assertEq(sleeps, @[10_000])
+  # a wait of one retry interval still retries once
+  reset()
+  responses = @[respond(200, "[]", warning), respond(200, readFile(page2))]
+  review = compareDependencies(refs(), waitSeconds = 10)
+  assertEq(review.snapshotWarnings, "")
+  assertEq(sleeps, @[10_000])
+  # persistent warnings stop at the deadline
+  reset()
+  responses = @[respond(200, "[]", warning), respond(200, "[]", warning),
+                respond(200, "[]", warning)]
+  review = compareDependencies(refs(), waitSeconds = 20)
+  assertEq(review.snapshotWarnings, "Pending snapshot")
+  assertEq(len(calls), 3)
+  assertEq(sleeps, @[10_000, 10_000])
 
 proc testCache() =
   github()
@@ -284,6 +317,14 @@ proc testCache() =
   assertEq(len(calls), 0)
   assertEq(cached.status, rsReviewed)
   assertEq(cached.changes, reviewed().changes)
+
+  # a truncated or foreign cache file is ignored and the review re-fetched
+  for file in walkFiles(temp / "chalk-dependency-review-*.json"):
+    writeFile(file, """{"status": "reviewed"}""")
+  reset()
+  responses = pages()
+  assertEq(dependencyReview(refs()).changes.len, 7)
+  assertEq(len(calls), 2)
 
   # unavailable is kept too, failures only for the process
   var other = refs()
@@ -317,6 +358,10 @@ proc testIncompleteCache() =
     assertEq(dependencyReview(refs()).snapshotWarnings, "Pending snapshot")
     if newProcess:
       reset()
+    else:
+      # an equal or shorter wait reuses the incomplete review in-process
+      assertEq(dependencyReview(refs()).snapshotWarnings, "Pending snapshot")
+      assertEq(len(calls), 1)
     responses = @[respond(200, "[]", warning), respond(200, readFile(page2))]
     let complete = dependencyReview(refs(), waitSeconds = 30)
     assertEq(complete.snapshotWarnings, "")
@@ -451,6 +496,12 @@ proc testCheck() =
   findings = settings.check(review)
   assertEq(findings.subjects(), @[lodash])
   doAssert findings[0].reason.endsWith(". Upgrade it"), findings[0].reason
+
+  # a rating chalk does not know always counts rather than silently passing
+  let added = DependencyChange(changeType: "added", scope: "runtime")
+  for severity in ["ultra", ""]:
+    doAssert defaults().counts(added, DependencyVulnerability(severity: severity,
+                                                              ghsaId: "GHSA-new"))
 
   settings = defaults()
   settings.maxFindings = 3
