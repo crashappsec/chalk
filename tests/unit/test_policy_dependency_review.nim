@@ -718,7 +718,7 @@ proc testContextFallback() =
       delEnv("GITHUB_ACTIONS")
     policyOutcome = nil
     evaluatePolicies(build, collect, rules, collectContext = collectContext)
-    doAssert policyOutcome == nil
+    doAssert policyOutcome.result == "pass" and policyOutcome.findings.len == 0
     assertEq(contexts, 0)
     assertEq(len(calls), 0)
   # Unavailable review is a notice, even when context collection fails.
@@ -727,7 +727,7 @@ proc testContextFallback() =
     responses = @[respond(403)]
     policyOutcome = nil
     evaluatePolicies(build, collect, rules, collectContext = collectContext)
-    doAssert policyOutcome == nil
+    doAssert policyOutcome.result == "pass" and policyOutcome.findings.len == 0
     assertEq(takePolicyNotices().len, 0) # consumed by the engine
   # With an available review, uncertain contexts broaden the check and
   # still block real vulnerabilities, rather than creating context errors.
