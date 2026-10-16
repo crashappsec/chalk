@@ -2277,10 +2277,12 @@ report_template usage {
 }
 
 report_template policy_report {
-  shortdoc: "Report for build policy violations"
+  shortdoc: "Report for build policy evaluations"
   doc: """
-Published to the `policy` topic when build policies produce a violation
-or an evaluation error.
+Published to the `policy` topic whenever build policies are evaluated,
+including when every policy passes. Only this report carries the
+`_POLICY_*` keys; adding them to other templates duplicates each policy
+evaluation for consumers of both reports.
 """
   key._POLICY_MODE.use                        = true
   key._POLICY_ID.use                          = true
@@ -2308,6 +2310,7 @@ or an evaluation error.
   key.BUILD_ORIGIN_OWNER_ID.use               = true
   key.BUILD_ORIGIN_URI.use                    = true
   key._COMMIT_ID.use                          = true
+  key._AUTHOR.use                             = true
 }
 
 report_template heartbeat {

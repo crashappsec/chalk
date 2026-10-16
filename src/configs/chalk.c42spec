@@ -2543,9 +2543,10 @@ the image. Images whose mark does not record it (the default mark
 templates do not), unchalked images and marks that keep it in an object
 store pass these rules.
 
-Violations and evaluation errors are published to the `policy` topic
-using the `policy_report` report template. Nothing is published when
-all policies pass.
+Every evaluation is published to the `policy` topic using the
+`policy_report` report template, including when all policies pass
+(`_POLICY_RESULT` is then `pass`). Only that report carries the
+`_POLICY_*` keys.
 
 See `docs/design-build-policy.md` in the chalk repository for details.
 """

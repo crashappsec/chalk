@@ -252,9 +252,14 @@ proc testAuditAndEnforceDecideIndependently() =
   doAssert policyOutcome.findings[0].policyId == "golden-images@3"
   doAssert policyOutcome.findings[1].policyId == "chainguard-only@1"
 
-  # all pass: nothing is reported
+  # all pass: still reported
   (blocked, collected) = evaluateJson(multi, @[subject("cgr.dev/chainguard/static")])
-  doAssert not blocked and policyOutcome == nil
+  doAssert not blocked
+  doAssert policyOutcome.result == "pass" and policyOutcome.mode == "enforce"
+  doAssert results() == @[("golden-images@3", "pass"), ("chainguard-only@1", "pass")]
+  doAssert policyOutcome.findings.len == 0
+  for r in policyOutcome.policies:
+    doAssert r.rules == @["golden_images"]
 
 proc testOnErrorPerPolicy() =
   let doc = """{"policies": [

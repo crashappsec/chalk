@@ -1,4 +1,4 @@
-import std/[strutils]
+import std/[json, strutils]
 import ../../src/types
 import ../../src/policy/engine
 import ../../src/policy/rules/golden_images
@@ -36,7 +36,7 @@ proc testCollectionErrorsOnlyForRulesNeedingAllSubjects() =
   # e.g. pushing an unchalked image with only custom_check configured
   let input = PolicyInput(errors: @[collectionError("image is not chalked", "img")])
   doAssert not evaluate("enforce", "block", @[rule("custom_check", false)], input)
-  doAssert policyOutcome == nil
+  doAssert policyOutcome.result == "pass" and policyOutcome.findings.len == 0
   doAssert evaluate("enforce", "block",
                     @[rule("custom_check", false), rule("a", true), rule("b", true)], input)
   doAssert policyOutcome.findings.len == 2
@@ -65,6 +65,48 @@ proc testGoldenImagesRule() =
   doAssert evaluate("enforce", "allow", @[golden], PolicyInput(subjects: @[subject]))
   doAssert not evaluate("audit", "allow", @[golden], PolicyInput(subjects: @[subject]))
   doAssert policyOutcome.result == "violation"
+  doAssert policyOutcome.policies[0].rules == @["golden_images"]
+
+proc testAllPassIsReported() =
+  # every evaluation is reported, not only those with findings
+  doAssert not evaluate("enforce", "block",
+                        @[rule("golden_images", true), rule("registries", false)], PolicyInput())
+  doAssert policyOutcome.result == "pass" and policyOutcome.mode == "enforce"
+  doAssert policyOutcome.findings.len == 0
+  doAssert policyOutcome.policies[0].result == "pass"
+  let report = policyOutcome.asChalkDict()
+  doAssert unpack[string](report["_POLICY_RESULT"]) == "pass"
+  doAssert unpack[seq[Box]](report["_POLICY_FINDINGS"]).len == 0
+  let results = parseJson(boxToJson(report["_POLICY_RESULTS"]))
+  doAssert results.len == 1 and results[0]["result"].getStr() == "pass", $results
+  doAssert results[0]["rules"] == %*["golden_images", "registries"], $results
+
+proc testRulesOfEachPolicy() =
+  setPolicyJson("""{"policies":[
+    {"id":"loaded","mode":"audit"},
+    {"id":"broken","mode":"audit","golden_images":{"enabled":1}}
+  ]}""")
+  policyOutcome = nil
+  let build = ChalkDict()
+  build["command"] = pack("build")
+  let
+    passing = proc(input: PolicyInput): seq[PolicyFinding] = discard
+    enabled = PolicyRule(name: "registries", load: proc(): bool = true, checkInput: passing)
+    disabled = PolicyRule(name: "secrets", load: proc(): bool = false, checkInput: passing)
+    unloadable = PolicyRule(name: "licenses", checkInput: passing,
+      load: proc(): bool = raise newException(ValueError, "invalid licenses settings"))
+  evaluatePolicies(build, proc(): PolicyInput = PolicyInput(command: "build"),
+                   @[enabled, disabled, unloadable])
+  # a rule that could not load is reported with its error; the synthetic
+  # config rule of an unreadable policy is not a rule
+  doAssert policyOutcome.policies[0].rules == @["registries", "licenses"]
+  doAssert policyOutcome.policies[0].findings[0].rule == "licenses"
+  doAssert policyOutcome.policies[1].rules.len == 0
+  doAssert policyOutcome.policies[1].findings[0].rule == "config"
+  let results = parseJson(boxToJson(policyOutcome.asChalkDict()["_POLICY_RESULTS"]))
+  doAssert results[0]["rules"] == %*["registries", "licenses"], $results
+  doAssert results[1]["rules"] == newJArray(), $results
+  setPolicyJson("")
 
 proc testModeOff() =
   let input = PolicyInput(errors: @[collectionError("x")])
@@ -219,6 +261,8 @@ testCollectionErrorsOnlyForRulesNeedingAllSubjects()
 testRuleFailureIsAnError()
 testGoldenImagesRule()
 testModeOff()
+testAllPassIsReported()
+testRulesOfEachPolicy()
 testCollectorFailureForMultiplePolicies()
 testContextCollectedOnlyWhenRequired()
 testConfigErrorHonorsDeclaredMode()

@@ -176,8 +176,12 @@ proc evaluate(doc, repo: string, image = "busybox"): tuple[blocked: bool, resolv
   result.resolved = resolved
 
 proc firstResult(): TableRef[string, string] =
+  ## the string fields of the first `_POLICY_RESULTS` entry
+  result = newTable[string, string]()
   let dict = policyOutcome.asChalkDict()
-  unpack[seq[TableRef[string, string]]](dict["_POLICY_RESULTS"])[0]
+  for k, v in unpack[seq[ChalkDict]](dict["_POLICY_RESULTS"])[0]:
+    if v.kind == MkStr:
+      result[k] = unpack[string](v)
 
 const
   single = """{"id": "golden@1", "mode": "audit",
@@ -193,6 +197,7 @@ proc testEnforcedInListedRepo() =
   doAssert r["mode"] == "audit" and r["effective_mode"] == "enforce"
   doAssert r["mode_source"] == "enforce_repos" and r["repo"] == listed
   doAssert r["result"] == "blocked"
+  doAssert policyOutcome.policies[0].rules == @["golden_images"]
 
   (blocked, resolved) = evaluate(single, "github.com/crashappsec/chalk")
   doAssert not blocked

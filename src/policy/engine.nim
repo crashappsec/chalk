@@ -22,6 +22,8 @@ import "."/[
 
 export api, configuration, repo, summary
 
+const configRule = "config" # findings of a policy whose configuration could not be read
+
 type
   PolicyCollector* = proc(): PolicyInput {.closure.}
   ## Adds the build context to the input. Separate from `PolicyCollector` as
@@ -47,6 +49,13 @@ proc evaluatePolicy*(settings: PolicyConfig,
     repo:          settings.repo,
     hasEnforceRepos: len(settings.enforceRepos) > 0,
   )
+  for rule in rules:
+    result.rules.add(rule.name)
+  # a rule whose configuration could not be loaded did not run, yet its
+  # error finding must belong to one of the policy's rules
+  for f in findings:
+    if f.rule notin ["", configRule] and f.rule notin result.rules:
+      result.rules.add(f.rule)
   var
     findings   = findings
     attributed = false
@@ -108,6 +117,8 @@ proc evaluatePolicy*(settings: PolicyConfig,
 proc recordPolicyResults*(results: seq[PolicyResult], build: ChalkDict) =
   ## Records the outcome of all evaluated policies for reporting and raises
   ## `PolicyViolation` when any of them blocks the command.
+  if len(results) == 0:
+    return
   var
     findings:   seq[PolicyFinding]
     blockedIds: seq[string]
@@ -132,18 +143,22 @@ proc recordPolicyResults*(results: seq[PolicyResult], build: ChalkDict) =
       else:
         inc(failures)
 
-  if len(findings) == 0:
-    trace("policy: all policies passed")
-    return
-
+  # reported even when every policy passes: every evaluation is a policy event
   let blocked = len(blockedIds) > 0
   policyOutcome = PolicyOutcome(
     mode:     mode,
-    result:   (if blocked: "blocked" elif anyViolation: "violation" else: "error"),
+    result:   (if blocked: "blocked"
+               elif anyViolation: "violation"
+               elif len(findings) > 0: "error"
+               else: "pass"),
     findings: findings,
     policies: results,
     build:    build,
   )
+
+  if len(findings) == 0:
+    trace("policy: all policies passed")
+    return
 
   # audit findings are warnings so they do not pollute _OP_ERRORS;
   # the policy report is the source of truth for audit mode
@@ -175,7 +190,7 @@ proc evaluatePolicies*(settings: PolicyConfig,
   recordPolicyResults(@[evaluatePolicy(settings, rules, input, findings)], build)
 
 proc configError(settings: PolicyConfig): PolicyFinding =
-  PolicyFinding(rule: "config", kind: "error", reason: settings.configError)
+  PolicyFinding(rule: configRule, kind: "error", reason: settings.configError)
 
 proc resolveModes(configs: seq[PolicyConfig], resolver: PolicyRepoResolver): seq[PolicyConfig] =
   ## the repository is only looked up when a policy has `enforce_repos`

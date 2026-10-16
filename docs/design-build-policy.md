@@ -30,17 +30,20 @@ images", without changing how developers invoke docker.
 
 ## Modes
 
-| Mode      | Evaluates | Policy report on violation | Fails the command |
-| --------- | --------- | -------------------------- | ----------------- |
-| `off`     | no        | no                         | no                |
-| `audit`   | yes       | yes                        | no                |
-| `enforce` | yes       | yes                        | yes (exit 1)      |
+| Mode      | Evaluates | Policy report | Fails the command     |
+| --------- | --------- | ------------- | --------------------- |
+| `off`     | no        | no            | no                    |
+| `audit`   | yes       | yes           | no                    |
+| `enforce` | yes       | yes           | on violation (exit 1) |
 
 `mode` applies to every repository unless `enforce_repos` enforces the policy
 in some of them, see [Per-repository enforcement](#per-repository-enforcement).
 
-A policy report is published only when there is at least one violation or an
-evaluation error. Builds that pass all policies publish nothing extra.
+A policy report is published for every evaluation, including when every
+policy passes (`_POLICY_RESULT` is then `pass`), so consumers see every
+evaluated build and not only the failing ones. Passing does not change
+anything else: only violations block, and the
+[job summary](#github-actions-job-summary) is still skipped by default.
 
 When a policy cannot reach a decision (for example an image digest could not
 be resolved, or an allowlist entry uses an unknown kind), `on_error` decides.
@@ -1276,7 +1279,7 @@ than SARIF.
 
 ## Reporting
 
-Findings are published to the `policy` topic, which is subscribed to
+Every evaluation is published to the `policy` topic, which is subscribed to
 `default_out` by default. Subscribe any other sink to forward them, e.g.:
 
 ```con4m
@@ -1295,8 +1298,8 @@ The `policy_report` template includes:
 | ------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy is enforced, else `audit`                                                                 |
 | `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                                                      |
-| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`                                            |
-| `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `mode_source`, `repo`                           |
+| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error` if any, else `pass`                        |
+| `_POLICY_RESULTS`  | `list[dict[string, any]]`    | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `mode_source`, `repo`, `rules`                  |
 | `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`, `subject`, `location`, `severity` |
 | `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                                                |
 
@@ -1310,9 +1313,14 @@ against `enforce_repos` (empty when the policy has none or the repository
 could not be determined). `result` is one of `pass`, `violation`, `blocked`
 or `error`. A policy's `result` is `blocked` only for enforced policies,
 `violation` for a non-blocking violation and `error` when it only produced
-non-blocking evaluation errors. Every finding carries the `policy_id` of the
+non-blocking evaluation errors. `rules` lists the rules the policy evaluated
+(a JSON array of strings, named like the `rule` of a finding, e.g.
+`golden_images`), so a rule that passed is reported without findings; it
+includes a rule whose configuration could not be loaded and is empty when the
+policy's configuration could not be read (findings with the `config` rule).
+Every finding carries the `policy_id` of the
 policy that produced it (empty when that policy has no id), so a consumer
-storing one row per finding joins it to `_POLICY_RESULTS` by id. The same
+storing one row per finding joins it to `_POLICY_RESULTS` by id and rule. The same
 image violating two policies yields two findings. For example, with the two
 policies above and `FROM busybox`:
 
@@ -1328,7 +1336,8 @@ policies above and `FROM busybox`:
       "result": "blocked",
       "effective_mode": "enforce",
       "mode_source": "default",
-      "repo": ""
+      "repo": "",
+      "rules": ["golden_images"]
     },
     {
       "id": "chainguard-only@1",
@@ -1337,7 +1346,8 @@ policies above and `FROM busybox`:
       "result": "violation",
       "effective_mode": "audit",
       "mode_source": "default",
-      "repo": ""
+      "repo": "",
+      "rules": ["golden_images"]
     }
   ],
   "_POLICY_FINDINGS": [
@@ -1368,18 +1378,25 @@ policies above and `FROM busybox`:
 
 plus host-level operation and CI keys (`_OPERATION`, `_ACTION_ID`,
 `_OP_CHALKER_VERSION`, `_OP_EXIT_CODE`, `_OP_ERRORS`, `BUILD_*`) and
-`_COMMIT_ID`, the HEAD commit of the first local git worktree found among the
-build's context directories. `_COMMIT_ID` is the commit builds are linked to
+`_COMMIT_ID` and `_AUTHOR`, the HEAD commit and its author from the first local
+git worktree found among the build's context directories. `_AUTHOR` is what
+Crash Override reports as the contributor of a policy event, which webhook
+filters on `contributor.email` match on; since only the policy report carries
+`_POLICY_*`, it has to carry `_AUTHOR` too. `_COMMIT_ID` is the commit builds are linked to
 pull requests by (matched against a pull request's head or merge commit), so a
 policy report from a `push` build on the default branch can be tied to the
 merged pull request. Builds on `pull_request` events usually check out a
 synthetic merge commit (`refs/pull/N/merge`) that matches neither, the same
-limitation build reports have. `_COMMIT_ID` is absent when there is no local
+limitation build reports have. Both are absent when there is no local
 worktree, e.g. for a remote git context
 (`docker build https://github.com/org/repo.git#ref`).
 Artifact-level keys are not included because a blocked build stops before any
 artifact exists; `_POLICY_BUILD` identifies the build instead. Use
 `policy.report_template` to select a different template.
+
+With `FROM cgr.dev/chainguard/static` both policies pass and the report has
+`"_POLICY_RESULT": "pass"`, `"_POLICY_FINDINGS": []` and each policy's
+`"result": "pass"` with the same `rules`.
 
 The policy report is a report of its own. Like every chalk report it carries a
 unique `_ACTION_ID`, which therefore differs from the `_ACTION_ID` of the
@@ -1387,9 +1404,11 @@ unique `_ACTION_ID`, which therefore differs from the `_ACTION_ID` of the
 use `BUILD_URI` (the CI run) together with `_POLICY_BUILD` (`tags`,
 `dockerfile_path`), which identifies the docker invocation within that run.
 
-The `_POLICY_*` keys can also be added to any other report template. When a
-build is blocked, chalk additionally publishes the regular `fail` report with
-`_OP_EXIT_CODE = 1`.
+Only the policy report carries the `_POLICY_*` keys. Adding them to another
+report template (e.g. the `build` or `push` report) reports each evaluation
+twice, so backends that derive policy events from reports would count it
+twice and attribute it to the wrong report. When a build is blocked, chalk
+additionally publishes the regular `fail` report with `_OP_EXIT_CODE = 1`.
 
 Blocking findings and evaluation errors are logged as errors. Audit-mode
 violations are logged as warnings (prefixed with

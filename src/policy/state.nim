@@ -45,12 +45,13 @@ type
     modeSource*:    string # "default" or "enforce_repos"
     repo*:          string # repository `enforce_repos` was matched against
     hasEnforceRepos*: bool
+    rules*:    seq[string] # rules it evaluated, named as `rule` in findings
     hints*:    seq[PolicyHint]
     findings*: seq[PolicyFinding]
 
   PolicyOutcome* = ref object
     mode*:      string # "enforce" when any evaluated policy is enforced
-    result*:    string # "violation", "blocked" or "error", across policies
+    result*:    string # "pass", "violation", "blocked" or "error", across policies
     findings*:  seq[PolicyFinding] # of every policy
     policies*:  seq[PolicyResult]
     build*:     ChalkDict
@@ -85,15 +86,16 @@ proc asDict(self: PolicyFinding): TableRef[string, string] =
   result["location"]  = self.location
   result["severity"]  = self.severity
 
-proc asDict(self: PolicyResult): TableRef[string, string] =
-  result = newTable[string, string]()
-  result["id"]       = self.id
-  result["mode"]     = self.mode
-  result["on_error"] = self.onError
-  result["result"]   = self.result
-  result["effective_mode"] = self.effectiveMode
-  result["mode_source"]    = self.modeSource
-  result["repo"]           = self.repo
+proc asDict(self: PolicyResult): ChalkDict =
+  result = ChalkDict()
+  result["id"]       = pack(self.id)
+  result["mode"]     = pack(self.mode)
+  result["on_error"] = pack(self.onError)
+  result["result"]   = pack(self.result)
+  result["effective_mode"] = pack(self.effectiveMode)
+  result["mode_source"]    = pack(self.modeSource)
+  result["repo"]           = pack(self.repo)
+  result["rules"]          = pack(self.rules)
 
 proc asChalkDict*(self: PolicyOutcome): ChalkDict =
   result = ChalkDict()
@@ -101,7 +103,7 @@ proc asChalkDict*(self: PolicyOutcome): ChalkDict =
     return
   var
     findings = newSeq[TableRef[string, string]]()
-    policies = newSeq[TableRef[string, string]]()
+    policies = newSeq[ChalkDict]()
   for f in self.findings:
     findings.add(f.asDict())
   for p in self.policies:
