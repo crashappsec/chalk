@@ -8,13 +8,13 @@
 ## `policy.vulnerabilities`: block pull requests that add dependencies with
 ## known vulnerabilities, from GitHub's dependency review of the commits the
 ## GitHub Actions job compares, as actions/dependency-review-action does.
-## `policy.sast` enables it too, unless `policy.sast.dependency_review` is
-## false. See docs/design-build-policy.md.
+## See docs/design-build-policy.md.
 
 import std/[
   algorithm,
   json,
   os,
+  sequtils,
   strutils,
   tables,
 ]
@@ -40,24 +40,20 @@ const
   severities*  = ["low", "medium", "high", "critical"]
   scopes*      = ["runtime", "development", "unknown"]
   defaultScopes = ["runtime"]
-  maxSnapshotWaitSeconds* = 600
   # keeps reports and the job summary bounded
   maxReportedFindings = 100
 
 type
   VulnerabilitiesConfig* = object
-    ## `vulnerabilities`, or `sast` when only it enables the review
-    source*:           string
     minSeverity*:      string # one of `severities`
     scopes*:           seq[string]
-    ignoreAdvisories*: seq[string]
+    ignoreAdvisories*: seq[string] # lowercase globs, as GHSA ids are compared
     ignorePackages*:   seq[PurlPattern]
     ignorePaths*:      seq[string]
     maxFindings*:      int
     message*:          string
     events*:           seq[string]
     contextOnly*:      bool
-    snapshotWaitSeconds*: int
 
   ## manifests of a build context, within the repository
   ReviewContext* = object
@@ -72,6 +68,13 @@ proc normalizeSeverity*(value: string): string =
 
 proc rank(value: string): int =
   severities.find(value.normalizeSeverity())
+
+proc sortRank(value: string): int =
+  ## a rating chalk does not know counts (see `counts`), so it is kept
+  ## ahead of known ones when findings are capped
+  result = value.rank()
+  if result < 0:
+    result = len(severities)
 
 proc defaulted(values: seq[string], default: openArray[string]): seq[string] =
   if len(values) == 0: @default else: values
@@ -98,51 +101,25 @@ proc validate(settings: VulnerabilitiesConfig) =
                                      $reviewEvents)
   if settings.maxFindings < 0:
     raise newException(ValueError, path & "max_findings must not be negative")
-  if settings.snapshotWaitSeconds notin 0 .. maxSnapshotWaitSeconds:
-    raise newException(ValueError, path & "dependency_review.snapshot_wait_seconds must be " &
-                                   "between 0 and " & $maxSnapshotWaitSeconds)
 
 proc loadVulnerabilitiesConfig*(): Option[VulnerabilitiesConfig] =
-  ## `vulnerabilities` wins over `sast` when both enable the review
-  if policyBoolSetting([sectionName, "enabled"], false):
-    if not policyBoolSetting([sectionName, "dependency_review", "enabled"], true):
-      return none(VulnerabilitiesConfig)
-    var settings = VulnerabilitiesConfig(
-      source:           sectionName,
-      minSeverity:      policyStringSetting([sectionName, "min_severity"], "high").normalizeSeverity(),
-      scopes:           policyStringsSetting([sectionName, "scopes"]).defaulted(defaultScopes),
-      ignoreAdvisories: policyStringsSetting([sectionName, "ignore_advisories"]),
-      ignorePaths:      policyStringsSetting([sectionName, "ignore_paths"]),
-      maxFindings:      policyIntSetting([sectionName, "max_findings"], 0),
-      message:          policyStringSetting([sectionName, "message"], ""),
-      events:           policyStringsSetting([sectionName, "dependency_review", "events"])
-                          .defaulted(defaultReviewEvents),
-      contextOnly:      policyBoolSetting([sectionName, "dependency_review", "context_only"], true),
-      snapshotWaitSeconds: policyIntSetting([sectionName, "dependency_review",
-                                             "snapshot_wait_seconds"], 0),
-    )
-    settings.ignorePackages = policyStringsSetting([sectionName, "ignore_packages"])
-      .parseIgnorePackages("policy." & sectionName & ".")
-    settings.validate()
-    return some(settings)
-  if policyBoolSetting(["sast", "enabled"], false) and
-     policyBoolSetting(["sast", "dependency_review"], true):
-    # semgrep's `info` has no advisory counterpart
-    var severity = policyStringSetting(["sast", "min_severity"], "high")
-    if severity == "info":
-      severity = "low"
-    if severity notin severities:
-      # the sast rule reports it
-      severity = "high"
-    return some(VulnerabilitiesConfig(
-      source:      "sast",
-      minSeverity: severity,
-      scopes:      @defaultScopes,
-      message:     policyStringSetting(["sast", "message"], ""),
-      events:      @defaultReviewEvents,
-      contextOnly: true,
-    ))
-  return none(VulnerabilitiesConfig)
+  if not policyBoolSetting([sectionName, "enabled"], false):
+    return none(VulnerabilitiesConfig)
+  var settings = VulnerabilitiesConfig(
+    minSeverity:      policyStringSetting([sectionName, "min_severity"], "high").normalizeSeverity(),
+    scopes:           policyStringsSetting([sectionName, "scopes"]).defaulted(defaultScopes),
+    ignoreAdvisories: policyStringsSetting([sectionName, "ignore_advisories"]).mapIt(it.toLowerAscii()),
+    ignorePaths:      policyStringsSetting([sectionName, "ignore_paths"]),
+    maxFindings:      policyIntSetting([sectionName, "max_findings"], 0),
+    message:          policyStringSetting([sectionName, "message"], ""),
+    events:           policyStringsSetting([sectionName, "dependency_review", "events"])
+                        .defaulted(defaultReviewEvents),
+    contextOnly:      policyBoolSetting([sectionName, "dependency_review", "context_only"], true),
+  )
+  settings.ignorePackages = policyStringsSetting([sectionName, "ignore_packages"])
+    .parseIgnorePackages("policy." & sectionName & ".")
+  settings.validate()
+  return some(settings)
 
 proc matchesAny(patterns: seq[string], value: string): bool =
   for pattern in patterns:
@@ -183,7 +160,8 @@ proc counts*(settings: VulnerabilitiesConfig, change: DependencyChange,
     # a rating chalk does not know, e.g. a level GitHub adds later, always
     # counts rather than silently passing
     (severity < 0 or severity >= settings.minSeverity.rank()) and
-    not settings.ignoreAdvisories.matchesAny(vulnerability.ghsaId) and
+    # GitHub writes ids `GHSA-` plus lowercase; globs are matched case-insensitively
+    not settings.ignoreAdvisories.matchesAny(vulnerability.ghsaId.toLowerAscii()) and
     not settings.ignorePaths.matchesAny(change.manifest) and
     not settings.isIgnoredPackage(change)
 
@@ -216,7 +194,7 @@ proc check*(settings: VulnerabilitiesConfig, review: DependencyReview,
   for hit in hits.values():
     ordered.add(hit)
   ordered.sort(proc(a, b: Hit): int =
-    result = -cmp(a.vulnerability.severity.rank(), b.vulnerability.severity.rank())
+    result = -cmp(a.vulnerability.severity.sortRank(), b.vulnerability.severity.sortRank())
     if result == 0:
       result = cmp(a.change.subject(), b.change.subject()))
   var violations: seq[PolicyFinding]
@@ -270,20 +248,13 @@ proc reviewContexts*(input: PolicyInput, refs: ReviewRefs): Option[seq[ReviewCon
     return none(seq[ReviewContext])
   return some(contexts)
 
-proc pushIsReviewed(input: PolicyInput, refs: ReviewRefs): bool =
-  ## whether building every pushed image reviewed the same commits already;
-  ## images pulled, built for other commits or not chalked are reviewed
-  if len(input.pushMarks) == 0 or len(input.pushMarks) < len(input.pushTargets):
-    return false
-  for mark in input.pushMarks:
-    if not refs.isReviewedIn(mark):
-      return false
-  return true
-
-proc ruleSection(settings: VulnerabilitiesConfig): string =
-  "policy." & settings.source
-
 proc checkReview*(settings: VulnerabilitiesConfig, input: PolicyInput): seq[PolicyFinding] =
+  # Only builds are reviewed: a push has no build context to narrow the
+  # review to, and what its images were built from is not known reliably
+  # (an unsigned mark, inherited through FROM).
+  if input.command != "build":
+    trace("policy: dependency review only runs on docker build")
+    return
   var found: Option[ReviewRefs]
   try:
     found = reviewRefs(settings.events)
@@ -293,16 +264,12 @@ proc checkReview*(settings: VulnerabilitiesConfig, input: PolicyInput): seq[Poli
                                getCurrentExceptionMsg())]
   if found.isNone():
     return
-  let refs = found.get()
-  if input.command == "push" and input.pushIsReviewed(refs):
-    trace("policy: dependency changes of " & $refs & " were reviewed when the pushed images were built")
-    return
-  let review = refs.dependencyReview(settings.snapshotWaitSeconds)
-  if input.command == "build":
-    dependencyReviewMark = refs.reviewMark(review)
+  let
+    refs   = found.get()
+    review = refs.dependencyReview()
   case review.status
   of rsUnavailable:
-    let message = "Dependency review of " & refs.repo & " is unavailable, so " & settings.ruleSection() &
+    let message = "Dependency review of " & refs.repo & " is unavailable, so policy." & sectionName &
                   " cannot check the dependencies this " & refs.event.replace('_', ' ') &
                   " adds for vulnerabilities: " & review.reason
     warnOnce("policy: " & message)
@@ -313,19 +280,18 @@ proc checkReview*(settings: VulnerabilitiesConfig, input: PolicyInput): seq[Poli
   of rsReviewed:
     discard
   if review.snapshotWarnings != "":
+    # e.g. a dependency submission for the head commit still pending
     warnOnce("policy: GitHub's dependency graph may be incomplete for " & $refs & ": " &
              review.snapshotWarnings.strip())
   let contexts =
-    if input.command == "build" and settings.contextOnly: input.reviewContexts(refs)
+    if settings.contextOnly: input.reviewContexts(refs)
     else: none(seq[ReviewContext])
   settings.check(review, contexts)
 
 const
   dependencyReviewJsonFields = [
-    PolicyJsonField(name: "enabled",               kind: JBool),
-    PolicyJsonField(name: "events",                kind: JArray),
-    PolicyJsonField(name: "context_only",          kind: JBool),
-    PolicyJsonField(name: "snapshot_wait_seconds", kind: JInt),
+    PolicyJsonField(name: "events",       kind: JArray),
+    PolicyJsonField(name: "context_only", kind: JBool),
   ]
   vulnerabilitiesJsonFields = [
     PolicyJsonField(name: "enabled",           kind: JBool),
@@ -363,9 +329,6 @@ proc validateVulnerabilitiesJson(node: JsonNode, path: string) =
     if event notin reviewEvents:
       raise newException(ValueError, path & "dependency_review.events entries must be one of " &
                                      $reviewEvents)
-  if review{"snapshot_wait_seconds"}.getInt(0) notin 0 .. maxSnapshotWaitSeconds:
-    raise newException(ValueError, path & "dependency_review.snapshot_wait_seconds must be " &
-                                   "between 0 and " & $maxSnapshotWaitSeconds)
 
 registerPolicyJsonSection(sectionName, validateVulnerabilitiesJson)
 

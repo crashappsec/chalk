@@ -73,10 +73,6 @@ type
 var policyOutcome*: PolicyOutcome = nil
 # set once policies run so a later failure is left to the docker failsafe
 var policyEvaluated* = false
-# the pull request diff the build's dependency review checked, recorded in
-# the chalk mark as `DEPENDENCY_REVIEW` so pushing the image does not review
-# it again; nil when no review ran
-var dependencyReviewMark*: TableRef[string, string] = nil
 
 proc id*(self: PolicyOutcome): string =
   ## the policy id when a single policy was evaluated, as `_POLICY_ID`

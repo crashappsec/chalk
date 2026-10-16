@@ -2,7 +2,6 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
-import base64
 import json
 from typing import Optional
 
@@ -741,10 +740,6 @@ def dependency_graph_compare(
     if page < len(DEPENDENCY_CHANGES):
         url = request.url.include_query_params(page=page + 1)
         headers["Link"] = f'<{url}>; rel="next"'
-    if owner == "snapshot":
-        headers["X-GitHub-Dependency-Graph-Snapshot-Warnings"] = base64.b64encode(
-            b"Snapshot for the head commit is pending"
-        ).decode()
     return JSONResponse(DEPENDENCY_CHANGES[page - 1], headers=headers)
 
 

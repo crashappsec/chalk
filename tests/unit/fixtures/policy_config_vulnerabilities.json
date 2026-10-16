@@ -12,15 +12,8 @@
     "max_findings": 0,
     "message": "Upgrade vulnerable dependencies",
     "dependency_review": {
-      "enabled": true,
       "events": ["pull_request", "merge_group"],
-      "context_only": true,
-      "snapshot_wait_seconds": 30
+      "context_only": true
     }
-  },
-  "sast": {
-    "enabled": true,
-    "min_severity": "medium",
-    "dependency_review": false
   }
 }

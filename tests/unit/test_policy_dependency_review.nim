@@ -29,7 +29,6 @@ const
 var
   calls:     seq[tuple[url: string, headers: HttpHeaders]]
   responses: seq[GithubResponse]
-  sleeps:    seq[int]
 
 proc respond(code: int, body = "[]", headers: openArray[(string, string)] = []): GithubResponse =
   GithubResponse(code: code, body: body, headers: newHttpHeaders(headers))
@@ -45,18 +44,15 @@ githubFetcher = proc(url: string, headers: HttpHeaders): GithubResponse =
     raise newException(IOError, "connection refused")
   result = responses[0]
   responses.delete(0)
-reviewSleeper = proc(ms: int) = sleeps.add(ms)
 
 proc reset() =
   calls     = @[]
   responses = @[]
-  sleeps    = @[]
   clearDependencyReviewCache()
   discard takePolicyNotices()
-  dependencyReviewMark = nil
 
 const githubEnv = ["GITHUB_ACTIONS", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "GITHUB_REPOSITORY",
-                   "GITHUB_API_URL", "GITHUB_TOKEN", "GITHUB_SERVER_URL", "RUNNER_TEMP"]
+                   "GITHUB_API_URL", "GITHUB_TOKEN", "GITHUB_SERVER_URL"]
 
 proc clearEnv() =
   for name in githubEnv:
@@ -87,7 +83,7 @@ proc reviewed(): DependencyReview =
                    changes: parseChanges(readFile(page1)) & parseChanges(readFile(page2)))
 
 proc defaults(): VulnerabilitiesConfig =
-  VulnerabilitiesConfig(source: "vulnerabilities", minSeverity: "high", scopes: @["runtime"],
+  VulnerabilitiesConfig(minSeverity: "high", scopes: @["runtime"],
                         events: @defaultReviewEvents, contextOnly: true)
 
 proc subjects(findings: seq[PolicyFinding]): seq[string] =
@@ -227,29 +223,32 @@ proc testCompare() =
   assertEq(len(calls), 1)
   doAssert "HTTP 404: Not Found" in review.reason, review.reason
 
-  # transient failures are retried
+  # one request: server errors, rate limits and network failures are not
+  # retried, they fail the review and on_error decides
   reset()
   responses = @[respond(502, "bad gateway")] & pages()
   review = compareDependencies(refs())
-  assertEq(review.status, rsReviewed)
-  assertEq(len(calls), 3)
-  assertEq(sleeps, @[1000])
+  assertEq(review.status, rsFailed)
+  assertEq(len(calls), 1)
+  doAssert "HTTP 502" in review.reason, review.reason
+
+  # a rate-limited 403 is failed, not unavailable; so is 429
+  for limited in [respond(403, """{"message": "API rate limit exceeded"}""",
+                          {"x-ratelimit-remaining": "0"}),
+                  respond(403, """{"message": "You have exceeded a secondary rate limit"}""",
+                          {"retry-after": "60"}),
+                  respond(429, """{"message": "too many requests"}""")]:
+    reset()
+    responses = @[limited]
+    review = compareDependencies(refs())
+    assertEq(review.status, rsFailed)
+    assertEq(len(calls), 1)
+    doAssert "rate limit" in review.reason, review.reason
 
   reset()
-  responses = @[respond(403, """{"message": "API rate limit exceeded"}""",
-                        {"x-ratelimit-remaining": "0"})]
-  responses.add(responses[0])
-  responses.add(responses[0])
   review = compareDependencies(refs())
   assertEq(review.status, rsFailed)
-  assertEq(len(calls), 3)
-  doAssert "rate limit" in review.reason, review.reason
-
-  reset()
-  review = compareDependencies(refs())
-  assertEq(review.status, rsFailed)
-  assertEq(len(calls), 3)
-  assertEq(sleeps, @[1000, 2000])
+  assertEq(len(calls), 1)
   doAssert "connection refused" in review.reason, review.reason
 
   reset()
@@ -270,128 +269,38 @@ proc testCompare() =
   doAssert "GITHUB_TOKEN" in review.reason
 
 proc testSnapshotWarnings() =
+  # kept on the review and logged, never waited for
   github()
   let warning = {"x-github-dependency-graph-snapshot-warnings": "UGVuZGluZyBzbmFwc2hvdA=="}
   responses = @[respond(200, "[]", warning)]
-  var review = compareDependencies(refs())
+  let review = compareDependencies(refs())
   assertEq(review.status, rsReviewed)
   assertEq(review.snapshotWarnings, "Pending snapshot")
   assertEq(len(calls), 1)
-  reset()
-  responses = @[respond(200, "[]", warning), respond(200, readFile(page2))]
-  review = compareDependencies(refs(), waitSeconds = 30)
-  assertEq(review.snapshotWarnings, "")
-  assertEq(len(review.changes), 3)
-  assertEq(len(calls), 2)
-  assertEq(sleeps, @[10_000])
-  # a wait of one retry interval still retries once
-  reset()
-  responses = @[respond(200, "[]", warning), respond(200, readFile(page2))]
-  review = compareDependencies(refs(), waitSeconds = 10)
-  assertEq(review.snapshotWarnings, "")
-  assertEq(sleeps, @[10_000])
-  # persistent warnings stop at the deadline
-  reset()
-  responses = @[respond(200, "[]", warning), respond(200, "[]", warning),
-                respond(200, "[]", warning)]
-  review = compareDependencies(refs(), waitSeconds = 20)
-  assertEq(review.snapshotWarnings, "Pending snapshot")
-  assertEq(len(calls), 3)
-  assertEq(sleeps, @[10_000, 10_000])
 
 proc testCache() =
+  # once per process, whatever the outcome
   github()
   responses = pages()
   discard dependencyReview(refs())
   assertEq(dependencyReview(refs()).changes.len, 7)
   assertEq(len(calls), 2)
-
-  # other chalk commands of the job read it from RUNNER_TEMP
-  let temp = createTempDir("chalk-runner-temp-", "")
-  putEnv("RUNNER_TEMP", temp)
-  reset()
-  responses = pages()
-  discard dependencyReview(refs())
-  reset()
-  let cached = dependencyReview(refs())
-  assertEq(len(calls), 0)
-  assertEq(cached.status, rsReviewed)
-  assertEq(cached.changes, reviewed().changes)
-
-  # a truncated or foreign cache file is ignored and the review re-fetched
-  for file in walkFiles(temp / "chalk-dependency-review-*.json"):
-    writeFile(file, """{"status": "reviewed"}""")
+  var other = refs()
+  other.head = "3333333333333333333333333333333333333333"
+  responses = @[respond(403)]
+  assertEq(dependencyReview(other).status, rsUnavailable)
+  assertEq(dependencyReview(other).status, rsUnavailable)
+  assertEq(len(calls), 3)
+  other.head = "4444444444444444444444444444444444444444"
+  responses = @[respond(404)]
+  assertEq(dependencyReview(other).status, rsFailed)
+  assertEq(dependencyReview(other).status, rsFailed)
+  assertEq(len(calls), 4)
+  # another process compares again
   reset()
   responses = pages()
   assertEq(dependencyReview(refs()).changes.len, 7)
   assertEq(len(calls), 2)
-
-  # unavailable is kept too, failures only for the process
-  var other = refs()
-  other.head = "3333333333333333333333333333333333333333"
-  reset()
-  responses = @[respond(403)]
-  discard dependencyReview(other)
-  reset()
-  assertEq(dependencyReview(other).status, rsUnavailable)
-  assertEq(len(calls), 0)
-  other.head = "4444444444444444444444444444444444444444"
-  reset()
-  responses = @[respond(404)]
-  assertEq(dependencyReview(other).status, rsFailed)
-  assertEq(dependencyReview(other).status, rsFailed)
-  assertEq(len(calls), 1)
-  reset()
-  responses = @[respond(200)]
-  assertEq(dependencyReview(other).status, rsReviewed)
-  removeDir(temp)
-  clearEnv()
-
-proc testIncompleteCache() =
-  # A later policy's wait must still run, including in the same process.
-  for newProcess in [false, true]:
-    github()
-    let temp = createTempDir("chalk-incomplete-cache-", "")
-    putEnv("RUNNER_TEMP", temp)
-    let warning = {"x-github-dependency-graph-snapshot-warnings": "UGVuZGluZyBzbmFwc2hvdA=="}
-    responses = @[respond(200, "[]", warning)]
-    assertEq(dependencyReview(refs()).snapshotWarnings, "Pending snapshot")
-    if newProcess:
-      reset()
-    else:
-      # an equal or shorter wait reuses the incomplete review in-process
-      assertEq(dependencyReview(refs()).snapshotWarnings, "Pending snapshot")
-      assertEq(len(calls), 1)
-    responses = @[respond(200, "[]", warning), respond(200, readFile(page2))]
-    let complete = dependencyReview(refs(), waitSeconds = 30)
-    assertEq(complete.snapshotWarnings, "")
-    assertEq(complete.changes.len, 3)
-    assertEq(len(calls), if newProcess: 2 else: 3)
-    assertEq(sleeps, @[10_000])
-    removeDir(temp)
-  clearEnv()
-
-proc testCacheCredentials() =
-  # A missing or insufficient token in an earlier step must not disable
-  # review after credentials change, in memory or on disk.
-  for newProcess in [false, true]:
-    for (token, code) in [("", 0), ("bad-token", 401), ("restricted-token", 403)]:
-      github(token = token)
-      let temp = createTempDir("chalk-auth-cache-", "")
-      putEnv("RUNNER_TEMP", temp)
-      if code != 0:
-        responses = @[respond(code)]
-      assertEq(dependencyReview(refs()).status, rsUnavailable)
-      putEnv("GITHUB_TOKEN", "working-token")
-      if newProcess:
-        reset()
-      let before = len(calls)
-      responses = pages()
-      let complete = dependencyReview(refs())
-      assertEq(complete.status, rsReviewed)
-      assertEq(complete.changes.len, 7)
-      assertEq(len(calls) - before, 2)
-      removeDir(temp)
   clearEnv()
 
 proc rejects(json, reason: string) =
@@ -421,48 +330,33 @@ proc testConfig() =
   rejects("""{"dependency_review": {"event": []}}""", "unknown field " & path & "dependency_review.event")
   rejects("""{"dependency_review": {"events": ["release"]}}""",
           path & "dependency_review.events entries must be one of")
-  rejects("""{"dependency_review": {"snapshot_wait_seconds": 601}}""",
-          path & "dependency_review.snapshot_wait_seconds must be between 0 and 600")
-  let sast = parsePolicyJson("""{"sast": {"dependency_review": "no"}}""")
-  doAssert "policy.sast.dependency_review must be a boolean" in sast[0].configError, sast[0].configError
+  # dependency review is the only source, so there is nothing to turn off
+  rejects("""{"dependency_review": {"enabled": true}}""",
+          "unknown field " & path & "dependency_review.enabled")
+  rejects("""{"dependency_review": {"snapshot_wait_seconds": 30}}""",
+          "unknown field " & path & "dependency_review.snapshot_wait_seconds")
+  # sast does not enable the review
+  let sast = parsePolicyJson("""{"sast": {"dependency_review": true}}""")
+  doAssert "unknown field policy.sast.dependency_review" in sast[0].configError, sast[0].configError
 
   doAssert load("""{"mode": "audit"}""").isNone()
   doAssert load("""{"mode": "audit", "vulnerabilities": {}}""").isNone()
+  doAssert load("""{"mode": "enforce", "sast": {"enabled": true, "min_severity": "low"}}""").isNone()
   let d = load("""{"mode": "audit", "vulnerabilities": {"enabled": true}}""").get()
-  assertEq(d.source, "vulnerabilities")
   assertEq(d.minSeverity, "high")
   assertEq(d.scopes, @["runtime"])
   assertEq(d.events, @defaultReviewEvents)
   doAssert d.contextOnly
-  assertEq(d.snapshotWaitSeconds, 0)
   assertEq(d.maxFindings, 0)
 
   let full = load(readFile(configFixture)).get()
   assertEq(full.minSeverity, "medium")
   assertEq(full.scopes, @["runtime", "development"])
-  assertEq(full.ignoreAdvisories, @["GHSA-29mw-*"])
+  assertEq(full.ignoreAdvisories, @["ghsa-29mw-*"])
   assertEq(full.ignorePackages[0].raw, "pkg:npm/axios@<0.21.1")
   assertEq(full.ignorePaths, @["test/*"])
   assertEq(full.message, "Upgrade vulnerable dependencies")
   assertEq(full.events, @["pull_request", "merge_group"])
-  assertEq(full.snapshotWaitSeconds, 30)
-
-  # sast enables it with its own threshold and message
-  let s = load("""{"mode": "enforce", "sast": {"enabled": true, "min_severity": "info",
-                                                "message": "see appsec"}}""").get()
-  assertEq(s.source, "sast")
-  assertEq(s.minSeverity, "low")
-  assertEq(s.message, "see appsec")
-  assertEq(s.scopes, @["runtime"])
-  doAssert s.contextOnly
-  doAssert load("""{"sast": {"enabled": true, "dependency_review": false}}""").isNone()
-  doAssert load("""{"sast": {"enabled": false}}""").isNone()
-  # vulnerabilities wins, including turning the review off
-  assertEq(load("""{"sast": {"enabled": true, "min_severity": "low"},
-                    "vulnerabilities": {"enabled": true, "min_severity": "critical"}}""").get().minSeverity,
-           "critical")
-  doAssert load("""{"sast": {"enabled": true},
-                    "vulnerabilities": {"enabled": true, "dependency_review": {"enabled": false}}}""").isNone()
 
 proc testCheck() =
   let review = reviewed()
@@ -489,13 +383,17 @@ proc testCheck() =
   assertEq(findings[^1].severity, "medium")
   doAssert "GHSA-29mw-wpgm-hmr9" in findings[^1].reason
 
-  settings.ignoreAdvisories = @["GHSA-29mw-*", "GHSA-xvch-5gv4-984h"]
+  # advisory globs match case-insensitively (loaded lowercase)
+  settings.ignoreAdvisories = @["ghsa-29mw-*", "ghsa-xvch-5gv4-984h"]
   settings.ignorePaths = @["test/*"]
   settings.ignorePackages = @[parsePurlPattern("pkg:pypi/pyyaml@<5.4")]
   settings.message = "Upgrade it"
   findings = settings.check(review)
   assertEq(findings.subjects(), @[lodash])
   doAssert findings[0].reason.endsWith(". Upgrade it"), findings[0].reason
+  let upper = DependencyChange(changeType: "added", scope: "runtime")
+  doAssert not settings.counts(upper, DependencyVulnerability(severity: "high",
+                                                              ghsaId: "GHSA-XVCH-5GV4-984H"))
 
   # a rating chalk does not know always counts rather than silently passing
   let added = DependencyChange(changeType: "added", scope: "runtime")
@@ -509,7 +407,8 @@ proc testCheck() =
   settings.maxFindings = 2
   assertEq(len(settings.check(review)), 3)
 
-  # bounded
+  # bounded; an unknown rating sorts first, as critical would, so the cap
+  # never drops it
   var many = DependencyReview(status: rsReviewed)
   for i in 0 ..< 150:
     many.changes.add(DependencyChange(changeType: "added", manifest: "package.json",
@@ -517,10 +416,16 @@ proc testCheck() =
                                       scope: "runtime",
                                       vulnerabilities: @[DependencyVulnerability(
                                         severity: "critical", ghsaId: "GHSA-" & $i)]))
+  many.changes.add(DependencyChange(changeType: "added", manifest: "package.json",
+                                    ecosystem: "npm", name: "unrated", version: "1.0.0",
+                                    scope: "runtime",
+                                    vulnerabilities: @[DependencyVulnerability(
+                                      severity: "ultra", ghsaId: "GHSA-ultra")]))
   findings = defaults().check(many)
   assertEq(len(findings), 101)
-  assertEq(findings[0].subject, "npm/p0@1.0.0")
-  assertEq(findings[^1].reason, "50 more vulnerable dependencies not listed")
+  assertEq(findings[0].subject, "npm/unrated@1.0.0")
+  assertEq(findings[1].subject, "npm/p0@1.0.0")
+  assertEq(findings[^1].reason, "51 more vulnerable dependencies not listed")
   assertEq(findings[^1].kind, "violation")
 
 proc testContexts() =
@@ -551,31 +456,16 @@ proc testContexts() =
   doAssert input.reviewContexts(refs()).isNone()
   removeDir(dir)
 
-proc mark(review: JsonNode): ChalkDict =
-  result = ChalkDict()
-  result["CHALK_ID"] = pack("ABC")
-  if review != nil:
-    result["DEPENDENCY_REVIEW"] = pack(newTable({"repo": review{"repo"}.getStr(),
-                                                 "base": review{"base"}.getStr(),
-                                                 "head": review{"head"}.getStr(),
-                                                 "result": review{"result"}.getStr()}))
-
 proc testCheckReview() =
   clearEnv()
   reset()
   doAssert defaults().checkReview(PolicyInput(command: "build")).len == 0
   assertEq(len(calls), 0)
-  doAssert dependencyReviewMark == nil
 
   github()
   responses = pages()
   var findings = defaults().checkReview(PolicyInput(command: "build"))
   assertEq(findings.subjects(), @[pyyaml, "pkg:npm/axios@0.21.0", lodash])
-  assertEq(dependencyReviewMark["result"], "reviewed")
-  assertEq(dependencyReviewMark["repo"], "acme/app")
-  assertEq(dependencyReviewMark["base"], base)
-  assertEq(dependencyReviewMark["head"], head)
-  assertEq(dependencyReviewMark["event"], "pull_request")
   assertEq(len(takePolicyNotices()), 0)
 
   # unavailable is a notice, never a finding
@@ -589,7 +479,6 @@ proc testCheckReview() =
   doAssert notices[0].message.startsWith("Dependency review of acme/app is unavailable, so " &
                                          "policy.vulnerabilities cannot check the dependencies " &
                                          "this pull request adds"), notices[0].message
-  assertEq(dependencyReviewMark["result"], "unavailable")
 
   github()
   responses = @[respond(404, """{"message": "Not Found"}""")]
@@ -603,67 +492,13 @@ proc testCheckReview() =
   assertEq(findings[0].kind, "error")
   doAssert "could not determine the commits to review" in findings[0].reason
 
-  # push skips images whose build reviewed the same commits
-  let same = %*{"repo": "ACME/app", "base": base, "head": head, "result": "reviewed"}
+  # push is not reviewed, whatever it pushes
   github()
-  var push = PolicyInput(command: "push", pushTargets: @["app:1"], pushMarks: @[mark(same)])
+  responses = pages()
+  let push = PolicyInput(command: "push", pushTargets: @["app:1"])
   assertEq(len(defaults().checkReview(push)), 0)
   assertEq(len(calls), 0)
-  doAssert dependencyReviewMark == nil
-  for other in [%*{"repo": "acme/app", "base": base, "head": "3333", "result": "reviewed"},
-                %*{"repo": "acme/app", "base": base, "head": head, "result": "unavailable"},
-                %*{"repo": "acme/app", "base": base, "head": head, "result": "incomplete"},
-                %*{"repo": "acme/app", "base": base, "head": head, "result": "failed"},
-                nil]:
-    github()
-    responses = pages()
-    push.pushMarks = @[mark(other)]
-    assertEq(len(defaults().checkReview(push)), 3)
-    assertEq(len(calls), 2)
-  # unchalked: no mark, or fewer marks than pushed tags
-  for (targets, marks) in [(@["app:1"], newSeq[ChalkDict]()),
-                           (@["app:1", "app:2"], @[mark(same)])]:
-    github()
-    responses = pages()
-    push = PolicyInput(command: "push", pushTargets: targets, pushMarks: marks)
-    # push reviews the whole repository
-    assertEq(len(defaults().checkReview(push)), 3)
-    doAssert dependencyReviewMark == nil
-  clearEnv()
-
-proc testPushRetriesIncompleteBuild() =
-  github()
-  let temp = createTempDir("chalk-partial-build-", "")
-  putEnv("RUNNER_TEMP", temp)
-  responses = @[respond(200, "[]", {
-    "x-github-dependency-graph-snapshot-warnings": "UGVuZGluZyBzbmFwc2hvdA=="})]
-  assertEq(defaults().checkReview(PolicyInput(command: "build")).len, 0)
-  assertEq(dependencyReviewMark["result"], "incomplete")
-  let built = ChalkDict()
-  built[markKey] = pack(dependencyReviewMark)
-  reset() # a separate chalk push after the snapshots are complete
-  responses = pages()
-  let push = PolicyInput(command: "push", pushTargets: @["app:1"], pushMarks: @[built])
-  assertEq(defaults().checkReview(push).len, 3)
-  assertEq(len(calls), 2)
-  removeDir(temp)
-  clearEnv()
-
-proc testPushRetriesUnavailableBuild() =
-  github(token = "")
-  let temp = createTempDir("chalk-unavailable-build-", "")
-  putEnv("RUNNER_TEMP", temp)
-  assertEq(defaults().checkReview(PolicyInput(command: "build")).len, 0)
-  assertEq(dependencyReviewMark["result"], "unavailable")
-  let built = ChalkDict()
-  built[markKey] = pack(dependencyReviewMark)
-  reset()
-  putEnv("GITHUB_TOKEN", "working-token")
-  responses = pages()
-  let push = PolicyInput(command: "push", pushTargets: @["app:1"], pushMarks: @[built])
-  assertEq(defaults().checkReview(push).len, 3)
-  assertEq(len(calls), 2)
-  removeDir(temp)
+  assertEq(len(takePolicyNotices()), 0)
   clearEnv()
 
 proc testEngine() =
@@ -750,14 +585,10 @@ testParse()
 testCompare()
 testSnapshotWarnings()
 testCache()
-testIncompleteCache()
-testCacheCredentials()
 testConfig()
 testCheck()
 testContexts()
 testCheckReview()
-testPushRetriesIncompleteBuild()
-testPushRetriesUnavailableBuild()
 testEngine()
 testUsesContext()
 testContextFallback()

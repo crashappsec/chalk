@@ -2128,29 +2128,6 @@ collecting this information.
 """
 }
 
-keyspec DEPENDENCY_REVIEW {
-    kind:     ChalkTimeArtifact
-    type:     dict[string, string]
-    standard: true
-    since:    "1.3.0"
-    shortdoc: "GitHub dependency review done by the build policy"
-    doc:      """
-Set when a build policy reviewed the dependency changes of the GitHub
-Actions pull request (or merge group, or push) the image was built for,
-with `policy.vulnerabilities` or `policy.sast`. Fields:
-
-* `repo` - the `owner/name` repository reviewed
-* `event` - the GitHub event, e.g. `pull_request`
-* `base`, `head` - the commits compared
-* `result` - `reviewed`, `incomplete` (GitHub reported snapshot warnings),
-  `unavailable` (e.g. the repository has no GitHub Code Security) or `failed`
-
-`chalk docker push` does not review the commits again for images whose
-mark records a complete `reviewed` review of the same commits. Incomplete,
-unavailable and failed reviews are retried.
-"""
-}
-
 keyspec ERR_INFO {
     kind:             ChalkTimeArtifact
     type:             list[string]

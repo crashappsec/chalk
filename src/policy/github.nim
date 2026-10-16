@@ -18,11 +18,7 @@ import std/[
   os,
   strutils,
   tables,
-  times,
   uri,
-]
-import pkg/nimutils/[
-  sha,
 ]
 import ".."/[
   types,
@@ -36,13 +32,9 @@ const
   snapshotWarningsHeader = "x-github-dependency-graph-snapshot-warnings"
   defaultReviewEvents*   = ["pull_request", "pull_request_target", "merge_group"]
   reviewEvents*          = ["pull_request", "pull_request_target", "merge_group", "push"]
-  markKey*               = "DEPENDENCY_REVIEW"
   perPage                = 100
   maxPages               = 100
-  attempts               = 3
   requestTimeoutMs       = 30_000
-  # as the action's retry-on-snapshot-warnings
-  snapshotRetrySeconds   = 10
 
 type
   ReviewRefs* = object
@@ -88,11 +80,8 @@ type
 
   ## Replaced by unit tests
   GithubFetcher* = proc(url: string, headers: HttpHeaders): GithubResponse
-  ReviewSleeper* = proc(ms: int)
 
 proc fetch(url: string, headers: HttpHeaders): GithubResponse =
-  # status codes and connection errors are handled by `fetchPage`, the one
-  # retry authority, so retry layers do not multiply
   let response = safeRequest(url        = url,
                              httpMethod = HttpGet,
                              headers    = headers,
@@ -101,14 +90,11 @@ proc fetch(url: string, headers: HttpHeaders): GithubResponse =
 
 var
   githubFetcher*: GithubFetcher = fetch
-  reviewSleeper*: ReviewSleeper = proc(ms: int) = sleep(ms)
   reviews = initTable[string, DependencyReview]()
-  incomplete = initTable[string, tuple[review: DependencyReview, waitSeconds: int]]()
   warned: seq[string]
 
 proc clearDependencyReviewCache*() =
   reviews.clear()
-  incomplete.clear()
   warned = @[]
 
 proc warnOnce*(message: string) =
@@ -220,17 +206,6 @@ proc parseChanges*(body: string): seq[DependencyChange] =
       ))
     result.add(change)
 
-proc toJson(change: DependencyChange): JsonNode =
-  ## as GitHub lists it, so `parseChanges` reads it back
-  var vulnerabilities = newJArray()
-  for v in change.vulnerabilities:
-    vulnerabilities.add(%*{"severity": v.severity, "advisory_ghsa_id": v.ghsaId,
-                           "advisory_summary": v.summary, "advisory_url": v.url})
-  %*{"change_type": change.changeType, "manifest": change.manifest,
-     "ecosystem": change.ecosystem, "name": change.name, "version": change.version,
-     "package_url": change.packageUrl, "scope": change.scope,
-     "vulnerabilities": vulnerabilities}
-
 proc snapshotWarnings*(value: string): string =
   ## the header is base64 encoded
   if value.strip() == "":
@@ -269,25 +244,6 @@ proc isRateLimited(response: GithubResponse): bool =
                                response.header("retry-after") != "" or
                                "rate limit" in response.body.toLowerAscii()))
 
-proc isTransient(response: GithubResponse): bool =
-  response.code >= 500 or response.isRateLimited()
-
-proc fetchPage(url: string, headers: HttpHeaders): GithubResponse =
-  ## retries network errors, rate limits and server errors
-  var delay = 1000
-  for attempt in 1 .. attempts:
-    try:
-      result = githubFetcher(url, headers)
-      if not result.isTransient() or attempt == attempts:
-        return
-      trace("policy: dependency review: GitHub returned HTTP " & $result.code & ", retrying")
-    except CatchableError:
-      if attempt == attempts:
-        raise
-      trace("policy: dependency review: " & getCurrentExceptionMsg() & ", retrying")
-    reviewSleeper(delay)
-    delay *= 2
-
 proc apiMessage(response: GithubResponse): string =
   ## GitHub's error `message`, else the body
   try:
@@ -311,6 +267,9 @@ proc failed(reason: string): DependencyReview =
   DependencyReview(status: rsFailed, reason: reason)
 
 proc fetchComparison(refs: ReviewRefs, token: string): DependencyReview =
+  # One request per page, no retries: the primary rate limit resets on
+  # `x-ratelimit-reset`, minutes away, and a server error is left to
+  # `on_error` like any other evaluation error.
   let headers = refs.api.requestHeaders(token)
   var
     url   = refs.api & "/repos/" & refs.repo & "/dependency-graph/compare/" &
@@ -320,13 +279,13 @@ proc fetchComparison(refs: ReviewRefs, token: string): DependencyReview =
     inc(pages)
     if pages > maxPages:
       return failed("the comparison has more than " & $(maxPages * perPage) & " dependency changes")
-    let response = fetchPage(url, headers)
+    let response = githubFetcher(url, headers)
+    if response.isRateLimited():
+      return failed("the GitHub API rate limit is exceeded (HTTP " & $response.code & ")")
     case response.code
     of 200 .. 299:
       discard
     of 401, 403:
-      if response.isRateLimited():
-        return failed("the GitHub API rate limit is exceeded")
       # https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review#dependency-review-enablement
       return unavailable("GitHub returned HTTP " & $response.code & " (" & response.apiMessage() &
                          "); dependency review needs the dependency graph, and GitHub Code " &
@@ -346,129 +305,20 @@ proc fetchComparison(refs: ReviewRefs, token: string): DependencyReview =
       return failed("GitHub paginated to another host: " & url)
   result.status = rsReviewed
 
-proc compareDependencies*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
-  ## Retries while GitHub warns the snapshots are incomplete, e.g. while a
-  ## dependency submission for the head commit is pending, for at most
-  ## `waitSeconds`.
+proc compareDependencies*(refs: ReviewRefs): DependencyReview =
   let token = getEnv("GITHUB_TOKEN")
   if token == "":
     return unavailable("GITHUB_TOKEN is not set")
-  # both the sleeps asked for and the wall clock count toward the deadline,
-  # so a `snapshot_wait_seconds` of one retry interval still retries once
-  # and slow fetches do not extend the wait
-  let deadline = epochTime() + float(waitSeconds)
-  var waited = 0
-  while true:
-    try:
-      result = fetchComparison(refs, token)
-    except CatchableError:
-      return failed("could not compare the dependencies of " & $refs & ": " &
-                    getCurrentExceptionMsg())
-    if result.status != rsReviewed or result.snapshotWarnings.strip() == "" or
-       waited >= waitSeconds or epochTime() >= deadline:
-      return
-    trace("policy: dependency graph snapshot warnings, retrying in " & $snapshotRetrySeconds &
-          "s: " & result.snapshotWarnings)
-    reviewSleeper(snapshotRetrySeconds * 1000)
-    waited += snapshotRetrySeconds
-
-proc cacheKey(refs: ReviewRefs): string =
-  # Availability depends on the credentials of the current step. Keep the
-  # token inside the digest so it is never written to the cache or its path.
-  sha256Hex(refs.api & "\0" & refs.repo & "\0" & refs.base & "..." & refs.head &
-            "\0" & getEnv("GITHUB_TOKEN"))
-
-proc cachePath(key: string): string =
-  ## GitHub deletes RUNNER_TEMP at the end of the job, so the comparison is
-  ## kept for the job's other chalk commands only
-  let dir = getEnv("RUNNER_TEMP")
-  if dir == "" or not dirExists(dir):
-    return ""
-  dir / ("chalk-dependency-review-" & key & ".json")
-
-proc readCached(path: string): Option[DependencyReview] =
-  if path == "" or not fileExists(path):
-    return none(DependencyReview)
   try:
-    let doc = parseFile(path)
-    var review = DependencyReview(reason: doc{"reason"}.getStr())
-    case doc{"status"}.getStr()
-    of "reviewed":    review.status = rsReviewed
-    of "unavailable": review.status = rsUnavailable
-    else: return none(DependencyReview)
-    let changes = doc{"changes"}
-    # a truncated or foreign file: `$nil` would be a Defect, not catchable
-    if changes == nil or changes.kind != JArray:
-      return none(DependencyReview)
-    review.changes = parseChanges($changes)
-    trace("policy: dependency review read from " & path)
-    return some(review)
+    result = fetchComparison(refs, token)
   except CatchableError:
-    trace("policy: ignoring dependency review cache " & path & ": " & getCurrentExceptionMsg())
-    return none(DependencyReview)
+    return failed("could not compare the dependencies of " & $refs & ": " &
+                  getCurrentExceptionMsg())
 
-proc writeCached(path: string, review: DependencyReview) =
-  if path == "":
-    return
-  var changes = newJArray()
-  for change in review.changes:
-    changes.add(change.toJson())
-  let status = if review.status == rsReviewed: "reviewed" else: "unavailable"
-  let tmp = path & "." & $getCurrentProcessId() & ".tmp"
-  try:
-    writeFile(tmp, $(%*{"status": status, "reason": review.reason, "changes": changes}))
-    moveFile(tmp, path)
-  except CatchableError:
-    trace("policy: could not cache the dependency review in " & path & ": " &
-          getCurrentExceptionMsg())
-    discard tryRemoveFile(tmp)
-
-proc dependencyReview*(refs: ReviewRefs, waitSeconds = 0): DependencyReview =
-  ## `compareDependencies`, once per process and, in GitHub Actions, once
-  ## per job: several builds of a job compare the same commits. Failures are
-  ## only kept for the process. Comparisons with snapshot warnings are never
-  ## written to the job cache, and are only reused in-process for an equal
-  ## or shorter wait, so another policy configuring a longer
-  ## snapshot_wait_seconds can still wait for a complete one.
-  let key = refs.cacheKey()
-  if key in reviews:
-    return reviews[key]
-  if key in incomplete and waitSeconds <= incomplete[key].waitSeconds:
-    return incomplete[key].review
-  let path = key.cachePath()
-  let cached = path.readCached()
-  if cached.isSome():
-    reviews[key] = cached.get()
-    return cached.get()
-  result = refs.compareDependencies(waitSeconds)
-  if result.snapshotWarnings == "":
-    reviews[key] = result
-    if result.status != rsFailed:
-      path.writeCached(result)
-  else:
-    incomplete[key] = (review: result, waitSeconds: waitSeconds)
-
-proc reviewMark*(refs: ReviewRefs, review: DependencyReview): TableRef[string, string] =
-  ## `DEPENDENCY_REVIEW` for an image built after `review`
-  let status = case review.status
-               of rsReviewed:
-                 if review.snapshotWarnings == "": "reviewed" else: "incomplete"
-               of rsUnavailable: "unavailable"
-               of rsFailed:      "failed"
-  newTable({"repo": refs.repo, "event": refs.event, "base": refs.base,
-            "head": refs.head, "result": status})
-
-proc isReviewedIn*(refs: ReviewRefs, mark: ChalkDict): bool =
-  ## whether the build of the image whose chalk mark is `mark` already
-  ## completely reviewed the same commits; incomplete, unavailable and failed
-  ## reviews are retried, as snapshots and credentials may have changed
-  if mark == nil or markKey notin mark:
-    return false
-  try:
-    let node = parseJson(mark[markKey].boxToJson())
-    return node{"repo"}.getStr().toLowerAscii() == refs.repo.toLowerAscii() and
-           node{"base"}.getStr() == refs.base and node{"head"}.getStr() == refs.head and
-           node{"result"}.getStr() == "reviewed"
-  except CatchableError:
-    trace("policy: could not read " & markKey & " of the chalk mark: " & getCurrentExceptionMsg())
-    return false
+proc dependencyReview*(refs: ReviewRefs): DependencyReview =
+  ## `compareDependencies`, once per process: every policy enabling the
+  ## review compares the same commits
+  let key = refs.api & " " & $refs
+  if key notin reviews:
+    reviews[key] = refs.compareDependencies()
+  reviews[key]

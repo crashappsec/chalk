@@ -639,8 +639,6 @@ const
     PolicyJsonField(name: "max_findings",   kind: JInt),
     PolicyJsonField(name: "run_tools",      kind: JBool),
     PolicyJsonField(name: "message",        kind: JString),
-    # read by the dependency_review rule
-    PolicyJsonField(name: "dependency_review", kind: JBool),
   ]
 
 proc validateSastJson(node: JsonNode, path: string) =

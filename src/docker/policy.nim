@@ -68,14 +68,27 @@ proc repoPathResolver(): proc(dir: string): Option[string] =
     if dir in paths:
       return paths[dir]
     result = none(string)
-    let worktree = gitDiscoverWorkTree(dir)
+    # libgit2 reports the work tree with symlinks resolved; `dir` must be
+    # too, or a symlinked workspace relativizes to `../..` and no manifest
+    # matches, letting every vulnerable dependency through
+    var real = dir
+    try:
+      real = expandFilename(dir)
+    except OSError:
+      trace("policy: could not resolve " & dir & ": " & getCurrentExceptionMsg())
+    let worktree = gitDiscoverWorkTree(real)
     if worktree != "":
       let origin = gitOriginRepo(worktree)
-      if ciRepo == "" or origin == "" or origin == ciRepo:
-        let path = dir.relativePath(worktree)
-        result = some(if path == ".": "" else: path)
-      else:
+      if ciRepo != "" and origin != ciRepo:
         trace("policy: " & dir & " is in a checkout of " & origin & ", not " & ciRepo)
+      else:
+        let path = real.relativePath(worktree)
+        if path == ".":
+          result = some("")
+        elif path.startsWith(".."):
+          trace("policy: " & dir & " resolves outside its work tree " & worktree)
+        else:
+          result = some(path)
     paths[dir] = result
 
 proc isImageContext(value: string): bool =

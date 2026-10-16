@@ -3613,17 +3613,6 @@ Additional guidance shown to the user and included in the report.
 """
   }
 
-  field dependency_review {
-    type:     bool
-    default:  true
-    shortdoc: "Also review pull requests for vulnerable dependencies"
-    doc: """
-In GitHub Actions pull request and merge group jobs, also run GitHub's
-dependency review as `policy.vulnerabilities` does, with `min_severity`
-(`info` as `low`) and `message` of this section, unless
-`policy.vulnerabilities` is enabled, whose settings then apply.
-"""
-  }
 }
 
 singleton vulnerabilities {
@@ -3636,9 +3625,8 @@ groups by default), chalk asks GitHub's dependency graph which
 dependencies the head commit adds over the base commit, from manifests
 and lock files, and which GitHub security advisories affect them, like
 `actions/dependency-review-action`. Only dependencies added in the build
-contexts count (see `dependency_review.context_only`). `chalk docker push`
-reviews the whole repository, unless the pushed images' chalk marks
-record a complete review of the same commits (`DEPENDENCY_REVIEW`).
+contexts count (see `dependency_review.context_only`). Only `chalk docker
+build` is reviewed, not `docker push`.
 
 Other events, other CI systems and local runs are not reviewed. When the
 repository cannot use dependency review (no dependency graph, a private
@@ -3646,8 +3634,6 @@ repository without GitHub Code Security, or no `GITHUB_TOKEN`), chalk
 logs a warning and adds it to the job summary but the policy is not
 affected. Other API failures are evaluation errors and `on_error`
 decides.
-
-`policy.sast` enables the review too (see `policy.sast.dependency_review`).
 
 See `docs/design-build-policy.md` in the chalk repository for details.
 """
@@ -3739,16 +3725,6 @@ How `policy.vulnerabilities` reviews dependency changes with GitHub's
 dependency review API.
 """
 
-  field enabled {
-    type:     bool
-    default:  true
-    shortdoc: "Use GitHub dependency review"
-    doc: """
-Review the dependency changes of GitHub Actions jobs. It is currently the
-only source of the vulnerabilities policy.
-"""
-  }
-
   field events {
     type:     list[string]
     default:  ["pull_request", "pull_request_target", "merge_group"]
@@ -3766,22 +3742,10 @@ deleting a branch). Empty means the default.
     default:  true
     shortdoc: "Only count manifests in the build contexts"
     doc: """
-On `chalk docker build`, only dependencies added in manifests inside the
-local build contexts, and not left out by their `.dockerignore`, count.
-When no build context is part of the job's repository, or any context
-cannot be collected, every manifest counts.
-"""
-  }
-
-  field snapshot_wait_seconds {
-    type:     int
-    default:  0
-    range:    (0, 600)
-    shortdoc: "Wait for complete dependency snapshots"
-    doc: """
-When GitHub warns that the dependency snapshots of the commits are
-incomplete, e.g. while a dependency submission action is still running,
-retry every 10 seconds for up to this long. Remaining warnings are logged.
+Only dependencies added in manifests inside the local build contexts, and
+not left out by their `.dockerignore`, count. When no build context is
+part of the job's repository, or any context cannot be collected, every
+manifest counts.
 """
   }
 }

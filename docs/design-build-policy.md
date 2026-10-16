@@ -1278,13 +1278,6 @@ Set `tool.semgrep.semgrep_format: "json"` for exact `CRITICAL` severities
 and `subcategory`, at the cost of the `SAST` key holding semgrep JSON rather
 than SARIF.
 
-**Dependency review.** In GitHub Actions pull request and merge group jobs,
-`policy.sast` also checks the dependencies the pull request adds for known
-vulnerabilities, as `policy.vulnerabilities` does (see "Vulnerable
-dependencies"), with this section's `min_severity` (`info` counts as `low`)
-and `message`. Set `policy.sast.dependency_review: false` to only run SAST.
-When `policy.vulnerabilities` is enabled too, its settings apply instead.
-
 ### Vulnerable dependencies
 
 `policy.vulnerabilities` blocks pull requests that add dependencies with
@@ -1313,10 +1306,8 @@ and none of them replaces another.
     "max_findings": 0,
     "message": "Upgrade vulnerable dependencies: https://example.com/appsec",
     "dependency_review": {
-      "enabled": true,
       "events": ["pull_request", "pull_request_target", "merge_group"],
-      "context_only": true,
-      "snapshot_wait_seconds": 0
+      "context_only": true
     }
   }
 }
@@ -1335,21 +1326,18 @@ policy {
 }
 ```
 
-| Field                                                            | Type           | Default        | Meaning                                                                             |
-| ---------------------------------------------------------------- | -------------- | -------------- | ----------------------------------------------------------------------------------- |
-| `policy.vulnerabilities.enabled`                                 | `bool`         | `false`        | review added dependencies                                                           |
-| `policy.vulnerabilities.min_severity`                            | `string`       | `"high"`       | `low`, `medium` (or `moderate`), `high` or `critical`; lower advisories are ignored |
-| `policy.vulnerabilities.scopes`                                  | `list[string]` | `["runtime"]`  | `runtime`, `development`, `unknown`, as GitHub determines them (empty: the default) |
-| `policy.vulnerabilities.ignore_advisories`                       | `list[string]` | `[]`           | GitHub advisory id globs to ignore, e.g. `GHSA-35jh-r3h4-6jhm`                      |
-| `policy.vulnerabilities.ignore_packages`                         | `list[string]` | `[]`           | purl patterns to ignore, as in `policy.packages.denied`                             |
-| `policy.vulnerabilities.ignore_paths`                            | `list[string]` | `[]`           | repository-relative manifest path globs to ignore                                   |
-| `policy.vulnerabilities.max_findings`                            | `int`          | `0`            | violation only when more vulnerable dependencies count                              |
-| `policy.vulnerabilities.message`                                 | `string`       | `""`           | guidance appended to every violation                                                |
-| `policy.vulnerabilities.dependency_review.enabled`               | `bool`         | `true`         | use GitHub dependency review, currently the only source                             |
-| `policy.vulnerabilities.dependency_review.events`                | `list[string]` | PRs and queues | GitHub events whose jobs are reviewed; `push` is opt-in (empty: the default)        |
-| `policy.vulnerabilities.dependency_review.context_only`          | `bool`         | `true`         | on build, only manifests docker sends from the build contexts count                 |
-| `policy.vulnerabilities.dependency_review.snapshot_wait_seconds` | `int`          | `0`            | retry while GitHub warns the dependency snapshots are incomplete, at most 600       |
-| `policy.sast.dependency_review`                                  | `bool`         | `true`         | `policy.sast` reviews dependencies too, see "SAST findings"                         |
+| Field                                                   | Type           | Default        | Meaning                                                                             |
+| ------------------------------------------------------- | -------------- | -------------- | ----------------------------------------------------------------------------------- |
+| `policy.vulnerabilities.enabled`                        | `bool`         | `false`        | review added dependencies                                                           |
+| `policy.vulnerabilities.min_severity`                   | `string`       | `"high"`       | `low`, `medium` (or `moderate`), `high` or `critical`; lower advisories are ignored |
+| `policy.vulnerabilities.scopes`                         | `list[string]` | `["runtime"]`  | `runtime`, `development`, `unknown`, as GitHub determines them (empty: the default) |
+| `policy.vulnerabilities.ignore_advisories`              | `list[string]` | `[]`           | GitHub advisory id globs to ignore, e.g. `GHSA-35jh-r3h4-6jhm`                      |
+| `policy.vulnerabilities.ignore_packages`                | `list[string]` | `[]`           | purl patterns to ignore, as in `policy.packages.denied`                             |
+| `policy.vulnerabilities.ignore_paths`                   | `list[string]` | `[]`           | repository-relative manifest path globs to ignore                                   |
+| `policy.vulnerabilities.max_findings`                   | `int`          | `0`            | violation only when more vulnerable dependencies count                              |
+| `policy.vulnerabilities.message`                        | `string`       | `""`           | guidance appended to every violation                                                |
+| `policy.vulnerabilities.dependency_review.events`       | `list[string]` | PRs and queues | GitHub events whose jobs are reviewed; `push` is opt-in (empty: the default)        |
+| `policy.vulnerabilities.dependency_review.context_only` | `bool`         | `true`         | only manifests docker sends from the build contexts count                           |
 
 GitHub rates advisories `low`, `moderate`, `high` or `critical`; `moderate`
 is reported as `medium`, the SAST and catalog scale. Each added dependency
@@ -1362,8 +1350,13 @@ dependencies never count, so a pull request is not blocked for
 vulnerabilities its base branch already has. A version an `ignore_packages`
 range cannot compare is not ignored.
 
-**When it runs.** Only in GitHub Actions (`GITHUB_ACTIONS=true`) for one of
-`dependency_review.events`. Pull requests compare `pull_request.base.sha`
+**When it runs.** Only on `chalk docker build`, in GitHub Actions
+(`GITHUB_ACTIONS=true`) for one of `dependency_review.events`. `docker push`
+is not reviewed: it has no build context to narrow the review to, and which
+commits its images were built from is not known reliably (a chalk mark is
+unsigned and inherited through `FROM`), so a push-side review would either
+block on manifests the build ignored or skip images it should not.
+Pull requests compare `pull_request.base.sha`
 and `pull_request.head.sha` of the event payload (`GITHUB_EVENT_PATH`),
 merge groups `merge_group.base_sha` and `head_sha`, and pushes (when listed)
 `before` and `after`; a push creating or deleting a branch has nothing to
@@ -1373,45 +1366,35 @@ silently (trace log). The repository is `GITHUB_REPOSITORY`, the API
 `GITHUB_TOKEN`, which needs `contents: read` (setup-chalk-action exports the
 job's token). The API version `2026-03-10` is requested from `api.github.com`.
 
-**Build contexts.** On `docker build` with `context_only`, only dependencies
-added in manifests inside a local build context count, and not those its
+**Build contexts.** With `context_only`, only dependencies added in
+manifests inside a local build context count, and not those its
 `.dockerignore` leaves out, so a monorepo pull request only blocks the
 services whose manifests it changes. Manifests are matched by the path of
-the context within its git work tree; a context in a checkout of another
-repository than `GITHUB_REPOSITORY` is not part of the comparison. When no
+the context within its git work tree, with symlinks resolved on both sides;
+a context in a checkout of another repository than `GITHUB_REPOSITORY`, or
+of a repository without an origin while `GITHUB_REPOSITORY` is set, is not
+part of the comparison. When no
 build context is part of the repository (e.g. a remote context), every
 manifest counts and chalk logs a warning, so a vulnerable dependency is never
 let through for not being located. If any context cannot be collected (e.g.
 stdin or a URL), dependency review checks the whole repository instead.
 Skipped or unavailable dependency reviews never create context findings.
 
-**Scan once.** A job usually builds and then pushes, sometimes several
-images, so the comparison is fetched once per job: per process, and in
-`RUNNER_TEMP` for the job's other chalk commands, with separate entries for
-different credentials. Comparisons with snapshot warnings are never cached,
-so another policy can wait for complete snapshots. Builds record the review
-in the chalk mark as
-`DEPENDENCY_REVIEW` (`repo`, `event`, `base`, `head`, `result`), and
-`docker push` does not review the commits again when the marks of all
-pushed images record a complete `reviewed` review of the same commits.
-`incomplete`, `unavailable` and `failed` reviews are retried on push: the
-snapshots or credentials may have changed. Otherwise (pulled images,
-images built for other commits, unchalked images) push also reviews every
-manifest of the repository, as there is no build context.
+The comparison is fetched once per process, as every policy enabling the
+review compares the same commits.
 
 **When the review is unavailable.** GitHub answers HTTP 403 when the
 repository has no dependency graph, or is private without GitHub Code
 Security (or Advanced Security), and 401 for a bad token. Then, and without
 `GITHUB_TOKEN`, chalk logs a warning and adds it to the job summary but the
-policy is not affected: no finding, never `on_error`, so enabling
-`policy.sast` never fails builds of repositories that cannot use dependency
-review. Rate limits, server errors and network failures are retried twice,
-then, like a 404 (unknown commits), malformed responses or comparisons over
-10,000 changes, are an evaluation error that `on_error` decides. GitHub
-reports incomplete snapshots (e.g. a pending
+policy is not affected: no finding, never `on_error`. Rate limits (429, or
+403 with the limit exhausted; the primary limit resets minutes later, so
+chalk does not retry), server errors, network failures, a 404 (unknown
+commits), malformed responses and comparisons over 10,000 changes are an
+evaluation error that `on_error` decides. GitHub reports incomplete
+snapshots (e.g. a pending
 [dependency submission](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/using-the-dependency-submission-api))
-in the `x-github-dependency-graph-snapshot-warnings` header: chalk retries
-every 10 seconds for up to `snapshot_wait_seconds`, then logs the warnings
+in the `x-github-dependency-graph-snapshot-warnings` header: chalk logs them
 and evaluates what GitHub returned.
 
 **Not covered.** Dependencies GitHub's dependency graph does not see
