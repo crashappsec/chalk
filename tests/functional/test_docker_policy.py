@@ -2481,6 +2481,39 @@ def test_dependency_review_other_checkout_reviews_repository(
     assert sorted(f["subject"] for f in report["_POLICY_FINDINGS"]) == [LODASH, PYYAML]
 
 
+@pytest.mark.parametrize("unmapped_main", [False, True])
+def test_dependency_review_mixed_contexts_review_repository(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    unmapped_main: bool,
+):
+    repo = f"vulnerable/{random_hex}"
+    known = monorepo(tmp_data_dir, repo)
+    unmapped = tmp_path / "copied-context"
+    unmapped.mkdir()
+    (unmapped / "requirements.txt").write_text("pyyaml==5.3\n")
+    main, extra = (unmapped, known) if unmapped_main else (known, unmapped)
+    _, result = build_review(
+        chalk,
+        random_hex,
+        main,
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        tag=random_hex,
+        named_contexts={"extra": extra},
+        buildx=True,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="blocked")
+    assert sorted(f["subject"] for f in report["_POLICY_FINDINGS"]) == [LODASH, PYYAML]
+    assert "some build contexts could not be located" in result.logs
+
+
 def test_dependency_review_symlinked_context(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
 ):

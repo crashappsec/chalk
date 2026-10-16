@@ -217,7 +217,7 @@ proc check*(settings: VulnerabilitiesConfig, review: DependencyReview,
 
 proc reviewContexts*(input: PolicyInput, refs: ReviewRefs): Option[seq[ReviewContext]] =
   ## The build contexts within the repository, with their `.dockerignore`;
-  ## none, to review every manifest, when none of them is part of it, e.g.
+  ## none, to review every manifest, when any of them cannot be located, e.g.
   ## a remote context or a checkout of another repository, so a vulnerable
   ## dependency is never let through for not being located
   if len(input.contextErrors) > 0:
@@ -234,7 +234,9 @@ proc reviewContexts*(input: PolicyInput, refs: ReviewRefs): Option[seq[ReviewCon
     except CatchableError:
       trace("policy: could not locate " & dir & " in " & refs.repo & ": " & getCurrentExceptionMsg())
     if path.isNone():
-      continue
+      warnOnce("policy: dependency review: some build contexts could not be located, so " &
+               refs.repo & "'s dependency changes are reviewed outside them too")
+      return none(seq[ReviewContext])
     var ignore: DockerIgnore
     try:
       ignore = loadDockerignore(dir, input.mainContextDockerfile(dir))

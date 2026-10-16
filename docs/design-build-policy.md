@@ -1373,10 +1373,11 @@ services whose manifests it changes. Manifests are matched by the path of
 the context within its git work tree, with symlinks resolved on both sides;
 a context in a checkout of another repository than `GITHUB_REPOSITORY`, or
 of a repository without an origin while `GITHUB_REPOSITORY` is set, is not
-part of the comparison. When no
-build context is part of the repository (e.g. a remote context), every
-manifest counts and chalk logs a warning, so a vulnerable dependency is never
-let through for not being located. If any context cannot be collected (e.g.
+part of the comparison. When any
+build context cannot be located in the repository (e.g. a remote context),
+every manifest counts and chalk logs a warning, even if other contexts were
+located, so a vulnerable dependency is never let through for not being
+located. If any context cannot be collected (e.g.
 stdin or a URL), dependency review checks the whole repository instead.
 Skipped or unavailable dependency reviews never create context findings.
 

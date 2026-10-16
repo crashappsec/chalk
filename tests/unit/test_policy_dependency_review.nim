@@ -443,7 +443,7 @@ proc testContexts() =
 
   let dir = createTempDir("chalk-review-context-", "")
   writeFile(dir / ".dockerignore", "requirements.txt\n")
-  var input = PolicyInput(command: "build", contextDirs: @[dir, "/elsewhere"])
+  var input = PolicyInput(command: "build", contextDirs: @[dir])
   doAssert input.reviewContexts(refs()).isNone()
   input.repoPath = proc(d: string): Option[string] =
     if d == dir: some("services/api") else: none(string)
@@ -451,6 +451,20 @@ proc testContexts() =
   assertEq(len(contexts), 1)
   assertEq(contexts[0].path, "services/api")
   assertEq(defaults().check(review, some(contexts)).subjects(), @[lodash])
+  # An unmapped main or named context must broaden the review even when
+  # another context maps successfully. Resolver errors have the same fallback.
+  for dirs in [@[dir, "/elsewhere"], @["/elsewhere", dir]]:
+    for fails in [false, true]:
+      input.contextDirs = dirs
+      input.repoPath = proc(d: string): Option[string] =
+        if d == dir:
+          return some("services/api")
+        if fails:
+          raise newException(IOError, "cannot locate context")
+        return none(string)
+      let mixed = input.reviewContexts(refs())
+      doAssert mixed.isNone()
+      assertEq(defaults().check(review, mixed).subjects(), defaults().check(review).subjects())
   # no context in the repository reviews every manifest
   input.repoPath = proc(d: string): Option[string] = none(string)
   doAssert input.reviewContexts(refs()).isNone()

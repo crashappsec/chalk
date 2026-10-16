@@ -3743,9 +3743,9 @@ deleting a branch). Empty means the default.
     shortdoc: "Only count manifests in the build contexts"
     doc: """
 Only dependencies added in manifests inside the local build contexts, and
-not left out by their `.dockerignore`, count. When no build context is
-part of the job's repository, or any context cannot be collected, every
-manifest counts.
+not left out by their `.dockerignore`, count. When any build context cannot
+be located in the job's repository or cannot be collected, every manifest
+counts.
 """
   }
 }
