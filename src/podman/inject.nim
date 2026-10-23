@@ -19,6 +19,7 @@ import "../docker"/[
   dockerfile,
 ]
 import "./binding"
+import "./chalk_platform"
 import "./notice"
 import "./types" as podman_types
 
@@ -40,6 +41,7 @@ type
     case kind*: PodmanInputResultKind
     of pirResolved:
       spec*: podman_types.PodmanBuildSpec
+      target*: ChalkPlatform
     of pirRefused:
       reason*: PodmanSkipReason
 
@@ -81,24 +83,6 @@ proc namedContextReplacesBase*(contextNames, chainRefs: seq[string],
     if selectedAlias != "" and name == selectedAlias:
       return true
   return false
-
-proc isLinuxAmd64Elf(path: string): bool =
-  var f: File
-  if not f.open(path):
-    return false
-  try:
-    var hdr: array[20, char]
-    if f.readBuffer(addr hdr[0], 20) != 20:
-      return false
-    if hdr[0] != '\x7f' or hdr[1] != 'E' or hdr[2] != 'L' or hdr[3] != 'F':
-      return false
-    if hdr[4] != '\x02':
-      return false
-    if hdr[18] != '\x3e' or hdr[19] != '\x00':
-      return false
-    return true
-  finally:
-    f.close()
 
 proc canonicalChild(filePath, contextPath: string): bool =
   if filePath == contextPath:
@@ -193,11 +177,15 @@ proc resolvePodmanInputs*(spec: podman_types.PodmanBuildSpec,
     return PodmanInputResult(kind: pirRefused, reason: selection.reason)
   let containerfile = selection.path
 
+  var target: Option[ChalkPlatform]
   try:
-    if not isLinuxAmd64Elf(chalkPath):
-      return refusedInput(psrBinaryIncompatible)
+    target = readChalkPlatform(chalkPath)
   except:
+    discard
+  if target.isNone():
     return refusedInput(psrBinaryIncompatible)
+  if spec.requestedPlatform.isSome() and spec.requestedPlatform.get() != target.get():
+    return refusedInput(psrCommandPlatformMismatch)
 
   var text: string
   try:
@@ -236,7 +224,7 @@ proc resolvePodmanInputs*(spec: podman_types.PodmanBuildSpec,
   filled.resolvedContainerfile = containerfile
   filled.containerfileText     = text
   filled.startup               = config
-  return PodmanInputResult(kind: pirResolved, spec: filled)
+  return PodmanInputResult(kind: pirResolved, spec: filled, target: target.get())
 
 proc formatPodmanChalkExec(entrypoint: JsonNode): string =
   var arr = newJArray()
@@ -371,7 +359,8 @@ proc externalPodmanTempBase(contextPath: string): Option[string] =
     return some(baseCanon)
   return none(string)
 
-proc preparePodmanBuild*(spec: podman_types.PodmanBuildSpec):
+proc preparePodmanBuild*(spec: podman_types.PodmanBuildSpec,
+                          chalkPath = getMyAppPath()):
                         Option[podman_types.PodmanWorkspace] =
   try:
     if spec.startupPlan.isNone():
@@ -403,7 +392,7 @@ proc preparePodmanBuild*(spec: podman_types.PodmanBuildSpec):
       return none(podman_types.PodmanWorkspace)
     registerTmpDir(root)
     createDir(assets)
-    copyFile(getMyAppPath(), chalkBin)
+    copyFile(chalkPath, chalkBin)
     discard chmodFilePermissions(chalkBin, "0755")
     writeFile(derived, text)
     return some(podman_types.PodmanWorkspace(

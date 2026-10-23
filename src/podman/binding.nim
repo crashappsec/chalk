@@ -8,6 +8,7 @@
 ## Immutable base operand selected before a Podman build is instrumented.
 
 import std/strutils
+import "./chalk_platform"
 
 type
   BaseBindingKind* = enum
@@ -25,7 +26,7 @@ type
     of bbRegistryDigest:
       reference*:     string
       imageId*:       string
-      proofPlatform*: string
+      proofPlatform*: ChalkPlatform
 
 proc operand*(binding: BaseBinding): string =
   case binding.kind
@@ -57,5 +58,4 @@ proc validBinding*(binding: BaseBinding): bool =
     return marker > 0 and
            binding.reference.find('@') == marker and
            validConfigId(binding.reference[marker + "@sha256:".len .. ^1]) and
-           validConfigId(binding.imageId) and
-           binding.proofPlatform == "linux/amd64"
+           validConfigId(binding.imageId)

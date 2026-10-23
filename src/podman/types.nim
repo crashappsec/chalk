@@ -8,6 +8,7 @@
 import std/options
 import "../docker"/dockerfile
 import "./exec"
+import "./chalk_platform"
 import "./notice"
 
 type
@@ -31,7 +32,7 @@ type
     contextArg*:            string
     containerfileArg*:      string
     tags*:                  seq[string]
-    platform*:              string
+    requestedPlatform*:     Option[ChalkPlatform]
     imageFormat*:           string
     quietOutput*:           bool
     target*:                string

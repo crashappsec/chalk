@@ -18,6 +18,7 @@ import ".."/[
 ]
 import "../docker"/ids
 import "./binding"
+import "./chalk_platform"
 import "./run"
 import "./types" as podman_types
 
@@ -143,15 +144,15 @@ proc inspectPulled(exe, pulledId: string,
     return none(InspectedBaseImage)
   return inspectImage(exe, pulledId, pulledId, cancellation)
 
-proc effectivePullPlatform(commandPlatform: string,
+proc effectivePullPlatform(commandPlatform: Option[ChalkPlatform],
                            rootPlatform: DeclaredPlatform,
-                           effectiveStageCount: int): string =
-  if commandPlatform != "":
-    return commandPlatform
+                           effectiveStageCount: int, target: ChalkPlatform): string =
+  if commandPlatform.isSome():
+    return $commandPlatform.get()
   if rootPlatform.kind == dpkKnown:
     return $rootPlatform.platform
   if effectiveStageCount > 1:
-    return "linux/amd64"
+    return $target
   return ""
 
 proc splitRepoDigest(value: string): tuple[repository, digest: string] =
@@ -196,8 +197,9 @@ proc registryBindingReference(image: string,
 
 proc fetchBaseImage*(exe, image: string,
                      cancellation: var Option[podman_types.ChildResult],
+                     target: ChalkPlatform,
                      policy = podman_types.bppMissing,
-                     commandPlatform = "",
+                     commandPlatform = none(ChalkPlatform),
                      rootPlatform = DeclaredPlatform(kind: dpkAbsent),
                      effectiveStageCount = 1):
                     Option[InspectedBaseImage] =
@@ -214,6 +216,7 @@ proc fetchBaseImage*(exe, image: string,
     commandPlatform,
     rootPlatform,
     effectiveStageCount,
+    target,
   )
 
   case policy
@@ -236,7 +239,7 @@ proc fetchBaseImage*(exe, image: string,
       exe,
       reference.get(),
       podman_types.bppAlways,
-      "linux/amd64",
+      $target,
       cancellation,
     )
     if cancellation.isSome() or proofId.isNone() or
@@ -246,7 +249,7 @@ proc fetchBaseImage*(exe, image: string,
       kind:          bbRegistryDigest,
       reference:     reference.get(),
       imageId:       result.get().imageId,
-      proofPlatform: "linux/amd64",
+      proofPlatform: target,
     )
     return result
   of podman_types.bppNewer:

@@ -24,6 +24,7 @@ import ".."/[
 ]
 import "../docker"/ids
 import "./cmdline"
+import "./chalk_platform"
 import "./exec" as podman_exec
 import "./host"
 import "./image"
@@ -77,7 +78,8 @@ proc failOpenOriginal(exe: string, spec: podman_types.PodmanBuildSpec,
   return status
 
 proc writeMark(spec: podman_types.PodmanBuildSpec,
-               ws: podman_types.PodmanWorkspace): Option[ChalkObj] =
+               ws: podman_types.PodmanWorkspace,
+               target: ChalkPlatform): Option[ChalkObj] =
   let chalk = newChalk(
     name         = primaryTag(spec),
     resourceType = {ResourceImage},
@@ -88,8 +90,8 @@ proc writeMark(spec: podman_types.PodmanBuildSpec,
   chalk.collectedData.setIfNeeded("DOCKER_FILE_CHALKED", ws.derivedText)
   chalk.collectedData.setIfNeeded("DOCKERFILE_PATH", spec.resolvedContainerfile)
   chalk.collectedData.setIfNeeded("DOCKER_CONTEXT", spec.contextArg)
-  chalk.collectedData.setIfNeeded("DOCKER_PLATFORM", spec.platform)
-  chalk.collectedData.setIfNeeded("DOCKER_PLATFORMS", @[spec.platform])
+  chalk.collectedData.setIfNeeded("DOCKER_PLATFORM", $target)
+  chalk.collectedData.setIfNeeded("DOCKER_PLATFORMS", @[$target])
   if len(spec.tags) > 0:
     chalk.collectedData.setIfNeeded("DOCKER_TAGS", spec.tags)
   if spec.target != "":
@@ -196,7 +198,7 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
       if info.child.kind == podman_types.ceExited: some(info.child.exitCode)
       else: none(int)
     return failOpenOriginal(exe, spec, pasHostInspection, status)
-  let hostPlatform = checkPodmanHost(info.stdout)
+  let hostPlatform = checkPodmanHost(info.stdout, resolved.target)
   if hostPlatform.kind == phrRefused:
     emitPodmanSkip(PodmanSkip(operation: poBuild,
                              reason: hostPlatform.reason))
@@ -207,7 +209,7 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
     fromPlatform = spec.startup.fromPlatform
     rootImage = spec.startup.rootImage
     rootIsScratch = rootImage == "scratch"
-    declaredSkip = declaredPlatformSkip(fromPlatform)
+    declaredSkip = declaredPlatformSkip(fromPlatform, resolved.target)
   if declaredSkip.isSome():
     emitPodmanSkip(PodmanSkip(operation: poBuild,
                              reason: declaredSkip.get()))
@@ -219,20 +221,17 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   # Platform compatibility is independent of startup inheritance: an explicit
   # ENTRYPOINT must not skip this check.
   if not rootIsScratch:
-    inspected = fetchBaseImage(exe, rootImage, cancellation, spec.pullPolicy,
-                               spec.platform, spec.startup.rootFromPlatform,
+    inspected = fetchBaseImage(exe, rootImage, cancellation, resolved.target,
+                               spec.pullPolicy,
+                               spec.requestedPlatform, spec.startup.rootFromPlatform,
                                spec.startup.effectiveStageCount)
     if cancellation.isSome():
       return cancellationExit(cancellation.get())
-  let base = decideFinalBase(rootImage, spec.platform, fromPlatform, inspected)
+  let base = decideFinalBase(rootImage, spec.requestedPlatform, fromPlatform,
+                             inspected, resolved.target)
   if base.kind == fbdSkip:
     emitPodmanSkip(PodmanSkip(operation: poBuild, reason: base.reason))
     execReplacingSelf(exe, spec.originalArgs)
-
-  if spec.platform == "":
-    # --platform was omitted, so podman builds for the host platform, which the
-    # check above has just confirmed is one we can instrument.
-    spec.platform = hostPlatform.platform
 
   let startup = podman_exec.planStartup(spec.startup, base.root)
   if startup.kind == podman_exec.sprRefuse:
@@ -248,14 +247,14 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   except:
     return failOpenOriginal(exe, spec, pasCollectionInitialization)
 
-  let wsOpt = preparePodmanBuild(spec)
+  let wsOpt = preparePodmanBuild(spec, chalkPath)
   if wsOpt.isNone():
     return failOpenOriginal(exe, spec, pasWorkspacePreparation)
   let ws = wsOpt.get()
 
   var chalkOpt: Option[ChalkObj]
   try:
-    chalkOpt = writeMark(spec, ws)
+    chalkOpt = writeMark(spec, ws, resolved.target)
   except:
     return failOpenOriginal(exe, spec, pasMarkCreation)
   if chalkOpt.isNone():

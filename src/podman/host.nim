@@ -11,12 +11,14 @@
 ## than in build.nim so they can be unit tested without linking the whole Chalk
 ## runtime.
 
+import std/options
 import ".."/[
   utils/json,
   utils/semver,
 ]
 import "../docker"/ids
 import "./notice"
+import "./chalk_platform"
 
 type
   PodmanHostResultKind* = enum
@@ -25,7 +27,7 @@ type
   PodmanHostResult* = object
     case kind*: PodmanHostResultKind
     of phrSupported:
-      platform*: string
+      platform*: ChalkPlatform
     of phrRefused:
       reason*: PodmanSkipReason
 
@@ -52,7 +54,7 @@ proc refusedHost(kind: PodmanSkipReasonKind): PodmanHostResult =
 # older host simply keeps the plain RUN it has today.
 const verifiedRunNetworkBuildah = "1.39.3"
 
-proc checkPodmanHost*(raw: string): PodmanHostResult =
+proc checkPodmanHost*(raw: string, target: ChalkPlatform): PodmanHostResult =
   ## Returns the platform the host will build for when the command named none,
   ## or a fixed refusal if this host is outside the supported envelope.
   ##
@@ -71,8 +73,11 @@ proc checkPodmanHost*(raw: string): PodmanHostResult =
       return refusedHost(psrHostInfoInvalid)
     if platform.platform.os != "linux":
       return refusedHost(psrUnsupportedHostOs)
-    if platform.platform.architecture != "amd64":
+    let hostPlatform = chalkPlatformOf(platform.platform)
+    if hostPlatform.isNone():
       return refusedHost(psrUnsupportedHostArch)
+    if hostPlatform.get() != target:
+      return refusedHost(psrHostPlatformMismatch)
     # A remote service builds on another machine, where the local paths we pass
     # via --build-context and --iidfile do not exist. That one is a real limit.
     if remote:
@@ -84,11 +89,8 @@ proc checkPodmanHost*(raw: string): PodmanHostResult =
     # privileged CI container is a completely ordinary way to build. Requiring
     # it silently refused to instrument exactly that case.
     #
-    # /chalk is this binary, a linux/amd64 static ELF (checked by
-    # resolvePodmanInputs), so the image it becomes the entrypoint of has to be
-    # linux/amd64 for it to exec at container start.
     return PodmanHostResult(kind: phrSupported,
-                            platform: $platform.platform)
+                            platform: target)
   except:
     return refusedHost(psrHostInfoInvalid)
 

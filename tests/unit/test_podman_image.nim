@@ -1,3 +1,4 @@
+import ../../src/podman/chalk_platform
 import std/[
   json,
   options,
@@ -124,17 +125,19 @@ proc fetch(image = BaseRef,
            policy = bppMissing,
            commandPlatform = "",
            rootPlatform = DeclaredPlatform(kind: dpkAbsent),
-           effectiveStageCount = 1): FetchResult =
+           effectiveStageCount = 1,
+           target = cpLinuxAmd64): FetchResult =
   var cancellation = none(ChildResult)
   result.image = fetchBaseImage(
     fake,
     image,
     cancellation,
+    target,
     policy,
-    commandPlatform,
+    parseCommandPlatform(commandPlatform),
     rootPlatform,
     effectiveStageCount,
-  )
+   )
   result.cancellation = cancellation
 
 proc expectCalls(expected: seq[seq[string]]) =
@@ -238,7 +241,7 @@ doAssert always.image.get().binding.kind == bbRegistryDigest
 doAssert always.image.get().binding.reference ==
   "registry.example/customer/base@" & DigestA
 doAssert always.image.get().binding.imageId == ImageAId
-doAssert always.image.get().binding.proofPlatform == "linux/amd64"
+doAssert always.image.get().binding.proofPlatform == cpLinuxAmd64
 expectCalls(@[
   @["pull", "--quiet", "--policy", "always", BaseRef],
   @["image", "inspect", ImageAId, "--format", "json"],
@@ -433,6 +436,51 @@ doAssert proofCancelled.image.isNone()
 doAssert proofCancelled.cancellation.isSome()
 doAssert proofCancelled.cancellation.get().kind == ceSignaled
 doAssert recordedCalls(log).len == 3
+
+for target in ChalkPlatform:
+  let arch = if target == cpLinuxAmd64: "amd64" else: "arm64"
+  resetCase()
+  putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection(architecture = arch))
+  let multi = fetch(effectiveStageCount = 2, target = target)
+  doAssert multi.image.isSome()
+  expectCalls(@[
+    @["pull", "--quiet", "--policy", "missing", "--platform", $target, BaseRef],
+    @["image", "inspect", ImageAId, "--format", "json"],
+  ])
+  resetCase()
+  putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection(architecture = arch))
+  let explicit = fetch(commandPlatform = $target, target = target)
+  doAssert explicit.image.isSome()
+  expectCalls(@[
+    @["pull", "--quiet", "--policy", "missing", "--platform", $target, BaseRef],
+    @["image", "inspect", ImageAId, "--format", "json"],
+  ])
+  resetCase()
+  putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection(architecture = arch))
+  let declared = fetch(rootPlatform = parseDeclaredPlatform($target), target = target)
+  doAssert declared.image.isSome()
+  expectCalls(@[
+    @["pull", "--quiet", "--policy", "missing", "--platform", $target, BaseRef],
+    @["image", "inspect", ImageAId, "--format", "json"],
+  ])
+  resetCase()
+  putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection(architecture = arch))
+  let proven = fetch(policy = bppAlways, commandPlatform = $target, target = target)
+  doAssert proven.image.isSome()
+  doAssert proven.image.get().binding.proofPlatform == target
+  expectCalls(@[
+    @["pull", "--quiet", "--policy", "always", "--platform", $target, BaseRef],
+    @["image", "inspect", ImageAId, "--format", "json"],
+    @["pull", "--quiet", "--policy", "always", "--platform", $target,
+      "registry.example/customer/base@" & DigestA],
+  ])
+  resetCase()
+  putEnv("PODMAN_IMAGE_TEST_PROOF_CANCEL", "1")
+  let cancelled = fetch(policy = bppAlways, target = target)
+  doAssert cancelled.image.isNone()
+  doAssert cancelled.cancellation.isSome()
+  doAssert cancelled.cancellation.get().kind == ceSignaled
+  doAssert recordedCalls(log).len == 3
 
 removeFile(log)
 removeDir(root)

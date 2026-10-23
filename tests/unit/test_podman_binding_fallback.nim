@@ -88,6 +88,8 @@ proc writeFakeLinuxAmd64(path: string) =
   header[2] = 'L'
   header[3] = 'F'
   header[4] = '\x02'
+  header[5] = '\x01'
+  header[6] = '\x01'
   header[18] = '\x3e'
   header[19] = '\x00'
   writeFile(path, header)

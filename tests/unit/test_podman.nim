@@ -1,3 +1,4 @@
+import ../../src/podman/chalk_platform
 import std/[
   options,
   os,
@@ -108,8 +109,7 @@ proc main() =
   ])
   discard expectSkip(@["build", "-tsecret", "."], poBuild,
                      psrUnsupportedFlag, "-t")
-  discard expectSkip(@["build", "--platform", "linux/arm64", "."], poBuild,
-                     psrInvalidFlag, "--platform")
+  discard expectBuildRoute(@["build", "--platform", "linux/arm64", "."])
   let remote = expectSkip(
     @["build", "https://user:secret@example.invalid/context.git"],
     poBuild,
@@ -135,7 +135,7 @@ proc main() =
   expectPass(@["--remote", "build", "."])
   expectPass(@["build", "--help"])
   expectPass(@["build", "--from", "another-stage", "."])
-  expectPass(@["build", "--platform", "linux/arm64", "."])
+  discard expectBuildRoute(@["build", "--platform", "linux/arm64", "."])
   expectPass(@["build", "--build-arg-file", "PASSWORD=secret", "."])
   expectPass(@["build", "-"])
   expectPass(@["build", "https://example.invalid/context.git"])
@@ -188,7 +188,7 @@ proc main() =
   expectBuildUntagged(@["build", "--platform", "linux/amd64", "."])
 
   # An option that IS given must still name something we can instrument.
-  expectPass(@["build", "-t", "foo", "--platform", "linux/arm64", "."])
+  expectBuild(@["build", "-t", "foo", "--platform", "linux/arm64", "."])
   expectPass(@["build", "-t", "foo", "--format", "docker", "."])
   expectPass(@["build", "--format", "docker", "."])
   expectPass(@["build", "-t", "foo", "-f", "-", "."])
@@ -200,7 +200,7 @@ proc main() =
   # podman's containerfile lookup and from `podman info`.
   let implied = expectBuildRoute(@["build", "-t", "foo", "."])
   assertEq(implied.spec.containerfileArg, "")
-  assertEq(implied.spec.platform, "")
+  assertEq(implied.spec.requestedPlatform, none(ChalkPlatform))
   assertEq(implied.spec.imageFormat, "")
   assertEq(implied.spec.fileValueIndex, -1)
   assertEq(implied.spec.contextArg, ".")
@@ -213,12 +213,12 @@ proc main() =
     ""","security":{"rootless":""" & $rootless & """}}}"""
 
   proc expectHost(raw, platform: string) =
-    let checked = checkPodmanHost(raw)
+    let checked = checkPodmanHost(raw, target = cpLinuxAmd64)
     assertEq(checked.kind, phrSupported)
-    assertEq(checked.platform, platform)
+    assertEq($checked.platform, platform)
 
   proc expectHostRefusal(raw: string, reason: PodmanSkipReasonKind) =
-    let checked = checkPodmanHost(raw)
+    let checked = checkPodmanHost(raw, target = cpLinuxAmd64)
     assertEq(checked.kind, phrRefused)
     assertEq(checked.reason.kind, reason)
 
@@ -226,7 +226,7 @@ proc main() =
   expectHost(info("linux", "amd64", false, true), "linux/amd64")
   expectHost(info("linux", "x86_64", false, false), "linux/amd64")
   expectHostRefusal(info("linux", "arm64", false, true),
-                    psrUnsupportedHostArch)
+                    psrHostPlatformMismatch)
   expectHostRefusal(info("darwin", "amd64", false, true),
                     psrUnsupportedHostOs)
   expectHostRefusal(info("linux", "amd64", true, true), psrRemoteHost)
@@ -1085,6 +1085,8 @@ proc main() =
     hdr[2] = 'L'
     hdr[3] = 'F'
     hdr[4] = '\x02'
+    hdr[5] = '\x01'
+    hdr[6] = '\x01'
     hdr[18] = '\x3e'
     hdr[19] = '\x00'
     writeFile(path, hdr)
