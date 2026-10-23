@@ -294,6 +294,7 @@ outconf = {
     "dump",
     "setup",
     "docker",
+    "podman",
 }
 
 
