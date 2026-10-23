@@ -2438,6 +2438,18 @@ Tags added to a docker image. Will be in the form: REPOSITORY:TAG
 """
 }
 
+keyspec PODMAN_IMAGE_ID {
+    kind:     RunTimeArtifact
+    type:     string
+    standard: true
+    system:   false
+    since:    "1.2.0"
+    shortdoc: "Podman image id for a wrapped build"
+    doc:      """
+Canonical image id collected from Podman after a wrapped `podman build`.
+"""
+}
+
 keyspec DOCKER_CONTEXT {
     kind:     ChalkTimeArtifact
     type:     string

@@ -686,6 +686,19 @@ All arguments appearing after the word 'docker' are passed to docker.  No flags 
 """
   }
 
+  command podman {
+    shortdoc: "Run a podman command, then chalk supported builds"
+    args:    (0, high())
+    ignore_all_flags: true
+    doc: """
+Chalk a Podman operation. This always transparently calls podman, as long as it is anywhere in your path (even if 'chalk' is named or symlinked as 'podman').
+
+Unsupported Podman invocations are executed unchanged.
+<p>
+All arguments appearing after the word 'podman' are passed to podman.  No flags to chalk can appear after the command.
+"""
+  }
+
   command setup {
     arg_sub_mutex: false # should be the default?
     shortdoc: "Set up automatic code signing"

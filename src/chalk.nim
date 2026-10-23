@@ -65,6 +65,7 @@ when isMainModule:
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())
+  of "podman":             runCmdPodman(getArgs())
   of "exec":               runCmdExec(getArgs())
   of "setup":              runCmdSetup()
   of "docgen":             runChalkDocGen() # in cmd_help

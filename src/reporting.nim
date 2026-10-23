@@ -150,6 +150,51 @@ proc activeCustomReportTopics*(): seq[string] =
       continue
     result.add(topic)
 
+type ReportSinkRedirect = tuple[
+  config: SinkConfig,
+  implementation: SinkImplementation,
+]
+
+proc addReportSink(sinks: var seq[SinkConfig], config: SinkConfig) =
+  var current = config
+  while current != nil and current notin sinks:
+    sinks.add(current)
+    let fallbackName = getFallbackName(current.name)
+    if fallbackName == "":
+      break
+    let fallback = getSinkConfigByName(fallbackName)
+    if fallback.isNone():
+      break
+    current = fallback.get()
+
+proc reportSinks(topic: string): seq[SinkConfig] =
+  if topic in allTopics:
+    for config in allTopics[topic].getSubscribers():
+      result.addReportSink(config)
+
+  for customTopic in activeCustomReportTopics():
+    let spec = "custom_report." & customTopic
+    for configName in attrGet[seq[string]](spec & ".sink_configs"):
+      let config = getSinkConfigByName(configName)
+      if config.isSome():
+        result.addReportSink(config.get())
+
+proc redirectReportStdout(topic: string): seq[ReportSinkRedirect] =
+  let stderrImplementation = getSinkImplementation("stderr")
+  if stderrImplementation.isNone():
+    raise newException(ValueError,
+                       "stderr sink implementation is unavailable")
+
+  for config in reportSinks(topic):
+    if config.mySink.name != "stdout":
+      continue
+    result.add((config, config.mySink))
+    config.mySink = stderrImplementation.get()
+
+proc restoreReportSinks(redirects: seq[ReportSinkRedirect]) =
+  for redirect in redirects:
+    redirect.config.mySink = redirect.implementation
+
 proc doCustomReporting(beforeCommand = false, afterOthers = false) =
   for topic in activeCustomReportTopics():
     trace(topic & ": checking custom report")
@@ -209,40 +254,63 @@ proc doPolicySummary() =
   except CatchableError:
     warn("policy: could not write the GitHub step summary: " & getCurrentExceptionMsg())
 
+proc doReportingImpl(
+    topic                = "report",
+    clearState           = false,
+    writeCache           = true,
+    reportStdoutToStderr = false,
+) =
+  let redirects =
+    if reportStdoutToStderr: redirectReportStdout(topic)
+    else:                    @[]
+  try:
+    if inSubscan():
+      let ctx = getCurrentCollectionCtx()
+      ctx.report = doEmbeddedReport()
+    else:
+      let
+        skipCommand = attrGet[bool]("skip_command_report")
+        skipCustom  = attrGet[bool]("skip_custom_reports")
+      if skipCommand and skipCustom:
+        return
+      collectRunTimeHostInfo()
+      if not skipCustom:
+        try:
+          doCustomReporting(beforeCommand = true)
+        except:
+          error("custom reporting before command failed: " & getCurrentExceptionMsg())
+          dumpExOnDebug()
+      if skipCommand:
+        info("Skipping the command report as per the `skip_command_report` directive")
+      else:
+        doCommandReport(topic)
+      if not skipCustom:
+        doCustomReporting()
+      doPolicyReporting()
+      doPolicySummary()
+      if not skipCustom:
+        doCustomReporting(afterOthers = true)
+      if writeCache:
+        writeReportCache()
+      else:
+        clearReportCache()
+    if clearState:
+      clearReportingState()
+  finally:
+    restoreReportSinks(redirects)
+
+
 proc doReporting*(
     topic      = "report",
     clearState = false,
     writeCache = true,
 ) {.exportc, cdecl.} =
-  if inSubscan():
-    let ctx = getCurrentCollectionCtx()
-    ctx.report = doEmbeddedReport()
-  else:
-    let
-      skipCommand = attrGet[bool]("skip_command_report")
-      skipCustom  = attrGet[bool]("skip_custom_reports")
-    if skipCommand and skipCustom:
-      return
-    collectRunTimeHostInfo()
-    if not skipCustom:
-      try:
-        doCustomReporting(beforeCommand = true)
-      except:
-        error("custom reporting before command failed: " & getCurrentExceptionMsg())
-        dumpExOnDebug()
-    if skipCommand:
-      info("Skipping the command report as per the `skip_command_report` directive")
-    else:
-      doCommandReport(topic)
-    if not skipCustom:
-      doCustomReporting()
-    doPolicyReporting()
-    doPolicySummary()
-    if not skipCustom:
-      doCustomReporting(afterOthers = true)
-    if writeCache:
-      writeReportCache()
-    else:
-      clearReportCache()
-  if clearState:
-    clearReportingState()
+  doReportingImpl(topic, clearState, writeCache)
+
+proc doReportingWithStdoutRedirected*(
+    topic      = "report",
+    clearState = false,
+    writeCache = true,
+) =
+  doReportingImpl(topic, clearState, writeCache,
+                  reportStdoutToStderr = true)

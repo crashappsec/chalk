@@ -9,13 +9,17 @@
 
 import std/[
   algorithm,
+  options,
   sequtils,
+  strutils,
+  tables,
   unicode,
 ]
 import ".."/[
   types,
   utils/envvars,
   utils/json,
+  utils/sets,
 ]
 import "."/[
   ids,
@@ -313,8 +317,11 @@ proc lexOneLineTok(ctx: DockerParse, d: DockerStatement, s: seq[Rune], i: var in
       return ctx.lexWhiteSpace(d, s, i)
     if c == ctx.currentEscape or c notin nonWordRunes:
       return ctx.lexWord(d, s, i)
+    let startix = i
     i += 1
     result = LineToken(kind:      ltOther,
+                       startix:   startix,
+                       endix:     i,
                        contents:  @[$(c)],
                        line:      d.startLine)
 
@@ -821,9 +828,59 @@ template firstFromCheck() =
     errors.add("Got bad commands before first FROM")
     gotFirstFrom = true # Don't keep erroring
 
+type
+  ContainerInstruction* = enum
+    ciAdd, ciArg, ciCmd, ciCopy, ciEntrypoint, ciEnv, ciExpose, ciFrom,
+    ciHealthcheck, ciLabel, ciMaintainer, ciOnbuild, ciRun, ciShell,
+    ciStopsignal, ciUser, ciVolume, ciWorkdir
+
+  ContainerfileIssueKind* = enum
+    cfikSyntax, cfikVariableDependent, cfikUnsupportedForm, cfikMissingFrom,
+    cfikTargetUnavailable
+
+  ContainerfileIssue* = object
+    kind*:        ContainerfileIssueKind
+    instruction*: Option[ContainerInstruction]
+    line*:        Option[int]
+
+proc containerInstruction(name: string): Option[ContainerInstruction] =
+  case name
+  of "ADD":        some(ciAdd)
+  of "ARG":        some(ciArg)
+  of "CMD":        some(ciCmd)
+  of "COPY":       some(ciCopy)
+  of "ENTRYPOINT": some(ciEntrypoint)
+  of "ENV":        some(ciEnv)
+  of "EXPOSE":     some(ciExpose)
+  of "FROM":       some(ciFrom)
+  of "HEALTHCHECK": some(ciHealthcheck)
+  of "LABEL":      some(ciLabel)
+  of "MAINTAINER": some(ciMaintainer)
+  of "ONBUILD":    some(ciOnbuild)
+  of "RUN":        some(ciRun)
+  of "SHELL":      some(ciShell)
+  of "STOPSIGNAL": some(ciStopsignal)
+  of "USER":       some(ciUser)
+  of "VOLUME":     some(ciVolume)
+  of "WORKDIR":    some(ciWorkdir)
+  else:             none(ContainerInstruction)
+
+proc addIssue(issues: var seq[ContainerfileIssue],
+              kind: ContainerfileIssueKind,
+              instruction: Option[ContainerInstruction] =
+                none(ContainerInstruction),
+              line: Option[int] = none(int)) =
+  issues.add(ContainerfileIssue(
+    kind:        kind,
+    instruction: instruction,
+    line:        line,
+  ))
+
 proc parseAndEval(s:      Stream,
                   args:   Table[string, string],
-                  errors: var seq[string]): (DockerParse, seq[InfoBase]) =
+                  errors: var seq[string],
+                  issues: var seq[ContainerfileIssue]):
+                 (DockerParse, seq[InfoBase]) =
   ## This function parses the Dockerfile, but also will apply variable
   ## substitutions, "evaluating" the docker file.
   ##
@@ -836,12 +893,19 @@ proc parseAndEval(s:      Stream,
     res: seq[InfoBase] = @[]
 
   for tok in parse.tokens:
+    let tokenErrorCount = len(errors)
     if len(tok.errors) != 0:
       errors &= tok.errors
+    if len(errors) > tokenErrorCount:
+      let instruction =
+        if tok.kind == tltCommand: containerInstruction(tok.cmd.name)
+        else: none(ContainerInstruction)
+      issues.addIssue(cfikSyntax, instruction, some(tok.startLine + 1))
 
     if tok.kind != tltCommand: continue
 
     let cmd = tok.cmd
+    let commandErrorCount = len(errors)
     if len(cmd.errors) == 0:
       errors &= cmd.errors
     case cmd.name
@@ -883,6 +947,10 @@ proc parseAndEval(s:      Stream,
     else:
       firstFromCheck()
 
+    if len(errors) > commandErrorCount:
+      issues.addIssue(cfikSyntax, containerInstruction(cmd.name),
+                      some(cmd.startLine + 1))
+
   # input args take precedence over any ARG params
   parse.inArgs = args
   for k, v in args:
@@ -891,7 +959,9 @@ proc parseAndEval(s:      Stream,
   return (parse, res)
 
 proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string]) =
-  var errors: seq[string]
+  var
+    errors: seq[string]
+    issues: seq[ContainerfileIssue]
 
   if ctx.inDockerFile == "":
     error("docker: unable to locate a valid Dockerfile")
@@ -899,7 +969,7 @@ proc evalAndExtractDockerfile*(ctx: DockerInvocation, args: Table[string, string
 
   let
     stream        = newStringStream(ctx.inDockerFile)
-    (parse, cmds) = stream.parseAndEval(args, errors)
+    (parse, cmds) = stream.parseAndEval(args, errors, issues)
 
   stream.close()
   var
@@ -1318,3 +1388,521 @@ proc formatCopyImages*(ctx: DockerInvocation): ChalkDict =
       copies.add(item)
     if len(copies) > 0:
       result[section.alias] = pack(copies)
+
+let defaultShellJson* = `%*`(["/bin/sh", "-c"])
+
+type
+  StartupValueKind* = enum
+    svInherited,
+    svAbsent,
+    svExec,
+    svShell
+
+  StartupValue* = object
+    ## A symbolic ENTRYPOINT or CMD while the Containerfile is being parsed.
+    ## Inherited values are filled from the external root image by the Podman
+    ## startup planner. Absent is distinct because a stage-local ENTRYPOINT can
+    ## clear an inherited CMD before that image is inspected.
+    case kind*: StartupValueKind
+    of svExec:
+      argv*: JsonNode
+    of svShell:
+      command*: string
+    of svInherited, svAbsent:
+      discard
+
+  SourceInterval* = object
+    ## A half-open byte interval in the original Containerfile.
+    start*: int
+    stop*:  int
+
+  FinalExecConfig* = object
+    ## Symbolic startup configuration for the selected Containerfile stage.
+    entrypoint*:          StartupValue
+    cmd*:                 StartupValue
+    stageAliases*:        HashSet[string]
+    stageAlias*:          string  ## selected stage alias; empty if unnamed
+    rootImage*:           string  ## external root image
+    cmdInFinal*:          bool    ## CMD was declared in the selected stage
+    fromPlatform*:        DeclaredPlatform
+    rootFromPlatform*:    DeclaredPlatform
+    injectAt*:            Option[int] ## next FROM byte offset; none appends
+    chainRefs*:           seq[string] ## FROM operands from external root through selected stage
+    rootImageSpan*:       Option[SourceInterval]
+    effectiveStageCount*: int ## stages through the selected target
+
+proc hasVariableSubstitution(tokens: seq[LineToken]): bool =
+  for token in tokens:
+    if len(token.varSubs) > 0:
+      return true
+  return false
+
+proc declaredFromPlatform(parse: DockerParse,
+                          item: FromInfo): DeclaredPlatform =
+  if "--platform" notin item.flags:
+    return DeclaredPlatform(kind: dpkAbsent)
+  let flag = item.flags["--platform"]
+  # Podman resolves FROM with global build arguments and automatic values such
+  # as TARGETPLATFORM and BUILDPLATFORM. This parser also carries the Chalk
+  # process environment plus later ENV and stage-local ARG values, so a
+  # substituted flag cannot establish Podman's platform choice here.
+  if not flag.valid or hasVariableSubstitution(flag.argtoks):
+    return DeclaredPlatform(kind: dpkUnresolved)
+  var platformErrors: seq[string] = @[]
+  let value = parse.evalFlag(flag, platformErrors)
+  if len(platformErrors) > 0 or value == "" or "$" in value:
+    return DeclaredPlatform(kind: dpkUnresolved)
+  return parseDeclaredPlatform(value)
+
+proc stageReferencePlatform(stage,
+                            flag: DeclaredPlatform): DeclaredPlatform =
+  ## A FROM flag on a stage reference cannot change the stage's contents. A
+  ## conflicting or unresolved flag makes the final platform uncertain, while
+  ## a matching flag preserves the fact established when the stage was built.
+  case flag.kind
+  of dpkAbsent:
+    return stage
+  of dpkUnresolved:
+    return DeclaredPlatform(kind: dpkUnresolved)
+  of dpkRequested:
+    # parseDeclaredPlatform never returns this kind for a FROM flag.
+    return DeclaredPlatform(kind: dpkUnresolved)
+  of dpkKnown:
+    case stage.kind
+    of dpkAbsent:
+      return DeclaredPlatform(kind: dpkRequested,
+                              platform: flag.platform)
+    of dpkUnresolved:
+      return DeclaredPlatform(kind: dpkUnresolved)
+    of dpkKnown, dpkRequested:
+      if stage.platform == flag.platform:
+        return stage
+      return DeclaredPlatform(kind: dpkUnresolved)
+
+proc jsonHasSubstitution(node: JsonNode): bool =
+  if node == nil:
+    return false
+  case node.kind
+  of JString:
+    return "$" in node.getStr()
+  of JArray:
+    for item in node:
+      if jsonHasSubstitution(item):
+        return true
+    return false
+  of JObject:
+    for _, item in node:
+      if jsonHasSubstitution(item):
+        return true
+    return false
+  else:
+    return true
+
+proc jsonArrayOfStrings(node: JsonNode): bool =
+  if node == nil or node.kind != JArray:
+    return false
+  for item in node:
+    if item.kind != JString:
+      return false
+  return true
+
+type StageExec = object
+  ## Per-stage accumulator while walking the Containerfile.
+  entrypoint:       StartupValue
+  entrypointLine:   Option[int]
+  cmd:              StartupValue
+  cmdLine:          Option[int]
+  cmdHere:          bool
+  rootImage:        string
+  rootFromPlatform: DeclaredPlatform
+  rootImageSpan:    Option[SourceInterval]
+  rootImageLine:    Option[int]
+  fromPlatform:     DeclaredPlatform
+  chain:            seq[string]
+
+proc lineStartOffsets(contents: string): seq[int] =
+  result = @[0]
+  var i = 0
+  while i < len(contents):
+    if contents[i] == '\r':
+      inc i
+      if i < len(contents) and contents[i] == '\n':
+        inc i
+      result.add(i)
+    elif contents[i] == '\n':
+      inc i
+      result.add(i)
+    else:
+      inc i
+
+proc lineNumberAt(contents: string, offset: int): int =
+  result = 1
+  var i = 0
+  let limit = min(offset, len(contents))
+  while i < limit:
+    if contents[i] == '\r':
+      inc result
+      inc i
+      if i < limit and contents[i] == '\n':
+        inc i
+    elif contents[i] == '\n':
+      inc result
+      inc i
+    else:
+      inc i
+
+proc commandArgumentRuneOffset(line: string): Option[int] =
+  let runes = line.toRunes()
+  var i = 0
+  while i < len(runes) and runes[i].isWhiteSpace():
+    inc i
+  while i < len(runes) and not runes[i].isWhiteSpace():
+    inc i
+  while i < len(runes) and runes[i].isWhiteSpace():
+    inc i
+  if i >= len(runes):
+    return none(int)
+  return some(i)
+
+proc literalImageSpan(contents: string, offsets: seq[int], parse: DockerParse,
+                      item: FromInfo, image: string): Option[SourceInterval] =
+  if item.startLine != item.endLine or item.image.isNone():
+    return none(SourceInterval)
+  let tokens = item.image.get()
+  if len(tokens) == 0:
+    return none(SourceInterval)
+  for token in tokens:
+    if token.line != item.startLine or token.error != "" or
+        token.quoteType.isSome() or len(token.varSubs) > 0:
+      return none(SourceInterval)
+  let argStart = commandArgumentRuneOffset(parse.sourceLines[item.startLine])
+  if argStart.isNone():
+    return none(SourceInterval)
+  let
+    firstRune = argStart.get() + tokens[0].startix
+    lastRune = argStart.get() + tokens[^1].endix
+    line = parse.sourceLines[item.startLine]
+  if firstRune < 0 or lastRune <= firstRune or lastRune > line.runeLen():
+    return none(SourceInterval)
+  let
+    lineStart = line.runeOffset(firstRune)
+    lineStop =
+      if lastRune == line.runeLen(): len(line)
+      else: line.runeOffset(lastRune)
+  if lineStart < 0 or lineStop < 0:
+    return none(SourceInterval)
+  let
+    start = offsets[item.startLine] + lineStart
+    stop = offsets[item.startLine] + lineStop
+  if stop > len(contents) or contents[start ..< stop] != image:
+    return none(SourceInterval)
+  return some(SourceInterval(start: start, stop: stop))
+
+proc isNumericTarget(value: string): bool =
+  if value == "":
+    return false
+  for c in value:
+    if c notin {'0' .. '9'}:
+      return false
+  return true
+
+proc fromFollowsContinuation(lines: seq[string], fromLine: int,
+                             escape: string): bool =
+  var i = fromLine - 1
+  while i >= 0:
+    let raw = lines[i]
+    var endix = len(raw)
+    while endix > 0 and raw[endix - 1] in {' ', '\t'}:
+      dec endix
+    let stripped = unicode.strip(raw)
+    if stripped == "":
+      dec i
+      continue
+    if stripped[0] == '#':
+      dec i
+      continue
+    return raw[0 ..< endix].endsWith(escape)
+  return false
+
+proc targetAliasUnavailable(target: string, aliases: HashSet[string],
+                            counts: Table[string, int]): bool =
+  if isNumericTarget(target) or counts.getOrDefault(target) != 1:
+    return true
+  for alias in aliases:
+    if alias != target and cmpIgnoreCase(alias, target) == 0:
+      return true
+  return false
+
+proc parsedStartupValue(json: JsonNode, str: string): StartupValue =
+  if json != nil:
+    return StartupValue(kind: svExec, argv: json)
+  if str != "":
+    return StartupValue(kind: svShell, command: str)
+  return StartupValue(kind: svAbsent)
+
+proc validateStartupValue(value: StartupValue, what: string,
+                          instruction: ContainerInstruction,
+                          line: Option[int], errors: var seq[string],
+                          issues: var seq[ContainerfileIssue]) =
+  case value.kind
+  of svExec:
+    if not jsonArrayOfStrings(value.argv) or len(value.argv) == 0:
+      errors.add(what & " must be a nonempty JSON array of strings")
+      issues.addIssue(cfikUnsupportedForm, some(instruction), line)
+    elif jsonHasSubstitution(value.argv):
+      errors.add(what & " is variable-dependent")
+      issues.addIssue(cfikVariableDependent, some(instruction), line)
+    elif unicode.strip(value.argv[0].getStr()) == "":
+      errors.add(what & " executable is empty")
+      issues.addIssue(cfikUnsupportedForm, some(instruction), line)
+  of svShell:
+    if "$" in value.command:
+      errors.add(what & " is variable-dependent")
+      issues.addIssue(cfikVariableDependent, some(instruction), line)
+  of svInherited, svAbsent:
+    discard
+
+proc firstContainerfileIssue(issues: seq[ContainerfileIssue]):
+                            Option[ContainerfileIssue] =
+  var best = -1
+  for i, issue in issues:
+    if issue.line.isNone():
+      continue
+    if best < 0 or issue.line.get() < issues[best].line.get():
+      best = i
+  if best >= 0:
+    return some(issues[best])
+  if len(issues) > 0:
+    return some(issues[0])
+  return none(ContainerfileIssue)
+
+proc getFinalExecConfig*(contents: string, target = ""): tuple[
+    config: Option[FinalExecConfig],
+    errors: seq[string],
+    issue: Option[ContainerfileIssue]] =
+  var
+    errors: seq[string] = @[]
+    issues: seq[ContainerfileIssue]
+  let stream = newStringStream(contents)
+  let (parse, cmds) = stream.parseAndEval(initTable[string, string](), errors,
+                                          issues)
+  stream.close()
+
+  let
+    offsets = lineStartOffsets(contents)
+    selectingTarget = target != ""
+
+  if selectingTarget:
+    let heredocAt = contents.find("<<")
+    if heredocAt >= 0:
+      errors.add("heredoc is unsupported for --target")
+      issues.addIssue(cfikUnsupportedForm, none(ContainerInstruction),
+                      some(lineNumberAt(contents, heredocAt)))
+    for tok in parse.tokens:
+      if tok.kind == tltDirective and tok.directive.name == "escape":
+        errors.add("escape directive is unsupported for --target")
+        issues.addIssue(cfikUnsupportedForm, none(ContainerInstruction),
+                        some(tok.startLine + 1))
+        break
+
+  var
+    aliases    = initHashSet[string]()
+    aliasCount = initTable[string, int]()
+    stages     = initTable[string, StageExec]()
+    cur        = StageExec()
+    curAlias   = ""
+    sawFrom    = false
+    selected           = StageExec()
+    selectedAlias      = ""
+    selectedInject     = none(int)
+    selectedStageCount = 0
+    selectedFound      = false
+    stageCount         = 0
+
+  proc closeStage(nextFromLine: Option[int]) =
+    if selectingTarget and curAlias == target:
+      selected = cur
+      selectedAlias = curAlias
+      if nextFromLine.isSome():
+        selectedInject = some(offsets[nextFromLine.get()])
+      else:
+        selectedInject = none(int)
+      selectedStageCount = stageCount
+      selectedFound = true
+    if curAlias != "":
+      stages[curAlias] = cur
+
+  for obj in cmds:
+    if obj.error != "":
+      errors.add(obj.error)
+      let instruction =
+        if obj of FromInfo:       some(ciFrom)
+        elif obj of ShellInfo:    some(ciShell)
+        elif obj of EntryPointInfo: some(ciEntrypoint)
+        elif obj of CmdInfo:      some(ciCmd)
+        elif obj of LabelInfo:    some(ciLabel)
+        elif obj of AddInfo:      some(ciAdd)
+        elif obj of CopyInfo:     some(ciCopy)
+        elif obj of UserInfo:     some(ciUser)
+        elif obj of OnBuildInfo:  some(ciOnbuild)
+        else:                     none(ContainerInstruction)
+      issues.addIssue(cfikSyntax, instruction, some(obj.startLine + 1))
+
+    if obj of FromInfo:
+      let item = FromInfo(obj)
+      if selectingTarget and
+          fromFollowsContinuation(parse.sourceLines, item.startLine, "\\"):
+        errors.add("FROM continues from the previous instruction")
+        issues.addIssue(cfikUnsupportedForm, some(ciFrom),
+                        some(item.startLine + 1))
+      # close out the stage we were in so a later FROM can name it
+      if sawFrom:
+        closeStage(some(item.startLine))
+      sawFrom  = true
+      inc stageCount
+      curAlias = ""
+      if item.asArg.isSome():
+        let tok = item.asArg.get()
+        if len(tok.varSubs) > 0 or tok.error != "":
+          errors.add("stage alias is variable-dependent")
+          issues.addIssue(cfikVariableDependent, some(ciFrom),
+                          some(item.startLine + 1))
+        else:
+          curAlias = tok.contents.join("")
+          if curAlias != "":
+            aliases.incl(curAlias)
+            aliasCount[curAlias] = aliasCount.getOrDefault(curAlias) + 1
+      let imageVariableDependent =
+        item.image.isSome() and hasVariableSubstitution(item.image.get())
+      var imageErrors: seq[string] = @[]
+      let image = parse.evalOrReturnEmptyString(item.image, imageErrors)
+      # Evaluation errors still reject malformed or unavailable values. A
+      # successfully evaluated substituted token remains unresolved below
+      # because this parser does not model Podman's global build arguments.
+      if len(imageErrors) > 0:
+        errors.add(imageErrors)
+        issues.addIssue(cfikVariableDependent, some(ciFrom),
+                        some(item.startLine + 1))
+      let flagPlatform = parse.declaredFromPlatform(item)
+      let imageSpan = literalImageSpan(contents, offsets, parse, item, image)
+      if image == "":
+        if not imageVariableDependent:
+          errors.add("FROM image could not be evaluated")
+          issues.addIssue(cfikUnsupportedForm, some(ciFrom),
+                          some(item.startLine + 1))
+        cur = StageExec(fromPlatform: flagPlatform)
+      elif image in stages:
+        cur         = stages[image]
+        cur.cmdHere = false
+        cur.chain.add(image)
+        cur.fromPlatform = stageReferencePlatform(cur.fromPlatform,
+                                                  flagPlatform)
+      else:
+        cur = StageExec(
+          entrypoint:       StartupValue(kind: svInherited),
+          entrypointLine:   none(int),
+          cmd:              StartupValue(kind: svInherited),
+          cmdLine:          none(int),
+          rootImage:        image,
+          rootFromPlatform: flagPlatform,
+          rootImageSpan:    imageSpan,
+          rootImageLine:    some(item.startLine + 1),
+          fromPlatform:     flagPlatform,
+          chain:            @[image],
+        )
+      if imageVariableDependent:
+        # The evaluated token may name a different image or stage than Podman
+        # uses. Preserve no root fact from that evaluation.
+        cur.rootImage = ""
+        cur.rootFromPlatform = DeclaredPlatform(kind: dpkUnresolved)
+        cur.rootImageSpan = none(SourceInterval)
+        cur.rootImageLine = none(int)
+        cur.fromPlatform = DeclaredPlatform(kind: dpkUnresolved)
+        cur.chain = @[]
+
+    elif obj of EntryPointInfo:
+      let item = EntryPointInfo(obj)
+      if item.error == "":
+        cur.entrypoint = parsedStartupValue(item.json, item.str)
+        cur.entrypointLine = some(item.startLine + 1)
+        # Buildah clears CMD only when this stage has not declared one. A CMD
+        # earlier in the same stage survives; a CMD inherited through FROM does
+        # not.
+        if not cur.cmdHere:
+          cur.cmd = StartupValue(kind: svAbsent)
+          cur.cmdLine = none(int)
+
+    elif obj of CmdInfo:
+      let item = CmdInfo(obj)
+      if item.error == "":
+        cur.cmd = parsedStartupValue(item.json, item.str)
+        cur.cmdLine = some(item.startLine + 1)
+        # imagebuilder sets CmdSet only for a CMD with arguments. An empty CMD
+        # does not make a later ENTRYPOINT preserve an inherited command, and
+        # it does not undo CmdSet from an earlier nonempty CMD in this stage.
+        if cur.cmd.kind == svShell or
+            (cur.cmd.kind == svExec and len(cur.cmd.argv) > 0):
+          cur.cmdHere = true
+
+    elif obj of ShellInfo:
+      let item = ShellInfo(obj)
+      if item.error == "":
+        if not jsonArrayOfStrings(item.json) or len(item.json) == 0:
+          errors.add("SHELL must be a nonempty JSON array of strings")
+          issues.addIssue(cfikUnsupportedForm, some(ciShell),
+                          some(item.startLine + 1))
+        elif unicode.strip(item.json[0].getStr()) == "":
+          # A blank interpreter cannot produce a runnable entrypoint, and it
+          # would only surface later as an empty --exec-command-name.
+          errors.add("SHELL executable is empty")
+          issues.addIssue(cfikUnsupportedForm, some(ciShell),
+                          some(item.startLine + 1))
+        else:
+          discard
+
+  if not sawFrom:
+    errors.add("no FROM")
+    issues.addIssue(cfikMissingFrom)
+  elif selectingTarget:
+    closeStage(none(int))
+    if not selectedFound or
+        targetAliasUnavailable(target, aliases, aliasCount):
+      errors.add("target stage is unavailable")
+      issues.addIssue(cfikTargetUnavailable)
+  else:
+    selected = cur
+    selectedAlias = curAlias
+    selectedInject = none(int)
+    selectedStageCount = stageCount
+    selectedFound = true
+
+  # Only the selected stage's values are ever wrapped, so only those are
+  # validated. Validating every stage as we walked rejected whole
+  # Containerfiles over a malformed ENTRYPOINT in a throwaway builder stage
+  # that gets discarded.
+  if selectedFound:
+    if selected.rootImage != "" and selected.rootImageSpan.isNone():
+      errors.add("FROM image operand cannot be located exactly")
+      issues.addIssue(cfikUnsupportedForm, some(ciFrom),
+                      selected.rootImageLine)
+    validateStartupValue(selected.entrypoint, "ENTRYPOINT", ciEntrypoint,
+                         selected.entrypointLine, errors, issues)
+    validateStartupValue(selected.cmd, "CMD", ciCmd, selected.cmdLine,
+                         errors, issues)
+  if len(errors) > 0:
+    return (config: none(FinalExecConfig), errors: errors,
+            issue: firstContainerfileIssue(issues))
+  return (config: some(FinalExecConfig(
+    entrypoint:          selected.entrypoint,
+    cmd:                 selected.cmd,
+    stageAliases:        aliases,
+    stageAlias:          selectedAlias,
+    rootImage:           selected.rootImage,
+    cmdInFinal:          selected.cmdHere,
+    fromPlatform:        selected.fromPlatform,
+    rootFromPlatform:    selected.rootFromPlatform,
+    injectAt:            selectedInject,
+    chainRefs:           selected.chain,
+    rootImageSpan:       selected.rootImageSpan,
+    effectiveStageCount: selectedStageCount,
+  )), errors: errors, issue: none(ContainerfileIssue))
