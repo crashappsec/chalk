@@ -1123,3 +1123,17 @@ issues, we use the underlying docker command to collect most data,
 instead of using the docker socket.
 """
 }
+
+plugin podman {
+    ~enabled: true
+    codec:    true
+    priority: 2
+    enabled:  true
+    pre_chalk_keys: ["DOCKER_FILE", "DOCKER_FILE_CHALKED", "DOCKERFILE_PATH",
+                     "DOCKER_CONTEXT", "DOCKER_PLATFORM", "DOCKER_PLATFORMS",
+                     "DOCKER_TAGS", "DOCKER_TARGET"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "PODMAN_IMAGE_ID"]
+    doc: """
+Codec for Podman images produced by a wrapped `podman build`.
+"""
+}

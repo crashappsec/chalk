@@ -12,7 +12,7 @@ default_key_priority := 4611686018427387904  # 2^62.
 
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
-                         "load", "dump", "docker", "version", "env", "exec",
+                         "load", "dump", "docker", "podman", "version", "env", "exec",
                          "setup", "docgen", "__"]
 
 all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
@@ -5152,6 +5152,17 @@ Standard `log_level` overwrites logging verbosity otherwise.
 """
   }
 
+  field podman_log_level {
+    type:     string
+    default:  "error"
+    choice:   valid_log_levels
+    shortdoc: "Podman Log Level"
+    doc: """
+Default log level to use when running podman commands.
+Standard `log_level` overwrites logging verbosity otherwise.
+"""
+  }
+
   field log_format {
     type:     string
     default:  "auto"
@@ -5455,6 +5466,19 @@ When running the 'docker' command, this tells chalk where to look for the docker
 If this is not provided, or if the file is not found, chalk will search the PATH for the first instance of 'docker' that is not itself (We generally expect renaming chalk to docker and using this variable to point to the actual docker EXE will be the most seamless approach).
 
 Note that, when chalk is invoked with 'docker' as its EXE name, the default IO configuration is to *NOT* anything chalk-specific on the console.
+"""
+  }
+
+  field podman_exe {
+    type:     string
+    require:  false
+    shortdoc: "Podman command location"
+    doc: """
+When running the 'podman' command, this tells chalk where to look for the podman executable to exec.
+
+If this is not provided, or if the file is not found, chalk will search the PATH for the first instance of 'podman' that is not itself (We generally expect renaming chalk to podman and using this variable to point to the actual podman EXE will be the most seamless approach).
+
+Note that, when chalk is invoked with 'podman' as its EXE name, the default IO configuration is to *NOT* log anything chalk-specific on the console.
 """
   }
 

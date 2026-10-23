@@ -162,6 +162,9 @@ proc loadAllConfigs*() =
     params = @[exeName] & params
   else: discard
 
+  if paramStr(0).extractFilename() == "podman":
+    params = @["podman"] & params
+
   con4mRuntime = stack
 
   stack.

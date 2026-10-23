@@ -89,6 +89,9 @@ if cmd == "docker" or default_command == "docker" {
   # initial docker log level
   # cmd_docker sets its final verbosity after all configs are loaded
   log_level: "error"
+} elif cmd == "podman" or default_command == "podman" {
+  # silence plugin-load warnings before cmd_podman runs
+  log_level: "error"
 } elif cmd == "exec" or default_command == "exec" {
   if using_tty() {
     # hide any chalk errors in interactive shell

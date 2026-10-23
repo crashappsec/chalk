@@ -50,6 +50,7 @@ loadPlugins([
   "cloudMetadata",
   "codecCerts",
   "codecDocker",
+  "codecPodman",
   "codecElf",
   "codecFallbackElf",
   "codecGguf",

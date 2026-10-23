@@ -91,6 +91,7 @@ proc loadAttestation*(forceLoad = false, withPrivateKey = false) =
     # e.g. no need to init attestation for docker version
     #      but we need it for docker build
     "docker",
+    "podman",
   ]:
     return
 

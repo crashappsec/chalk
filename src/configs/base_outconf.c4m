@@ -72,6 +72,10 @@ outconf docker {
   report_template:        "unknown_docker"
 }
 
+outconf podman {
+  report_template:        "unknown_docker"
+}
+
 custom_report chalk_usage_stats {
   sink_configs:     []
   ~report_template: "usage"
