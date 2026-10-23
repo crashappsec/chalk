@@ -31,6 +31,8 @@ type
     psrContainerfileOutsideContext,
     psrContainerfileUnreadable,
     psrBinaryIncompatible,
+    psrCommandPlatformMismatch,
+    psrHostPlatformMismatch,
     psrContainerfileIssue,
     psrHostInfoInvalid,
     psrUnsupportedHostOs,
@@ -203,7 +205,11 @@ proc formatReason(skip: PodmanSkip): string =
   of psrContainerfileUnreadable:
     return "Containerfile cannot be read"
   of psrBinaryIncompatible:
-    return "Chalk executable is incompatible with linux/amd64 images"
+    return "Chalk executable platform is unsupported"
+  of psrCommandPlatformMismatch:
+    return "--platform does not match the Chalk executable platform"
+  of psrHostPlatformMismatch:
+    return "host platform does not match the Chalk executable platform"
   of psrContainerfileIssue:
     return formatContainerfileIssue(skip.reason.issue)
   of psrHostInfoInvalid:

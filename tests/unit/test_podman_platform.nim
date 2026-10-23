@@ -1,3 +1,4 @@
+import ../../src/podman/chalk_platform
 import std/[options, strutils]
 import ../../src/docker/ids
 import ../../src/podman/binding
@@ -53,15 +54,15 @@ let
   requestedArm64 = DeclaredPlatform(
     kind: dpkRequested, platform: arm64.platform)
   unresolved = DeclaredPlatform(kind: dpkUnresolved)
-doAssert declaredPlatformSkip(absent).isNone()
-doAssert declaredPlatformSkip(amd64).isNone()
-doAssert declaredPlatformSkip(x86).isNone()
-expectReason(declaredPlatformSkip(arm64), psrIncompatibleImagePlatform)
-expectReason(declaredPlatformSkip(windows), psrIncompatibleImagePlatform)
-doAssert declaredPlatformSkip(requestedAmd64).isNone()
-expectReason(declaredPlatformSkip(requestedArm64),
+doAssert declaredPlatformSkip(absent, target = cpLinuxAmd64).isNone()
+doAssert declaredPlatformSkip(amd64, target = cpLinuxAmd64).isNone()
+doAssert declaredPlatformSkip(x86, target = cpLinuxAmd64).isNone()
+expectReason(declaredPlatformSkip(arm64, target = cpLinuxAmd64), psrIncompatibleImagePlatform)
+expectReason(declaredPlatformSkip(windows, target = cpLinuxAmd64), psrIncompatibleImagePlatform)
+doAssert declaredPlatformSkip(requestedAmd64, target = cpLinuxAmd64).isNone()
+expectReason(declaredPlatformSkip(requestedArm64, target = cpLinuxAmd64),
              psrUnresolvedImagePlatform)
-expectReason(declaredPlatformSkip(unresolved), psrUnresolvedImagePlatform)
+expectReason(declaredPlatformSkip(unresolved, target = cpLinuxAmd64), psrUnresolvedImagePlatform)
 
 let
   inspectedAmd64 = some(InspectedBaseImage(
@@ -87,72 +88,72 @@ let
     binding: BaseBinding(kind: bbConfigId, configId: imageId),
   ))
 
-let accepted = decideFinalBase("example/base:latest", "", absent,
-                               inspectedAmd64)
+let accepted = decideFinalBase("example/base:latest", parseCommandPlatform(""), absent,
+                               inspectedAmd64, target = cpLinuxAmd64)
 assertEq(accepted.kind, fbdAccept)
 assertEq(accepted.root.entrypoint, %*["/bin/sh"])
 assertEq(accepted.root.cmd, %*["-c"])
 assertEq(accepted.root.binding.kind, bbConfigId)
-assertEq(decideFinalBase("example/base:latest", "", amd64,
-                         inspectedX86).kind, fbdAccept)
-assertEq(decideFinalBase("example/base:latest", "", requestedAmd64,
-                         inspectedAmd64).kind, fbdAccept)
+assertEq(decideFinalBase("example/base:latest", parseCommandPlatform(""), amd64,
+                         inspectedX86, target = cpLinuxAmd64).kind, fbdAccept)
+assertEq(decideFinalBase("example/base:latest", parseCommandPlatform(""), requestedAmd64,
+                         inspectedAmd64, target = cpLinuxAmd64).kind, fbdAccept)
 expectDecisionReason(
-  decideFinalBase("example/base:latest", "", absent, inspectedArm),
+  decideFinalBase("example/base:latest", parseCommandPlatform(""), absent, inspectedArm, target = cpLinuxAmd64),
   psrIncompatibleImagePlatform,
 )
 expectDecisionReason(
-  decideFinalBase("example/base:latest", "", requestedAmd64,
-                  inspectedArm),
+  decideFinalBase("example/base:latest", parseCommandPlatform(""), requestedAmd64,
+                  inspectedArm, target = cpLinuxAmd64),
   psrIncompatibleImagePlatform,
 )
 expectDecisionReason(
-  decideFinalBase("example/base:latest", "", requestedArm64,
-                  inspectedAmd64),
+  decideFinalBase("example/base:latest", parseCommandPlatform(""), requestedArm64,
+                  inspectedAmd64, target = cpLinuxAmd64),
   psrUnresolvedImagePlatform,
 )
 expectDecisionReason(
-  decideFinalBase("example/base:latest", "", amd64, inspectedArm),
+  decideFinalBase("example/base:latest", parseCommandPlatform(""), amd64, inspectedArm, target = cpLinuxAmd64),
   psrUnresolvedImagePlatform,
 )
 expectDecisionReason(
-  decideFinalBase("example/base:latest", "linux/amd64", absent,
-                  inspectedArm),
+  decideFinalBase("example/base:latest", parseCommandPlatform("linux/amd64"), absent,
+                  inspectedArm, target = cpLinuxAmd64),
   psrUnresolvedImagePlatform,
 )
 expectDecisionReason(
   decideFinalBase(
-    "example/base@sha256:0123456789abcdef", "linux/amd64", absent,
-    inspectedArm),
+    "example/base@sha256:0123456789abcdef", parseCommandPlatform("linux/amd64"), absent,
+    inspectedArm, target = cpLinuxAmd64),
   psrUnresolvedImagePlatform,
 )
 expectDecisionReason(
   decideFinalBase(
-    "example/base@sha256:0123456789abcdef", "", amd64,
-    inspectedArm),
+    "example/base@sha256:0123456789abcdef", parseCommandPlatform(""), amd64,
+    inspectedArm, target = cpLinuxAmd64),
   psrUnresolvedImagePlatform,
 )
 expectDecisionReason(
   decideFinalBase(
-    "example/base@sha256:0123456789abcdef", "", absent,
-    inspectedArm),
+    "example/base@sha256:0123456789abcdef", parseCommandPlatform(""), absent,
+    inspectedArm, target = cpLinuxAmd64),
   psrIncompatibleImagePlatform,
 )
 expectDecisionReason(
-  decideFinalBase("example/base:latest", "", absent, inspectedUnknown),
+  decideFinalBase("example/base:latest", parseCommandPlatform(""), absent, inspectedUnknown, target = cpLinuxAmd64),
   psrUnresolvedImagePlatform,
 )
 expectDecisionReason(
-  decideFinalBase("example/base:latest", "", absent,
-                  none(InspectedBaseImage)),
+  decideFinalBase("example/base:latest", parseCommandPlatform(""), absent,
+                  none(InspectedBaseImage), target = cpLinuxAmd64),
   psrImageBindingUnavailable,
 )
 expectDecisionReason(
-  decideFinalBase("scratch", "", arm64, none(InspectedBaseImage)),
+  decideFinalBase("scratch", parseCommandPlatform(""), arm64, none(InspectedBaseImage), target = cpLinuxAmd64),
   psrIncompatibleImagePlatform,
 )
-let scratch = decideFinalBase("scratch", "", absent,
-                              none(InspectedBaseImage))
+let scratch = decideFinalBase("scratch", parseCommandPlatform(""), absent,
+                              none(InspectedBaseImage), target = cpLinuxAmd64)
 assertEq(scratch.kind, fbdAccept)
 doAssert scratch.root.entrypoint == nil
 doAssert scratch.root.cmd == nil

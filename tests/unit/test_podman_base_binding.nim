@@ -1,3 +1,4 @@
+import ../../src/podman/chalk_platform
 import std/[
   options,
   os,
@@ -84,14 +85,15 @@ let inspected = fetchBaseImage(
   fake,
   config.rootImage,
   cancellation,
+  cpLinuxAmd64,
   spec.pullPolicy,
-  spec.platform,
+  spec.requestedPlatform,
 )
 doAssert cancellation.isNone()
 doAssert inspected.isSome()
 
-let base = decideFinalBase(config.rootImage, spec.platform,
-                           config.fromPlatform, inspected)
+let base = decideFinalBase(config.rootImage, spec.requestedPlatform,
+                           config.fromPlatform, inspected, target = cpLinuxAmd64)
 doAssert base.kind == fbdAccept
 let startup = podman_exec.planStartup(config, base.root)
 doAssert startup.kind == podman_exec.sprPlan
@@ -256,7 +258,7 @@ let registryBinding = BaseBinding(
   kind:          bbRegistryDigest,
   reference:     "registry.example/customer/base@sha256:" & repeat('1', 64),
   imageId:       ImageAId,
-  proofPlatform: "linux/amd64",
+  proofPlatform: cpLinuxAmd64,
 )
 let registryText =
   "FROM --platform=linux/amd64 " & BaseRef & " AS chosen\n" &

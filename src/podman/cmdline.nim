@@ -11,6 +11,7 @@ import std/[
 ]
 import "./notice"
 import "./report"
+import "./chalk_platform"
 import "./types"
 
 type NoticeTarget = object
@@ -509,17 +510,9 @@ proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
           pullPolicy = parsePullPolicy(value).get()
       i += matched.consumed
 
-  # An option that is absent is not the same as an option we cannot support.
-  # Where podman's own default is one we can instrument, omitting the flag is
-  # accepted and the default is filled in later: --file falls back to podman's
-  # Containerfile/Dockerfile lookup (resolvePodmanInputs), --platform to the
-  # host platform once `podman info` has confirmed it is linux/amd64
-  # (runPodman), --format to podman's own default of "oci", and --tag to an
-  # untagged build identified by its image id. A flag that IS given must still
-  # name something we can instrument.
   if fileSeen and (fileArg == "" or fileArg == "-"):
     return passThrough(args, invalidFlagReason("--file"))
-  if platformSeen and platform != "linux/amd64":
+  if platformSeen and parseCommandPlatform(platform).isNone():
     return passThrough(args, invalidFlagReason("--platform"))
   if formatSeen and imageFormat != "oci":
     return passThrough(args, invalidFlagReason("--format"))
@@ -539,7 +532,7 @@ proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
       contextArg:         context.value,
       containerfileArg:   fileArg,
       tags:               tags,
-      platform:           platform,
+      requestedPlatform:  parseCommandPlatform(platform),
       imageFormat:        imageFormat,
       quietOutput:        quietOutput,
       target:             target,
