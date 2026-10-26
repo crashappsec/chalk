@@ -10,6 +10,7 @@ parameter auth_config.crashoverride_attestation.token {
   doc:       "Token for retrieving cosign key material for attestation from CrashOverride"
   default:   ""
   validator: func validate_jwt(string) -> string
+  sensitive: true
 }
 
 parameter attestation.attestation_key_get.uri {

@@ -10,6 +10,7 @@ parameter auth_config.crashoverride_object_store_read.token {
   doc:       "Token interacting with CrashOverride object store"
   default:   ""
   validator: func validate_jwt(string) -> string
+  sensitive: true
 }
 
 parameter auth_config.crashoverride_object_store_write.token {
@@ -17,6 +18,7 @@ parameter auth_config.crashoverride_object_store_write.token {
   doc:       "Token interacting with CrashOverride object store"
   default:   ""
   validator: func validate_jwt(string) -> string
+  sensitive: true
 }
 
 parameter object_store_config.crashoverride.object_store_presign.uri {
