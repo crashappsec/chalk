@@ -185,6 +185,10 @@
   knew, so the second copy's tag was discarded with a
   `could not match docker image tag` warning. Tags are now also matched on the
   platform image manifest, and the newly discovered index digest is recorded.
+- The `attestation_easy` and `object_store` Crash Override components now mark
+  their token parameters `sensitive`, as `attestation_easy2` already does, so
+  the tokens are not copied into the configuration of other chalk binaries
+  that chalk self-configures.
 
 ## 1.2.0
 
