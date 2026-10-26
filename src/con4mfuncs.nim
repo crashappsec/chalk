@@ -15,7 +15,6 @@
 import std/os
 import pkg/[
   con4m/st,
-  nimutils/jwt,
 ]
 import "."/[
   auth,
@@ -88,19 +87,9 @@ proc logTrace(args: seq[Box], s: ConfigState): Option[Box] =
   return logBase("trace", args, s)
 
 proc isJwtValid(args: seq[Box], s: ConfigState): Option[Box] =
-  let token = unpack[string](args[0])
-  if len(token) == 0:
-    return some(pack(false))
-  try:
-    let
-      jwt     = parseJwtToken(token)
-      isAlive = jwt.isStillAlive()
-    # TODO validate full JWT structure
-    return some(pack(isAlive))
-  except:
-    return some(pack(false))
-
-proc isCoTokenValidFn(args: seq[Box], s: ConfigState): Option[Box] =
+  # API keys are accepted here, not via a new builtin: chalkdust.io serves
+  # configs/ to already released chalk binaries, which fail to compile a
+  # config that calls a builtin they do not have.
   return some(pack(isCoTokenValid(unpack[string](args[0]))))
 
 proc authHeaders(args: seq[Box], s: ConfigState): Option[Box] =
@@ -307,14 +296,8 @@ executable name).
     ("is_jwt_valid(string) -> bool",
      BuiltInFn(isJwtValid),
      """
-Returns whether JWT token is valid and hasnt expired.
-""",
-     @["chalk"]),
-    ("is_co_token_valid(string) -> bool",
-     BuiltInFn(isCoTokenValidFn),
-     """
-Returns whether the Crash Override token is either an unexpired JWT or a
-WorkOS API key (`sk_...`). API keys are only checked for shape here.
+Returns whether the token is either an unexpired JWT or a WorkOS API key
+(`sk_...`). API keys are only checked for shape here.
 """,
      @["chalk"]),
     ("auth_headers(string) -> dict[string, string]",

@@ -2,11 +2,16 @@
 #
 # This file is part of Chalk
 # (see https://crashoverride.com/docs/chalk)
+import base64
 import itertools
 import json
+import platform
+import shutil
+import time
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
+import httpx
 import pytest
 
 from .chalk.runner import Chalk, ChalkMark, ChalkReport
@@ -778,3 +783,145 @@ def test_load_params_for_unused_component(chalk_copy: Chalk, tmp_path: Path):
         "policy.config_json: component is not used by the loaded configuration"
         in result.logs
     )
+
+
+def _jwt(exp: int) -> str:
+    def b64(s: str) -> str:
+        return base64.urlsafe_b64encode(s.encode()).decode().rstrip("=")
+
+    return ".".join(
+        [
+            b64('{"alg":"none","typ":"JWT"}'),
+            b64(json.dumps({"sub": "x", "exp": exp})),
+            b64("sig"),
+        ]
+    )
+
+
+# built at runtime so secret scanners do not flag the fixture
+API_KEY = "sk" + "_test_" + "x" * 24
+
+# every Crash Override component whose token goes through `validate_jwt`,
+# with all of its parameters: chalk 1.2.0 crashes on omitted `--params`
+CO_TOKEN_COMPONENTS: dict[str, list[tuple[str, str]]] = {
+    "crashoverride2": [
+        ("auth_config.crashoverride_reporting.token", "{token}"),
+        *[
+            (
+                f"sink_config.crashoverride_{op}.uri",
+                f"https://chalk.example.com/v0.1/report/{op}",
+            )
+            for op in ["insert", "extract", "build", "push", "exec", "env"]
+        ],
+    ],
+    "object_store": [
+        ("auth_config.crashoverride_object_store_read.token", "{token}"),
+        ("auth_config.crashoverride_object_store_write.token", "{token}"),
+        (
+            "object_store_config.crashoverride.object_store_presign.uri",
+            "https://chalk.example.com/v0.1/objects",
+        ),
+    ],
+    "attestation_easy": [
+        ("auth_config.crashoverride_attestation.token", "{token}"),
+        (
+            "attestation.attestation_key_get.uri",
+            "https://chalk.example.com/v0.1/key-provider/keys",
+        ),
+    ],
+    "attestation_easy2": [
+        ("auth_config.crashoverride_attestation.token", "{token}"),
+        (
+            "attestation.attestation_key_get.uri",
+            "https://chalk.example.com/v0.1/key-provider/keys",
+        ),
+    ],
+    "chalkular": [
+        ("auth_config.crashoverride_chalkular.token", "{token}"),
+        ("docker.docker_registry.chalkular.uri", "registry.example.com"),
+        (
+            "docker.docker_registry.chalkular.docker_login_get.uri",
+            "https://chalk.example.com/v0.1/chalkular/login",
+        ),
+        (
+            "docker.docker_registry.chalkular.docker_push.chalkular.repository",
+            "chalkular",
+        ),
+    ],
+}
+
+
+@pytest.fixture(scope="session")
+def released_chalk_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    dl = "https://dl.crashoverride.run/chalk"
+    version = (
+        httpx.get(f"{dl}/current-version.txt", follow_redirects=True)
+        .raise_for_status()
+        .text.strip()
+    )
+    arch = "arm64" if platform.machine() in {"aarch64", "arm64"} else "x86_64"
+    binary = tmp_path_factory.mktemp("released") / f"chalk-{version}"
+    binary.write_bytes(
+        httpx.get(f"{dl}/chalk-{version}-linux-{arch}", follow_redirects=True)
+        .raise_for_status()
+        .content
+    )
+    binary.chmod(0o755)
+    return binary
+
+
+@pytest.mark.parametrize("component", sorted(CO_TOKEN_COMPONENTS))
+def test_co_token_components_load_on_released_chalk(
+    released_chalk_binary: Path, tmp_path: Path, component: str
+):
+    """
+    chalkdust.io serves configs/ from main to every chalk install, including
+    already released binaries. Those fail to compile a component that calls a
+    builtin they do not have, so these components must stay loadable there.
+    """
+    chalk = Chalk(binary=Path(shutil.copy(released_chalk_binary, tmp_path / "chalk")))
+    co = REPO / "configs" / "co"
+    profile = tmp_path / "profile.c4m"
+    profile.write_text(f'use {component} from "{co}"\n')
+    token = _jwt(int(time.time()) + 3600)
+    chalk.load(
+        profile,
+        component_params=[
+            [True, f"{co}/{component}", name, "string", value.format(token=token)]
+            for name, value in CO_TOKEN_COMPONENTS[component]
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    "token, valid",
+    [
+        (_jwt(int(time.time()) + 3600), True),
+        (API_KEY, True),
+        (_jwt(int(time.time()) - 3600), False),
+        ("", False),
+        ("sk_short", False),
+        (API_KEY.replace("_x", "_ x"), False),
+    ],
+    # stable ids: the JWTs embed the collection time, which differs per xdist worker
+    ids=["jwt", "api_key", "expired_jwt", "empty", "short_key", "key_with_space"],
+)
+def test_is_jwt_valid_accepts_api_keys(
+    chalk_copy: Chalk, tmp_path: Path, token: str, valid: bool
+):
+    """
+    The CO components validate tokens with `is_jwt_valid`, which accepts a
+    WorkOS API key as well as an unexpired JWT.
+    """
+    config = tmp_path / "config.c4m"
+    config.write_text(
+        'if not is_jwt_valid(env("CO_TOKEN")) {\n  error("CO_TOKEN rejected")\n}\n'
+    )
+    result = chalk_copy.run(
+        command="version",
+        config=config,
+        env={"CO_TOKEN": token},
+        expecting_report=False,
+        ignore_errors=True,
+    )
+    assert ("CO_TOKEN rejected" in result.logs) != valid

@@ -1,5 +1,5 @@
 func validate_jwt(token) {
-  if not is_co_token_valid(token) {
+  if not is_jwt_valid(token) {
     return "Invalid JWT or API key for retrieving chalkular docker login creds from CrashOverride"
   }
   return ""
