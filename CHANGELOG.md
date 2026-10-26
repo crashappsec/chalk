@@ -4,6 +4,11 @@
 
 ### New Features
 
+- Crash Override configs (`crashoverride2`, `object_store`, `attestation_easy`,
+  `attestation_easy2`, `chalkular`) now also accept a WorkOS API key (`sk_...`)
+  as the token, in addition to an unexpired JWT. API keys are only checked for
+  shape locally and sent as the `Authorization: Bearer` token. Adds the
+  `is_co_token_valid()` con4m builtin.
 - Opt-in build policies for `chalk docker build` and `chalk docker push`,
   disabled by default (`policy.mode = "off"`) with no change in behavior
   unless enabled. The new `policy` configuration section restricts base images (and `COPY --from`

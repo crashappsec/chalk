@@ -43,7 +43,7 @@ auth jwt {
   doc:            """
 | Parameter | Type     | Required | Description                                                    |
 |-----------|----------|----------|----------------------------------------------------------------|
-| `token`   | `string` | yes      | JWT Token to be sent as Bearer token. Token cannot be expired. |
+| `token`   | `string` | yes      | JWT or API key to be sent as Bearer token. A JWT cannot be expired. |
 
 This auth method allows to define JWT auth which can be used by sinks.
 
