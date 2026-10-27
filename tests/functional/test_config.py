@@ -902,9 +902,21 @@ def test_co_token_components_load_on_released_chalk(
         ("", False),
         ("sk_short", False),
         (API_KEY.replace("_x", "_ x"), False),
+        # keys are not trimmed: a padded key must not reach a header
+        (f"{API_KEY}\n", False),
+        (f" {API_KEY}", False),
     ],
     # stable ids: the JWTs embed the collection time, which differs per xdist worker
-    ids=["jwt", "api_key", "expired_jwt", "empty", "short_key", "key_with_space"],
+    ids=[
+        "jwt",
+        "api_key",
+        "expired_jwt",
+        "empty",
+        "short_key",
+        "key_with_space",
+        "key_trailing_newline",
+        "key_leading_space",
+    ],
 )
 def test_is_jwt_valid_accepts_api_keys(
     chalk_copy: Chalk, tmp_path: Path, token: str, valid: bool
@@ -925,3 +937,59 @@ def test_is_jwt_valid_accepts_api_keys(
         ignore_errors=True,
     )
     assert ("CO_TOKEN rejected" in result.logs) != valid
+
+
+@pytest.mark.parametrize(
+    "token, error",
+    [
+        (_jwt(int(time.time()) + 3600), None),
+        (API_KEY, None),
+        (_jwt(int(time.time()) - 3600), "JWT token has expired since"),
+        ("sk_short", "Invalid JWT"),
+        (f" {API_KEY}", "Invalid JWT"),
+        (f"{API_KEY}\n", "Invalid JWT"),
+    ],
+    ids=[
+        "jwt",
+        "api_key",
+        "expired_jwt",
+        "short_key",
+        "key_leading_space",
+        "key_trailing_newline",
+    ],
+)
+def test_jwt_auth_sends_api_keys(
+    chalk_copy: Chalk, tmp_path: Path, token: str, error: Optional[str]
+):
+    """
+    `is_jwt_valid` only gates `chalk load`. Sinks, attestation, object store
+    and docker login build their `jwt` auth config at runtime, which must
+    send an API key as the bearer token and reject everything it rejected
+    before, with the same errors and without logging the token.
+    """
+    config = tmp_path / "config.c4m"
+    config.write_text(
+        "auth_config co {\n"
+        '  auth:  "jwt"\n'
+        '  token: env("CO_TOKEN")\n'
+        "}\n"
+        'h := auth_headers("co")\n'
+        'if contains(h, "authorization") {\n'
+        '  if h["authorization"] == "Bearer " + env("CO_TOKEN") {\n'
+        '    info("CO_TOKEN sent as bearer")\n'
+        "  }\n"
+        "}\n"
+    )
+    result = chalk_copy.run(
+        command="version",
+        config=config,
+        env={"CO_TOKEN": token},
+        expecting_report=False,
+        ignore_errors=True,
+    )
+    assert ("CO_TOKEN sent as bearer" in result.logs) == (error is None)
+    if error:
+        assert f"auth_config.co is misconfigured: {error}" in result.logs
+    else:
+        assert "auth_config.co is misconfigured" not in result.logs
+    assert token.strip() not in result.logs

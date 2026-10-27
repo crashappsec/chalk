@@ -9,9 +9,12 @@
 ## WorkOS API key.
 
 import std/[
+  options,
   strutils,
+  tables,
 ]
 import pkg/[
+  nimutils/auth,
   nimutils/jwt,
 ]
 
@@ -39,3 +42,21 @@ proc isCoTokenValid*(token: string): bool =
   if len(token) == 0:
     return false
   return token.isApiKey() or token.isJwtAlive()
+
+proc acceptApiKeysInJwtAuth*() =
+  ## `is_jwt_valid` only gates interactive `chalk load`. nimutils' `jwt` auth
+  ## parses its token as a JWT again whenever sinks, attestation, object store
+  ## or docker login build their auth config, which rejected API keys at
+  ## runtime. Skip that parse for API keys only: every other token, JWTs
+  ## included, keeps the original validation and error messages.
+  let implOpt = getAuthImplementation("jwt")
+  if implOpt.isNone():
+    return
+  let
+    impl   = implOpt.get()
+    legacy = impl.validate
+  impl.validate = proc(auth: AuthConfig) =
+    if auth.params.getOrDefault("token").isApiKey():
+      return
+    if legacy != nil:
+      legacy(auth)
