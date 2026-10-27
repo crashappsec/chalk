@@ -23,7 +23,6 @@ import "."/[
   config,
   run_management,
   types,
-  utils/co_token,
   utils/files,
   utils/json,
   utils/sink_impls,
@@ -604,4 +603,3 @@ proc ioSetup*(bgColor = "darkslategray") =
     setDefaultUserAgent("chalk/" & getChalkExeVersion() & " " & getDefaultUserAgent())
     useCrashTheme()
     addDefaultAuths()
-    acceptApiKeysInJwtAuth()

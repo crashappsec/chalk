@@ -1,6 +1,6 @@
 func validate_jwt(token) {
   if not is_jwt_valid(token) {
-    return "Invalid JWT or API key for retrieving cosign key material from CrashOverride"
+    return "Invalid JWT token for retrieving cosign key material from CrashOverride"
   }
   return ""
 }
