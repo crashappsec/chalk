@@ -41,8 +41,24 @@ proc runFakePodman() =
   logStream.close()
 
   if argv.len >= 3 and argv[0 .. 1] == @["image", "inspect"]:
+    if argv[2] == getEnv("PODMAN_IMAGE_TEST_ORIGINAL"):
+      if getEnv("PODMAN_IMAGE_TEST_ORIGINAL_CANCEL") == "1":
+        discard kill(getpid(), SIGTERM)
+        quit(99)
+      let originalExit = getEnv("PODMAN_IMAGE_TEST_ORIGINAL_EXIT")
+      if originalExit != "":
+        stdout.write(getEnv("PODMAN_IMAGE_TEST_ORIGINAL_STDOUT"))
+        stderr.write(getEnv("PODMAN_IMAGE_TEST_ORIGINAL_STDERR"))
+        quit(parseInt(originalExit))
     if getEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING") == "1" and
         argv[2] == getEnv("PODMAN_IMAGE_TEST_ORIGINAL"):
+      stdout.write("[]\n")
+      stderr.write("Error: " & argv[2] & ": image not known\n")
+      quit(125)
+    if getEnv("PODMAN_IMAGE_TEST_INSPECT_CANCEL") == "1":
+      discard kill(getpid(), SIGTERM)
+      quit(99)
+    if getEnv("PODMAN_IMAGE_TEST_INSPECT_FAIL") == "1":
       quit(125)
     stdout.write(getEnv("PODMAN_IMAGE_TEST_INSPECT"))
     quit(0)
@@ -101,6 +117,12 @@ proc inspection(id = ImageAId,
 
 const CaseVariables = [
   "PODMAN_IMAGE_TEST_ORIGINAL_MISSING",
+  "PODMAN_IMAGE_TEST_ORIGINAL_CANCEL",
+  "PODMAN_IMAGE_TEST_ORIGINAL_EXIT",
+  "PODMAN_IMAGE_TEST_ORIGINAL_STDOUT",
+  "PODMAN_IMAGE_TEST_ORIGINAL_STDERR",
+  "PODMAN_IMAGE_TEST_INSPECT_CANCEL",
+  "PODMAN_IMAGE_TEST_INSPECT_FAIL",
   "PODMAN_IMAGE_TEST_PULL_CANCEL",
   "PODMAN_IMAGE_TEST_PULL_FAIL",
   "PODMAN_IMAGE_TEST_PROOF_CANCEL",
@@ -115,6 +137,11 @@ proc resetCase(original = BaseRef) =
   putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection())
   putEnv("PODMAN_IMAGE_TEST_PULL_STDOUT", ImageAId & "\n")
   putEnv("PODMAN_IMAGE_TEST_PROOF_STDOUT", ImageAId & "\n")
+
+proc setOriginalResult(exitCode: int, output, error: string) =
+  putEnv("PODMAN_IMAGE_TEST_ORIGINAL_EXIT", $exitCode)
+  putEnv("PODMAN_IMAGE_TEST_ORIGINAL_STDOUT", output)
+  putEnv("PODMAN_IMAGE_TEST_ORIGINAL_STDERR", error)
 
 type FetchResult = tuple[
   image: Option[InspectedBaseImage],
@@ -164,7 +191,7 @@ let missingAbsent = fetch()
 expectConfigBinding(missingAbsent)
 expectCalls(@[
   @["image", "inspect", BaseRef, "--format", "json"],
-  @["pull", "--quiet", "--policy", "missing", BaseRef],
+  @["pull", "--quiet", BaseRef],
   @["image", "inspect", ImageAId, "--format", "json"],
 ])
 
@@ -184,8 +211,98 @@ for request in [
   )
   expectConfigBinding(promoted)
   expectCalls(@[
-    @["pull", "--quiet", "--policy", "missing", "--platform", "linux/amd64", BaseRef],
+    @["image", "inspect", BaseRef, "--format", "json"],
+  ])
+
+  resetCase()
+  putEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING", "1")
+  let promotedAbsent = fetch(
+    commandPlatform = request.command,
+    rootPlatform = request.root,
+    effectiveStageCount = request.stages,
+  )
+  expectConfigBinding(promotedAbsent)
+  expectCalls(@[
+    @["image", "inspect", BaseRef, "--format", "json"],
+    @["pull", "--quiet", "--platform", "linux/amd64", BaseRef],
     @["image", "inspect", ImageAId, "--format", "json"],
+  ])
+
+resetCase()
+setOriginalResult(
+  125,
+  " \n[]\n",
+  "Warning: using local image storage\n\nError: " & BaseRef &
+    ": image not known\n\n",
+)
+let missingAfterWarning = fetch()
+expectConfigBinding(missingAfterWarning)
+expectCalls(@[
+  @["image", "inspect", BaseRef, "--format", "json"],
+  @["pull", "--quiet", BaseRef],
+  @["image", "inspect", ImageAId, "--format", "json"],
+])
+
+for taggedDigest in [
+  (reference: "alpine:latest@" & DigestA,
+   diagnostic: "alpine@" & DigestA),
+  (reference: "registry.example:5000/team/base:latest@" & DigestA,
+   diagnostic: "registry.example:5000/team/base@" & DigestA),
+]:
+  let reference = taggedDigest.reference
+  resetCase(reference)
+  setOriginalResult(
+    125,
+    "[]\n",
+    "Error: " & taggedDigest.diagnostic & ": image not known\n",
+  )
+  let missingTaggedDigest = fetch(image = reference)
+  expectConfigBinding(missingTaggedDigest)
+  expectCalls(@[
+    @["image", "inspect", reference, "--format", "json"],
+    @["pull", "--quiet", reference],
+    @["image", "inspect", ImageAId, "--format", "json"],
+  ])
+
+let exactMissingDiagnostic = "Error: " & BaseRef & ": image not known\n"
+for rejected in [
+  (exitCode: 0, output: "[]\n", error: exactMissingDiagnostic),
+  (exitCode: 44, output: "[]\n", error: exactMissingDiagnostic),
+  (exitCode: 125, output: "[{}]\n", error: exactMissingDiagnostic),
+  (exitCode: 125, output: "not-json\n", error: exactMissingDiagnostic),
+  (exitCode: 125, output: "warning\n[]\n", error: exactMissingDiagnostic),
+  (exitCode: 125, output: "[]\n",
+   error: "Error: registry.example/other:latest: image not known\n"),
+  (exitCode: 125, output: "[]\n",
+   error: "Error: " & BaseRef & ": image not known: extra\n"),
+  (exitCode: 125, output: "[]\n",
+   error: exactMissingDiagnostic & "Warning: later diagnostic\n"),
+]:
+  resetCase()
+  setOriginalResult(
+    rejected.exitCode,
+    rejected.output,
+    rejected.error,
+  )
+  let lookupFailure = fetch()
+  doAssert lookupFailure.cancellation.isNone()
+  doAssert lookupFailure.image.isNone()
+  expectCalls(@[
+    @["image", "inspect", BaseRef, "--format", "json"],
+  ])
+
+for malformedLocal in [
+  "not-json\n",
+  "[{}]\n",
+  inspection(id = "a".repeat(63)),
+]:
+  resetCase()
+  setOriginalResult(0, malformedLocal, "")
+  let malformedLookup = fetch()
+  doAssert malformedLookup.cancellation.isNone()
+  doAssert malformedLookup.image.isNone()
+  expectCalls(@[
+    @["image", "inspect", BaseRef, "--format", "json"],
   ])
 
 resetCase()
@@ -358,6 +475,17 @@ let malformedPullOutputs = [
 ]
 for malformedOutput in malformedPullOutputs:
   resetCase()
+  putEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING", "1")
+  putEnv("PODMAN_IMAGE_TEST_PULL_STDOUT", malformedOutput)
+  let malformedMissing = fetch()
+  doAssert malformedMissing.cancellation.isNone()
+  doAssert malformedMissing.image.isNone()
+  expectCalls(@[
+    @["image", "inspect", BaseRef, "--format", "json"],
+    @["pull", "--quiet", BaseRef],
+  ])
+
+  resetCase()
   putEnv("PODMAN_IMAGE_TEST_PULL_STDOUT", malformedOutput)
   let malformed = fetch(policy = bppNewer)
   doAssert malformed.cancellation.isNone()
@@ -380,6 +508,58 @@ expectCalls(@[
   @["pull", "--quiet", "--policy", "newer", BaseRef],
   @["image", "inspect", ImageAId, "--format", "json"],
 ])
+
+resetCase()
+putEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING", "1")
+putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection(id = ImageBId))
+let changedAfterMissingPull = fetch()
+doAssert changedAfterMissingPull.cancellation.isNone()
+doAssert changedAfterMissingPull.image.isNone()
+expectCalls(@[
+  @["image", "inspect", BaseRef, "--format", "json"],
+  @["pull", "--quiet", BaseRef],
+  @["image", "inspect", ImageAId, "--format", "json"],
+])
+
+resetCase()
+putEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING", "1")
+putEnv("PODMAN_IMAGE_TEST_PULL_FAIL", "1")
+let missingPullFailed = fetch()
+doAssert missingPullFailed.cancellation.isNone()
+doAssert missingPullFailed.image.isNone()
+expectCalls(@[
+  @["image", "inspect", BaseRef, "--format", "json"],
+  @["pull", "--quiet", BaseRef],
+])
+
+resetCase()
+putEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING", "1")
+putEnv("PODMAN_IMAGE_TEST_INSPECT_FAIL", "1")
+let missingInspectionFailed = fetch()
+doAssert missingInspectionFailed.cancellation.isNone()
+doAssert missingInspectionFailed.image.isNone()
+expectCalls(@[
+  @["image", "inspect", BaseRef, "--format", "json"],
+  @["pull", "--quiet", BaseRef],
+  @["image", "inspect", ImageAId, "--format", "json"],
+])
+
+for malformedSelectedInspection in [
+  "not-json\n",
+  "[]\n",
+  inspection(id = "b".repeat(63)),
+]:
+  resetCase()
+  putEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING", "1")
+  putEnv("PODMAN_IMAGE_TEST_INSPECT", malformedSelectedInspection)
+  let malformedSelected = fetch()
+  doAssert malformedSelected.cancellation.isNone()
+  doAssert malformedSelected.image.isNone()
+  expectCalls(@[
+    @["image", "inspect", BaseRef, "--format", "json"],
+    @["pull", "--quiet", BaseRef],
+    @["image", "inspect", ImageAId, "--format", "json"],
+  ])
 
 for proofId in [ArmImageId, ImageBId]:
   resetCase()
@@ -437,6 +617,41 @@ doAssert proofCancelled.cancellation.isSome()
 doAssert proofCancelled.cancellation.get().kind == ceSignaled
 doAssert recordedCalls(log).len == 3
 
+resetCase()
+putEnv("PODMAN_IMAGE_TEST_ORIGINAL_CANCEL", "1")
+let missingLookupCancelled = fetch()
+doAssert missingLookupCancelled.image.isNone()
+doAssert missingLookupCancelled.cancellation.isSome()
+doAssert missingLookupCancelled.cancellation.get().kind == ceSignaled
+expectCalls(@[
+  @["image", "inspect", BaseRef, "--format", "json"],
+])
+
+resetCase()
+putEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING", "1")
+putEnv("PODMAN_IMAGE_TEST_PULL_CANCEL", "1")
+let missingPullCancelled = fetch()
+doAssert missingPullCancelled.image.isNone()
+doAssert missingPullCancelled.cancellation.isSome()
+doAssert missingPullCancelled.cancellation.get().kind == ceSignaled
+expectCalls(@[
+  @["image", "inspect", BaseRef, "--format", "json"],
+  @["pull", "--quiet", BaseRef],
+])
+
+resetCase()
+putEnv("PODMAN_IMAGE_TEST_ORIGINAL_MISSING", "1")
+putEnv("PODMAN_IMAGE_TEST_INSPECT_CANCEL", "1")
+let missingInspectionCancelled = fetch()
+doAssert missingInspectionCancelled.image.isNone()
+doAssert missingInspectionCancelled.cancellation.isSome()
+doAssert missingInspectionCancelled.cancellation.get().kind == ceSignaled
+expectCalls(@[
+  @["image", "inspect", BaseRef, "--format", "json"],
+  @["pull", "--quiet", BaseRef],
+  @["image", "inspect", ImageAId, "--format", "json"],
+])
+
 for target in ChalkPlatform:
   let arch = if target == cpLinuxAmd64: "amd64" else: "arm64"
   resetCase()
@@ -444,24 +659,21 @@ for target in ChalkPlatform:
   let multi = fetch(effectiveStageCount = 2, target = target)
   doAssert multi.image.isSome()
   expectCalls(@[
-    @["pull", "--quiet", "--policy", "missing", "--platform", $target, BaseRef],
-    @["image", "inspect", ImageAId, "--format", "json"],
+    @["image", "inspect", BaseRef, "--format", "json"],
   ])
   resetCase()
   putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection(architecture = arch))
   let explicit = fetch(commandPlatform = $target, target = target)
   doAssert explicit.image.isSome()
   expectCalls(@[
-    @["pull", "--quiet", "--policy", "missing", "--platform", $target, BaseRef],
-    @["image", "inspect", ImageAId, "--format", "json"],
+    @["image", "inspect", BaseRef, "--format", "json"],
   ])
   resetCase()
   putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection(architecture = arch))
   let declared = fetch(rootPlatform = parseDeclaredPlatform($target), target = target)
   doAssert declared.image.isSome()
   expectCalls(@[
-    @["pull", "--quiet", "--policy", "missing", "--platform", $target, BaseRef],
-    @["image", "inspect", ImageAId, "--format", "json"],
+    @["image", "inspect", BaseRef, "--format", "json"],
   ])
   resetCase()
   putEnv("PODMAN_IMAGE_TEST_INSPECT", inspection(architecture = arch))

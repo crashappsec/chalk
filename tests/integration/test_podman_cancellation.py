@@ -55,6 +55,61 @@ def survivors(owned):
             current[pid]['start'] == data['start'] and current[pid]['state'] != 'Z'}
 
 
+PHASE_PODMAN = r'''#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import sys
+import time
+
+argv = sys.argv[1:]
+with open(os.environ['CANCEL_PHASE_CALLS'], 'a') as stream:
+    stream.write(json.dumps({'argv': argv, 'pid': os.getpid()}) + '\n')
+
+phase = os.environ['CANCEL_PHASE']
+base = os.environ['CANCEL_PHASE_BASE']
+selected_id = os.environ['CANCEL_PHASE_ID']
+
+def wait_if(name):
+    if phase != name:
+        return
+    Path(os.environ['CANCEL_PHASE_READY']).write_text(str(os.getpid()))
+    while True:
+        time.sleep(0.1)
+
+if argv == ['info', '--format', 'json']:
+    sys.stdout.write('{"host":{"os":"linux","arch":"amd64",'
+                     '"serviceIsRemote":false,"buildahVersion":"1.43.1"}}')
+    sys.exit(0)
+
+if argv == ['image', 'inspect', base, '--format', 'json']:
+    wait_if('lookup')
+    sys.stdout.write('[]\n')
+    sys.stderr.write(f'Error: {base}: image not known\n')
+    sys.exit(125)
+
+if argv == ['pull', '--quiet', '--platform', 'linux/amd64', base]:
+    wait_if('pull')
+    sys.stdout.write(selected_id + '\n')
+    sys.exit(0)
+
+if argv == ['image', 'inspect', selected_id, '--format', 'json']:
+    wait_if('selected-inspect')
+    sys.stdout.write(json.dumps([{
+        'Id': selected_id,
+        'Os': 'linux',
+        'Architecture': 'amd64',
+        'Config': {'Entrypoint': ['/bin/true'], 'Cmd': []},
+    }]))
+    sys.exit(0)
+
+if argv and argv[0] == 'build':
+    sys.exit(0)
+
+sys.exit(99)
+'''
+
+
 try:
     with tempfile.TemporaryDirectory(prefix='chalk-podman-cancel-') as temp:
         root = Path(temp)
@@ -79,6 +134,113 @@ os.execv(os.environ['CANCEL_REAL'], [os.environ['CANCEL_REAL'], *sys.argv[1:]])
         calls = root / 'calls.jsonl'
         env = dict(os.environ, PATH=str(wrapped) + os.pathsep + str(proxy) + os.pathsep + os.environ['PATH'],
                    CANCEL_CALLS=str(calls), CANCEL_REAL=real_podman)
+
+        phase_source = root / 'phase-source'
+        phase_proxy = root / 'phase-proxy'
+        phase_source.mkdir()
+        phase_proxy.mkdir()
+        phase_base = 'registry.invalid/chalk-cancel-phase:latest'
+        phase_id = 'a' * 64
+        (phase_source / 'Containerfile').write_text(
+            f'FROM {phase_base}\nENTRYPOINT ["/bin/true"]\n')
+        (phase_proxy / 'podman').write_text(PHASE_PODMAN)
+        (phase_proxy / 'podman').chmod(0o755)
+        phase_calls = root / 'phase-calls.jsonl'
+        phase_expectations = {
+            'lookup': [
+                ['info', '--format', 'json'],
+                ['image', 'inspect', phase_base, '--format', 'json'],
+            ],
+            'pull': [
+                ['info', '--format', 'json'],
+                ['image', 'inspect', phase_base, '--format', 'json'],
+                ['pull', '--quiet', '--platform', 'linux/amd64', phase_base],
+            ],
+            'selected-inspect': [
+                ['info', '--format', 'json'],
+                ['image', 'inspect', phase_base, '--format', 'json'],
+                ['pull', '--quiet', '--platform', 'linux/amd64', phase_base],
+                ['image', 'inspect', phase_id, '--format', 'json'],
+            ],
+        }
+        for phase, expected_calls in phase_expectations.items():
+            phase_calls.write_text('')
+            ready = root / (phase + '.ready')
+            ready.unlink(missing_ok=True)
+            report_offset = report_log.stat().st_size if report_log.exists() else 0
+            phase_env = dict(
+                os.environ,
+                PATH=(str(wrapped) + os.pathsep + str(phase_proxy) +
+                      os.pathsep + os.environ['PATH']),
+                CANCEL_PHASE=phase,
+                CANCEL_PHASE_BASE=phase_base,
+                CANCEL_PHASE_ID=phase_id,
+                CANCEL_PHASE_CALLS=str(phase_calls),
+                CANCEL_PHASE_READY=str(ready),
+            )
+            process = subprocess.Popen(
+                [str(wrapped / 'podman'), 'build', '--platform', 'linux/amd64', '.'],
+                cwd=phase_source, env=phase_env, stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            transcript = b''
+            child_pid = None
+            owned = {}
+            try:
+                deadline = time.monotonic() + 30
+                while not ready.exists():
+                    assert process.poll() is None, process.communicate()[0]
+                    assert time.monotonic() < deadline, phase + ' did not start'
+                    time.sleep(0.05)
+                child_pid = int(ready.read_text())
+                owned = descendants(child_pid)
+                cancel_started = time.monotonic()
+                process.send_signal(signal.SIGTERM)
+                transcript = process.communicate(timeout=30)[0]
+                recorded = [json.loads(line) for line in
+                            phase_calls.read_text().splitlines()]
+                observed_calls = [record['argv'] for record in recorded]
+                builds = [argv for argv in observed_calls if argv[:1] == ['build']]
+                remaining = survivors(owned)
+                deadline = time.monotonic() + 3
+                while remaining and time.monotonic() < deadline:
+                    time.sleep(0.1)
+                    remaining = survivors(owned)
+                observation = {
+                    'phase': phase,
+                    'signal': signal.SIGTERM.name,
+                    'wrapper_pid': process.pid,
+                    'podman_pid': child_pid,
+                    'returncode': process.returncode,
+                    'elapsed_seconds': time.monotonic() - cancel_started,
+                    'calls': observed_calls,
+                    'survivors': remaining,
+                }
+                observations.append(observation)
+                check(phase + ' cancellation exit',
+                      process.returncode in (-signal.SIGTERM,
+                                             128 + signal.SIGTERM))
+                check(phase + ' exact child sequence',
+                      observed_calls == expected_calls)
+                check(phase + ' no fallback build', builds == [])
+                check(phase + ' no report',
+                      (report_log.stat().st_size if report_log.exists() else 0) ==
+                      report_offset)
+                check(phase + ' child stopped', not remaining)
+            finally:
+                if child_pid is not None:
+                    try:
+                        os.kill(child_pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait()
+                (output / ('phase-' + phase + '.log')).write_bytes(transcript)
+
         for sig in (signal.SIGINT, signal.SIGTERM):
             tag = 'localhost/chalk-cancel:' + str(os.getpid()) + '-' + sig.name.lower()
             calls.write_text('')

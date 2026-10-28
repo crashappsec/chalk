@@ -41,11 +41,21 @@ proc fileArg(argv: seq[string]): string =
 proc runFakePodman() =
   let argv = commandLineParams()
   if len(argv) >= 3 and argv[0 .. 1] == @["image", "inspect"]:
+    if argv[2] == BaseRef and getEnv("PODMAN_BASE_BINDING_MISSING") == "1":
+      stdout.write("[]\n")
+      stderr.write("Error: " & BaseRef & ": image not known\n")
+      quit(125)
     if argv[2] == BaseRef or argv[2] == ImageAId:
       stdout.write(ImageAInspect)
       writeFile(getEnv("PODMAN_BASE_BINDING_STATE"), ImageBId)
       quit(0)
     quit(125)
+
+  if len(argv) >= 2 and argv[0 .. 1] == @["pull", "--quiet"]:
+    if "--policy" in argv:
+      quit(125)
+    stdout.write(ImageAId & "\n")
+    quit(0)
 
   if len(argv) > 0 and argv[0] == "build":
     let
@@ -71,6 +81,7 @@ writeFile(context / "Containerfile", ContainerfileText)
 writeFile(state, ImageAId)
 putEnv("PODMAN_BASE_BINDING_CHILD", "1")
 putEnv("PODMAN_BASE_BINDING_STATE", state)
+delEnv("PODMAN_BASE_BINDING_MISSING")
 
 let route = classifyPodmanArgs(@["build", "--pull=never", context])
 doAssert route.kind == prInstrument
@@ -118,6 +129,58 @@ doAssert "/image-a" in ws.derivedText
 doAssert "cmd-a" in ws.derivedText
 
 removeDir(ws.root)
+
+writeFile(state, ImageAId)
+putEnv("PODMAN_BASE_BINDING_MISSING", "1")
+let missingRoute = classifyPodmanArgs(@[
+  "build", "--platform", "linux/amd64", context,
+])
+doAssert missingRoute.kind == prInstrument
+var missingSpec = missingRoute.spec
+var missingCancellation = none(ChildResult)
+let pulledInspection = fetchBaseImage(
+  fake,
+  config.rootImage,
+  missingCancellation,
+  cpLinuxAmd64,
+  missingSpec.pullPolicy,
+  missingSpec.requestedPlatform,
+)
+doAssert missingCancellation.isNone()
+doAssert pulledInspection.isSome()
+doAssert pulledInspection.get().imageId == ImageAId
+
+let pulledBase = decideFinalBase(
+  config.rootImage,
+  missingSpec.requestedPlatform,
+  config.fromPlatform,
+  pulledInspection,
+  target = cpLinuxAmd64,
+)
+doAssert pulledBase.kind == fbdAccept
+let pulledStartup = podman_exec.planStartup(config, pulledBase.root)
+doAssert pulledStartup.kind == podman_exec.sprPlan
+missingSpec.resolvedContext = context
+missingSpec.resolvedContainerfile = context / "Containerfile"
+missingSpec.containerfileText = ContainerfileText
+missingSpec.startup = config
+missingSpec.startupPlan = some(pulledStartup.plan)
+
+let missingWorkspace = preparePodmanBuild(missingSpec)
+doAssert missingWorkspace.isSome()
+let missingWs = missingWorkspace.get()
+let missingInjectedArgs = makeInjectedArgs(missingSpec, missingWs)
+doAssert missingInjectedArgs[0 ..< len(missingSpec.originalArgs)] ==
+  missingSpec.originalArgs
+let missingChild = runAttached(fake, missingInjectedArgs)
+doAssert missingChild.kind == ceExited
+doAssert missingChild.exitCode == 0
+doAssert readFile(state) == ImageAId
+doAssert ("FROM " & ImageAId & "\n") in missingWs.derivedText
+doAssert "/image-a" in missingWs.derivedText
+doAssert "cmd-a" in missingWs.derivedText
+removeDir(missingWs.root)
+delEnv("PODMAN_BASE_BINDING_MISSING")
 
 proc chalkBlock(contextName: string): string =
   return

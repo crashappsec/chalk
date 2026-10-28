@@ -42,7 +42,8 @@ import time
 
 argv = sys.argv[1:]
 with open(os.environ['PODMAN_CALLS'], 'a') as stream:
-    stream.write(json.dumps({'argv': argv, 'pid': os.getpid()}) + '\n')
+    stream.write(json.dumps({'argv': argv, 'pid': os.getpid(),
+                             'cwd': os.getcwd()}) + '\n')
 
 if argv == ['info', '--format', 'json']:
     sys.stdout.write(os.environ.get('PODMAN_INFO', '{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.43.1"}}'))
@@ -50,11 +51,18 @@ if argv == ['info', '--format', 'json']:
     sys.exit(int(os.environ.get('PODMAN_INFO_EXIT', '0')))
 
 if argv[:2] == ['image', 'inspect']:
+    selected_id = os.environ.get('PODMAN_SELECTED_ID')
+    if selected_id and argv[2] == selected_id:
+        sys.stdout.write(os.environ.get('PODMAN_SELECTED_INSPECT_STDOUT', ''))
+        sys.stderr.write(os.environ.get('PODMAN_SELECTED_INSPECT_STDERR',
+                                        'captured-selected-inspect-error\n'))
+        sys.exit(int(os.environ.get('PODMAN_SELECTED_INSPECT_EXIT', '46')))
     sys.stdout.write(os.environ.get('PODMAN_INSPECT_STDOUT', ''))
     sys.stderr.write(os.environ.get('PODMAN_INSPECT_STDERR', 'captured-inspect-error\n'))
     sys.exit(int(os.environ.get('PODMAN_INSPECT_EXIT', '44')))
 
 if argv[:2] == ['pull', '--quiet']:
+    sys.stdout.write(os.environ.get('PODMAN_BASE_PULL_STDOUT', ''))
     sys.stderr.write(os.environ.get('PODMAN_BASE_PULL_STDERR', 'captured-pull-error\n'))
     sys.exit(int(os.environ.get('PODMAN_BASE_PULL_EXIT', '45')))
 
@@ -82,8 +90,12 @@ sys.exit(99)
 '''
 
 
+def call_records(path):
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
 def calls(path):
-    return [json.loads(line)['argv'] for line in path.read_text().splitlines()]
+    return [record['argv'] for record in call_records(path)]
 
 
 def notice_lines(stderr):
@@ -326,6 +338,10 @@ with tempfile.TemporaryDirectory(prefix='podman-input-notices-') as temp:
 
     root_secret = 'registry.invalid/base-secret-must-not-be-reported:latest'
     root_input, _ = context('root-unavailable', f'FROM {root_secret}\n')
+    selected_base_notice = (
+        'chalk: skipped Podman build processing: '
+        'an immutable selected-base identity is unavailable.'
+    )
     result, seen = run(['build', str(root_input)], env={
         'PODMAN_INSPECT_STDERR': 'remote-url-secret-must-not-be-reported\n',
         'PODMAN_BASE_PULL_STDERR': 'credential-secret-must-not-be-reported\n',
@@ -334,14 +350,96 @@ with tempfile.TemporaryDirectory(prefix='podman-input-notices-') as temp:
     assert seen == [
         ['info', '--format', 'json'],
         ['image', 'inspect', root_secret, '--format', 'json'],
-        ['pull', '--quiet', '--policy', 'missing', root_secret],
         ['build', str(root_input)],
     ], seen
     assert_skip(result, 'build',
                 'an immutable selected-base identity is unavailable')
+    assert selected_base_notice in notice_lines(result.stderr), result.stderr
     assert_secret_free(result, root_secret, 'remote-url-secret-must-not-be-reported',
                        'credential-secret-must-not-be-reported')
-    evidence.append({'case': 'platform-base-unavailable',
+    lookup_records = call_records(call_log)
+    assert lookup_records[-1]['argv'] == ['build', str(root_input)]
+    assert lookup_records[-1]['cwd'] == str(root)
+    evidence.append({'case': 'base-lookup-error',
+                     'exit_code': result.returncode,
+                     'native_executions': len(seen)})
+
+    result, seen = run(['build', str(root_input)], env={
+        'PODMAN_INSPECT_STDERR': 'lookup-error-must-not-be-reported\n',
+        'PODMAN_NATIVE_EXIT': '23',
+    })
+    assert result.returncode == 23, result
+    assert seen == [
+        ['info', '--format', 'json'],
+        ['image', 'inspect', root_secret, '--format', 'json'],
+        ['build', str(root_input)],
+    ], seen
+    assert selected_base_notice in notice_lines(result.stderr), result.stderr
+    lookup_failure_records = call_records(call_log)
+    assert lookup_failure_records[-1]['argv'] == ['build', str(root_input)]
+    assert lookup_failure_records[-1]['cwd'] == str(root)
+    assert_secret_free(result, root_secret, 'lookup-error-must-not-be-reported')
+    evidence.append({'case': 'base-lookup-error-native-failure',
+                     'exit_code': result.returncode,
+                     'native_executions': len(seen)})
+
+    absent_env = {
+        'PODMAN_INSPECT_EXIT': '125',
+        'PODMAN_INSPECT_STDOUT': '[]\n',
+        'PODMAN_INSPECT_STDERR': (
+            'Warning: test diagnostic\n'
+            f'Error: {root_secret}: image not known\n'
+        ),
+    }
+    result, seen = run(['build', str(root_input)], env={
+        **absent_env,
+        'PODMAN_BASE_PULL_EXIT': '45',
+        'PODMAN_BASE_PULL_STDERR': 'pull-error-must-not-be-reported\n',
+    })
+    assert result.returncode == 0, result
+    assert seen == [
+        ['info', '--format', 'json'],
+        ['image', 'inspect', root_secret, '--format', 'json'],
+        ['pull', '--quiet', root_secret],
+        ['build', str(root_input)],
+    ], seen
+    assert selected_base_notice in notice_lines(result.stderr), result.stderr
+    pull_failure_records = call_records(call_log)
+    assert pull_failure_records[-1]['argv'] == ['build', str(root_input)]
+    assert pull_failure_records[-1]['cwd'] == str(root)
+    assert_secret_free(result, root_secret, 'pull-error-must-not-be-reported')
+    evidence.append({'case': 'base-download-error-native-success',
+                     'exit_code': result.returncode,
+                     'native_executions': len(seen)})
+
+    selected_id = 'a' * 64
+    result, seen = run(['build', str(root_input)], env={
+        **absent_env,
+        'PODMAN_BASE_PULL_EXIT': '0',
+        'PODMAN_BASE_PULL_STDOUT': selected_id + '\n',
+        'PODMAN_BASE_PULL_STDERR': '',
+        'PODMAN_SELECTED_ID': selected_id,
+        'PODMAN_SELECTED_INSPECT_EXIT': '46',
+        'PODMAN_SELECTED_INSPECT_STDERR': (
+            'selected-inspect-error-must-not-be-reported\n'
+        ),
+        'PODMAN_NATIVE_EXIT': '23',
+    })
+    assert result.returncode == 23, result
+    assert seen == [
+        ['info', '--format', 'json'],
+        ['image', 'inspect', root_secret, '--format', 'json'],
+        ['pull', '--quiet', root_secret],
+        ['image', 'inspect', selected_id, '--format', 'json'],
+        ['build', str(root_input)],
+    ], seen
+    assert selected_base_notice in notice_lines(result.stderr), result.stderr
+    selected_failure_records = call_records(call_log)
+    assert selected_failure_records[-1]['argv'] == ['build', str(root_input)]
+    assert selected_failure_records[-1]['cwd'] == str(root)
+    assert_secret_free(result, root_secret,
+                       'selected-inspect-error-must-not-be-reported')
+    evidence.append({'case': 'selected-base-inspection-error-native-failure',
                      'exit_code': result.returncode,
                      'native_executions': len(seen)})
 
