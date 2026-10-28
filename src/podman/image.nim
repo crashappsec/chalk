@@ -32,6 +32,21 @@ type
     repoDigests*: seq[string]
     binding*:     BaseBinding
 
+  ImageLookupKind = enum
+    ilkFound,
+    ilkAbsent,
+    ilkFailed,
+    ilkCancelled
+
+  ImageLookupResult = object
+    case kind: ImageLookupKind
+    of ilkFound:
+      image: InspectedBaseImage
+    of ilkCancelled:
+      cancellation: podman_types.ChildResult
+    of ilkAbsent, ilkFailed:
+      discard
+
 proc isRegistryDigest(value: string): bool =
   return value.startsWith("sha256:") and
          validConfigId(value["sha256:".len .. ^1])
@@ -91,19 +106,65 @@ proc parseInspectedBaseImage*(raw: string): Option[InspectedBaseImage] =
   except:
     return none(InspectedBaseImage)
 
+proc lastNonEmptyLine(raw: string): string =
+  for line in raw.splitLines():
+    if line.strip() != "":
+      result = line
+
+proc redundantTaglessDigest(image: string): string =
+  try:
+    let parsed = parseImage(image, defaultTag = "")
+    if parsed.tag != "" and
+        isRegistryDigest("sha256:" & parsed.digest):
+      return parsed.asRepoDigest()
+  except:
+    discard
+  return ""
+
+proc isAbsentImageResult(image: string,
+                         r: tuple[child: podman_types.ChildResult,
+                                  stdout: string, stderr: string]): bool =
+  if r.child.kind != podman_types.ceExited or r.child.exitCode != 125:
+    return false
+  try:
+    let parsed = parseJson(r.stdout)
+    if parsed.kind != JArray or len(parsed) != 0:
+      return false
+  except:
+    return false
+  let diagnostic = r.stderr.lastNonEmptyLine()
+  if diagnostic == "Error: " & image & ": image not known":
+    return true
+  let tagless = image.redundantTaglessDigest()
+  return tagless != "" and
+         diagnostic == "Error: " & tagless & ": image not known"
+
+proc lookupImage(exe, image: string, expectedId: string): ImageLookupResult =
+  let r = runCaptured(exe, @["image", "inspect", image, "--format", "json"])
+  if isCancellation(r.child):
+    return ImageLookupResult(kind: ilkCancelled, cancellation: r.child)
+  if r.child.kind != podman_types.ceExited or r.child.exitCode != 0:
+    if isAbsentImageResult(image, r):
+      return ImageLookupResult(kind: ilkAbsent)
+    return ImageLookupResult(kind: ilkFailed)
+  let inspected = parseInspectedBaseImage(r.stdout)
+  if inspected.isNone() or
+      (expectedId != "" and inspected.get().imageId != expectedId):
+    return ImageLookupResult(kind: ilkFailed)
+  return ImageLookupResult(kind: ilkFound, image: inspected.get())
+
 proc inspectImage(exe, image: string, expectedId: string,
                   cancellation: var Option[podman_types.ChildResult]):
                  Option[InspectedBaseImage] =
-  let r = runCaptured(exe, @["image", "inspect", image, "--format", "json"])
-  if isCancellation(r.child):
-    cancellation = some(r.child)
-    return none(InspectedBaseImage)
-  if r.child.kind != podman_types.ceExited or r.child.exitCode != 0:
-    return none(InspectedBaseImage)
-  result = parseInspectedBaseImage(r.stdout)
-  if result.isSome() and expectedId != "" and
-      result.get().imageId != expectedId:
-    return none(InspectedBaseImage)
+  let lookup = lookupImage(exe, image, expectedId)
+  case lookup.kind
+  of ilkFound:
+    return some(lookup.image)
+  of ilkCancelled:
+    cancellation = some(lookup.cancellation)
+  of ilkAbsent, ilkFailed:
+    discard
+  return none(InspectedBaseImage)
 
 proc pullImage(exe, image: string, policy: podman_types.BasePullPolicy,
                platform: string,
@@ -112,7 +173,7 @@ proc pullImage(exe, image: string, policy: podman_types.BasePullPolicy,
   var args = @["pull", "--quiet"]
   case policy
   of podman_types.bppMissing:
-    args.add(["--policy", "missing"])
+    discard
   of podman_types.bppNever:
     return none(string)
   of podman_types.bppAlways:
@@ -258,17 +319,18 @@ proc fetchBaseImage*(exe, image: string,
       return none(InspectedBaseImage)
     return inspectPulled(exe, pulled.get(), cancellation)
   of podman_types.bppMissing:
-    if pullPlatform != "":
-      let pulled = pullImage(exe, image, policy, pullPlatform, cancellation)
-      if cancellation.isSome() or pulled.isNone():
-        return none(InspectedBaseImage)
-      return inspectPulled(exe, pulled.get(), cancellation)
-    result = inspectImage(exe, image, "", cancellation)
-    if cancellation.isSome():
+    let lookup = lookupImage(exe, image, "")
+    case lookup.kind
+    of ilkFound:
+      return some(lookup.image)
+    of ilkFailed:
       return none(InspectedBaseImage)
-    if result.isSome():
-      return result
-    let pulled = pullImage(exe, image, policy, "", cancellation)
+    of ilkCancelled:
+      cancellation = some(lookup.cancellation)
+      return none(InspectedBaseImage)
+    of ilkAbsent:
+      discard
+    let pulled = pullImage(exe, image, policy, pullPlatform, cancellation)
     if cancellation.isSome() or pulled.isNone():
       return none(InspectedBaseImage)
     return inspectPulled(exe, pulled.get(), cancellation)
