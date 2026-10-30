@@ -7,6 +7,7 @@
 
 import std/options
 import "../docker"/dockerfile
+import "../types" as chalk_types
 import "./exec"
 import "./chalk_platform"
 import "./notice"
@@ -53,6 +54,7 @@ type
   PodmanRoute* = object
     originalArgs*: seq[string]
     image*:        string  ## operand of a push/pull; empty otherwise
+    destination*:  Option[string]  ## optional destination operand of a push
     case kind*: PodmanRouteKind
     of prPassThrough:
       skip*: Option[PodmanSkip]
@@ -68,6 +70,15 @@ type
     iidFile*:              string
     contextName*:          string
     derivedText*:          string
+
+  PodmanPublication* = object
+    ## Registry reference and manifest digests from one successful push.
+    reference*:   chalk_types.DockerImage
+    imageDigest*: string
+    listDigest*:  string
+
+  PodmanArtifactCache* = ref object of RootRef
+    publications*: seq[PodmanPublication]
 
   ChildEndKind* = enum
     ceExited, ceSignaled, ceSpawnFailed

@@ -323,10 +323,12 @@ proc main() =
   doAssert not guardCanSkipNetwork("garbage")
 
   # push / pull routing
-  proc expectTransfer(args: seq[string], kind: PodmanRouteKind, image: string) =
+  proc expectTransfer(args: seq[string], kind: PodmanRouteKind, image: string,
+                      destination = none(string)) =
     let r = classifyPodmanArgs(args)
     assertEq(r.kind, kind)
     assertEq(r.image, image)
+    assertEq(r.destination, destination)
     assertEq(r.originalArgs, args)
 
   expectTransfer(@["pull", "busybox"], prPull, "busybox")
@@ -335,9 +337,16 @@ proc main() =
                  prPull, "docker.io/library/busybox:latest")
   expectTransfer(@["pull", "--tls-verify=false", "reg/img"], prPull, "reg/img")
   expectTransfer(@["push", "img"], prPush, "img")
-  expectTransfer(@["push", "img", "reg/dest:tag"], prPush, "img")
+  expectTransfer(@["push", "img", "reg/dest:tag"], prPush, "img",
+                 some("reg/dest:tag"))
+  expectTransfer(@["push", "sha256:abc", "docker://reg/dest:tag"],
+                 prPush, "sha256:abc", some("docker://reg/dest:tag"))
   expectTransfer(@["push", "--remove-signatures", "img"], prPush, "img")
   expectTransfer(@["push", "--authfile=/tmp/a", "img"], prPush, "img")
+  expectTransfer(@[
+    "push", "--digestfile=/tmp/digest", "sha256:abc",
+    "docker://reg/dest:tag",
+  ], prPush, "sha256:abc", some("docker://reg/dest:tag"))
   expectTransfer(@["pull", "--", "busybox"], prPull, "busybox")
 
   # A bare flag we do not recognise may or may not consume the next token, so

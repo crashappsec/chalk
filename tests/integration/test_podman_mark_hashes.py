@@ -40,6 +40,9 @@ if argv and argv[0] == 'build':
 if argv and argv[0] == 'pull':
     sys.exit(0)
 
+if argv and argv[0] == 'push':
+    sys.exit(int(os.environ.get('PODMAN_PUSH_EXIT', '0')))
+
 if argv[:2] == ['image', 'inspect']:
     print(json.dumps([{'Id': image_id, 'RepoTags': []}]))
     sys.exit(0)
@@ -92,6 +95,15 @@ def validated_metadata(value):
             result.extend(validated_metadata(child))
         return result
     return []
+
+
+def operation_reports(values, operation):
+    result = []
+    for value in values:
+        items = value if isinstance(value, list) else [value]
+        result.extend(item for item in items
+                      if item.get('_OPERATION') == operation)
+    return result
 
 
 results = []
@@ -203,6 +215,139 @@ with tempfile.TemporaryDirectory(prefix='podman-mark-hashes-') as temp:
         validations = validated_metadata(reports)
         default_report_sentinel_absent = secret not in build.stdout
         metadata_valid = validations == [True]
+
+        valid_args = ['push', image, 'dir:/tmp/valid-mark']
+        valid_push = subprocess.run(
+            common + valid_args,
+            cwd=context,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert valid_push.returncode == 0, valid_push
+        valid_reports = operation_reports(
+            json_values(valid_push.stdout),
+            'push',
+        )
+        assert len(valid_reports) == 1, valid_reports
+        valid_artifacts = valid_reports[0].get('_CHALKS', [])
+        assert len(valid_artifacts) == 1, valid_reports[0]
+        valid_artifact = valid_artifacts[0]
+        assert valid_artifact['CHALK_ID'] == mark['CHALK_ID']
+        assert valid_artifact['METADATA_ID'] == mark['METADATA_ID']
+        assert valid_artifact['_OP_ARTIFACT_TYPE'] == 'Podman Image'
+        assert valid_reports[0]['_OP_ARGV'][-len(valid_args):] == valid_args
+
+        stale_mark = dict(mark)
+        stale_mark.update({
+            '_REPO_DIGESTS': {
+                'stale.invalid': {'old/image': ['old-image-digest']},
+            },
+            '_REPO_LIST_DIGESTS': {
+                'stale.invalid': {'old/image': ['old-index-digest']},
+            },
+            '_REPO_TAGS': {
+                'stale.invalid': {
+                    'old/image': {'old': 'old-index-digest'},
+                },
+            },
+        })
+        mark_path.write_text(json.dumps(stale_mark))
+
+        push_args = ['push', image]
+        failed_env = dict(env, PODMAN_PUSH_EXIT='23')
+        failed_push = subprocess.run(
+            common + push_args,
+            cwd=context,
+            env=failed_env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert failed_push.returncode == 23, failed_push
+        failed_reports = operation_reports(json_values(failed_push.stdout), 'push')
+        assert len(failed_reports) == 1, failed_reports
+        failed_report = failed_reports[0]
+        failed_artifacts = failed_report.get('_CHALKS', [])
+        assert len(failed_artifacts) == 1, failed_report
+        failed_artifact = failed_artifacts[0]
+        assert all(key not in failed_artifact for key in (
+            '_REPO_DIGESTS', '_REPO_LIST_DIGESTS', '_REPO_TAGS',
+        )), failed_artifact
+        assert failed_artifact['CHALK_ID'] == mark['CHALK_ID']
+        assert failed_artifact['PODMAN_IMAGE_ID'] == 'sha256:' + 'a' * 64
+        assert failed_artifact['_CURRENT_HASH'] == 'sha256:' + 'a' * 64
+        assert failed_report['_OP_ARGV'][-len(push_args):] == push_args
+
+        cancelled_exit_codes = []
+        for exit_code in (130, 143):
+            cancelled_env = dict(env, PODMAN_PUSH_EXIT=str(exit_code))
+            cancelled_push = subprocess.run(
+                common + push_args,
+                cwd=context,
+                env=cancelled_env,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            assert cancelled_push.returncode == exit_code, cancelled_push
+            assert operation_reports(
+                json_values(cancelled_push.stdout),
+                'push',
+            ) == [], cancelled_push.stdout
+            cancelled_exit_codes.append(cancelled_push.returncode)
+
+        excluded_args = ['push', image, 'dir:/tmp/not-a-registry']
+        excluded_push = subprocess.run(
+            common + excluded_args,
+            cwd=context,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert excluded_push.returncode == 0, excluded_push
+        excluded_reports = operation_reports(
+            json_values(excluded_push.stdout),
+            'push',
+        )
+        assert len(excluded_reports) == 1, excluded_reports
+        excluded_artifact = excluded_reports[0]['_CHALKS'][0]
+        assert all(key not in excluded_artifact for key in (
+            '_REPO_DIGESTS', '_REPO_LIST_DIGESTS', '_REPO_TAGS',
+        )), excluded_artifact
+        assert excluded_reports[0]['_OP_ARGV'][-len(excluded_args):] == excluded_args
+
+        lookup_args = [
+            'push', image, 'localhost:1/unreachable:latest',
+        ]
+        lookup_push = subprocess.run(
+            common + lookup_args,
+            cwd=context,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert lookup_push.returncode == 0, lookup_push
+        lookup_reports = operation_reports(
+            json_values(lookup_push.stdout),
+            'push',
+        )
+        assert len(lookup_reports) == 1, lookup_reports
+        lookup_artifacts = lookup_reports[0].get('_CHALKS', [])
+        assert len(lookup_artifacts) == 1, lookup_reports[0]
+        lookup_artifact = lookup_artifacts[0]
+        assert all(key not in lookup_artifact for key in (
+            '_REPO_DIGESTS', '_REPO_LIST_DIGESTS', '_REPO_TAGS',
+        )), lookup_artifact
+        assert lookup_artifact['CHALK_ID'] == mark['CHALK_ID']
+        assert lookup_artifact['PODMAN_IMAGE_ID'] == 'sha256:' + 'a' * 64
+        assert lookup_artifact['_CURRENT_HASH'] == 'sha256:' + 'a' * 64
+        assert lookup_artifact['_OP_ARTIFACT_TYPE'] == 'Podman Image'
+        assert lookup_reports[0]['_OP_ARGV'][-len(lookup_args):] == lookup_args
+
         results.append({
             'template': template,
             'metadata_id': mark['METADATA_ID'],
@@ -212,6 +357,12 @@ with tempfile.TemporaryDirectory(prefix='podman-mark-hashes-') as temp:
             ),
             'sentinel_absent': secret not in mark_text,
             'default_report_sentinel_absent': default_report_sentinel_absent,
+            'valid_push_identity_preserved': True,
+            'failed_push_exit_code': failed_push.returncode,
+            'failed_push_stale_repository_fields_absent': True,
+            'cancelled_push_exit_codes': cancelled_exit_codes,
+            'non_registry_push_repository_fields_absent': True,
+            'registry_lookup_failure_repository_fields_absent': True,
             'fixtures': fixture_results,
             'passed': (
                 secret not in mark_text and
