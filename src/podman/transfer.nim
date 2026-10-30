@@ -18,8 +18,8 @@
 ## below invokes, and the upload goes out over plain registry HTTP
 ## (manifest.put -> registry.nim, which never shells out to docker). The only
 ## thing that was missing is chalk.repos: canVerifyBySigStore requires it to be
-## non-empty, so with it unset the plugin skipped signing silently. collectRepos
-## fills it from the image's registry references after the push lands.
+## non-empty, so with it unset the plugin skipped signing silently.
+## collectPublishedRepo fills it from the destination after the push lands.
 ##
 ## STILL NOT AT DOCKER PARITY on push:
 ##
@@ -42,7 +42,6 @@ import ".."/[
   run_management,
   types,
   utils/exec,
-  utils/json,
 ]
 import "../docker"/[
   manifest,
@@ -124,6 +123,11 @@ proc runPodmanPush*(exe: string, route: podman_types.PodmanRoute): int =
 
   let chalk = chalkOpt.get()
   chalk.withErrorContext():
+    # An externally supplied or modified mark may contain repository fields
+    # from another publication. This push must report only what it publishes.
+    for key in ["_REPO_DIGESTS", "_REPO_LIST_DIGESTS", "_REPO_TAGS"]:
+      chalk.collectedData.del(key)
+
     if not chalk.isChalked():
       warn("podman: " & chalk.name &
            " is not chalked. reporting will be limited")
@@ -147,9 +151,7 @@ proc runPodmanPush*(exe: string, route: podman_types.PodmanRoute): int =
     # what makes the image attestable -- so this must come after the push and
     # before run-time collection, which is where signing is triggered.
     if result == 0:
-      collectRepos(exe, route.image, chalk, cancellation)
-      if cancellation.isSome():
-        return cancellationExit(cancellation.get())
+      collectPublishedRepo(route.destination.get(route.image), chalk)
 
     collectRunTimeArtifactInfo(chalk)
     collectRunTimeHostInfo()

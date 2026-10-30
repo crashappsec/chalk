@@ -1132,7 +1132,8 @@ plugin podman {
     pre_chalk_keys: ["DOCKER_FILE", "DOCKER_FILE_CHALKED", "DOCKERFILE_PATH",
                      "DOCKER_CONTEXT", "DOCKER_PLATFORM", "DOCKER_PLATFORMS",
                      "DOCKER_TAGS", "DOCKER_TARGET"]
-    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "PODMAN_IMAGE_ID"]
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "PODMAN_IMAGE_ID",
+                      "_REPO_TAGS", "_REPO_DIGESTS", "_REPO_LIST_DIGESTS"]
     doc: """
 Codec for Podman images produced by a wrapped `podman build`.
 """

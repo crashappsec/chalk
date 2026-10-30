@@ -14,7 +14,7 @@
 ## without starting it, copy /chalk.json out, discard the container.
 
 import std/[
-  sets,
+  strutils,
 ]
 import ".."/[
   chalkjson,
@@ -30,6 +30,66 @@ import "../docker"/[
 ]
 import "./run"
 import "./types" as podman_types
+
+const nonRegistryPushTransports = [
+  "containers-storage:",
+  "dir:",
+  "docker-archive:",
+  "docker-daemon:",
+  "oci:",
+  "oci-archive:",
+]
+
+proc registryPushReference(name: string): string =
+  if name.startsWith("docker://"):
+    return name["docker://".len .. ^1]
+  if "://" in name:
+    return ""
+  for prefix in nonRegistryPushTransports:
+    if name.startsWith(prefix):
+      return ""
+  return name
+
+proc collectPublishedRepo*(name: string, chalk: ChalkObj) =
+  ## Capture the exact registry reference from a successful push. The same
+  ## fetched manifest supplies both report identities and signing identities.
+  let registryName = registryPushReference(name)
+  if registryName == "":
+    return
+  let parsedRef = parseImage(
+    registryName,
+    defaultTag = (if "@" in registryName: "" else: "latest"),
+  ).normalize()
+  if parsedRef.repo == "":
+    return
+  try:
+    let
+      fetched = fetchImageManifest(
+        parsedRef,
+        DockerPlatform(nil),
+        ifManySystemPlatform = true,
+        fetchConfig          = false,
+      )
+      listDigest =
+        if fetched.list != nil: fetched.list.digest
+        else:                   ""
+      publication = podman_types.PodmanPublication(
+        reference:   parsedRef,
+        imageDigest: fetched.digest,
+        listDigest:  listDigest,
+      )
+      imageRepo = fetched.asImageRepo(
+        tags = (if parsedRef.tag != "": @[parsedRef.tag] else: @[]),
+      )
+
+    if chalk.cache == nil:
+      chalk.cache = RootRef(podman_types.PodmanArtifactCache())
+    podman_types.PodmanArtifactCache(chalk.cache).publications.add(publication)
+    chalk.repos[parsedRef.repo] =
+      imageRepo + chalk.repos.getOrDefault(parsedRef.repo)
+  except:
+    trace("podman: could not fetch manifest for " & name & ": " &
+          getCurrentExceptionMsg())
 
 proc imageId*(exe, image: string,
               cancellation: var Option[podman_types.ChildResult]): string =
@@ -91,12 +151,10 @@ proc extractImageMark*(exe, image: string,
 
 proc collectRepos*(exe, image: string, chalk: ChalkObj,
                    cancellation: var Option[podman_types.ChildResult]) =
-  ## Populate chalk.repos from the image's registry references.
+  ## Populate chalk.repos for a pulled image from its local registry tags.
   ##
-  ## This is what makes attestation reachable. canVerifyBySigStore requires
-  ## len(chalk.repos) > 0, and signBySigStore iterates chalk.repos.manifests to
-  ## decide what to sign -- with repos empty the attestation plugin skips
-  ## signing silently and a pushed image carries no signature.
+  ## Signature verification requires registry manifests in chalk.repos.
+  ## Podman's RepoTags identify which registry references to fetch.
   ##
   ## Digests come from the REGISTRY, not from podman's local RepoDigests, for
   ## the same reason docker/collect.nim fetches manifests: the two disagree.
@@ -106,8 +164,6 @@ proc collectRepos*(exe, image: string, chalk: ChalkObj,
   ## such manifest exists there. Only the registry can say what was actually
   ## stored.
   ##
-  ## podman's RepoTags is still the right way to learn WHICH references exist;
-  ## it is only the digests that cannot be trusted.
   let r = runCaptured(exe, @["image", "inspect", image, "--format", "json"])
   if isCancellation(r.child):
     cancellation = some(r.child)
@@ -171,6 +227,7 @@ proc scanPodmanImage*(exe, image: string,
     resourceType = {ResourceImage},
     codec        = getPluginByName("podman"),
     imageId      = id,
+    cache        = RootRef(podman_types.PodmanArtifactCache()),
   )
   chalk.cachedEndingHash = id
 

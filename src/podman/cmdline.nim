@@ -388,6 +388,12 @@ proc classifyTransfer(args: seq[string], kind: PodmanRouteKind,
     kind:         kind,
     originalArgs: args,
     image:        image,
+    destination: (
+      if kind == prPush and len(positionals) == 2:
+        some(positionals[1])
+      else:
+        none(string)
+    ),
   )
 
 proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
