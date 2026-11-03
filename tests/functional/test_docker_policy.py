@@ -954,6 +954,23 @@ def test_report_has_commit_id(chalk: Chalk, random_hex: str, tmp_data_dir: Path)
     )
 
 
+def test_report_has_build_ref(chalk: Chalk, random_hex: str):
+    # a pull_request build's _COMMIT_ID is the synthetic merge commit, which no PR
+    # lists; BUILD_REF names the PR instead
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env={"CI": "true", "GITHUB_SHA": "abc", "GITHUB_REF": "refs/pull/5/merge"},
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(BUILD_REF="refs/pull/5/merge")
+
+
 def test_report_no_commit_id_outside_git(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path
 ):

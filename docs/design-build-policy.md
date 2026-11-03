@@ -1516,7 +1516,8 @@ pull requests by (matched against a pull request's head or merge commit), so a
 policy report from a `push` build on the default branch can be tied to the
 merged pull request. Builds on `pull_request` events usually check out a
 synthetic merge commit (`refs/pull/N/merge`) that matches neither, the same
-limitation build reports have. Both are absent when there is no local
+limitation build reports have; for those, `BUILD_REF` (`refs/pull/N/merge`)
+names the pull request. `_COMMIT_ID` and `_AUTHOR` are absent when there is no local
 worktree, e.g. for a remote git context
 (`docker build https://github.com/org/repo.git#ref`).
 Artifact-level keys are not included because a blocked build stops before any
