@@ -22,6 +22,7 @@ import "."/[
   http,
   json,
   strings,
+  uri,
   tables,
 ]
 
@@ -105,7 +106,7 @@ proc elicitHeaders*(
   for challenge in challenges:
     try:
       return challenge.elicitHeaders(headers, fetch)
-    except HttpDeadlineError, HttpBodyTooLargeError:
+    except HttpDeadlineError, HttpBodyTooLargeError, HttpTlsError:
       raise
     except:
       continue
@@ -266,14 +267,15 @@ proc authHeadersBoundedRequest*(url: Uri,
                                 headers: HttpHeaders = newHttpHeaders(),
                                 pinnedCert: string = "",
                                 verifyMode = CVerifyPeer,
+                                sameOriginRedirects = false,
                                 acceptStatusCodes: openArray[Slice[int]] = @[],
-                                ): (HttpHeaders, Response) =
+                                ): (HttpHeaders, Response, Uri) =
   ## `authHeadersSafeRequest` over `boundedRequest`: the challenge, its token
   ## fetch, and the answered request all draw on the same `budget`.
   var
     authHeaders = headers
     newHeaders  = newHttpHeaders()
-    response    = boundedRequest(
+    exchange    = boundedRequest(
       url,
       httpMethod,
       budget,
@@ -281,9 +283,12 @@ proc authHeadersBoundedRequest*(url: Uri,
       headers    = authHeaders,
       pinnedCert = pinnedCert,
       verifyMode = verifyMode,
+      sameOriginRedirects = sameOriginRedirects,
     )
 
+  var response = exchange.response
   if (
+    sameOrigin(url, exchange.effectiveUri) and
     response.code() == Http401 and
     response.headers.hasKey("www-authenticate")
   ):
@@ -292,22 +297,35 @@ proc authHeadersBoundedRequest*(url: Uri,
     newHeaders     = challenges.elicitHeaders(
       headers = authHeaders,
       fetch   = proc(tokenUrl: string, tokenHeaders: HttpHeaders): Response =
-        boundedRequest(parseUri(tokenUrl), HttpGet, budget, headers = tokenHeaders),
+        let target = parseUri(tokenUrl)
+        if url.scheme == "https" and target.scheme != "https" and
+            tokenHeaders.hasKey("Authorization"):
+          raise newException(HttpPeerVerificationError,
+                             "registry token endpoint would expose credentials over plaintext")
+        try:
+          boundedRequest(target, HttpGet, budget, headers = tokenHeaders).response
+        except HttpTlsProtocolError:
+          raise newException(HttpTlsError, "registry token endpoint did not complete TLS"),
     )
     authHeaders    = authHeaders.update(newHeaders)
 
-    response = boundedRequest(
-      url,
-      httpMethod,
-      budget,
-      body       = body,
-      headers    = authHeaders,
-      pinnedCert = pinnedCert,
-      verifyMode = verifyMode,
-    )
+    try:
+      exchange = boundedRequest(
+        url,
+        httpMethod,
+        budget,
+        body       = body,
+        headers    = authHeaders,
+        pinnedCert = pinnedCert,
+        verifyMode = verifyMode,
+        sameOriginRedirects = sameOriginRedirects,
+      )
+    except HttpTlsProtocolError:
+      raise newException(HttpTlsError, "registry TLS failed after its authentication challenge")
 
+    response = exchange.response
   discard response.check(url, acceptStatusCodes = acceptStatusCodes)
-  return (newHeaders, response)
+  return (newHeaders, response, exchange.effectiveUri)
 
 proc authSafeRequest*(url: Uri | string,
                       httpMethod: HttpMethod | string = HttpGet,

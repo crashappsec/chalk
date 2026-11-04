@@ -20,16 +20,23 @@ import std/[
   openssl,
   streams,
   strutils,
-  uri,
 ]
 import pkg/nimutils/net
-import "."/[resolve_deadline, times]
+import "."/[resolve_deadline, times, uri]
 
 type
   HttpBudget* = object
     deadline*:     MonoTime
     maxBodyBytes*: int
 
+  BoundedResponse* = object
+    response*:     Response
+    effectiveUri*: Uri
+
+  HttpOriginError* = object of CatchableError
+  HttpTlsError* = object of CatchableError
+  HttpTlsProtocolError* = object of HttpTlsError
+  HttpPeerVerificationError* = object of HttpTlsError
   HttpDeadlineError* = object of CatchableError
   HttpBodyTooLargeError* = object of CatchableError
 
@@ -84,14 +91,10 @@ proc redirectTarget(current: Uri, headers: HttpHeaders): Uri =
     raise newException(ValueError, "redirect without a Location header")
   return combine(current, parseUri(location))
 
-proc origin(uri: Uri): tuple[scheme, hostname, port: string] =
-  let scheme = uri.scheme.toLowerAscii()
-  let port =
-    if uri.port != "": uri.port
-    elif scheme == "https": "443"
-    else: "80"
-  return (scheme, uri.hostname.toLowerAscii(), port)
-
+proc handshakeFinished(ssl: SslPtr): cint
+  {.cdecl, importc: "SSL_is_init_finished", dynlib: DLLSSLName.}
+proc peerVerifyResult(ssl: SslPtr): clong
+  {.cdecl, importc: "SSL_get_verify_result", dynlib: DLLSSLName.}
 proc setPeerHost(ssl: SslPtr, hostname: cstring): cint
   {.cdecl, importc: "SSL_set1_host", dynlib: DLLSSLName.}
 proc peerParameters(ssl: SslPtr): pointer
@@ -104,25 +107,24 @@ proc connectWithin(client: AsyncHttpClient, context: SslContext,
   if target.scheme notin ["http", "https"]:
     raise newException(ValueError, "unsupported registry URL scheme")
   client.close()
-  let port = origin(target).port
+  let port = uriOrigin(target).port
   var addresses: seq[string]
   try:
     addresses = resolveWithin(target.hostname, port, budget.remaining())
-  except ResolutionTimeoutError:
+  except NetworkTimeoutError:
     raise newException(HttpDeadlineError, "request timed out")
   var lastFailure: ref CatchableError
-  for address in addresses:
-    discard budget.remaining()
-    let connection = asyncnet.dial(address, Port(parseInt(port)))
+  for index, address in addresses:
+    let remaining = budget.remaining()
+    let attemptMs = max(1, remaining div (addresses.len - index))
     var socket: AsyncSocket
     try:
-      socket = connection.within(budget)
-    except HttpDeadlineError:
-      connection.addCallback(proc(future: Future[AsyncSocket]) =
-        if not future.failed:
-          future.read().close()
-      )
-      raise
+      socket = connectNumericWithin(address, Port(parseInt(port)), attemptMs)
+    except NetworkTimeoutError as error:
+      if timedOut(budget.deadline):
+        raise newException(HttpDeadlineError, "request timed out")
+      lastFailure = error
+      continue
     except CatchableError as error:
       lastFailure = error
       continue
@@ -136,7 +138,7 @@ proc connectWithin(client: AsyncHttpClient, context: SslContext,
             else:
               setPeerHost(socket.sslHandle(), target.hostname.cstring)
           if configured != 1:
-            raise newException(IOError, "could not configure registry certificate identity checks")
+            raise newException(HttpPeerVerificationError, "could not configure registry certificate identity checks")
       # The stdlib otherwise resolves the hostname synchronously in request().
       privateAccess(HttpClientBase[AsyncSocket])
       client.socket = socket
@@ -146,9 +148,16 @@ proc connectWithin(client: AsyncHttpClient, context: SslContext,
     except:
       socket.close()
       raise
+  if lastFailure of NetworkTimeoutError:
+    raise newException(HttpDeadlineError, "request timed out")
   if lastFailure != nil:
     raise lastFailure
   raise newException(IOError, "registry hostname has no usable addresses")
+
+proc isTlsProtocolMismatch*(message: string): bool =
+  let text = message.toLowerAscii()
+  return "wrong version number" in text or "unknown protocol" in text or
+         "packet length too long" in text or "record layer failure" in text
 
 proc boundedRequest*(url: Uri,
                      httpMethod: HttpMethod,
@@ -158,13 +167,13 @@ proc boundedRequest*(url: Uri,
                      pinnedCert = "",
                      verifyMode = CVerifyPeer,
                      maxRedirects = 3,
-                     ): Response =
+                     sameOriginRedirects = false,
+                     ): BoundedResponse =
   ## One request with up to `maxRedirects` redirects, every
   ## response body bounded by `budget`. Raises `HttpDeadlineError` or
   ## `HttpBodyTooLargeError`; status codes are returned, not checked.
   discard budget.remaining()
   var
-    pending: Future[AsyncResponse]
     target     = url
     reqMethod  = httpMethod
     reqBody    = body
@@ -179,37 +188,45 @@ proc boundedRequest*(url: Uri,
     while true:
       discard budget.remaining()
       connectWithin(client, context, target, budget, verifyMode)
-      pending = client.request(target, reqMethod, reqBody, reqHeaders)
+      let pending = client.request(target, reqMethod, reqBody, reqHeaders)
       let
         response = pending.within(budget)
         data     = readBody(response, reqMethod, budget)
         code     = response.code()
       if code notin redirectCodes or hops == maxRedirects:
-        return Response(
-          version:    response.version,
-          status:     response.status,
-          headers:    response.headers,
-          bodyStream: newStringStream(data),
+        return BoundedResponse(
+          response: Response(
+            version:    response.version,
+            status:     response.status,
+            headers:    response.headers,
+            bodyStream: newStringStream(data),
+          ),
+          effectiveUri: target,
         )
       let next = redirectTarget(target, response.headers)
+      if target.scheme == "https" and next.scheme != "https":
+        raise newException(HttpTlsError, "registry redirect would downgrade TLS")
+      if sameOriginRedirects and not sameOrigin(url, next):
+        raise newException(HttpOriginError, "referrer pagination left the registry origin")
       if code in {Http301, Http302, Http303}:
         if reqMethod notin {HttpGet, HttpHead}:
           reqMethod = HttpGet
         reqBody = ""
         for name in ["Content-Length", "Content-Type", "Transfer-Encoding"]:
           reqHeaders.del(name)
-      if origin(next) != origin(target):
+      if not sameOrigin(next, target):
         reqHeaders.del("Host")
         reqHeaders.del("Authorization")
       target = next
       inc hops
+  except SslError:
+    let socket = client.getSocket()
+    if socket != nil and socket.sslHandle() != nil:
+      if verifyMode != CVerifyNone and peerVerifyResult(socket.sslHandle()) != 0:
+        raise newException(HttpPeerVerificationError, "registry TLS peer identity verification failed")
+      if handshakeFinished(socket.sslHandle()) == 0:
+        raise newException(HttpTlsProtocolError, "registry endpoint did not complete TLS")
+    raise newException(HttpTlsError, "registry TLS exchange failed")
   finally:
     client.close()
-    if pending != nil and not pending.finished:
-      # A timed-out dial can finish later and still needs its TLS context.
-      pending.addCallback(proc(future: Future[AsyncResponse]) =
-        client.close()
-        context.destroyContext()
-      )
-    else:
-      context.destroyContext()
+    context.destroyContext()

@@ -1,5 +1,7 @@
 import std/[
   sequtils,
+  options,
+  strutils,
   uri,
 ]
 
@@ -44,3 +46,23 @@ proc endpoint*(self: Uri): string =
   result = self.address
   if self.port != "":
     result &= ":" & self.port
+
+proc uriOrigin*(url: Uri): tuple[scheme, hostname, port: string] =
+  let scheme = url.scheme.toLowerAscii()
+  let port =
+    if url.port != "": url.port
+    elif scheme == "https": "443"
+    elif scheme == "http": "80"
+    else: ""
+  return (scheme, url.hostname.toLowerAscii(), port)
+
+proc sameOrigin*(a, b: Uri): bool = uriOrigin(a) == uriOrigin(b)
+
+proc resolveSameOrigin*(base: Uri, reference: string): Option[Uri] =
+  let text = reference.strip()
+  if text == "" or text.startsWith("//"):
+    return none(Uri)
+  let target = combine(base, parseUri(text))
+  if target.username != "" or target.password != "" or not sameOrigin(base, target):
+    return none(Uri)
+  return some(target)

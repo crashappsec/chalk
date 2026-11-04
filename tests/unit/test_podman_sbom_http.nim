@@ -14,6 +14,7 @@ import ../../src/docker/[ids, registry]
 import ../../src/podman/sbom
 import ../../src/podman/types
 import ../../src/utils/json
+import ../../src/utils/bounded_http
 
 proc linkInsertCommand(path: seq[string])
     {.exportc: "runCmdInsert", cdecl.} =
@@ -471,6 +472,53 @@ proc main() =
         doAssert "forbidden" notin diag.message
       finally:
         stopRegistry(p)
+
+    block redirectedIndexUsesItsEffectivePath:
+      var routes = attachmentRoutes()
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(302, "", %*{"Location": "/pages/first"})
+      routes["GET /pages/first"] = route(200, indexDoc(%*[]), %*{"Link": "<next>; rel=\"next\""})
+      routes["GET /pages/next"] = route(200, indexDoc(%*[descriptor(attachmentDigest, len(attachmentBody))]))
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, routes, port)
+      try:
+        assertEq(expectDocument(collectFrom(port, imageDigest, configDigest, authFile, "")).sourceBytes, blob)
+        doAssert "GET /pages/next" in readFile(hits)
+      finally:
+        stopRegistry(p)
+
+    block cachedRedirectedIndexRetainsItsEffectivePath:
+      var routes = attachmentRoutes()
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(302, "", %*{"Location": "/pages/first"})
+      routes["GET /pages/first"] = route(200, indexDoc(%*[]), %*{"Link": "<next>; rel=\"next\""})
+      routes["GET /pages/next"] = route(200, indexDoc(%*[descriptor(attachmentDigest, len(attachmentBody))]))
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, routes, port)
+      try:
+        let access = newAuthFileRegistryAccess(authFile)
+        access.strictReferrerLinks = true
+        access.budget = some(HttpBudget(deadline: getMonoTime() + initDuration(seconds = 5),
+                                       maxBodyBytes: maxPodmanSbomBytes))
+        withRegistryAccess(access):
+          let image = parseImage("127.0.0.1:" & $port & "/demo@" & imageDigest)
+          let original = image.referrersGet()
+          discard manifestGet(image.withDigest(attachmentDigest), "application/vnd.oci.image.manifest.v1+json")
+          let before = readFile(hits)
+          let cached = image.referrersGet()
+          assertEq(cached.json, original.json)
+          assertEq(readFile(hits), before)
+      finally:
+        stopRegistry(p)
+
+    block unexpectedStatusDoesNotProveAbsence:
+      for status in [408, 429]:
+        var routes = newJObject()
+        routes["GET /v2/demo/manifests/" & imageDigest] = route(status, "retry later")
+        let port = freePort()
+        let (p, _) = startRegistry(dir, routes, port)
+        try:
+          discard expectDiagnostic(collectFrom(port, imageDigest, configDigest, authFile, ""), pdkOther)
+        finally:
+          stopRegistry(p)
 
     block serverErrorIsNotAttachmentAbsence:
       var routes = newJObject()

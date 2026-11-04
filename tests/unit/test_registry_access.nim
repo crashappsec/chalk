@@ -69,8 +69,8 @@ proc main() =
     doAssert "buildx" notin sources
     doAssert "authfile" in sources
 
-    let key = (image, HttpGet, "/manifests/x\t", RegistryUseCase.ReadOnly)
-    accessA.jsonCache[key] = ("a", Response())
+    let key = (image, HttpGet, "/manifests/x\t", RegistryUseCase.ReadOnly, false)
+    accessA.jsonCache[key] = ("a", Response(), parseUri("https://registry.example"))
     doAssert key notin accessB.jsonCache
     doAssert key notin dockerRegistryAccess.jsonCache
     doAssert dockerRegistryAccess.discoverDocker

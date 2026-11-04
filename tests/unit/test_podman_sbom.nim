@@ -37,7 +37,7 @@ proc spdxDoc(packages = "[]", version = "SPDX-2.3"): string =
   """"creationInfo":{"created":"2024-01-01T00:00:00Z","creators":["Tool: test"]},""" &
   """"packages":""" & packages & "}"
 
-proc writeFakePodman(dir, imageFile, logFile: string, createSleepSec = "", rmSleepSec = "", printContainerId = true): string =
+proc writeFakePodman(dir, imageFile, logFile: string, createSleepSec = "", rmSleepSec = "", printContainerId = true, rmFault = "", cpFault = ""): string =
   result = dir / "fake-podman"
   var body = "#!/bin/sh\n"
   body &= "log=\"$CHALK_FAKE_PODMAN_LOG\"\n"
@@ -52,6 +52,8 @@ proc writeFakePodman(dir, imageFile, logFile: string, createSleepSec = "", rmSle
     body &= "    sleep " & createSleepSec & "\n"
   body &= "    ;;\n"
   body &= "  cp)\n"
+  if cpFault != "":
+    body &= "    " & cpFault & "\n"
   body &= "    dest=\"$2\"\n"
   body &= "    if [ ! -f \"$CHALK_FAKE_IMAGE_SBOM\" ]; then exit 1; fi\n"
   body &= "    cp \"$CHALK_FAKE_IMAGE_SBOM\" \"$dest\"\n"
@@ -60,6 +62,8 @@ proc writeFakePodman(dir, imageFile, logFile: string, createSleepSec = "", rmSle
   if rmSleepSec != "":
     body &= "    sleep " & rmSleepSec & "\n"
   body &= "    echo rm >> \"$log\"\n"
+  if rmFault != "":
+    body &= "    " & rmFault & "\n"
   body &= "    ;;\n"
   body &= "  *)\n"
   body &= "    exit 127\n"
@@ -355,6 +359,30 @@ proc main() =
       cancellation = collectCancel,
     ), pdkTimeout)
     doAssert "rm\n" in readFile(logFile), "scratch cleanup requires no stdout identity"
+
+    writeFile(imageFile, spdxDoc())
+    let dualTimeout = writeFakePodman(tmpDir, imageFile, logFile, createSleepSec = "2")
+    writeFile(path, spdxDoc())
+    collectCancel = none(ChildResult)
+    discard expectDiagnostic(collectNativePodmanSbom(
+      dualTimeout, "img", PodmanSbomNativeOutputs(hostOutput: path, imageOutput: "/sbom.spdx.json"),
+      @[beforeMissing], tmpDir, getMonoTime() + initDuration(milliseconds = 800), collectCancel,
+    ), pdkTimeout)
+    for fault in ["kill -PIPE $$", "kill -TERM $$", "exit 130"]:
+      let cleanupFault = writeFakePodman(tmpDir, imageFile, logFile, rmFault = fault)
+      collectCancel = none(ChildResult)
+      assertEq(expectDocument(collectNativePodmanSbom(
+        cleanupFault, "img", PodmanSbomNativeOutputs(imageOutput: "/sbom.spdx.json"),
+        @[], tmpDir, getMonoTime() + initDuration(seconds = 5), collectCancel,
+      )).sourceBytes, spdxDoc())
+      doAssert collectCancel.isNone(), "a cleanup child failure is not operator cancellation"
+    let copyFault = writeFakePodman(tmpDir, imageFile, logFile, cpFault = "exit 130")
+    collectCancel = none(ChildResult)
+    discard expectDiagnostic(collectNativePodmanSbom(
+      copyFault, "img", PodmanSbomNativeOutputs(imageOutput: "/sbom.spdx.json"),
+      @[], tmpDir, getMonoTime() + initDuration(seconds = 5), collectCancel,
+    ), pdkMissing)
+    doAssert collectCancel.isNone(), "a copy child failure is not operator cancellation"
 
     let child = runCaptured("/bin/sleep", @["2"], timeoutMs = 200)
     doAssert child.child.timedOut

@@ -324,6 +324,9 @@ proc parseHandoff*(raw: string, handoffDir: string):
     dir:     handoffDir,
   ), none(podman_types.PodmanSbomDiagnostic))
 
+proc collectionInterrupted(child: podman_types.ChildResult): bool =
+  return not child.timedOut and child.forwardedSignal in {1, 2, 3, 15}
+
 proc copyImagePath(exe, image, srcPath, destPath: string,
                    deadline: MonoTime,
                    cancellation: var Option[podman_types.ChildResult]):
@@ -333,11 +336,11 @@ proc copyImagePath(exe, image, srcPath, destPath: string,
   let reserve = min(1000, max(1, remainingMs(deadline) div 2))
   let copyDeadline = deadline - initDuration(milliseconds = reserve)
   let containerId = "chalk-sbom-" & destPath.sha256Hex()[0 ..< 32]
-  let created = runCaptured(exe, @["create", "--name", containerId, image, podmanCreatePlaceholderCommand],
+  let created = runCaptured(exe, @["create", "--name", containerId, "--label", "io.crashoverride.chalk.sbom-scratch=true", image, podmanCreatePlaceholderCommand],
                             timeoutMs = max(1, remainingMs(copyDeadline)))
   if created.child.timedOut:
     result = diagnostic(pdkTimeout, "SBOM collection timed out")
-  elif isCancellation(created.child):
+  elif collectionInterrupted(created.child):
     cancellation = some(created.child)
     result = diagnostic(pdkCancelled, "SBOM collection was cancelled")
   elif created.child.kind != podman_types.ceExited or created.child.exitCode != 0:
@@ -350,22 +353,21 @@ proc copyImagePath(exe, image, srcPath, destPath: string,
                                timeoutMs = max(1, remainingMs(copyDeadline)))
       if copied.child.timedOut:
         result = diagnostic(pdkTimeout, "SBOM collection timed out")
-      elif isCancellation(copied.child):
+      elif collectionInterrupted(copied.child):
         cancellation = some(copied.child)
         result = diagnostic(pdkCancelled, "SBOM collection was cancelled")
       elif copied.child.kind != podman_types.ceExited or copied.child.exitCode != 0:
         result = diagnostic(pdkMissing, "image SBOM path was not found")
       else:
         result = readLimitedFile(destPath, copyDeadline)
-  if containerId != "":
-    let removed = runCaptured(exe, @["rm", "--force", containerId],
-                              timeoutMs = cleanupBudgetMs(deadline))
-    if isCancellation(removed.child) and cancellation.isNone():
-      cancellation = some(removed.child)
-      if result.kind != psoDiagnostic or result.diagnostic.kind != pdkCancelled:
-        result = diagnostic(pdkCancelled, "SBOM collection was cancelled")
-    elif removed.child.kind != podman_types.ceExited or removed.child.exitCode != 0:
-      trace("podman: could not remove SBOM scratch container")
+  let removed = runCaptured(exe, @["rm", "--force", containerId],
+                            timeoutMs = cleanupBudgetMs(deadline))
+  if collectionInterrupted(removed.child) and cancellation.isNone():
+    cancellation = some(removed.child)
+    if result.kind != psoDiagnostic or result.diagnostic.kind != pdkCancelled:
+      result = diagnostic(pdkCancelled, "SBOM collection was cancelled")
+  elif removed.child.kind != podman_types.ceExited or removed.child.exitCode != 0:
+    trace("podman: could not remove SBOM scratch container " & containerId)
 
 proc collectNativePodmanSbom*(
   exe: string,
@@ -423,10 +425,7 @@ proc collectNativePodmanSbom*(
       if cancellation.isSome():
         return copied
       if copied.kind == psoDiagnostic:
-        if hostBytes.isNone():
-          return copied
-        return diagnostic(pdkInconsistent,
-                          "native SBOM image output could not be read")
+        return copied
       imageBytes = some(copied.document.sourceBytes)
     finally:
       try:
@@ -571,6 +570,8 @@ proc fetchReferrerIndex(image: DockerImage): JsonNode =
 
 proc registryCollectionFailure(failure: ref RegistryResponseError):
                               podman_types.PodmanSbomOutcome =
+  if failure of RegistryTlsError:
+    return diagnostic(pdkAuthFailure, failure.msg)
   if failure of RegistryTimeoutError:
     return diagnostic(pdkTimeout, "SBOM collection timed out")
   if failure of RegistryOversizedError:
@@ -579,9 +580,9 @@ proc registryCollectionFailure(failure: ref RegistryResponseError):
     return diagnostic(pdkAttachmentMismatch, failure.msg)
   if failure.statusCode in [401, 403]:
     return diagnostic(pdkAuthFailure, "registry authentication failed")
-  if failure.statusCode >= 500:
-    return diagnostic(pdkOther, "registry server request failed")
-  return diagnostic(pdkAttachmentAbsent, "registry request failed")
+  if failure.statusCode == 404:
+    return diagnostic(pdkAttachmentAbsent, "registry request failed")
+  return diagnostic(pdkOther, "registry request failed")
 
 proc collectAttachmentPodmanSbom*(
   localImageId: string,
@@ -674,7 +675,7 @@ proc collectAttachmentPodmanSbom*(
             return fail
           continue
         except:
-          continue
+          return diagnostic(pdkOther, "could not read the SBOM attachment manifest")
         if parseSha256Digest(fetched.digest) != itemDigest:
           continue
         let layers = spdxLayers(fetched.json)
@@ -712,7 +713,7 @@ proc collectAttachmentPodmanSbom*(
       except RegistryResponseError as e:
         return registryCollectionFailure(e)
       except:
-        return diagnostic(pdkAttachmentMismatch, "could not download the SBOM blob")
+        return diagnostic(pdkOther, "could not download the SBOM blob")
       if attachment.layerSize > 0 and len(blob) != attachment.layerSize:
         return diagnostic(pdkAttachmentMismatch,
                           "SBOM blob size does not match the layer")

@@ -1,5 +1,7 @@
 #include <assert.h>
 #include <netdb.h>
+#include <pthread.h>
+#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,6 +10,12 @@ char *chalk_resolve_deadline(const char *, const char *, int, int *);
 void chalk_resolve_free(char *);
 int mock_getaddrinfo(const char *host, const char *service,
                       const struct addrinfo *hints, struct addrinfo **result) {
+    sigset_t mask;
+    assert(pthread_sigmask(SIG_SETMASK, NULL, &mask) == 0);
+    assert(sigismember(&mask, SIGHUP) == 1);
+    assert(sigismember(&mask, SIGINT) == 1);
+    assert(sigismember(&mask, SIGQUIT) == 1);
+    assert(sigismember(&mask, SIGTERM) == 1);
     if (strcmp(host, "slow-resolver.test") == 0) {
         usleep(2000000);
         return EAI_AGAIN;
