@@ -45,9 +45,11 @@ import ".."/[
 ]
 import "../docker"/[
   manifest,
+  registry,
 ]
 import "./run"
 import "./scan"
+import "./sbom"
 import "./notice"
 import "./types" as podman_types
 
@@ -147,24 +149,30 @@ proc runPodmanPush*(exe: string, route: podman_types.PodmanRoute): int =
     result = childStatus(pushed)
     setExitCode(result)
 
-    # Registry references only exist once the push has landed, and they are
-    # what makes the image attestable -- so this must come after the push and
-    # before run-time collection, which is where signing is triggered.
-    if result == 0:
-      collectPublishedRepo(route.destination.get(route.image), chalk)
+    withRegistryAccess(newAuthFileRegistryAccess(route.authfile)):
+      # Registry references only exist once the push has landed, and they are
+      # what makes the image attestable -- so this must come after the push and
+      # before run-time collection, which is where signing is triggered.
+      if result == 0:
+        collectPublishedRepo(route.destination.get(route.image), chalk)
+        maybeCollectHandoffSbom(
+          attrGetOpt[string]("sbom_handoff").get(""),
+          chalk,
+          chalk.imageId,
+        )
 
-    collectRunTimeArtifactInfo(chalk)
-    collectRunTimeHostInfo()
+      collectRunTimeArtifactInfo(chalk)
+      collectRunTimeHostInfo()
 
-    # Signing above only queues the attestation manifests; this uploads them.
-    if result == 0:
+      # Signing above only queues the attestation manifests; this uploads them.
+      if result == 0:
+        try:
+          flushAttestationTags()
+        except:
+          error("podman push: could not push attestations: " &
+                getCurrentExceptionMsg())
+
       try:
-        flushAttestationTags()
+        doReporting("report")
       except:
-        error("podman push: could not push attestations: " &
-              getCurrentExceptionMsg())
-
-    try:
-      doReporting("report")
-    except:
-      error("podman push: " & getCurrentExceptionMsg())
+        error("podman push: " & getCurrentExceptionMsg())

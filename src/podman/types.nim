@@ -5,7 +5,11 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-import std/options
+import std/[
+  json,
+  options,
+  os,
+]
 import "../docker"/dockerfile
 import "../types" as chalk_types
 import "./exec"
@@ -25,6 +29,79 @@ type
   PodmanConfidentialArg* = object
     flag*:  string
     value*: string
+
+  PodmanSbomNativeOutputs* = object
+    ## Last-value Buildah SBOM flags, plus every scanner command.
+    ## PURL paths are forwarded and are not SPDX documents.
+    preset*:           string
+    scannerImage*:     string
+    scannerCommands*:  seq[string]
+    mergeStrategy*:    string
+    hostOutput*:       string
+    imageOutput*:      string
+    purlHostOutput*:   string
+    purlImageOutput*:  string
+
+  PodmanSbomSourceKind* = enum
+    pskNative,
+    pskHandoff,
+    pskAttachment
+
+  PodmanSbomDiagnosticKind* = enum
+    pdkMissing,
+    pdkStale,
+    pdkMalformed,
+    pdkInconsistent,
+    pdkOversized,
+    pdkTimeout,
+    pdkCancelled,
+    pdkStreamDestination,
+    pdkUnsupportedFormat,
+    pdkChanging,
+    pdkHandoffChecksum,
+    pdkHandoffImage,
+    pdkHandoffVersion,
+    pdkAttachmentAbsent,
+    pdkAttachmentAmbiguous,
+    pdkAttachmentMismatch,
+    pdkAuthFailure,
+    pdkOther
+
+  PodmanSbomDiagnostic* = object
+    kind*:    PodmanSbomDiagnosticKind
+    message*: string
+
+  PodmanSbomDocument* = object
+    parsed*:       JsonNode
+    sourceBytes*:  string
+    sourceSha256*: string
+    sourceKind*:   PodmanSbomSourceKind
+
+  PodmanSbomOutcomeKind* = enum
+    psoDocument,
+    psoDiagnostic
+
+  PodmanSbomOutcome* = object
+    case kind*: PodmanSbomOutcomeKind
+    of psoDocument:
+      document*: PodmanSbomDocument
+    of psoDiagnostic:
+      diagnostic*: PodmanSbomDiagnostic
+
+  HostFileSnapshot* = object
+    path*:     string
+    existed*:  bool
+    regular*:  bool
+    size*:     int64
+    mtimeNs*:  int64
+    fileId*:   tuple[device: DeviceId, file: FileId]
+
+  PodmanSbomHandoff* = object
+    version*: int
+    path*:    string
+    sha256*:  string
+    imageId*: string
+    dir*:     string
 
   PodmanBuildSpec* = object
     originalArgs*:          seq[string]
@@ -50,11 +127,14 @@ type
     guardNoNetwork*:        bool
     startup*:               FinalExecConfig
     startupPlan*:           Option[StartupPlan]
+    sbom*:                  PodmanSbomNativeOutputs
+    authfile*:              string
 
   PodmanRoute* = object
     originalArgs*: seq[string]
     image*:        string  ## operand of a push/pull; empty otherwise
     destination*:  Option[string]  ## optional destination operand of a push
+    authfile*:     string  ## last --authfile; empty when the flag is absent
     case kind*: PodmanRouteKind
     of prPassThrough:
       skip*: Option[PodmanSkip]
@@ -78,7 +158,9 @@ type
     listDigest*:  string
 
   PodmanArtifactCache* = ref object of RootRef
-    publications*: seq[PodmanPublication]
+    publications*:    seq[PodmanPublication]
+    sbom*:            Option[PodmanSbomDocument]
+    sbomDiagnostic*:  Option[PodmanSbomDiagnostic]
 
   ChildEndKind* = enum
     ceExited, ceSignaled, ceSpawnFailed
@@ -88,6 +170,7 @@ type
     exitCode*:        int
     signal*:          int
     forwardedSignal*: int
+    timedOut*:        bool
 
 proc primaryTag*(spec: PodmanBuildSpec): string =
   if len(spec.tags) > 0:
@@ -95,6 +178,8 @@ proc primaryTag*(spec: PodmanBuildSpec): string =
   return ""
 
 proc isCancellation*(r: ChildResult): bool =
+  if r.timedOut:
+    return false
   if r.forwardedSignal in {1, 2, 3, 15}:
     return true
   if r.kind == ceSignaled:

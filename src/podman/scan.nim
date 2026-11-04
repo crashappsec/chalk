@@ -23,6 +23,7 @@ import ".."/[
   types,
   utils/files,
   utils/json,
+  utils/sets,
 ]
 import "../docker"/[
   ids,
@@ -63,15 +64,26 @@ proc collectPublishedRepo*(name: string, chalk: ChalkObj) =
   if parsedRef.repo == "":
     return
   try:
+    let top = fetchManifest(parsedRef, fetchConfig = false)
+    var fetched: DockerManifest
+    for candidate in top.allImages().all():
+      let image = fetchImageManifest(candidate.asImage(), DockerPlatform(nil),
+                                     ifManySystemPlatform = false,
+                                     fetchConfig = false)
+      if image.config == nil or
+          image.config.digest.extractDockerHash() != chalk.imageId.extractDockerHash():
+        continue
+      if fetched != nil and fetched.digest != image.digest:
+        trace("podman: published image identity is ambiguous")
+        return
+      fetched = image
+    if fetched == nil:
+      trace("podman: published manifest does not match the local image")
+      return
     let
-      fetched = fetchImageManifest(
-        parsedRef,
-        DockerPlatform(nil),
-        ifManySystemPlatform = true,
-        fetchConfig          = false,
-      )
       listDigest =
-        if fetched.list != nil: fetched.list.digest
+        if top.kind == DockerManifestType.list: top.digest
+        elif fetched.list != nil: fetched.list.digest
         else:                   ""
       publication = podman_types.PodmanPublication(
         reference:   parsedRef,
@@ -81,6 +93,8 @@ proc collectPublishedRepo*(name: string, chalk: ChalkObj) =
       imageRepo = fetched.asImageRepo(
         tags = (if parsedRef.tag != "": @[parsedRef.tag] else: @[]),
       )
+    if listDigest != "":
+      imageRepo.listDigests.incl(listDigest.extractDockerHash())
 
     if chalk.cache == nil:
       chalk.cache = RootRef(podman_types.PodmanArtifactCache())
@@ -88,8 +102,7 @@ proc collectPublishedRepo*(name: string, chalk: ChalkObj) =
     chalk.repos[parsedRef.repo] =
       imageRepo + chalk.repos.getOrDefault(parsedRef.repo)
   except:
-    trace("podman: could not fetch manifest for " & name & ": " &
-          getCurrentExceptionMsg())
+    trace("podman: could not fetch the published image manifest")
 
 proc imageId*(exe, image: string,
               cancellation: var Option[podman_types.ChildResult]): string =

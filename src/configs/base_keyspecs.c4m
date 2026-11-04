@@ -3983,9 +3983,17 @@ keyspec _IMAGE_SBOM {
     standard:     true
     since:        "0.4.0"
     canonicalize: func canonicalize_image_sbom(`x) -> `y
-    shortdoc:     "Docker image SBOM information"
+    shortdoc:     "Container image SBOM information"
     doc:          """
-Docker SPDX SBOM information created with `docker build --sbom=true`.
+SPDX JSON for a container image, reported at runtime.
+
+Docker collection reads BuildKit SPDX attestations created with
+`docker build --sbom=true`.
+
+Podman collection reads an externally generated SPDX JSON 2.2 or 2.3
+document that customer CI already produced: a native Buildah output,
+a file handoff, or an existing registry attachment. Chalk does not
+generate this document.
 """
 }
 

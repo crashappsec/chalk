@@ -25,6 +25,7 @@ when defined(posix):
       exit_code:    cint
       sig:          cint
       forwarded:    cint
+      timed_out:    cint
       stdout_bytes: cstring
       stderr_bytes: cstring
 
@@ -32,6 +33,10 @@ when defined(posix):
     {.importc, cdecl, header: "podman/run.h".}
   proc chalk_podman_run_attached(exe: cstring, argv: cstringArray, capture: cint,
                                  outp: ptr ChalkPodmanCChild): cint
+    {.importc, cdecl, header: "podman/run.h".}
+  proc chalk_podman_run_attached_timed(exe: cstring, argv: cstringArray,
+                                       capture: cint, timeout_ms: cint,
+                                       outp: ptr ChalkPodmanCChild): cint
     {.importc, cdecl, header: "podman/run.h".}
   proc chalk_podman_child_free(child: ptr ChalkPodmanCChild)
     {.importc, cdecl, header: "podman/run.h".}
@@ -66,6 +71,7 @@ proc resolvePodmanExe*(): string =
 
 proc toChildResult(raw: ChalkPodmanCChild): podman_types.ChildResult =
   result.forwardedSignal = int(raw.forwarded)
+  result.timedOut = raw.timed_out != 0
   case int(raw.kind)
   of 1:
     result.kind   = podman_types.ceSignaled
@@ -85,24 +91,33 @@ proc execReplacingSelf*(exe: string; args: seq[string]) {.noreturn.} =
   discard chalk_podman_exec_replacing_self(cstring(exe), argv)
   quit(127)
 
-proc runAttached*(exe: string; args: seq[string]): podman_types.ChildResult =
+proc runAttached*(exe: string; args: seq[string]; timeoutMs = 0):
+                 podman_types.ChildResult =
   restoreChalkRecursionMarker()
   var raw: ChalkPodmanCChild
   let argv = allocCStringArray(@[exe] & args)
   try:
-    discard chalk_podman_run_attached(cstring(exe), argv, 0, addr raw)
+    if timeoutMs > 0:
+      discard chalk_podman_run_attached_timed(
+        cstring(exe), argv, 0, cint(timeoutMs), addr raw)
+    else:
+      discard chalk_podman_run_attached(cstring(exe), argv, 0, addr raw)
     result = toChildResult(raw)
   finally:
     chalk_podman_child_free(addr raw)
     deallocCStringArray(argv)
 
-proc runCaptured*(exe: string; args: seq[string]):
+proc runCaptured*(exe: string; args: seq[string]; timeoutMs = 0):
                  tuple[child: podman_types.ChildResult, stdout: string, stderr: string] =
   restoreChalkRecursionMarker()
   var raw: ChalkPodmanCChild
   let argv = allocCStringArray(@[exe] & args)
   try:
-    discard chalk_podman_run_attached(cstring(exe), argv, 1, addr raw)
+    if timeoutMs > 0:
+      discard chalk_podman_run_attached_timed(
+        cstring(exe), argv, 1, cint(timeoutMs), addr raw)
+    else:
+      discard chalk_podman_run_attached(cstring(exe), argv, 1, addr raw)
     result.child = toChildResult(raw)
     if raw.stdout_bytes != nil:
       result.stdout = $raw.stdout_bytes

@@ -3,7 +3,8 @@
 Run the Nim unit suite through `make unit-tests`. Use `DOCKER=` to run on a host
 with the documented Chalk dependencies. The suite includes Podman command
 routing, startup configuration, immutable image binding, platform selection,
-process handling, quiet output, and confidential-value redaction.
+process handling, quiet output, confidential-value redaction, and collection
+of customer-generated SPDX documents.
 
 Run `python3 tests/unit/test_podman_run.py` explicitly. The Nim test task does not
 execute Python process tests. These tests compile the C process adapter and
