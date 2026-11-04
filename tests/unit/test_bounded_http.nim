@@ -89,6 +89,10 @@ proc get(port: int, path: string, budget: HttpBudget,
   ).response
 
 proc main() =
+  doAssert isTlsProtocolMismatch("error:0A000139:lib(20)::reason(313)")
+  doAssert isTlsProtocolMismatch("error:0A00010B:lib(20)::reason(267)")
+  doAssert not isTlsProtocolMismatch("error:0A000126:lib(20)::reason(294)")
+  doAssert not isTlsProtocolMismatch("error:03000139:lib(6)::reason(313)")
   let dir = createTempDir("chalk-bounded-http-", "")
   let port = freePort()
   let other = "http://localhost:" & $port
