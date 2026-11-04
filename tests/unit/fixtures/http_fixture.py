@@ -35,6 +35,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        if route.get("save_authorization"):
+            with open(route["save_authorization"], "w") as captured:
+                captured.write(self.headers.get("Authorization", ""))
         auth = route.get("auth")
         if auth and self.headers.get("Authorization", "") != auth["header"]:
             body = b"denied"

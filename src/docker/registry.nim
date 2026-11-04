@@ -48,6 +48,7 @@ type
     ## `statusCode` is the HTTP status the registry answered with, or 0
     ## when the failure was not an HTTP status.
     statusCode*: int
+  RegistryTlsError* = object of RegistryResponseError
   RegistryTimeoutError* = object of RegistryResponseError
   RegistryOversizedError* = object of RegistryResponseError
   RegistryReferrersError* = object of RegistryResponseError
@@ -61,7 +62,7 @@ type
     ReadOnly # allows use of mirrors
 
   RegistryJsonCacheKey = tuple[image: DockerImage, httpMethod: HttpMethod,
-                               path: string, useCase: RegistryUseCase]
+                               path: string, useCase: RegistryUseCase, requireSameOrigin: bool]
 
   RegistryAccess* = ref object
     ## Registry HTTP state isolated to one operation.
@@ -72,7 +73,7 @@ type
     strictReferrerLinks*:  bool
     lastRequestUri*:       Uri
     configByRegistry*:     Table[(RegistryUseCase, string), RegistryConfig]
-    jsonCache*:            Table[RegistryJsonCacheKey, (string, Response)]
+    jsonCache*:            Table[RegistryJsonCacheKey, (string, Response, Uri)]
     referrersCache*:       Table[string, bool]
 
   RegistryConfig = ref object
@@ -97,7 +98,7 @@ proc newRegistryAccess(): RegistryAccess =
     discoverDocker:   true,
     budget:           none(HttpBudget),
     configByRegistry: initTable[(RegistryUseCase, string), RegistryConfig](),
-    jsonCache:        initTable[RegistryJsonCacheKey, (string, Response)](),
+    jsonCache:        initTable[RegistryJsonCacheKey, (string, Response, Uri)](),
     referrersCache:   initTable[string, bool](),
   )
 
@@ -608,13 +609,16 @@ proc request(self:              DockerImage,
              range              = 0 .. 0,
              size               = 0,
              timeout            = TIMEOUT,
+             requireSameOrigin  = false,
              acceptStatusCodes: openArray[Slice[int]] = @[200..299],
              ): (string, Response) =
   let
     access   = currentRegistryAccess
-    cacheKey = (self, httpMethod, path & "\t" & $url, useCase)
+    cacheKey = (self, httpMethod, path & "\t" & $url, useCase, requireSameOrigin)
   if cacheKey in access.jsonCache:
-    return access.jsonCache[cacheKey]
+    let (message, response, effectiveUri) = access.jsonCache[cacheKey]
+    access.lastRequestUri = effectiveUri
+    return (message, response)
   var
     failure:       ref RegistryResponseError
     ignoredErrors: seq[string] = @[]
@@ -657,40 +661,45 @@ proc request(self:              DockerImage,
       for k, v in headers.pairs():
         msg &= " " & k & ":" & v
       trace("docker: " & msg)
+      if requireSameOrigin and not sameOrigin(uri, defaultUri):
+        raise newException(HttpOriginError, "referrer pagination left the registry origin")
       let
-        isGet   = httpMethod in [HttpHead, HttpGet]
+        isGet = httpMethod in [HttpHead, HttpGet]
+        sendConfigAuth = access.discoverDocker or sameOrigin(uri, defaultUri)
         wwwAuth = (
           config.wwwAuth
           .mgetOrPut(normalized.repo, newTable[bool, HttpHeaders]())
           .mgetOrPut(isGet,           newHttpHeaders())
         )
-        requestHeaders = headers.update(config.authHeadersFor(normalized)).update(wwwAuth)
-        (authHeaders, response) =
-          if access.budget.isSome():
-            authHeadersBoundedRequest(
-              uri,
-              httpMethod,
-              access.budget.get(),
-              body              = body,
-              headers           = requestHeaders,
-              pinnedCert        = config.pinnedCert,
-              verifyMode        = config.verifyMode,
-              acceptStatusCodes = acceptStatusCodes,
-            )
-          else:
-            authHeadersSafeRequest(
-              uri,
-              httpMethod,
-              body              = body,
-              headers           = requestHeaders,
-              pinnedCert        = config.pinnedCert,
-              verifyMode        = config.verifyMode,
-              timeout           = timeout,
-              retries           = 2,
-              connectRetries    = 2,
-              acceptStatusCodes = acceptStatusCodes,
-            )
-      config.wwwAuth[normalized.repo][isGet] = wwwAuth.update(authHeaders)
+        requestHeaders = headers
+      if sendConfigAuth:
+        discard requestHeaders.update(config.authHeadersFor(normalized)).update(wwwAuth)
+      let (authHeaders, response, effectiveUri) =
+        if access.budget.isSome():
+          authHeadersBoundedRequest(
+            uri, httpMethod, access.budget.get(),
+            body              = body,
+            headers           = requestHeaders,
+            pinnedCert        = config.pinnedCert,
+            verifyMode        = config.verifyMode,
+            sameOriginRedirects = requireSameOrigin,
+            acceptStatusCodes = acceptStatusCodes,
+          )
+        else:
+          let (auth, response) = authHeadersSafeRequest(
+            uri, httpMethod,
+            body              = body,
+            headers           = requestHeaders,
+            pinnedCert        = config.pinnedCert,
+            verifyMode        = config.verifyMode,
+            timeout           = timeout,
+            retries           = 2,
+            connectRetries    = 2,
+            acceptStatusCodes = acceptStatusCodes,
+          )
+          (auth, response, uri)
+      if sendConfigAuth:
+        config.wwwAuth[normalized.repo][isGet] = wwwAuth.update(authHeaders)
       var respMsg = "docker: " & $response.status
       for k, v in response.headers.pairs():
         if k notin ["authorization"]:
@@ -699,12 +708,25 @@ proc request(self:              DockerImage,
       for u in useCase.uses():
         discard access.configByRegistry.hasKeyOrPut((u, normalized.registry), config)
         discard access.configByRegistry.hasKeyOrPut((u, self.registry), config)
-      access.lastRequestUri = uri
+      access.lastRequestUri = effectiveUri
       if isGet:
-        access.jsonCache[cacheKey] = (msg, response)
+        access.jsonCache[cacheKey] = (msg, response, effectiveUri)
       return (msg, response)
     # exceptions cannot be raised from inside this loop as the config
     # iterator catches them; a definitive failure is kept and raised after it
+    except HttpTlsProtocolError:
+      ignoredErrors.add("registry endpoint did not complete TLS")
+    except HttpTlsError as error:
+      failure = (ref RegistryTlsError)(msg: error.msg)
+      break
+    except HttpOriginError:
+      failure = (ref RegistryReferrersError)(msg: "referrer pagination left the registry origin")
+      break
+    except SslError as error:
+      if not access.discoverDocker and not isTlsProtocolMismatch(error.msg):
+        failure = (ref RegistryTlsError)(msg: "registry TLS peer identity verification failed")
+        break
+      ignoredErrors.add(error.msg)
     except HttpDeadlineError:
       failure = (ref RegistryTimeoutError)(msg: "registry request timed out")
       break
@@ -712,7 +734,10 @@ proc request(self:              DockerImage,
       failure = (ref RegistryOversizedError)(msg: "registry response exceeds the size limit")
       break
     except ValueError as e:
-      # ValueError is only raised when status code fails
+      if not access.discoverDocker and not (e of HttpStatusError):
+        failure = (ref RegistryResponseError)(msg: e.msg)
+        break
+      # A final HTTP status identifies the selected non-mirror registry.
       # for non-mirror registry:
       # as we can talk to the registry, any errors from this point on
       # mean image doesnt exist in the registry or invalid config such as
@@ -742,6 +767,8 @@ proc request(self:              DockerImage,
   var errMsg = "could not find working registry configuration for " & $self
   if ignoredErrors.len > 0:
     errMsg &= ": " & ignoredErrors.join("; ")
+  if not access.discoverDocker:
+    raise newException(RegistryResponseError, "registry transport request failed")
   raise newException(ValueError, errMsg)
 
 proc validateDigest(digest: string): string =
@@ -1165,51 +1192,12 @@ proc manifestPut*(image:       DockerImage,
       size      = len(body),
     )
 
-proc defaultOriginPort(scheme: string): string =
-  case scheme.toLowerAscii()
-  of "http":  "80"
-  of "https": "443"
-  else:       ""
-
-proc originKey(uri: Uri): string =
-  let scheme = uri.scheme.toLowerAscii()
-  let port =
-    if uri.port == "": defaultOriginPort(scheme)
-    else: uri.port
-  return scheme & "://" & uri.hostname.toLowerAscii() & ":" & port
-
-proc mergeUriPath(base, rel: string): string =
-  let slash = base.rfind('/')
-  if slash < 0:
-    return "/" & rel
-  return base[0 .. slash] & rel
+proc originKey(url: Uri): string =
+  let value = uriOrigin(url)
+  return value.scheme & "://" & value.hostname & ":" & value.port
 
 proc resolveReferrerNextLink*(current: Uri, link: string): Option[Uri] =
-  ## Same-origin next page for a `Link` header. none() for origin changes,
-  ## scheme-relative links, and empty targets.
-  let trimmed = link.strip()
-  if trimmed == "":
-    return none(Uri)
-  if trimmed.startsWith("//"):
-    return none(Uri)
-  let parsed = parseUri(trimmed)
-  if parsed.hostname != "" and parsed.scheme == "":
-    return none(Uri)
-  if parsed.scheme != "":
-    if originKey(parsed) != originKey(current):
-      return none(Uri)
-    return some(parsed)
-  var resolved = current
-  if parsed.path == "":
-    resolved.query = parsed.query
-    return some(resolved)
-  if parsed.path.startsWith("/"):
-    resolved.path = parsed.path
-    resolved.query = parsed.query
-    return some(resolved)
-  resolved.path = mergeUriPath(current.path, parsed.path)
-  resolved.query = parsed.query
-  return some(resolved)
+  return resolveSameOrigin(current, link)
 
 proc descriptorDigest(item: JsonNode): string =
   if item == nil or item.kind != JObject:
@@ -1248,6 +1236,7 @@ proc referrersGet*(image:        DockerImage,
         url               = nextUrl,
         accept            = "application/vnd.oci.image.index.v1+json",
         acceptStatusCodes = @[200..299, 404..404],
+        requireSameOrigin = access.strictReferrerLinks,
       )
       if not response.code().is2xx():
         if pages == 1:

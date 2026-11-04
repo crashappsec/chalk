@@ -13,6 +13,7 @@ import std/[
 ]
 import ../../src/utils/bounded_http
 import ../../src/utils/http
+import ../../src/utils/www_authenticate
 
 proc linkInsertCommand(path: seq[string])
     {.exportc: "runCmdInsert", cdecl.} =
@@ -27,6 +28,10 @@ proc linkDeleteCommand(path: seq[string])
   discard
 
 const fixtureServer = currentSourcePath().parentDir() / "fixtures" / "http_fixture.py"
+when defined(linux):
+  {.compile: "fixtures/slow_dns.c".}
+  {.passL: "-Wl,--wrap=getaddrinfo".}
+
 
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
@@ -81,13 +86,14 @@ proc get(port: int, path: string, budget: HttpBudget,
   boundedRequest(
     parseUri("http://127.0.0.1:" & $port & path), HttpGet, budget,
     headers = headers, maxRedirects = maxRedirects,
-  )
+  ).response
 
 proc main() =
   let dir = createTempDir("chalk-bounded-http-", "")
   let port = freePort()
   let other = "http://localhost:" & $port
   let otherPort = freePort()
+  let stolenHeader = dir / "stolen-auth"
   let otherDir = dir / "other"
   createDir(otherDir)
   var routes = %*{
@@ -102,6 +108,8 @@ proc main() =
     "GET /same-host": {"status": 302, "body": "", "headers": {"Location": "/echo"}},
     "GET /cross-host": {"status": 307, "body": "",
                         "headers": {"Location": other & "/echo"}},
+    "GET /redirect-challenge": {"status": 302, "body": "",
+                        "headers": {"Location": "http://127.0.0.1:" & $otherPort & "/challenge"}},
     "GET /cross-port": {"status": 302, "body": "",
                         "headers": {"Location": "http://127.0.0.1:" & $otherPort & "/echo"}},
     "GET /nested/relative": {"status": 302, "body": "", "headers": {"Location": "../echo"}},
@@ -112,7 +120,12 @@ proc main() =
                           "headers": {"Location": "/plain"}},
   }
   let (p, hits) = startServer(dir, routes, port)
-  let (otherServer, _) = startServer(otherDir, %*{"GET /echo": {"status": 200, "echo_authorization": true}}, otherPort)
+  let (otherServer, _) = startServer(otherDir, %*{
+    "GET /echo": {"status": 200, "echo_authorization": true},
+    "GET /challenge": {"status": 401, "body": "denied",
+      "headers": {"Www-Authenticate": "Bearer realm=\"http://127.0.0.1:" & $otherPort & "/token\""}},
+    "GET /token": {"status": 200, "body": "{\"token\":\"public\"}", "save_authorization": stolenHeader},
+  }, otherPort)
   try:
     block plain:
       let response = get(port, "/plain", budget(2000))
@@ -122,7 +135,7 @@ proc main() =
 
     block headIgnoresDeclaredLength:
       let response = boundedRequest(
-        parseUri("http://127.0.0.1:" & $port & "/head"), HttpHead, budget(2000))
+        parseUri("http://127.0.0.1:" & $port & "/head"), HttpHead, budget(2000)).response
       assertEq(int(response.code()), 200)
       assertEq(response.headers["Content-Length"], "99999999")
       assertEq(response.body(), "")
@@ -171,6 +184,17 @@ proc main() =
           failures.add(path & " raised " & getCurrentExceptionMsg())
       doAssert failures.len == 0, $failures
 
+    block redirectedChallengeCannotUseOriginalCredentials:
+      try:
+        discard authHeadersBoundedRequest(
+          parseUri("http://127.0.0.1:" & $port & "/redirect-challenge"), HttpGet, budget(2000),
+          headers = newHttpHeaders({"Authorization": "Basic registry-secret"}),
+          acceptStatusCodes = @[200..299])
+      except CatchableError:
+        discard
+      doAssert not fileExists(stolenHeader) or readFile(stolenHeader) == "",
+               "redirect target's token endpoint received the original registry credential"
+
     block redirectLimitReturnsLastResponse:
       writeFile(hits, "")
       let response = get(port, "/loop", budget(2000), maxRedirects = 2)
@@ -196,18 +220,42 @@ proc main() =
       let (tlsServer, _) = startServer(tlsDir, %*{
         "GET /plain": {"status": 200, "body": "tls"},
         "GET /host": {"status": 200, "echo_host": true},
+        "GET /redirect-downgrade": {"status": 302, "body": "", "headers": {
+          "Location": "http://127.0.0.1:" & $otherPort & "/token"}},
+        "GET /broken-token-tls": {"status": 401, "body": "denied", "headers": {
+          "Www-Authenticate": "Bearer realm=\"https://127.0.0.1:" & $otherPort & "/token\""}},
+        "GET /downgrade": {"status": 401, "body": "denied", "headers": {
+          "Www-Authenticate": "Bearer realm=\"http://127.0.0.1:" & $otherPort & "/token\""}},
         "GET /slow": {"status": 200, "body": "s".repeat(500),
                       "drip": {"chunk": 10, "delay_ms": 200}},
       }, tlsPort, cert, key)
       try:
         let root = "https://localhost:" & $tlsPort
-        assertEq(boundedRequest(parseUri(root & "/plain"), HttpGet, budget(2000), pinnedCert = cert).body(), "tls")
-        assertEq(boundedRequest(parseUri(root & "/host"), HttpGet, budget(2000), pinnedCert = cert).body(), "localhost:" & $tlsPort)
+        assertEq(boundedRequest(parseUri(root & "/plain"), HttpGet, budget(2000), pinnedCert = cert).response.body(), "tls")
+        assertEq(boundedRequest(parseUri(root & "/host"), HttpGet, budget(2000), pinnedCert = cert).response.body(), "localhost:" & $tlsPort)
         assertEq(boundedRequest(parseUri("https://127.0.0.1:" & $tlsPort & "/plain"), HttpGet,
-                                budget(2000), pinnedCert = cert).body(), "tls")
+                                budget(2000), pinnedCert = cert).response.body(), "tls")
         doAssert "localhost" in readFile(tlsDir / "sni.log")
-        doAssertRaises(CatchableError):
+        doAssertRaises(HttpPeerVerificationError):
           discard boundedRequest(parseUri(root & "/plain"), HttpGet, budget(2000))
+        doAssertRaises(HttpPeerVerificationError):
+          discard authHeadersBoundedRequest(parseUri(root & "/downgrade"), HttpGet,
+            budget(2000), headers = newHttpHeaders({"Authorization": "Basic registry-secret"}),
+            pinnedCert = cert, acceptStatusCodes = @[200..299])
+        doAssert not fileExists(stolenHeader), "TLS realm downgrade sent registry credentials"
+        doAssertRaises(HttpTlsError):
+          discard boundedRequest(parseUri(root & "/redirect-downgrade"), HttpGet,
+            budget(2000), pinnedCert = cert)
+        doAssert not fileExists(stolenHeader), "TLS redirect fetched the plaintext endpoint"
+        var tokenTlsFailed = false
+        try:
+          discard authHeadersBoundedRequest(parseUri(root & "/broken-token-tls"), HttpGet,
+            budget(2000), pinnedCert = cert, acceptStatusCodes = @[200..299])
+        except HttpTlsProtocolError:
+          doAssert false, "token TLS failure could trigger a registry plaintext fallback"
+        except HttpTlsError:
+          tokenTlsFailed = true
+        doAssert tokenTlsFailed, "broken token TLS endpoint did not fail"
         doAssertRaises(HttpDeadlineError):
           discard boundedRequest(parseUri(root & "/slow"), HttpGet, budget(300), pinnedCert = cert)
       finally:
@@ -220,12 +268,16 @@ proc main() =
       let wrongPort = freePort()
       let (wrongServer, _) = startServer(tlsDir, %*{"GET /plain": {"status": 200, "body": "wrong"}}, wrongPort, cert, key)
       try:
-        doAssertRaises(CatchableError):
+        assertEq(boundedRequest(parseUri("https://localhost:" & $wrongPort & "/plain"), HttpGet,
+                                budget(2000), pinnedCert = cert, verifyMode = CVerifyNone).response.body(), "wrong")
+        writeFile(tlsDir / "hits.log", "")
+        doAssertRaises(HttpPeerVerificationError):
           discard boundedRequest(parseUri("https://localhost:" & $wrongPort & "/plain"), HttpGet,
                                  budget(2000), pinnedCert = cert)
-        doAssertRaises(CatchableError):
+        doAssertRaises(HttpPeerVerificationError):
           discard boundedRequest(parseUri("https://127.0.0.1:" & $wrongPort & "/plain"), HttpGet,
                                  budget(2000), pinnedCert = cert)
+        assertEq(readFile(tlsDir / "hits.log"), "")
       finally:
         stopServer(wrongServer)
 
@@ -234,24 +286,26 @@ proc main() =
       let source = fixtureServer.parentDir() / "slow_dns.c"
       let compiler = findExe("cc")
       doAssert compiler != "", "DNS fixture requires a C compiler"
-      let arguments =
-        when defined(macosx): @[compiler, "-dynamiclib", source, "-o", library]
-        else: @[compiler, "-shared", "-fPIC", source, "-o", library, "-ldl", "-pthread"]
-      let compiled = execCmdEx(quoteShellCommand(arguments))
-      doAssert compiled.exitCode == 0, compiled.output
       var environment = newStringTable(modeCaseSensitive)
       for key, value in envPairs():
         environment[key] = value
       when defined(macosx):
+        let compiled = execCmdEx(quoteShellCommand(@[compiler, "-dynamiclib", source, "-o", library]))
+        doAssert compiled.exitCode == 0, compiled.output
         environment["DYLD_INSERT_LIBRARIES"] = library
-      else:
-        environment["LD_PRELOAD"] = library
       let probe = startProcess(getAppFilename(), args = @["--slow-dns-probe"],
                                env = environment, options = {poStdErrToStdOut})
       let output = probe.outputStream.readAll()
       let exitCode = waitForExit(probe)
       close(probe)
       doAssert exitCode == 0, output
+      environment["CHALK_TEST_SLOW_NUMERIC"] = "1"
+      let numeric = startProcess(getAppFilename(), args = @["--numeric-dns-probe", $port],
+                                 env = environment, options = {poStdErrToStdOut})
+      let numericOutput = numeric.outputStream.readAll()
+      let numericExit = waitForExit(numeric)
+      close(numeric)
+      doAssert numericExit == 0, numericOutput
 
     block completedAndTimedOutResolversReleaseDescriptors:
       let compiler = findExe("cc")
@@ -269,7 +323,7 @@ proc main() =
 
     block connectionRefused:
       let closed = freePort()
-      doAssertRaises(OSError):
+      doAssertRaises(IOError):
         discard get(closed, "/plain", budget(2000))
   finally:
     stopServer(p)
@@ -282,5 +336,12 @@ if paramCount() == 1 and paramStr(1) == "--slow-dns-probe":
     discard boundedRequest(parseUri("http://slow-resolver.test/"), HttpGet, budget(200))
   doAssert (getMonoTime() - start).inMilliseconds < 1000,
            "DNS resolution ignored the collection budget"
+elif paramCount() == 2 and paramStr(1) == "--numeric-dns-probe":
+  let start = getMonoTime()
+  let response = boundedRequest(parseUri("http://second-lookup.test:" & paramStr(2) & "/plain"),
+                                HttpGet, budget(500)).response
+  assertEq(response.body(), "hello")
+  doAssert (getMonoTime() - start).inMilliseconds < 1000,
+           "numeric connect or the HTTP client performed a blocking resolver lookup"
 else:
   main()
