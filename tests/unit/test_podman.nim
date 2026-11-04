@@ -342,7 +342,25 @@ proc main() =
   expectTransfer(@["push", "sha256:abc", "docker://reg/dest:tag"],
                  prPush, "sha256:abc", some("docker://reg/dest:tag"))
   expectTransfer(@["push", "--remove-signatures", "img"], prPush, "img")
-  expectTransfer(@["push", "--authfile=/tmp/a", "img"], prPush, "img")
+  let authInline = classifyPodmanArgs(@["push", "--authfile=/tmp/a", "img"])
+  assertEq(authInline.kind, prPush)
+  assertEq(authInline.image, "img")
+  assertEq(authInline.authfile, "/tmp/a")
+  assertEq(authInline.originalArgs, @["push", "--authfile=/tmp/a", "img"])
+  let authSeparated = classifyPodmanArgs(@["pull", "--authfile", "/tmp/auth", "busybox"])
+  assertEq(authSeparated.kind, prPull)
+  assertEq(authSeparated.image, "busybox")
+  assertEq(authSeparated.authfile, "/tmp/auth")
+  assertEq(authSeparated.originalArgs,
+           @["pull", "--authfile", "/tmp/auth", "busybox"])
+  let authLast = classifyPodmanArgs(@[
+    "push", "--authfile", "/tmp/first", "--authfile=/tmp/second", "img",
+  ])
+  assertEq(authLast.kind, prPush)
+  assertEq(authLast.authfile, "/tmp/second")
+  discard expectSkip(@["pull", "--authfile"], poPull, psrInvalidFlag, "--authfile")
+  discard expectSkip(@["push", "--authfile", "--quiet", "img"], poPush,
+                     psrInvalidFlag, "--authfile")
   expectTransfer(@[
     "push", "--digestfile=/tmp/digest", "sha256:abc",
     "docker://reg/dest:tag",
@@ -351,7 +369,6 @@ proc main() =
 
   # A bare flag we do not recognise may or may not consume the next token, so
   # the image operand cannot be identified safely.
-  expectPass(@["pull", "--authfile", "/tmp/auth", "busybox"])
   expectPass(@["push", "--sign-by", "key", "img"])
   # operand counts
   expectPass(@["pull"])
@@ -415,6 +432,71 @@ proc main() =
     @["build", "--iidfile", "first.iid", "--iidfile=second.iid", "."],
   )
   assertEq(lastIid.spec.customerIidFile, "second.iid")
+
+  let sbomBuild = expectBuildRoute(@[
+    "build", "--sbom", "syft", "--sbom-output", "host.json",
+    "--sbom-image-output=/root/sbom.json",
+    "--sbom-scanner-command", "{SELF} syft {SRC}",
+    "--sbom-scanner-command=trivy image {SRC}",
+    "--sbom-scanner-image", "scanner:latest",
+    "--sbom-merge-strategy", "cat-files",
+    "--sbom-purl-output", "purl.json",
+    "--sbom-image-purl-output", "/root/purl.json",
+    "--authfile", "/tmp/auth.json",
+    ".",
+  ])
+  assertEq(sbomBuild.spec.originalArgs[sbomBuild.spec.originalArgs.find("--sbom") + 1],
+           "syft")
+  assertEq(sbomBuild.spec.sbom.preset, "syft")
+  assertEq(sbomBuild.spec.sbom.hostOutput, "host.json")
+  assertEq(sbomBuild.spec.sbom.imageOutput, "/root/sbom.json")
+  assertEq(sbomBuild.spec.sbom.scannerCommands,
+           @["{SELF} syft {SRC}", "trivy image {SRC}"])
+  assertEq(sbomBuild.spec.sbom.scannerImage, "scanner:latest")
+  assertEq(sbomBuild.spec.sbom.mergeStrategy, "cat-files")
+  assertEq(sbomBuild.spec.sbom.purlHostOutput, "purl.json")
+  assertEq(sbomBuild.spec.sbom.purlImageOutput, "/root/purl.json")
+  assertEq(sbomBuild.spec.authfile, "/tmp/auth.json")
+  assertEq(sbomBuild.authfile, "/tmp/auth.json")
+  doAssert "{SELF}" notin sbomBuild.spec.reportArgs.join(" ")
+  doAssert "trivy image" notin sbomBuild.spec.reportArgs.join(" ")
+  doAssert redactedArgText in sbomBuild.spec.reportArgs.join(" ")
+  assertEq(sbomBuild.spec.confidentialArgs, @[
+    PodmanConfidentialArg(flag: "--sbom-scanner-command", value: "{SELF} syft {SRC}"),
+    PodmanConfidentialArg(flag: "--sbom-scanner-command",
+                          value: "trivy image {SRC}"),
+  ])
+  let sbomLast = expectBuildRoute(@[
+    "build", "--sbom-output", "first.json", "--sbom-output=second.json", ".",
+  ])
+  assertEq(sbomLast.spec.sbom.hostOutput, "second.json")
+  let sbomEmpty = expectBuildRoute(@["build", "--sbom=", "."])
+  assertEq(sbomEmpty.spec.sbom.preset, "")
+  discard expectSkip(@["build", "--sbom-output"], poBuild,
+                     psrInvalidFlag, "--sbom-output")
+  discard expectSkip(@["build", "--sbom-output="], poBuild,
+                     psrInvalidFlag, "--sbom-output")
+  discard expectSkip(@["build", "--sbom-image-output="], poBuild,
+                     psrInvalidFlag, "--sbom-image-output")
+  discard expectSkip(@["build", "--sbom-scanner-command="], poBuild,
+                     psrInvalidFlag, "--sbom-scanner-command")
+  discard expectSkip(@["build", "--sbom"], poBuild, psrInvalidFlag, "--sbom")
+  let purlOnly = expectBuildRoute(@["build", "--sbom-purl-output", "p.json", "."])
+  assertEq(purlOnly.spec.sbom.purlHostOutput, "p.json")
+  assertEq(purlOnly.spec.sbom.hostOutput, "")
+  assertEq(purlOnly.spec.sbom.imageOutput, "")
+  let injectedSbom = makeInjectedArgs(sbomBuild.spec, ws)
+  doAssert "--sbom" in injectedSbom
+  doAssert "syft" in injectedSbom
+  doAssert "--sbom-output" in injectedSbom
+  doAssert "host.json" in injectedSbom
+  doAssert "--authfile" in injectedSbom
+  doAssert "/tmp/auth.json" in injectedSbom
+  assertEq(
+    injectedSbom.filterIt(it == "--sbom-scanner-command" or
+                         it.startsWith("--sbom-scanner-command=")).len,
+    2,
+  )
 
   let twoTags = expectBuildRoute(@["build", "-t", "one", "--tag=two", "."])
   assertEq(twoTags.spec.tags, @["one", "two"])

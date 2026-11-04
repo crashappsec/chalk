@@ -54,6 +54,7 @@ when isMainModule:
   of "extract.containers": runCmdExtractContainers()
   of "extract.images":     runCmdExtractImages()
   of "extract.all":        runCmdExtractAll(attrGet[seq[string]]("artifact_search_path"))
+  of "extract.podman":     runCmdExtractPodman()
   of "insert":             runCmdInsert(attrGet[seq[string]]("artifact_search_path"))
   of "delete":             runCmdDelete(attrGet[seq[string]]("artifact_search_path"))
   of "env":                runCmdEnv()

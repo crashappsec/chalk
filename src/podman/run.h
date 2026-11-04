@@ -19,6 +19,7 @@ typedef struct {
   int exit_code;
   int sig;
   int forwarded;
+  int timed_out;
   char *stdout_bytes;
   char *stderr_bytes;
 } chalk_podman_child_t;
@@ -27,6 +28,9 @@ int chalk_podman_snapshot_process_state(void);
 int chalk_podman_exec_replacing_self(const char *exe, char *const argv[]);
 int chalk_podman_run_attached(const char *exe, char *const argv[], int capture,
                               chalk_podman_child_t *out);
+int chalk_podman_run_attached_timed(const char *exe, char *const argv[],
+                                    int capture, int timeout_ms,
+                                    chalk_podman_child_t *out);
 void chalk_podman_child_free(chalk_podman_child_t *child);
 
 #endif

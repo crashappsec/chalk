@@ -55,5 +55,6 @@ profile_results.txt
 .gdb_history
 log
 .nimcache
+.audit/
 strace-*
 nimbledeps

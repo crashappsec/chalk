@@ -33,6 +33,7 @@ import "./notice"
 import "./platform"
 import "./report"
 import "./run"
+import "./sbom"
 import "./transfer"
 import "./types" as podman_types
 
@@ -106,7 +107,10 @@ proc writeMark(spec: podman_types.PodmanBuildSpec,
   return some(chalk)
 
 proc finalizeImage(exe: string, spec: podman_types.PodmanBuildSpec,
-                   ws: podman_types.PodmanWorkspace, chalk: ChalkObj): int =
+                   ws: podman_types.PodmanWorkspace, chalk: ChalkObj,
+                   snapshots: seq[podman_types.HostFileSnapshot],
+                   workingDir: string,
+                   cancellation: var Option[podman_types.ChildResult]): int =
   var imageId = ""
   if fileExists(ws.iidFile):
     imageId = extractDockerHash(tryToLoadFile(ws.iidFile).strip())
@@ -128,6 +132,9 @@ proc finalizeImage(exe: string, spec: podman_types.PodmanBuildSpec,
       chalk.name = imageId
   chalk.addToAllChalks()
   chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
+  maybeCollectNativeSbom(exe, spec, chalk, snapshots, workingDir, cancellation)
+  if cancellation.isSome():
+    return cancellationExit(cancellation.get())
   collectRunTimeArtifactInfo(chalk)
   try:
     doPodmanReporting(spec, "report", chalk)
@@ -260,6 +267,10 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   if chalkOpt.isNone():
     return failOpenOriginal(exe, spec, pasMarkCreation)
   let chalk = chalkOpt.get()
+  let workingDir = getCurrentDir()
+  var snapshots: seq[podman_types.HostFileSnapshot]
+  if isSubscribedKey("_IMAGE_SBOM") and hasNativeSbomDocument(spec.sbom):
+    snapshots = snapshotSbomHostOutputs(spec.sbom, workingDir)
 
   let injected = runAttached(exe, makeInjectedArgs(spec, ws))
   if isCancellation(injected):
@@ -273,7 +284,8 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
                             some(injected.exitCode))
 
   try:
-    let status = finalizeImage(exe, spec, ws, chalk)
+    let status = finalizeImage(exe, spec, ws, chalk, snapshots, workingDir,
+                               cancellation)
     if status != 0:
       return status
   except:

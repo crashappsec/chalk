@@ -226,7 +226,10 @@ type
     bfrIidFile,
     bfrBuildContext,
     bfrTarget,
-    bfrPull
+    bfrPull,
+    bfrAuthfile,
+    bfrSbomLast,
+    bfrSbomScannerCommand
   BuildFlagSpec = object
     names: seq[string]
     arity: BuildFlagArity
@@ -267,6 +270,21 @@ const buildFlags = [
   BuildFlagSpec(names: @["--force-rm"],      arity: bfaBare,          role: bfrForward),
   BuildFlagSpec(names: @["--squash"],        arity: bfaBare,          role: bfrForward),
   BuildFlagSpec(names: @["--squash-all"],    arity: bfaBare,          role: bfrForward),
+  BuildFlagSpec(names: @["--authfile"],      arity: bfaValue,         role: bfrAuthfile),
+  BuildFlagSpec(names: @["--sbom"],          arity: bfaValue,         role: bfrSbomLast),
+  BuildFlagSpec(names: @["--sbom-scanner-image"],
+                                             arity: bfaValue,         role: bfrSbomLast),
+  BuildFlagSpec(names: @["--sbom-scanner-command"],
+                                             arity: bfaValue,         role: bfrSbomScannerCommand),
+  BuildFlagSpec(names: @["--sbom-merge-strategy"],
+                                             arity: bfaValue,         role: bfrSbomLast),
+  BuildFlagSpec(names: @["--sbom-output"],   arity: bfaValue,         role: bfrSbomLast),
+  BuildFlagSpec(names: @["--sbom-image-output"],
+                                             arity: bfaValue,         role: bfrSbomLast),
+  BuildFlagSpec(names: @["--sbom-purl-output"],
+                                             arity: bfaValue,         role: bfrSbomLast),
+  BuildFlagSpec(names: @["--sbom-image-purl-output"],
+                                             arity: bfaValue,         role: bfrSbomLast),
 ]
 
 proc canonicalFlagName(spec: BuildFlagSpec): string =
@@ -355,13 +373,15 @@ proc classifyTransfer(args: seq[string], kind: PodmanRouteKind,
                       maxPositionals: int): PodmanRoute =
   ## Find the image operand of a push or pull.
   ##
-  ## `--flag=value` is self-contained and safe to skip. Any other unrecognised
-  ## flag passes the command through rather than risk mis-identifying which
-  ## operand is the image.
+  ## `--flag=value` is self-contained and safe to skip. `--authfile` is
+  ## captured in both forms and still forwarded unchanged. Any other
+  ## unrecognised flag passes the command through rather than risk
+  ## mis-identifying which operand is the image.
   var
     positionals: seq[string]
     i           = 1
     afterDash   = false
+    authfile    = ""
   while i < len(args):
     let cur = args[i]
     if not afterDash and cur == "--":
@@ -369,6 +389,17 @@ proc classifyTransfer(args: seq[string], kind: PodmanRouteKind,
       i += 1
       continue
     if not afterDash and cur.startsWith("-") and cur != "-":
+      if cur == "--authfile":
+        if i + 1 >= len(args) or args[i + 1] == "--" or
+            (args[i + 1].startsWith("-") and args[i + 1] != "-"):
+          return passThrough(args, invalidFlagReason("--authfile"))
+        authfile = args[i + 1]
+        i += 2
+        continue
+      if cur.startsWith("--authfile="):
+        authfile = cur["--authfile=".len .. ^1]
+        i += 1
+        continue
       if "=" in cur:
         i += 1
         continue
@@ -388,6 +419,7 @@ proc classifyTransfer(args: seq[string], kind: PodmanRouteKind,
     kind:         kind,
     originalArgs: args,
     image:        image,
+    authfile:     authfile,
     destination: (
       if kind == prPush and len(positionals) == 2:
         some(positionals[1])
@@ -428,6 +460,8 @@ proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
     confidentialArgs: seq[PodmanConfidentialArg]
     pullPolicy     = bppMissing
     reportArgs     = args
+    sbom           = PodmanSbomNativeOutputs()
+    authfile       = ""
     positionals: seq[tuple[index: int, value: string]]
 
   proc redactValue(index: int, equalsPrefix, flag, value: string) =
@@ -514,6 +548,36 @@ proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
           pullPolicy = bppAlways
         else:
           pullPolicy = parsePullPolicy(value).get()
+      of bfrAuthfile:
+        authfile = value
+      of bfrSbomLast:
+        case matched.flagName
+        of "--sbom":
+          sbom.preset = value
+        of "--sbom-scanner-image":
+          sbom.scannerImage = value
+        of "--sbom-merge-strategy":
+          sbom.mergeStrategy = value
+        of "--sbom-output":
+          if value == "":
+            return passThrough(args, invalidFlagReason("--sbom-output"))
+          sbom.hostOutput = value
+        of "--sbom-image-output":
+          if value == "":
+            return passThrough(args, invalidFlagReason("--sbom-image-output"))
+          sbom.imageOutput = value
+        of "--sbom-purl-output":
+          sbom.purlHostOutput = value
+        of "--sbom-image-purl-output":
+          sbom.purlImageOutput = value
+        else:
+          discard
+      of bfrSbomScannerCommand:
+        if value == "":
+          return passThrough(args, invalidFlagReason("--sbom-scanner-command"))
+        sbom.scannerCommands.add(value)
+        redactValue(matched.valueIndex, matched.equalsPrefix,
+                    matched.flagName, value)
       i += matched.consumed
 
   if fileSeen and (fileArg == "" or fileArg == "-"):
@@ -531,6 +595,7 @@ proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
   return PodmanRoute(
     kind:         prInstrument,
     originalArgs: args,
+    authfile:     authfile,
     spec: PodmanBuildSpec(
       originalArgs:       args,
       reportArgs:         reportArgs,
@@ -549,5 +614,7 @@ proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
       fileEqualsPrefix:   filePrefix,
       contextIndex:       context.index,
       dashDashIndex:      dashDashIndex,
+      sbom:               sbom,
+      authfile:           authfile,
     ),
   )

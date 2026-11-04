@@ -127,6 +127,17 @@ int main(int argc, char **argv)
     chalk_podman_child_free(&result);
     return ok ? 0 : 78;
   }
+  if (argc == 3 && strcmp(argv[1], "runner-timeout") == 0) {
+    chalk_podman_child_t result;
+    char *child[] = {argv[0], "child-wait-file", argv[2], NULL};
+    int ok;
+    if (chalk_podman_run_attached_timed(argv[0], child, 0, 200, &result) != 0) {
+      return 84;
+    }
+    ok = result.timed_out && result.forwarded == 0;
+    chalk_podman_child_free(&result);
+    return ok ? 0 : 85;
+  }
   if (argc == 4 && strcmp(argv[1], "runner-cancel") == 0) {
     chalk_podman_child_t result;
     char *child[] = {argv[0], "child-wait-file", argv[2], NULL};
@@ -318,6 +329,30 @@ class TestPodmanRun(unittest.TestCase):
                                 os.kill(pid, signal.SIGKILL)
                             except ProcessLookupError:
                                 pass
+
+    def test_timeout_kills_child_without_forwarded_signal(self):
+        with tempfile.TemporaryDirectory(prefix="chalk-podman-timeout-") as temp:
+            pidfile = Path(temp) / "child.pid"
+            process = subprocess.Popen(
+                [str(self.probe), "runner-timeout", str(pidfile)],
+                stdin=subprocess.DEVNULL,
+            )
+            child = None
+            try:
+                deadline = time.monotonic() + 3
+                while not pidfile.exists():
+                    self.assertIsNone(process.poll())
+                    self.assertLess(time.monotonic(), deadline)
+                    time.sleep(0.01)
+                child = int(pidfile.read_text())
+                self.assertEqual(process.wait(timeout=3), 0)
+            finally:
+                for pid in (child, process.pid):
+                    if pid:
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
 
 
 if __name__ == "__main__":

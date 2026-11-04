@@ -1774,6 +1774,34 @@ but when you push, we will add a signed attestation using the Sigstore
 standard.  Such marks are MUCH faster to access reliably and are the
 preferred method. See the `chalk setup` command.
 """
+
+  field podman_image {
+    type:     string
+    default:  ""
+    shortdoc: "Local Podman image for extract podman"
+    doc:      "Local Podman image whose mark and config digest are read."
+  }
+
+  field podman_registry_reference {
+    type:     string
+    default:  ""
+    shortdoc: "Published Podman image digest reference"
+    doc:      "REGISTRY/REPOSITORY@sha256:DIGEST of the published image manifest."
+  }
+
+  field podman_authfile {
+    type:     string
+    default:  ""
+    shortdoc: "Auth file for extract podman"
+    doc:      "Podman registry auth file. REGISTRY_AUTH_FILE is used when empty."
+  }
+
+  field podman_sbom_attachment {
+    type:     string
+    default:  ""
+    shortdoc: "SPDX attachment digest"
+    doc:      "Required when more than one application/spdx+json attachment exists."
+  }
 }
 
 singleton docker {
@@ -5546,6 +5574,17 @@ A few important notes:
 5. If this is off, there is no check for previously cached data.
 
 Note that this field is set on the command line with --use-report-cache / --no-use-report-cache.
+"""
+  }
+
+  field sbom_handoff {
+    type:       string
+    default:    ""
+    shortdoc:   "Podman SPDX handoff file"
+    doc:        """
+Path to a customer-written SPDX handoff JSON file. Set with
+`--sbom-handoff`. Used when wrapping `podman push`. Chalk does not
+create this file.
 """
   }
 

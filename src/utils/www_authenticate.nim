@@ -10,6 +10,7 @@
 
 import std/[
   net,
+  options,
   sequtils,
   uri,
 ]
@@ -22,6 +23,7 @@ import "."/[
   json,
   strings,
   tables,
+  times,
 ]
 
 type
@@ -68,12 +70,23 @@ proc initBearerChallenge(options: var OrderedTable[string, string]): AuthChallen
                        realm:   realm,
                        url:     $uri)
 
+proc timeoutForDeadline(timeout: int, deadline: Option[MonoTime]): int =
+  if deadline.isNone():
+    return timeout
+  let left = remainingMs(deadline.get())
+  if left <= 0:
+    raise newException(ValueError, "request timed out")
+  if timeout <= 0:
+    return left
+  return min(timeout, left)
+
 proc elicitHeaders(
     self:           AuthChallenge,
     headers:        HttpHeaders = newHttpHeaders(),
     timeout:        int         = 1000,
     retries:        int         = 0,
     connectRetries: int         = 0,
+    deadline:       Option[MonoTime] = none(MonoTime),
 ): HttpHeaders =
   case self.kind:
   of other:
@@ -83,7 +96,7 @@ proc elicitHeaders(
     let tokenResponse = safeRequest(
       self.url,
       headers        = headers,
-      timeout        = timeout,
+      timeout        = timeoutForDeadline(timeout, deadline),
       retries        = retries,
       connectRetries = connectRetries,
     )
@@ -107,6 +120,7 @@ proc elicitHeaders*(
     timeout:        int         = 1000,
     retries:        int         = 0,
     connectRetries: int         = 0,
+    deadline:       Option[MonoTime] = none(MonoTime),
 ): HttpHeaders =
   result = newHttpHeaders()
   for challenge in challenges:
@@ -116,8 +130,11 @@ proc elicitHeaders*(
         timeout        = timeout,
         retries        = retries,
         connectRetries = connectRetries,
+        deadline       = deadline,
       )
     except:
+      if deadline.isSome() and timedOut(deadline.get()):
+        raise
       continue
 
 proc parseAuthChallenge(data: seq[string]): AuthChallenge =
@@ -172,6 +189,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
                              disallowHttp: bool = false,
                              acceptStatusCodes: openArray[Slice[int]] = @[],
                              rejectStatusCodes: openArray[Slice[int]] = @[],
+                             deadline: Option[MonoTime] = none(MonoTime),
                              ): (HttpHeaders, Response) =
   var
     authHeaders = headers
@@ -185,7 +203,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       retries           = retries,
       connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
-      timeout           = timeout,
+      timeout           = timeoutForDeadline(timeout, deadline),
       pinnedCert        = pinnedCert,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
@@ -205,10 +223,10 @@ proc authHeadersSafeRequest*(url: Uri | string,
       timeout        = timeout,
       retries        = retries,
       connectRetries = connectRetries,
+      deadline       = deadline,
     )
     authHeaders       = authHeaders.update(newHeaders)
 
-    # reattempt request
     response = safeRequest(
       url               = url,
       httpMethod        = httpMethod,
@@ -218,7 +236,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       retries           = retries,
       connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
-      timeout           = timeout,
+      timeout           = timeoutForDeadline(timeout, deadline),
       pinnedCert        = pinnedCert,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
@@ -234,9 +252,6 @@ proc authHeadersSafeRequest*(url: Uri | string,
       rejectStatusCodes = rejectStatusCodes,
     )
   except:
-    # reattempt the request with retries as above response error
-    # might be transient however however never retried as
-    # status code is never checked on the first call
     response = safeRequest(
       url               = url,
       httpMethod        = httpMethod,
@@ -246,7 +261,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       retries           = retries,
       connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
-      timeout           = timeout,
+      timeout           = timeoutForDeadline(timeout, deadline),
       pinnedCert        = pinnedCert,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
@@ -272,6 +287,7 @@ proc authSafeRequest*(url: Uri | string,
                       disallowHttp: bool = false,
                       acceptStatusCodes: openArray[Slice[int]] = @[],
                       rejectStatusCodes: openArray[Slice[int]] = @[],
+                      deadline: Option[MonoTime] = none(MonoTime),
                       ): Response =
   let (_, response) = authHeadersSafeRequest(
     url               = url,
@@ -289,5 +305,6 @@ proc authSafeRequest*(url: Uri | string,
     disallowHttp      = disallowHttp,
     acceptStatusCodes = acceptStatusCodes,
     rejectStatusCodes = rejectStatusCodes,
+    deadline          = deadline,
   )
   return response

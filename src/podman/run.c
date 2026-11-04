@@ -37,6 +37,7 @@ static int g_original_state_ready;
 
 enum {
   CHALK_PODMAN_CANCEL_GRACE_MS = 20000,
+  CHALK_PODMAN_TIMEOUT_KILL_MS = 100,
   CHALK_PODMAN_POLL_MS = 10
 };
 
@@ -180,6 +181,13 @@ static int terminal_foreground_is(pid_t pgrp)
 int chalk_podman_run_attached(const char *exe, char *const argv[], int capture,
                               chalk_podman_child_t *out)
 {
+  return chalk_podman_run_attached_timed(exe, argv, capture, 0, out);
+}
+
+int chalk_podman_run_attached_timed(const char *exe, char *const argv[],
+                                    int capture, int timeout_ms,
+                                    chalk_podman_child_t *out)
+{
   int errpipe[2] = {-1, -1};
   int outpipe[2] = {-1, -1};
   int errcap[2] = {-1, -1};
@@ -190,7 +198,9 @@ int chalk_podman_run_attached(const char *exe, char *const argv[], int capture,
   int status = 0;
   int sent_kill = 0;
   int waiting_cancel = 0;
+  int waiting_timeout = 0;
   struct timespec cancel_start;
+  struct timespec run_start;
   struct sigaction act, oldact[4];
   const int sigs[4] = {SIGHUP, SIGINT, SIGQUIT, SIGTERM};
   sigset_t block, oldmask, waitmask;
@@ -303,6 +313,7 @@ int chalk_podman_run_attached(const char *exe, char *const argv[], int capture,
     sigdelset(&waitmask, sigs[i]);
   }
   sigprocmask(SIG_SETMASK, &waitmask, NULL);
+  clock_gettime(CLOCK_MONOTONIC, &run_start);
 
   for (;;) {
     pid_t waited;
@@ -312,8 +323,14 @@ int chalk_podman_run_attached(const char *exe, char *const argv[], int capture,
 
     if (g_forwarded && !waiting_cancel) {
       waiting_cancel = 1;
+      waiting_timeout = 0;
       clock_gettime(CLOCK_MONOTONIC, &cancel_start);
       kill_owned(pid, pgid, (int)g_forwarded);
+    } else if (timeout_ms > 0 && !waiting_cancel && !waiting_timeout &&
+               elapsed_ms(&run_start) >= timeout_ms) {
+      waiting_timeout = 1;
+      clock_gettime(CLOCK_MONOTONIC, &cancel_start);
+      kill_owned(pid, pgid, SIGTERM);
     }
     flags = WNOHANG | WUNTRACED;
 #ifdef WCONTINUED
@@ -380,7 +397,11 @@ int chalk_podman_run_attached(const char *exe, char *const argv[], int capture,
       continue;
     }
     if (waited == 0) {
-      if (waiting_cancel && !sent_kill &&
+      if (waiting_timeout && !sent_kill &&
+          elapsed_ms(&cancel_start) >= CHALK_PODMAN_TIMEOUT_KILL_MS) {
+        kill_owned(pid, pgid, SIGKILL);
+        sent_kill = 1;
+      } else if (waiting_cancel && !sent_kill &&
           elapsed_ms(&cancel_start) >= CHALK_PODMAN_CANCEL_GRACE_MS) {
         kill_owned(pid, pgid, SIGKILL);
         sent_kill = 1;
@@ -399,6 +420,7 @@ int chalk_podman_run_attached(const char *exe, char *const argv[], int capture,
   }
 
   out->forwarded = (int)g_forwarded;
+  out->timed_out = waiting_timeout && !g_forwarded;
   if (capture) {
     append_fd(outpipe[0], &out->stdout_bytes, &out_len);
     append_fd(errcap[0], &out->stderr_bytes, &err_len);
