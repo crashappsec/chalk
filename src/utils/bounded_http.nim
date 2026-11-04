@@ -225,6 +225,14 @@ proc boundedRequest*(url: Uri,
       inc hops
   except SslError:
     let socket = client.getSocket()
+    when defined(testing):
+      echo "TLS fixture reason: ", getCurrentExceptionMsg()
+      echo "TLS fixture socket: ", socket != nil
+      if socket != nil:
+        echo "TLS fixture handle: ", socket.sslHandle() != nil
+        if socket.sslHandle() != nil:
+          echo "TLS fixture verification: ", peerVerifyResult(socket.sslHandle())
+          echo "TLS fixture handshake finished: ", handshakeFinished(socket.sslHandle())
     if socket != nil and socket.sslHandle() != nil:
       if verifyMode != CVerifyNone and peerVerifyResult(socket.sslHandle()) != 0:
         raise newException(HttpPeerVerificationError, "registry TLS peer identity verification failed")

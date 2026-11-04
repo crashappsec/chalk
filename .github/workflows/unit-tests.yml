@@ -22,6 +22,15 @@ on:
       - "!src/docs/**"
       - Dockerfile
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Unit test suite
+        type: choice
+        default: all
+        options:
+          - all
+          - podman-sbom-http
+          - bounded-http
 
 permissions:
   contents: read
@@ -89,5 +98,12 @@ jobs:
           docker buildx bake --allow=fs.read=../nimutils chalk --load
 
       - name: Run unit tests
+        env:
+          UNIT_SUITE: ${{ inputs.suite || 'all' }}
         run: |
-          make unit-tests
+          case "$UNIT_SUITE" in
+            all) make unit-tests ;;
+            podman-sbom-http) make unit-tests args="--verbose pattern tests/unit/test_podman_sbom_http.nim" ;;
+            bounded-http) make unit-tests args="--verbose pattern tests/unit/test_bounded_http.nim" ;;
+            *) exit 2 ;;
+          esac
