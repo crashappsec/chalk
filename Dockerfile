@@ -33,6 +33,7 @@ RUN apt-get update -y && \
         git \
         make \
         musl-tools \
+        openssl \
         python3 \
         strace \
         && \

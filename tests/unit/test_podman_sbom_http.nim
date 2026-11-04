@@ -10,6 +10,7 @@ import std/[
   times,
 ]
 import nimutils/sha
+import ../../src/docker/[ids, registry]
 import ../../src/podman/sbom
 import ../../src/podman/types
 import ../../src/utils/json
@@ -29,6 +30,8 @@ proc linkDeleteCommand(path: seq[string])
 const sourceDir = currentSourcePath().parentDir().parentDir().parentDir() / "src"
 {.passc: "-I" & sourceDir.}
 
+const fixtureServer = currentSourcePath().parentDir() / "fixtures" / "http_fixture.py"
+
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
 
@@ -45,60 +48,11 @@ proc expectDiagnostic(outcome: PodmanSbomOutcome,
 proc sha(bytes: string): string =
   "sha256:" & bytes.sha256Hex()
 
-proc spdxDoc(): string =
+proc spdxDoc(pad = 0): string =
   """{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT",""" &
   """"name":"img","documentNamespace":"https://example.com/spdx/img",""" &
   """"creationInfo":{"created":"2024-01-01T00:00:00Z","creators":["Tool: test"]},""" &
-  """"packages":[]}"""
-
-const registryPy = """
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import json, sys, time
-
-routes = json.loads(open(sys.argv[1]).read())
-hits_path = sys.argv[2]
-port = int(sys.argv[3])
-
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):
-        return
-
-    def respond(self, method):
-        key = method + " " + self.path
-        with open(hits_path, "a") as hits:
-            hits.write(key + "\\n")
-        route = routes.get(key) or routes.get(method + " " + self.path.split("?", 1)[0])
-        if route is None:
-            self.send_response(404)
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return
-        delay = route.get("delay_ms", 0)
-        if delay:
-            time.sleep(delay / 1000.0)
-        body = route.get("body", "").encode()
-        self.send_response(int(route.get("status", 200)))
-        headers = route.get("headers", {})
-        for name, value in headers.items():
-            self.send_header(name, value)
-        if "Content-Type" not in headers:
-            self.send_header("Content-Type", route.get("content_type", "application/json"))
-        if method != "HEAD":
-            self.send_header("Content-Length", str(len(body)))
-        elif "Content-Length" not in headers:
-            self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        if method != "HEAD":
-            self.wfile.write(body)
-
-    def do_GET(self):
-        self.respond("GET")
-
-    def do_HEAD(self):
-        self.respond("HEAD")
-
-ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
-"""
+  """"packages":[]""" & " ".repeat(pad) & "}"
 
 proc freePort(): int =
   let s = newSocket()
@@ -118,21 +72,18 @@ proc waitReady(port: int) =
       sleep(20)
   doAssert false, "registry mock did not start"
 
-proc startRegistry(dir: string, routes: JsonNode): tuple[p: Process, port: int, hits: string] =
-  let port = freePort()
+proc startRegistry(dir: string, routes: JsonNode, port: int): tuple[p: Process, hits: string] =
   let routeFile = dir / "routes.json"
   let hits = dir / "hits.log"
-  let script = dir / "registry.py"
   writeFile(routeFile, $routes)
   writeFile(hits, "")
-  writeFile(script, registryPy)
   let p = startProcess(
     findExe("python3"),
-    args = @[script, routeFile, hits, $port],
+    args = @["-I", fixtureServer, routeFile, hits, $port],
     options = {poUsePath, poStdErrToStdOut},
   )
   waitReady(port)
-  return (p, port, hits)
+  return (p, hits)
 
 proc stopRegistry(p: Process) =
   terminate(p)
@@ -168,6 +119,14 @@ proc indexDoc(manifests: JsonNode): string =
     "manifests": manifests,
   })
 
+proc descriptor(digest: string, size: int): JsonNode =
+  %*{
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "digest": digest,
+    "size": size,
+    "artifactType": "application/spdx+json",
+  }
+
 proc route(status: int, body: string, headers: JsonNode = newJObject(),
            delayMs = 0): JsonNode =
   result = %*{
@@ -176,6 +135,10 @@ proc route(status: int, body: string, headers: JsonNode = newJObject(),
     "delay_ms": delayMs,
     "headers": headers,
   }
+
+proc dripping(r: JsonNode, chunk, delayMs: int): JsonNode =
+  result = r
+  result["drip"] = %*{"chunk": chunk, "delay_ms": delayMs}
 
 proc collectFrom(port: int, imageDigest, configDigest, authFile, attachment: string,
                  timeoutMs = 5000): PodmanSbomOutcome =
@@ -187,6 +150,12 @@ proc collectFrom(port: int, imageDigest, configDigest, authFile, attachment: str
     attachment,
     deadline,
   )
+
+proc timedCollect(port: int, imageDigest, configDigest, authFile: string,
+                  timeoutMs: int): (PodmanSbomOutcome, int) =
+  let start = getMonoTime()
+  let outcome = collectFrom(port, imageDigest, configDigest, authFile, "", timeoutMs)
+  return (outcome, int((getMonoTime() - start).inMilliseconds))
 
 proc main() =
   let dir = createTempDir("chalk-sbom-http-", "")
@@ -205,6 +174,10 @@ proc main() =
   let imageBody = ociManifest(
     configDigest, "application/vnd.oci.image.manifest.v1+json", %*[])
   let imageDigest = sha(imageBody)
+  let manifestHeaders = %*{
+    "Docker-Content-Digest": imageDigest,
+    "Content-Type": "application/vnd.oci.image.manifest.v1+json",
+  }
   let attachmentBody = ociManifest(
     configDigest,
     "application/vnd.oci.image.manifest.v1+json",
@@ -217,19 +190,11 @@ proc main() =
     artifactType = "application/spdx+json",
   )
   let attachmentDigest = sha(attachmentBody)
-  let indexBody = indexDoc(%*[{
-    "mediaType": "application/vnd.oci.image.manifest.v1+json",
-    "digest": attachmentDigest,
-    "size": len(attachmentBody),
-    "artifactType": "application/spdx+json",
-  }])
+  let indexBody = indexDoc(%*[descriptor(attachmentDigest, len(attachmentBody))])
 
   proc baseRoutes(extra: JsonNode = newJObject()): JsonNode =
     result = extra
-    result["GET /v2/demo/manifests/" & imageDigest] = route(
-      200, imageBody,
-      %*{"Docker-Content-Digest": imageDigest,
-         "Content-Type": "application/vnd.oci.image.manifest.v1+json"})
+    result["GET /v2/demo/manifests/" & imageDigest] = route(200, imageBody, manifestHeaders)
     result["HEAD /v2/demo/manifests/" & imageDigest] = route(
       200, imageBody,
       %*{"Docker-Content-Digest": imageDigest,
@@ -238,12 +203,25 @@ proc main() =
     result["GET /v2/demo/blobs/" & blobDigest] = route(
       200, blob, %*{"Content-Type": "application/spdx+json"})
 
+  proc attachmentRoutes(): JsonNode =
+    result = baseRoutes()
+    result["GET /v2/demo/referrers/" & imageDigest] = route(200, indexBody)
+    result["GET /v2/demo/manifests/" & attachmentDigest] = route(200, attachmentBody)
+
+  proc singleLayerAttachment(layerDigest: string, layerSize: int): (string, string) =
+    let body = ociManifest(
+      configDigest,
+      "application/vnd.oci.image.manifest.v1+json",
+      %*[{"mediaType": "application/spdx+json", "digest": layerDigest, "size": layerSize}],
+      subject = imageDigest,
+      artifactType = "application/spdx+json",
+    )
+    return (body, sha(body))
+
   try:
     block happy:
-      var routes = baseRoutes()
-      routes["GET /v2/demo/referrers/" & imageDigest] = route(200, indexBody)
-      routes["GET /v2/demo/manifests/" & attachmentDigest] = route(200, attachmentBody)
-      let (p, port, hits) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, attachmentRoutes(), port)
       try:
         let outcome = collectFrom(port, imageDigest, configDigest, authFile, "")
         assertEq(expectDocument(outcome).sourceBytes, blob)
@@ -258,7 +236,8 @@ proc main() =
       var routes = baseRoutes()
       routes["GET /v2/demo/referrers/" & imageDigest] = route(404, "")
       routes["GET /v2/demo/manifests/sha256-" & imageDigest[7 .. ^1]] = route(404, "")
-      let (p, port, _) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         discard expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -271,7 +250,8 @@ proc main() =
       routes["GET /v2/demo/referrers/" & imageDigest] = route(404, "")
       routes["GET /v2/demo/manifests/sha256-" & imageDigest[7 .. ^1]] = route(200, indexBody)
       routes["GET /v2/demo/manifests/" & attachmentDigest] = route(200, attachmentBody)
-      let (p, port, hits) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, routes, port)
       try:
         assertEq(expectDocument(
           collectFrom(port, imageDigest, configDigest, authFile, "")).sourceBytes, blob)
@@ -282,16 +262,9 @@ proc main() =
     block wrongGetDigest:
       var routes = baseRoutes()
       let corrupt = imageBody & " "
-      routes["GET /v2/demo/manifests/" & imageDigest] = route(
-        200, corrupt,
-        %*{"Docker-Content-Digest": imageDigest,
-           "Content-Type": "application/vnd.oci.image.manifest.v1+json"})
-      routes["HEAD /v2/demo/manifests/" & imageDigest] = route(
-        200, imageBody,
-        %*{"Docker-Content-Digest": imageDigest,
-           "Content-Type": "application/vnd.oci.image.manifest.v1+json",
-           "Content-Length": $len(imageBody)})
-      let (p, port, _) = startRegistry(dir, routes)
+      routes["GET /v2/demo/manifests/" & imageDigest] = route(200, corrupt, manifestHeaders)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         discard expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -314,14 +287,11 @@ proc main() =
       )
       let badDigest = sha(badAttach)
       var routes = baseRoutes()
-      routes["GET /v2/demo/referrers/" & imageDigest] = route(200, indexDoc(%*[{
-        "mediaType": "application/vnd.oci.image.manifest.v1+json",
-        "digest": badDigest,
-        "size": len(badAttach),
-        "artifactType": "application/spdx+json",
-      }]))
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(
+        200, indexDoc(%*[descriptor(badDigest, len(badAttach))]))
       routes["GET /v2/demo/manifests/" & badDigest] = route(200, badAttach)
-      let (p, port, _) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         discard expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -349,7 +319,8 @@ proc main() =
         "size": len(badAttach),
       }]))
       routes["GET /v2/demo/manifests/" & badDigest] = route(200, badAttach)
-      let (p, port, _) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         discard expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -370,14 +341,11 @@ proc main() =
       )
       let multiDigest = sha(multi)
       var routes = baseRoutes()
-      routes["GET /v2/demo/referrers/" & imageDigest] = route(200, indexDoc(%*[{
-        "mediaType": "application/vnd.oci.image.manifest.v1+json",
-        "digest": multiDigest,
-        "size": len(multi),
-        "artifactType": "application/spdx+json",
-      }]))
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(
+        200, indexDoc(%*[descriptor(multiDigest, len(multi))]))
       routes["GET /v2/demo/manifests/" & multiDigest] = route(200, multi)
-      let (p, port, _) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         discard expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, multiDigest),
@@ -388,38 +356,18 @@ proc main() =
     block ambiguousAndSelect:
       let secondBlob = spdxDoc().replace("img", "img2")
       let secondBlobDigest = sha(secondBlob)
-      let secondAttach = ociManifest(
-        configDigest,
-        "application/vnd.oci.image.manifest.v1+json",
-        %*[{
-          "mediaType": "application/spdx+json",
-          "digest": secondBlobDigest,
-          "size": len(secondBlob),
-        }],
-        subject = imageDigest,
-        artifactType = "application/spdx+json",
-      )
-      let secondDigest = sha(secondAttach)
+      let (secondAttach, secondDigest) = singleLayerAttachment(secondBlobDigest, len(secondBlob))
       var routes = baseRoutes()
       routes["GET /v2/demo/referrers/" & imageDigest] = route(200, indexDoc(%*[
-        {
-          "mediaType": "application/vnd.oci.image.manifest.v1+json",
-          "digest": attachmentDigest,
-          "size": len(attachmentBody),
-          "artifactType": "application/spdx+json",
-        },
-        {
-          "mediaType": "application/vnd.oci.image.manifest.v1+json",
-          "digest": secondDigest,
-          "size": len(secondAttach),
-          "artifactType": "application/spdx+json",
-        },
+        descriptor(attachmentDigest, len(attachmentBody)),
+        descriptor(secondDigest, len(secondAttach)),
       ]))
       routes["GET /v2/demo/manifests/" & attachmentDigest] = route(200, attachmentBody)
       routes["GET /v2/demo/manifests/" & secondDigest] = route(200, secondAttach)
       routes["GET /v2/demo/blobs/" & secondBlobDigest] = route(
         200, secondBlob, %*{"Content-Type": "application/spdx+json"})
-      let (p, port, _) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         discard expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -431,11 +379,10 @@ proc main() =
         stopRegistry(p)
 
     block corruptBlob:
-      var routes = baseRoutes()
-      routes["GET /v2/demo/referrers/" & imageDigest] = route(200, indexBody)
-      routes["GET /v2/demo/manifests/" & attachmentDigest] = route(200, attachmentBody)
+      var routes = attachmentRoutes()
       routes["GET /v2/demo/blobs/" & blobDigest] = route(200, blob & "nope")
-      let (p, port, _) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         discard expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -448,7 +395,8 @@ proc main() =
       routes["GET /v2/demo/referrers/" & imageDigest] = route(
         200, indexDoc(%*[]),
         %*{"Link": "<https://evil.example/v2/demo/referrers/next>; rel=\"next\""})
-      let (p, port, hits) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, routes, port)
       try:
         let diag = expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -460,19 +408,15 @@ proc main() =
         stopRegistry(p)
 
     block queryPage:
-      let page2 = indexDoc(%*[{
-        "mediaType": "application/vnd.oci.image.manifest.v1+json",
-        "digest": attachmentDigest,
-        "size": len(attachmentBody),
-        "artifactType": "application/spdx+json",
-      }])
+      let page2 = indexDoc(%*[descriptor(attachmentDigest, len(attachmentBody))])
       var routes = baseRoutes()
       routes["GET /v2/demo/referrers/" & imageDigest] = route(
         200, indexDoc(%*[]),
         %*{"Link": "<?n=2>; rel=\"next\""})
       routes["GET /v2/demo/referrers/" & imageDigest & "?n=2"] = route(200, page2)
       routes["GET /v2/demo/manifests/" & attachmentDigest] = route(200, attachmentBody)
-      let (p, port, hits) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, routes, port)
       try:
         assertEq(expectDocument(
           collectFrom(port, imageDigest, configDigest, authFile, "")).sourceBytes, blob)
@@ -489,7 +433,8 @@ proc main() =
       loopHeaders["Link"] = % ("</v2/demo/referrers/" & imageDigest & ">; rel=\"next\"")
       routes["GET /v2/demo/referrers/" & imageDigest & "?n=2"] = route(
         200, indexDoc(%*[]), loopHeaders)
-      let (p, port, _) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         let diag = expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -503,7 +448,8 @@ proc main() =
       routes["GET /v2/demo/manifests/" & imageDigest] = route(
         401, "denied",
         %*{"Www-Authenticate": "Bearer realm=\"http://127.0.0.1/token\""})
-      let (p, port, _) = startRegistry(dir, routes)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         let diag = expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, ""),
@@ -513,14 +459,229 @@ proc main() =
       finally:
         stopRegistry(p)
 
+    block forbidden:
+      var routes = newJObject()
+      routes["GET /v2/demo/manifests/" & imageDigest] = route(403, "forbidden")
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        let diag = expectDiagnostic(
+          collectFrom(port, imageDigest, configDigest, authFile, ""),
+          pdkAuthFailure)
+        doAssert "forbidden" notin diag.message
+      finally:
+        stopRegistry(p)
+
+    block serverErrorIsNotAttachmentAbsence:
+      var routes = newJObject()
+      routes["GET /v2/demo/manifests/" & imageDigest] = route(503, "unavailable")
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        discard expectDiagnostic(collectFrom(port, imageDigest, configDigest, authFile, ""), pdkOther)
+      finally:
+        stopRegistry(p)
+
+    block unavailableCandidateRequiresExplicitSelection:
+      let unavailable = "sha256:" & "f".repeat(64)
+      var routes = attachmentRoutes()
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(200, indexDoc(%*[
+        descriptor(unavailable, 100), descriptor(attachmentDigest, len(attachmentBody)),
+      ]))
+      routes["GET /v2/demo/manifests/" & unavailable] = route(503, "unavailable")
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        discard expectDiagnostic(collectFrom(port, imageDigest, configDigest, authFile, ""), pdkOther)
+        assertEq(expectDocument(collectFrom(port, imageDigest, configDigest, authFile, attachmentDigest)).sourceBytes, blob)
+      finally:
+        stopRegistry(p)
+
+    block nonStrictReferrersPreserveOriginalDocument:
+      let raw = " { \"schemaVersion\": 2, \"annotations\": {\"kept\": \"value\"}, \"manifests\": [] } "
+      var routes = newJObject()
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(200, raw)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        withRegistryAccess(newAuthFileRegistryAccess(authFile)):
+          let image = parseImage("127.0.0.1:" & $port & "/demo@" & imageDigest)
+          let document = image.referrersGet()
+          doAssert document != nil
+          assertEq(document.digest, sha(raw))
+          assertEq(document.json{"annotations"}{"kept"}.getStr(), "value")
+      finally:
+        stopRegistry(p)
+
+    block notFoundWithAuthLikeDigest:
+      let digest401 = "sha256:401" & "a".repeat(61)
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, newJObject(), port)
+      try:
+        discard expectDiagnostic(
+          collectFrom(port, digest401, configDigest, authFile, ""),
+          pdkAttachmentAbsent)
+        doAssert "GET /v2/demo/manifests/" & digest401 in readFile(hits)
+      finally:
+        stopRegistry(p)
+
+    block missingCandidateWithAuthLikeDigest:
+      let digest403 = "sha256:403" & "b".repeat(61)
+      var routes = attachmentRoutes()
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(200, indexDoc(%*[
+        descriptor(digest403, 100),
+        descriptor(attachmentDigest, len(attachmentBody)),
+      ]))
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, routes, port)
+      try:
+        assertEq(expectDocument(
+          collectFrom(port, imageDigest, configDigest, authFile, "")).sourceBytes, blob)
+        doAssert "GET /v2/demo/manifests/" & digest403 in readFile(hits)
+      finally:
+        stopRegistry(p)
+
+    block bearerChallenge:
+      let port = freePort()
+      var routes = attachmentRoutes()
+      let realm = "http://127.0.0.1:" & $port & "/token"
+      for key in ["GET /v2/demo/manifests/" & imageDigest,
+                  "GET /v2/demo/referrers/" & imageDigest,
+                  "GET /v2/demo/manifests/" & attachmentDigest,
+                  "GET /v2/demo/blobs/" & blobDigest]:
+        routes[key]["auth"] = %*{
+          "header": "Bearer tok",
+          "challenge": "Bearer realm=\"" & realm & "\",service=\"demo\"",
+        }
+      routes["GET /token"] = route(200, $(%*{"token": "tok"}))
+      let (p, hits) = startRegistry(dir, routes, port)
+      try:
+        assertEq(expectDocument(
+          collectFrom(port, imageDigest, configDigest, authFile, "")).sourceBytes, blob)
+        doAssert "GET /token?service=demo" in readFile(hits)
+      finally:
+        stopRegistry(p)
+
+    block oversizedTokenBody:
+      let port = freePort()
+      var routes = attachmentRoutes()
+      let realm = "http://127.0.0.1:" & $port & "/token"
+      routes["GET /v2/demo/manifests/" & imageDigest]["auth"] = %*{
+        "header": "Bearer tok", "challenge": "Bearer realm=\"" & realm & "\"",
+      }
+      routes["GET /token"] = route(200, "{}")
+      routes["GET /token"]["content_length"] = %(maxPodmanSbomBytes + 1)
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        discard expectDiagnostic(collectFrom(port, imageDigest, configDigest, authFile, ""), pdkOversized)
+      finally:
+        stopRegistry(p)
+
+    block slowTokenChallenge:
+      let port = freePort()
+      var routes = attachmentRoutes()
+      let realm = "http://127.0.0.1:" & $port & "/token"
+      routes["GET /v2/demo/manifests/" & imageDigest]["auth"] = %*{
+        "header": "Bearer tok",
+        "challenge": "Bearer realm=\"" & realm & "\"",
+      }
+      routes["GET /token"] = route(200, $(%*{"token": "tok"}), delayMs = 3000)
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        let (outcome, elapsed) = timedCollect(port, imageDigest, configDigest, authFile, 500)
+        discard expectDiagnostic(outcome, pdkTimeout)
+        doAssert elapsed < 2000, "token challenge ignored the deadline: " & $elapsed & "ms"
+      finally:
+        stopRegistry(p)
+
     block timeout:
       var routes = baseRoutes()
-      routes["GET /v2/demo/manifests/" & imageDigest] = route(200, imageBody, delayMs = 1000)
-      let (p, port, _) = startRegistry(dir, routes)
+      routes["GET /v2/demo/manifests/" & imageDigest] = route(200, imageBody, manifestHeaders, delayMs = 1000)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
       try:
         discard expectDiagnostic(
           collectFrom(port, imageDigest, configDigest, authFile, "", timeoutMs = 200),
           pdkTimeout)
+      finally:
+        stopRegistry(p)
+
+    block slowManifestBody:
+      var routes = attachmentRoutes()
+      routes["GET /v2/demo/manifests/" & imageDigest] =
+        route(200, imageBody, manifestHeaders).dripping(chunk = 20, delayMs = 250)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        let (outcome, elapsed) = timedCollect(port, imageDigest, configDigest, authFile, 500)
+        discard expectDiagnostic(outcome, pdkTimeout)
+        doAssert elapsed < 2000, "manifest body read outlived the budget: " & $elapsed & "ms"
+      finally:
+        stopRegistry(p)
+
+    block slowBlobBody:
+      let bigBlob = spdxDoc(pad = 60000)
+      let bigBlobDigest = sha(bigBlob)
+      let (bigAttach, bigDigest) = singleLayerAttachment(bigBlobDigest, len(bigBlob))
+      var routes = baseRoutes()
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(
+        200, indexDoc(%*[descriptor(bigDigest, len(bigAttach))]))
+      routes["GET /v2/demo/manifests/" & bigDigest] = route(200, bigAttach)
+      routes["GET /v2/demo/blobs/" & bigBlobDigest] =
+        route(200, bigBlob, %*{"Content-Type": "application/spdx+json"})
+        .dripping(chunk = 4096, delayMs = 200)
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        let (outcome, elapsed) = timedCollect(port, imageDigest, configDigest, authFile, 500)
+        discard expectDiagnostic(outcome, pdkTimeout)
+        doAssert elapsed < 2000, "blob read outlived the budget: " & $elapsed & "ms"
+      finally:
+        stopRegistry(p)
+
+    block oversizedDeclared:
+      let hugeDigest = "sha256:" & "e".repeat(64)
+      let hugeSize = 40 * 1024 * 1024
+      let (hugeAttach, hugeAttachDigest) = singleLayerAttachment(hugeDigest, hugeSize)
+      var routes = baseRoutes()
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(
+        200, indexDoc(%*[descriptor(hugeAttachDigest, len(hugeAttach))]))
+      routes["GET /v2/demo/manifests/" & hugeAttachDigest] = route(200, hugeAttach)
+      routes["GET /v2/demo/blobs/" & hugeDigest] = %*{
+        "status": 200,
+        "body_repeat": {"byte": "x", "count": hugeSize},
+        "headers": {"Content-Type": "application/spdx+json"},
+      }
+      let port = freePort()
+      let (p, hits) = startRegistry(dir, routes, port)
+      try:
+        discard expectDiagnostic(
+          collectFrom(port, imageDigest, configDigest, authFile, ""),
+          pdkOversized)
+        doAssert "GET /v2/demo/blobs/" & hugeDigest notin readFile(hits),
+          "blob was fetched despite its declared size"
+      finally:
+        stopRegistry(p)
+
+    block oversizedStream:
+      let lyingDigest = "sha256:" & "f".repeat(64)
+      let (lyingAttach, lyingAttachDigest) = singleLayerAttachment(lyingDigest, 100)
+      var routes = baseRoutes()
+      routes["GET /v2/demo/referrers/" & imageDigest] = route(
+        200, indexDoc(%*[descriptor(lyingAttachDigest, len(lyingAttach))]))
+      routes["GET /v2/demo/manifests/" & lyingAttachDigest] = route(200, lyingAttach)
+      routes["GET /v2/demo/blobs/" & lyingDigest] = %*{
+        "status": 200,
+        "body_repeat": {"byte": "x", "count": maxPodmanSbomBytes + 65536},
+        "chunked": true,
+        "headers": {"Content-Type": "application/spdx+json"},
+      }
+      let port = freePort()
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        discard expectDiagnostic(
+          collectFrom(port, imageDigest, configDigest, authFile, ""),
+          pdkOversized)
       finally:
         stopRegistry(p)
 

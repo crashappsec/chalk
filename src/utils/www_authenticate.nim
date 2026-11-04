@@ -10,7 +10,6 @@
 
 import std/[
   net,
-  options,
   sequtils,
   uri,
 ]
@@ -19,11 +18,11 @@ import pkg/[
   nimutils/logging,
 ]
 import "."/[
+  bounded_http,
   http,
   json,
   strings,
   tables,
-  times,
 ]
 
 type
@@ -40,6 +39,8 @@ type
       url:   string
     of other:
       discard
+
+  TokenFetch* = proc(url: string, headers: HttpHeaders): Response
 
 proc `$`(self: AuthChallenge): string =
   var options = ""
@@ -70,36 +71,17 @@ proc initBearerChallenge(options: var OrderedTable[string, string]): AuthChallen
                        realm:   realm,
                        url:     $uri)
 
-proc timeoutForDeadline(timeout: int, deadline: Option[MonoTime]): int =
-  if deadline.isNone():
-    return timeout
-  let left = remainingMs(deadline.get())
-  if left <= 0:
-    raise newException(ValueError, "request timed out")
-  if timeout <= 0:
-    return left
-  return min(timeout, left)
-
 proc elicitHeaders(
-    self:           AuthChallenge,
-    headers:        HttpHeaders = newHttpHeaders(),
-    timeout:        int         = 1000,
-    retries:        int         = 0,
-    connectRetries: int         = 0,
-    deadline:       Option[MonoTime] = none(MonoTime),
+    self:    AuthChallenge,
+    headers: HttpHeaders,
+    fetch:   TokenFetch,
 ): HttpHeaders =
   case self.kind:
   of other:
     raise newException(ValueError, "unsupported auth challenge scheme: " & self.scheme)
   of bearer:
     trace("http: fetching bearer token from: " & self.url)
-    let tokenResponse = safeRequest(
-      self.url,
-      headers        = headers,
-      timeout        = timeoutForDeadline(timeout, deadline),
-      retries        = retries,
-      connectRetries = connectRetries,
-    )
+    let tokenResponse = fetch(self.url, headers)
     if not tokenResponse.code().is2xx():
       raise newException(ValueError,
                          "Bearer auth realm URL did not return valid response: " &
@@ -115,26 +97,17 @@ proc elicitHeaders(
     result = newHttpHeaders({"Authorization": "Bearer " & token})
 
 proc elicitHeaders*(
-    challenges:     seq[AuthChallenge],
-    headers:        HttpHeaders = newHttpHeaders(),
-    timeout:        int         = 1000,
-    retries:        int         = 0,
-    connectRetries: int         = 0,
-    deadline:       Option[MonoTime] = none(MonoTime),
+    challenges: seq[AuthChallenge],
+    headers:    HttpHeaders,
+    fetch:      TokenFetch,
 ): HttpHeaders =
   result = newHttpHeaders()
   for challenge in challenges:
     try:
-      return challenge.elicitHeaders(
-        headers        = headers,
-        timeout        = timeout,
-        retries        = retries,
-        connectRetries = connectRetries,
-        deadline       = deadline,
-      )
+      return challenge.elicitHeaders(headers, fetch)
+    except HttpDeadlineError, HttpBodyTooLargeError:
+      raise
     except:
-      if deadline.isSome() and timedOut(deadline.get()):
-        raise
       continue
 
 proc parseAuthChallenge(data: seq[string]): AuthChallenge =
@@ -174,6 +147,19 @@ proc parseAuthChallenges(data: string): seq[AuthChallenge] =
   if len(challenge) > 0:
     result.add(parseAuthChallenge(challenge))
 
+proc statusAccepted(response: Response,
+                    acceptStatusCodes: openArray[Slice[int]],
+                    rejectStatusCodes: openArray[Slice[int]],
+                    ): bool =
+  let code =
+    try:
+      int(response.code())
+    except ValueError:
+      return false
+  if len(acceptStatusCodes) > 0 and not acceptStatusCodes.anyIt(code in it):
+    return false
+  return not rejectStatusCodes.anyIt(code in it)
+
 proc authHeadersSafeRequest*(url: Uri | string,
                              httpMethod: HttpMethod | string = HttpGet,
                              body = "",
@@ -189,7 +175,6 @@ proc authHeadersSafeRequest*(url: Uri | string,
                              disallowHttp: bool = false,
                              acceptStatusCodes: openArray[Slice[int]] = @[],
                              rejectStatusCodes: openArray[Slice[int]] = @[],
-                             deadline: Option[MonoTime] = none(MonoTime),
                              ): (HttpHeaders, Response) =
   var
     authHeaders = headers
@@ -203,7 +188,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       retries           = retries,
       connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
-      timeout           = timeoutForDeadline(timeout, deadline),
+      timeout           = timeout,
       pinnedCert        = pinnedCert,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
@@ -219,11 +204,15 @@ proc authHeadersSafeRequest*(url: Uri | string,
       wwwAuthenticate = response.headers["www-authenticate"]
       challenges      = parseAuthChallenges(wwwAuthenticate)
     newHeaders        = challenges.elicitHeaders(
-      headers        = authHeaders,
-      timeout        = timeout,
-      retries        = retries,
-      connectRetries = connectRetries,
-      deadline       = deadline,
+      headers = authHeaders,
+      fetch   = proc(tokenUrl: string, tokenHeaders: HttpHeaders): Response =
+        safeRequest(
+          tokenUrl,
+          headers        = tokenHeaders,
+          timeout        = timeout,
+          retries        = retries,
+          connectRetries = connectRetries,
+        ),
     )
     authHeaders       = authHeaders.update(newHeaders)
 
@@ -236,7 +225,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       retries           = retries,
       connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
-      timeout           = timeoutForDeadline(timeout, deadline),
+      timeout           = timeout,
       pinnedCert        = pinnedCert,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
@@ -245,13 +234,11 @@ proc authHeadersSafeRequest*(url: Uri | string,
       rejectStatusCodes = rejectStatusCodes,
     )
 
-  try:
-    discard response.check(
-      url               = url,
-      acceptStatusCodes = acceptStatusCodes,
-      rejectStatusCodes = rejectStatusCodes,
-    )
-  except:
+  # The first request carries no accepted codes so that a 401 challenge can
+  # be answered. A final status outside them is requested again through
+  # safeRequest, whose retry loop covers transient failures that the
+  # unchecked first request never retried.
+  if not response.statusAccepted(acceptStatusCodes, rejectStatusCodes):
     response = safeRequest(
       url               = url,
       httpMethod        = httpMethod,
@@ -261,7 +248,7 @@ proc authHeadersSafeRequest*(url: Uri | string,
       retries           = retries,
       connectRetries    = connectRetries,
       firstRetryDelayMs = firstRetryDelayMs,
-      timeout           = timeoutForDeadline(timeout, deadline),
+      timeout           = timeout,
       pinnedCert        = pinnedCert,
       verifyMode        = verifyMode,
       maxRedirects      = maxRedirects,
@@ -270,6 +257,56 @@ proc authHeadersSafeRequest*(url: Uri | string,
       rejectStatusCodes = rejectStatusCodes,
     )
 
+  return (newHeaders, response)
+
+proc authHeadersBoundedRequest*(url: Uri,
+                                httpMethod: HttpMethod,
+                                budget: HttpBudget,
+                                body = "",
+                                headers: HttpHeaders = newHttpHeaders(),
+                                pinnedCert: string = "",
+                                verifyMode = CVerifyPeer,
+                                acceptStatusCodes: openArray[Slice[int]] = @[],
+                                ): (HttpHeaders, Response) =
+  ## `authHeadersSafeRequest` over `boundedRequest`: the challenge, its token
+  ## fetch, and the answered request all draw on the same `budget`.
+  var
+    authHeaders = headers
+    newHeaders  = newHttpHeaders()
+    response    = boundedRequest(
+      url,
+      httpMethod,
+      budget,
+      body       = body,
+      headers    = authHeaders,
+      pinnedCert = pinnedCert,
+      verifyMode = verifyMode,
+    )
+
+  if (
+    response.code() == Http401 and
+    response.headers.hasKey("www-authenticate")
+  ):
+    trace("http: eliciting auth headers via www-authenticate for " & $url)
+    let challenges = parseAuthChallenges(response.headers["www-authenticate"])
+    newHeaders     = challenges.elicitHeaders(
+      headers = authHeaders,
+      fetch   = proc(tokenUrl: string, tokenHeaders: HttpHeaders): Response =
+        boundedRequest(parseUri(tokenUrl), HttpGet, budget, headers = tokenHeaders),
+    )
+    authHeaders    = authHeaders.update(newHeaders)
+
+    response = boundedRequest(
+      url,
+      httpMethod,
+      budget,
+      body       = body,
+      headers    = authHeaders,
+      pinnedCert = pinnedCert,
+      verifyMode = verifyMode,
+    )
+
+  discard response.check(url, acceptStatusCodes = acceptStatusCodes)
   return (newHeaders, response)
 
 proc authSafeRequest*(url: Uri | string,
@@ -287,7 +324,6 @@ proc authSafeRequest*(url: Uri | string,
                       disallowHttp: bool = false,
                       acceptStatusCodes: openArray[Slice[int]] = @[],
                       rejectStatusCodes: openArray[Slice[int]] = @[],
-                      deadline: Option[MonoTime] = none(MonoTime),
                       ): Response =
   let (_, response) = authHeadersSafeRequest(
     url               = url,
@@ -305,6 +341,5 @@ proc authSafeRequest*(url: Uri | string,
     disallowHttp      = disallowHttp,
     acceptStatusCodes = acceptStatusCodes,
     rejectStatusCodes = rejectStatusCodes,
-    deadline          = deadline,
   )
   return response

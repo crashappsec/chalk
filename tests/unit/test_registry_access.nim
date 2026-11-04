@@ -74,8 +74,10 @@ proc main() =
     doAssert key notin accessB.jsonCache
     doAssert key notin dockerRegistryAccess.jsonCache
     doAssert dockerRegistryAccess.discoverDocker
-    doAssert accessA.strictReferrerLinks
+    doAssert not accessA.strictReferrerLinks
     doAssert not dockerRegistryAccess.strictReferrerLinks
+    doAssert accessA.budget.isNone()
+    doAssert dockerRegistryAccess.budget.isNone()
 
     let current = parseUri("https://registry.example/v2/demo/referrers/sha256:abc")
     let queryOnly = resolveReferrerNextLink(current, "?n=2")
