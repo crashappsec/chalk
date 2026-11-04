@@ -16,6 +16,7 @@ RUN apk add --no-cache \
     make \
     musl-dev \
     openssl \
+    python3 \
     strace
 
 # add musl-gcc so its consistent CC with ubuntu
@@ -32,6 +33,7 @@ RUN apt-get update -y && \
         git \
         make \
         musl-tools \
+        python3 \
         strace \
         && \
     apt-get clean -y
