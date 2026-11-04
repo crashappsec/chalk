@@ -89,7 +89,8 @@ proc redirectTarget(current: Uri, headers: HttpHeaders): Uri =
   let location: string = headers.getOrDefault("Location")
   if location == "":
     raise newException(ValueError, "redirect without a Location header")
-  return combine(current, parseUri(location))
+  result = combine(current, parseUri(location))
+  result.isIpv6 = ':' in result.hostname
 
 proc handshakeFinished(ssl: SslPtr): cint
   {.cdecl, importc: "SSL_is_init_finished", dynlib: DLLSSLName.}
@@ -179,6 +180,7 @@ proc boundedRequest*(url: Uri,
     reqBody    = body
     reqHeaders = copyHeaders(headers)
     hops       = 0
+  target.isIpv6 = ':' in target.hostname
   let
     context = sslContextFor(pinnedCert, verifyMode)
     client  = newAsyncHttpClient(userAgent    = getDefaultUserAgent(),
@@ -188,6 +190,8 @@ proc boundedRequest*(url: Uri,
     while true:
       discard budget.remaining()
       connectWithin(client, context, target, budget, verifyMode)
+      if not reqHeaders.hasKey("Host"):
+        reqHeaders["Host"] = target.address & (if target.port != "": ":" & target.port else: "")
       let pending = client.request(target, reqMethod, reqBody, reqHeaders)
       let
         response = pending.within(budget)
@@ -224,7 +228,7 @@ proc boundedRequest*(url: Uri,
     if socket != nil and socket.sslHandle() != nil:
       if verifyMode != CVerifyNone and peerVerifyResult(socket.sslHandle()) != 0:
         raise newException(HttpPeerVerificationError, "registry TLS peer identity verification failed")
-      if handshakeFinished(socket.sslHandle()) == 0:
+      if handshakeFinished(socket.sslHandle()) == 0 and isTlsProtocolMismatch(getCurrentExceptionMsg()):
         raise newException(HttpTlsProtocolError, "registry endpoint did not complete TLS")
     raise newException(HttpTlsError, "registry TLS exchange failed")
   finally:

@@ -553,7 +553,7 @@ iterator getConfigs(self: DockerImage, useCase: RegistryUseCase): RegistryConfig
       if httpsConfig notin checkedConfigs:
         checkedConfigs.add(httpsConfig)
         yield httpsConfig
-      if self.domain in ["localhost", "127.0.0.1", "::1"]:
+      if self.domain in ["localhost", "127.0.0.1", "[::1]"]:
         let httpConfig = RegistryConfig(
           source:     "authfile",
           scheme:     "http://",
@@ -759,6 +759,9 @@ proc request(self:              DockerImage,
         )
         break
     except:
+      if not access.discoverDocker:
+        failure = newException(RegistryResponseError, "registry transport request failed")
+        break
       let msg = getCurrentExceptionMsg()
       trace("docker: ignoring error: " & msg)
       ignoredErrors.add(msg)

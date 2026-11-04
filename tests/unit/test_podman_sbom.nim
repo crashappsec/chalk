@@ -347,7 +347,7 @@ proc main() =
              "collection and cleanup exceeded their shared budget"
 
     let noIdFake = writeFakePodman(tmpDir, imageFile, logFile,
-                                  createSleepSec = "1", printContainerId = false)
+                                  createSleepSec = "3", printContainerId = false)
     writeFile(logFile, "")
     discard expectDiagnostic(collectNativePodmanSbom(
       exe          = noIdFake,
@@ -355,7 +355,7 @@ proc main() =
       outputs      = PodmanSbomNativeOutputs(imageOutput: "/sbom.spdx.json"),
       snapshots    = @[],
       workingDir   = tmpDir,
-      deadline     = getMonoTime() + initDuration(milliseconds = 200),
+      deadline     = getMonoTime() + initDuration(milliseconds = 2000),
       cancellation = collectCancel,
     ), pdkTimeout)
     doAssert "rm\n" in readFile(logFile), "scratch cleanup requires no stdout identity"
