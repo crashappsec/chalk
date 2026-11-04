@@ -162,7 +162,7 @@ proc isTlsProtocolMismatch*(message: string): bool =
     sslWrongVersionNumber = 267
     sslRecordLayerFailure = 313
   let text = message.toLowerAscii()
-  # Release OpenSSL omits reason strings, and Nim consumes the error queue.
+  # Release OpenSSL omits reason strings.
   if "lib(20)" in text:
     for reason in [sslPacketLengthTooLong, sslUnknownProtocol,
                    sslWrongVersionNumber, sslRecordLayerFailure]:
