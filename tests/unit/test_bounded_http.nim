@@ -30,7 +30,7 @@ proc linkDeleteCommand(path: seq[string])
 const fixtureServer = currentSourcePath().parentDir() / "fixtures" / "http_fixture.py"
 when defined(linux):
   {.compile: "fixtures/slow_dns.c".}
-  {.passL: "-Wl,--wrap=getaddrinfo".}
+  {.passl: "-Wl,--wrap=getaddrinfo".}
 
 
 template assertEq(a, b: untyped) =

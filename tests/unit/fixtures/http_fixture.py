@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import sys
 import ssl
+import socket
 import time
 
 routes = json.loads(open(sys.argv[1]).read())
@@ -10,6 +11,8 @@ port = int(sys.argv[3])
 
 
 def route_body(route, request):
+    if route.get("echo_host_json"):
+        return json.dumps({"host": request.headers.get("Host", "")}).encode()
     if route.get("echo_host"):
         return request.headers.get("Host", "").encode()
     if route.get("echo_authorization"):
@@ -94,8 +97,21 @@ class Handler(BaseHTTPRequestHandler):
         self.respond("HEAD")
 
 
-server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-if len(sys.argv) > 4:
+class FixtureServer(ThreadingHTTPServer):
+    address_family = socket.AF_INET6 if routes.get("__bind__") == "::1" else socket.AF_INET
+
+    def get_request(self):
+        while True:
+            connection, address = super().get_request()
+            if len(sys.argv) > 4 and sys.argv[4] == "abort-tls":
+                if connection.recv(1, socket.MSG_PEEK) == b"\x16":
+                    connection.close()
+                    continue
+            return connection, address
+
+
+server = FixtureServer((routes.get("__bind__", "127.0.0.1"), port), Handler)
+if len(sys.argv) > 4 and sys.argv[4] != "abort-tls":
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(sys.argv[4], sys.argv[5])
     def record_sni(connection, server_name, initial_context):

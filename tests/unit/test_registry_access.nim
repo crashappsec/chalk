@@ -79,6 +79,10 @@ proc main() =
     doAssert accessA.budget.isNone()
     doAssert dockerRegistryAccess.budget.isNone()
 
+    let ipv6Next = resolveReferrerNextLink(parseUri("http://[::1]:5000/pages/first"), "next")
+    doAssert ipv6Next.isSome()
+    assertEq($ipv6Next.get(), "http://[::1]:5000/pages/next")
+
     let current = parseUri("https://registry.example/v2/demo/referrers/sha256:abc")
     let queryOnly = resolveReferrerNextLink(current, "?n=2")
     doAssert queryOnly.isSome()

@@ -55,35 +55,37 @@ proc spdxDoc(pad = 0): string =
   """"creationInfo":{"created":"2024-01-01T00:00:00Z","creators":["Tool: test"]},""" &
   """"packages":[]""" & " ".repeat(pad) & "}"
 
-proc freePort(): int =
-  let s = newSocket()
+proc freePort(address = "127.0.0.1"): int =
+  let s = newSocket(domain = (if address == "::1": AF_INET6 else: AF_INET))
   s.setSockOpt(OptReuseAddr, true)
-  s.bindAddr(Port(0), "127.0.0.1")
+  s.bindAddr(Port(0), address)
   result = int(s.getLocalAddr()[1])
   s.close()
 
-proc waitReady(port: int) =
+proc waitReady(port: int, address = "127.0.0.1") =
   for i in 0 .. 50:
     try:
-      let s = newSocket()
-      s.connect("127.0.0.1", Port(port))
+      let s = newSocket(domain = (if address == "::1": AF_INET6 else: AF_INET))
+      s.connect(address, Port(port))
       s.close()
       return
     except:
       sleep(20)
   doAssert false, "registry mock did not start"
 
-proc startRegistry(dir: string, routes: JsonNode, port: int): tuple[p: Process, hits: string] =
+proc startRegistry(dir: string, routes: JsonNode, port: int, mode = ""): tuple[p: Process, hits: string] =
   let routeFile = dir / "routes.json"
   let hits = dir / "hits.log"
   writeFile(routeFile, $routes)
   writeFile(hits, "")
+  var arguments = @["-I", fixtureServer, routeFile, hits, $port]
+  if mode != "": arguments.add(mode)
   let p = startProcess(
     findExe("python3"),
-    args = @["-I", fixtureServer, routeFile, hits, $port],
+    args = arguments,
     options = {poUsePath, poStdErrToStdOut},
   )
-  waitReady(port)
+  waitReady(port, routes{"__bind__"}.getStr("127.0.0.1"))
   return (p, hits)
 
 proc stopRegistry(p: Process) =
@@ -230,6 +232,50 @@ proc main() =
         let hitText = readFile(hits)
         doAssert "GET /v2/demo/referrers/" & imageDigest in hitText
         doAssert "GET /v2/demo/blobs/" & blobDigest in hitText
+      finally:
+        stopRegistry(p)
+
+    block abortedTlsCannotSendCredentialsOverHttp:
+      let port = freePort()
+      let captured = dir / "aborted-tls-authorization"
+      let credentialFile = dir / "aborted-tls-auth.json"
+      let registry = "127.0.0.1:" & $port
+      writeFile(credentialFile, $(%*{"auths": {registry: {"auth": "dXNlcjpwYXNz"}}}))
+      var routes = newJObject()
+      routes["GET /v2/demo/manifests/" & imageDigest] = %*{
+        "status": 200, "body": "{}", "save_authorization": captured}
+      let (p, hits) = startRegistry(dir, routes, port, "abort-tls")
+      try:
+        for bounded in [true, false]:
+          let access = newAuthFileRegistryAccess(credentialFile)
+          if bounded:
+            access.budget = some(HttpBudget(deadline: getMonoTime() + initDuration(seconds = 3),
+                                           maxBodyBytes: maxPodmanSbomBytes))
+          var failed = false
+          withRegistryAccess(access):
+            try:
+              discard manifestGet(parseImage(registry & "/demo@" & imageDigest), "application/json")
+            except RegistryResponseError:
+              failed = true
+          doAssert failed, "aborted TLS handshake advanced to a plaintext registry request"
+          doAssert not fileExists(captured), "plaintext retry exposed the auth-file credential"
+          assertEq(readFile(hits), "")
+      finally:
+        stopRegistry(p)
+
+    block ipv6LoopbackHttpRegistry:
+      let port = freePort("::1")
+      var routes = newJObject()
+      routes["__bind__"] = %"::1"
+      routes["GET /v2/demo/manifests/" & imageDigest] = %*{"status": 200, "echo_host_json": true}
+      let (p, _) = startRegistry(dir, routes, port)
+      try:
+        let access = newAuthFileRegistryAccess(authFile)
+        access.budget = some(HttpBudget(deadline: getMonoTime() + initDuration(seconds = 3),
+                                       maxBodyBytes: maxPodmanSbomBytes))
+        withRegistryAccess(access):
+          let document = manifestGet(parseImage("[::1]:" & $port & "/demo@" & imageDigest), "application/json")
+          assertEq(document.json["host"].getStr(), "[::1]:" & $port)
       finally:
         stopRegistry(p)
 
@@ -552,7 +598,10 @@ proc main() =
       let port = freePort()
       let (p, _) = startRegistry(dir, routes, port)
       try:
-        withRegistryAccess(newAuthFileRegistryAccess(authFile)):
+        let access = newAuthFileRegistryAccess(authFile)
+        access.budget = some(HttpBudget(deadline: getMonoTime() + initDuration(seconds = 3),
+                                       maxBodyBytes: maxPodmanSbomBytes))
+        withRegistryAccess(access):
           let image = parseImage("127.0.0.1:" & $port & "/demo@" & imageDigest)
           let document = image.referrersGet()
           doAssert document != nil

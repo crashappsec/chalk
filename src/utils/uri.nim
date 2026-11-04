@@ -62,7 +62,8 @@ proc resolveSameOrigin*(base: Uri, reference: string): Option[Uri] =
   let text = reference.strip()
   if text == "" or text.startsWith("//"):
     return none(Uri)
-  let target = combine(base, parseUri(text))
+  var target = combine(base, parseUri(text))
+  target.isIpv6 = ':' in target.hostname
   if target.username != "" or target.password != "" or not sameOrigin(base, target):
     return none(Uri)
   return some(target)
