@@ -10,6 +10,7 @@ import std/[
 ]
 import ../../src/podman/run
 import ../../src/podman/sbom
+import ../../src/podman/scan
 import ../../src/podman/types
 import ../../src/types
 
@@ -36,16 +37,17 @@ proc spdxDoc(packages = "[]", version = "SPDX-2.3"): string =
   """"creationInfo":{"created":"2024-01-01T00:00:00Z","creators":["Tool: test"]},""" &
   """"packages":""" & packages & "}"
 
-proc writeFakePodman(dir, imageFile, logFile: string, createSleepSec = ""): string =
+proc writeFakePodman(dir, imageFile, logFile: string, createSleepSec = "", rmSleepSec = "", printContainerId = true): string =
   result = dir / "fake-podman"
   var body = "#!/bin/sh\n"
   body &= "log=\"$CHALK_FAKE_PODMAN_LOG\"\n"
-  body &= "echo \"$1\" >> \"$log\"\n"
+  body &= "echo \"$*\" >> \"$log\"\n"
   body &= "cmd=\"$1\"\n"
   body &= "shift\n"
   body &= "case \"$cmd\" in\n"
   body &= "  create)\n"
-  body &= "    echo ctr-$$\n"
+  if printContainerId:
+    body &= "    echo ctr-$$\n"
   if createSleepSec != "":
     body &= "    sleep " & createSleepSec & "\n"
   body &= "    ;;\n"
@@ -55,6 +57,8 @@ proc writeFakePodman(dir, imageFile, logFile: string, createSleepSec = ""): stri
   body &= "    cp \"$CHALK_FAKE_IMAGE_SBOM\" \"$dest\"\n"
   body &= "    ;;\n"
   body &= "  rm)\n"
+  if rmSleepSec != "":
+    body &= "    sleep " & rmSleepSec & "\n"
   body &= "    echo rm >> \"$log\"\n"
   body &= "    ;;\n"
   body &= "  *)\n"
@@ -179,9 +183,6 @@ proc main() =
     discard expectDiagnostic(streamRead, pdkStreamDestination)
     let deadlinePast = getMonoTime() - initDuration(seconds = 1)
     discard expectDiagnostic(readLimitedFile(path, deadlinePast), pdkTimeout)
-    let tooBig = tmpDir / "big.json"
-    writeFile(tooBig, "x".repeat(64))
-    # size gate uses the file size; a huge file is not created here.
     let parsedFile = readLimitedFile(path, getMonoTime() + initDuration(seconds = 5))
     assertEq(expectDocument(parsedFile).sourceBytes, spdxDoc())
     var cancellation = none(ChildResult)
@@ -258,7 +259,8 @@ proc main() =
     assertEq(expectDocument(embedded).sourceBytes, spdxDoc())
     doAssert collectCancel.isNone()
     let embeddedLog = readFile(logFile)
-    doAssert "create" in embeddedLog
+    doAssert "create --name chalk-sbom-" in embeddedLog
+    doAssert " img " & podmanCreatePlaceholderCommand in embeddedLog
     doAssert "cp" in embeddedLog
     doAssert "rm" in embeddedLog
     doAssert "syft" notin embeddedLog
@@ -322,6 +324,37 @@ proc main() =
     discard expectDiagnostic(timed, pdkTimeout)
     doAssert collectCancel.isNone()
     doAssert "rm" in readFile(logFile)
+
+    let cleanupFake = writeFakePodman(tmpDir, imageFile, logFile,
+                                     createSleepSec = "2", rmSleepSec = "0.1")
+    writeFile(logFile, "")
+    let cleanupStart = getMonoTime()
+    discard expectDiagnostic(collectNativePodmanSbom(
+      exe          = cleanupFake,
+      imageRef     = "img",
+      outputs      = PodmanSbomNativeOutputs(imageOutput: "/sbom.spdx.json"),
+      snapshots    = @[],
+      workingDir   = tmpDir,
+      deadline     = cleanupStart + initDuration(milliseconds = 800),
+      cancellation = collectCancel,
+    ), pdkTimeout)
+    doAssert "rm\n" in readFile(logFile)
+    doAssert (getMonoTime() - cleanupStart).inMilliseconds < 850,
+             "collection and cleanup exceeded their shared budget"
+
+    let noIdFake = writeFakePodman(tmpDir, imageFile, logFile,
+                                  createSleepSec = "1", printContainerId = false)
+    writeFile(logFile, "")
+    discard expectDiagnostic(collectNativePodmanSbom(
+      exe          = noIdFake,
+      imageRef     = "img",
+      outputs      = PodmanSbomNativeOutputs(imageOutput: "/sbom.spdx.json"),
+      snapshots    = @[],
+      workingDir   = tmpDir,
+      deadline     = getMonoTime() + initDuration(milliseconds = 200),
+      cancellation = collectCancel,
+    ), pdkTimeout)
+    doAssert "rm\n" in readFile(logFile), "scratch cleanup requires no stdout identity"
 
     let child = runCaptured("/bin/sleep", @["2"], timeoutMs = 200)
     doAssert child.child.timedOut

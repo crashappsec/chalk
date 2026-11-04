@@ -215,6 +215,8 @@ proc fetch(self:            DockerManifest,
           trace("docker: " & getCurrentExceptionMsg())
           raise
         except:
+          if not registryUsesDockerDiscovery():
+            raise
           error("docker: " & getCurrentExceptionMsg())
           requestManifestJson(self.asImage())
       self.setJson(data, check = checkJson)
@@ -236,6 +238,8 @@ proc fetch(self:            DockerManifest,
         trace("docker: " & getCurrentExceptionMsg())
         raise
       except:
+        if not registryUsesDockerDiscovery():
+          raise
         error("docker: " & getCurrentExceptionMsg())
         requestManifestJson(self.asImage())
     self.setJson(data, check = checkJson)
@@ -593,6 +597,8 @@ proc fetchManifest*(name:            DockerImage,
     trace("docker: " & getCurrentExceptionMsg())
     raise
   except:
+    if not registryUsesDockerDiscovery():
+      raise
     error("docker: " & getCurrentExceptionMsg())
     let data = requestManifestJson(name)
     result = newManifest(name, data)

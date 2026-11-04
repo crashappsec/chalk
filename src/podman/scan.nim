@@ -32,6 +32,11 @@ import "../docker"/[
 import "./run"
 import "./types" as podman_types
 
+const
+  podmanCreatePlaceholderCommand* = "true"
+    ## `podman create` rejects an image without CMD or ENTRYPOINT unless a
+    ## command is given. The container is never started, so it never runs.
+
 const nonRegistryPushTransports = [
   "containers-storage:",
   "dir:",
@@ -129,7 +134,7 @@ proc extractImageMark*(exe, image: string,
   ## `podman create` makes a container but never starts it, so this works on
   ## images whose entrypoint could not run here -- including ones with no shell
   ## at all. none() means the image carries no mark, which is not an error.
-  let created = runCaptured(exe, @["create", image])
+  let created = runCaptured(exe, @["create", image, podmanCreatePlaceholderCommand])
   if isCancellation(created.child):
     cancellation = some(created.child)
     return none(string)

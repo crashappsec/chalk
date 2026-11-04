@@ -6,11 +6,8 @@
 ##
 
 ## Collect customer-generated Podman SPDX JSON into `_IMAGE_SBOM`.
-##
-## One operation-local collector with three source variants: native Buildah
-## outputs, a customer-written file handoff, and an existing registry
-## attachment. Collection does not launch a scanner, rewrite the document,
-## or retry a native build.
+## Collection does not launch a scanner, rewrite the document, or retry a
+## native build.
 
 import std/[
   os,
@@ -25,6 +22,7 @@ import ".."/[
   reporting,
   run_management,
   types,
+  utils/bounded_http,
   utils/exec,
   utils/files,
   utils/json,
@@ -95,10 +93,7 @@ proc failedKeyCode*(kind: podman_types.PodmanSbomDiagnosticKind): string =
   of pdkOther:                "SBOM_COLLECTION_ERROR"
 
 proc cleanupBudgetMs(deadline: MonoTime): int =
-  let left = remainingMs(deadline)
-  if left > 0:
-    return left
-  return 1000
+  return max(1, remainingMs(deadline))
 
 proc isSha256Hex(value: string): bool =
   if len(value) != 64:
@@ -335,25 +330,24 @@ proc copyImagePath(exe, image, srcPath, destPath: string,
                   podman_types.PodmanSbomOutcome =
   if timedOut(deadline):
     return diagnostic(pdkTimeout, "SBOM collection timed out")
-  var containerId = ""
-  let created = runCaptured(exe, @["create", image],
-                            timeoutMs = remainingMs(deadline))
-  containerId = created.stdout.strip()
+  let reserve = min(1000, max(1, remainingMs(deadline) div 2))
+  let copyDeadline = deadline - initDuration(milliseconds = reserve)
+  let containerId = "chalk-sbom-" & destPath.sha256Hex()[0 ..< 32]
+  let created = runCaptured(exe, @["create", "--name", containerId, image, podmanCreatePlaceholderCommand],
+                            timeoutMs = max(1, remainingMs(copyDeadline)))
   if created.child.timedOut:
     result = diagnostic(pdkTimeout, "SBOM collection timed out")
   elif isCancellation(created.child):
     cancellation = some(created.child)
     result = diagnostic(pdkCancelled, "SBOM collection was cancelled")
-  elif created.child.kind != podman_types.ceExited or created.child.exitCode != 0 or
-      containerId == "":
+  elif created.child.kind != podman_types.ceExited or created.child.exitCode != 0:
     result = diagnostic(pdkMissing, "could not create a container to read the image SBOM")
-    containerId = created.stdout.strip()
   else:
-    if timedOut(deadline):
+    if timedOut(copyDeadline):
       result = diagnostic(pdkTimeout, "SBOM collection timed out")
     else:
       let copied = runCaptured(exe, @["cp", containerId & ":" & srcPath, destPath],
-                               timeoutMs = remainingMs(deadline))
+                               timeoutMs = max(1, remainingMs(copyDeadline)))
       if copied.child.timedOut:
         result = diagnostic(pdkTimeout, "SBOM collection timed out")
       elif isCancellation(copied.child):
@@ -362,7 +356,7 @@ proc copyImagePath(exe, image, srcPath, destPath: string,
       elif copied.child.kind != podman_types.ceExited or copied.child.exitCode != 0:
         result = diagnostic(pdkMissing, "image SBOM path was not found")
       else:
-        result = readLimitedFile(destPath, deadline)
+        result = readLimitedFile(destPath, copyDeadline)
   if containerId != "":
     let removed = runCaptured(exe, @["rm", "--force", containerId],
                               timeoutMs = cleanupBudgetMs(deadline))
@@ -572,24 +566,21 @@ proc fetchReferrerIndex(image: DockerImage): JsonNode =
     return nil
   let mediaType = tagged.json{"mediaType"}.getStr()
   if mediaType != "" and mediaType != ociIndexMediaType:
-    raise newException(RegistryResponseError, "referrer index has the wrong media type")
+    raise newException(RegistryReferrersError, "referrer index has the wrong media type")
   return tagged.json
 
-proc registryCollectionFailure(): podman_types.PodmanSbomOutcome =
-  let msg = getCurrentExceptionMsg()
-  if msg == "request timed out" or msg == "registry request timed out":
+proc registryCollectionFailure(failure: ref RegistryResponseError):
+                              podman_types.PodmanSbomOutcome =
+  if failure of RegistryTimeoutError:
     return diagnostic(pdkTimeout, "SBOM collection timed out")
-  if msg == "referrer pagination left the registry origin":
-    return diagnostic(pdkAttachmentMismatch,
-                      "referrer pagination left the registry origin")
-  if msg == "referrer pagination repeated a page":
-    return diagnostic(pdkAttachmentMismatch, "referrer pagination repeated a page")
-  if msg == "referrer pagination is incomplete":
-    return diagnostic(pdkAttachmentMismatch, "referrer pagination is incomplete")
-  if msg == "referrer index has the wrong media type":
-    return diagnostic(pdkAttachmentMismatch, "referrer index has the wrong media type")
-  if "401" in msg or "403" in msg or "Unauthorized" in msg:
+  if failure of RegistryOversizedError:
+    return diagnostic(pdkOversized, "registry response exceeds 32 MiB")
+  if failure of RegistryReferrersError:
+    return diagnostic(pdkAttachmentMismatch, failure.msg)
+  if failure.statusCode in [401, 403]:
     return diagnostic(pdkAuthFailure, "registry authentication failed")
+  if failure.statusCode >= 500:
+    return diagnostic(pdkOther, "registry server request failed")
   return diagnostic(pdkAttachmentAbsent, "registry request failed")
 
 proc collectAttachmentPodmanSbom*(
@@ -615,8 +606,8 @@ proc collectAttachmentPodmanSbom*(
   if attachmentDigest != "" and parseSha256Digest(attachmentDigest) == "":
     return diagnostic(pdkMalformed, "attachment digest must be a sha256 digest")
   let access = newAuthFileRegistryAccess(authFile)
-  access.deadline = some(deadline)
-  access.timeoutMs = max(1, remainingMs(deadline))
+  access.budget = some(HttpBudget(deadline: deadline, maxBodyBytes: maxPodmanSbomBytes))
+  access.strictReferrerLinks = true
   try:
     withRegistryAccess(access):
       if timedOut(deadline):
@@ -667,6 +658,8 @@ proc collectAttachmentPodmanSbom*(
         let itemMedia  = item{"mediaType"}.getStr()
         if itemDigest == "":
           continue
+        if attachmentDigest != "" and itemDigest != parseSha256Digest(attachmentDigest):
+          continue
         if itemMedia != "" and itemMedia != ociManifestMediaType:
           continue
         var fetched: DockerDigestedJson
@@ -675,11 +668,9 @@ proc collectAttachmentPodmanSbom*(
             parsedRef.withBare().withDigest(itemDigest),
             if itemMedia != "": itemMedia else: ociManifestMediaType,
           )
-        except RegistryTimeoutError:
-          return diagnostic(pdkTimeout, "SBOM collection timed out")
-        except RegistryResponseError:
-          let fail = registryCollectionFailure()
-          if fail.diagnostic.kind in {pdkTimeout, pdkAuthFailure}:
+        except RegistryResponseError as e:
+          let fail = registryCollectionFailure(e)
+          if fail.diagnostic.kind in {pdkTimeout, pdkAuthFailure, pdkOversized, pdkOther}:
             return fail
           continue
         except:
@@ -709,6 +700,8 @@ proc collectAttachmentPodmanSbom*(
       if attachment.layerDigest == "" or attachment.layerMediaType != spdxJsonMediaType:
         return diagnostic(pdkAttachmentMismatch,
                           "attachment does not contain an application/spdx+json layer")
+      if attachment.layerSize > maxPodmanSbomBytes:
+        return diagnostic(pdkOversized, "SBOM document exceeds 32 MiB")
       if timedOut(deadline):
         return diagnostic(pdkTimeout, "SBOM collection timed out")
       var blob: string
@@ -716,24 +709,18 @@ proc collectAttachmentPodmanSbom*(
         blob = parsedRef.withBare().withDigest(attachment.layerDigest).layerGetString(
           attachment.layerMediaType,
         )
-      except RegistryTimeoutError:
-        return diagnostic(pdkTimeout, "SBOM collection timed out")
-      except RegistryResponseError:
-        return registryCollectionFailure()
+      except RegistryResponseError as e:
+        return registryCollectionFailure(e)
       except:
         return diagnostic(pdkAttachmentMismatch, "could not download the SBOM blob")
-      if len(blob) > maxPodmanSbomBytes:
-        return diagnostic(pdkOversized, "SBOM document exceeds 32 MiB")
       if attachment.layerSize > 0 and len(blob) != attachment.layerSize:
         return diagnostic(pdkAttachmentMismatch,
                           "SBOM blob size does not match the layer")
       if parseSha256Digest("sha256:" & blob.sha256Hex()) != attachment.layerDigest:
         return diagnostic(pdkAttachmentMismatch, "SBOM blob digest does not match the layer")
       return parsePodmanSpdx(blob, pskAttachment)
-  except RegistryTimeoutError:
-    return diagnostic(pdkTimeout, "SBOM collection timed out")
-  except RegistryResponseError:
-    return registryCollectionFailure()
+  except RegistryResponseError as e:
+    return registryCollectionFailure(e)
   except:
     if timedOut(deadline):
       return diagnostic(pdkTimeout, "SBOM collection timed out")
@@ -795,9 +782,13 @@ proc maybeCollectNativeSbom*(
     applyPodmanSbom(chalk, diagnostic(pdkMissing, "built image id is unavailable"))
     return
   let deadline = getMonoTime() + initDuration(milliseconds = podmanSbomTimeoutMs)
-  let outcome = collectNativePodmanSbom(
-    exe, imageRef, spec.sbom, snapshots, workingDir, deadline, cancellation,
-  )
+  let outcome =
+    try:
+      collectNativePodmanSbom(
+        exe, imageRef, spec.sbom, snapshots, workingDir, deadline, cancellation,
+      )
+    except:
+      diagnostic(pdkOther, "SBOM collection failed")
   applyPodmanSbom(chalk, outcome)
 
 proc hasExistingPodmanIdentity*(chalk: ChalkObj): bool =
@@ -825,7 +816,12 @@ proc maybeCollectHandoffSbom*(
       "SBOM handoff requires an existing image build identity"))
     return
   let deadline = getMonoTime() + initDuration(milliseconds = podmanSbomTimeoutMs)
-  applyPodmanSbom(chalk, collectHandoffPodmanSbom(handoffPath, localImageId, deadline))
+  let outcome =
+    try:
+      collectHandoffPodmanSbom(handoffPath, localImageId, deadline)
+    except:
+      diagnostic(pdkOther, "SBOM collection failed")
+  applyPodmanSbom(chalk, outcome)
 
 proc collectExtractAttachmentSbom*(
   chalk: ChalkObj,
