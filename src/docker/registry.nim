@@ -33,6 +33,7 @@ import ".."/[
   utils/http,
   utils/sets,
   utils/strings,
+  utils/times,
   utils/uri,
   utils/www_authenticate,
 ]
@@ -615,6 +616,11 @@ proc request(self:              DockerImage,
   let
     access   = currentRegistryAccess
     cacheKey = (self, httpMethod, path & "\t" & $url, useCase, requireSameOrigin)
+  if not access.discoverDocker and access.budget.isNone():
+    access.budget = some(HttpBudget(
+      deadline: getMonoTime() + initDuration(seconds = 30),
+      maxBodyBytes: 32 * 1024 * 1024,
+    ))
   if cacheKey in access.jsonCache:
     let (message, response, effectiveUri) = access.jsonCache[cacheKey]
     access.lastRequestUri = effectiveUri

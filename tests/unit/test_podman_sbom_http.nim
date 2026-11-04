@@ -235,6 +235,41 @@ proc main() =
       finally:
         stopRegistry(p)
 
+    block defaultAuthFileAccessDoesNotTrustRedirectedChallenges:
+      let firstPort = freePort()
+      let secondPort = freePort()
+      let registry = "127.0.0.1:" & $firstPort
+      let credentials = dir / "redirected-default-auth.json"
+      let captured = dir / "redirected-default-token-auth"
+      let firstCapture = dir / "redirected-default-first-auth"
+      writeFile(credentials, $(%*{"auths": {registry: {"auth": "dXNlcjpwYXNz"}}}))
+      let secondDir = dir / "redirected-default-second"
+      createDir(secondDir)
+      let secondRoot = "http://127.0.0.1:" & $secondPort
+      var firstRoutes = newJObject()
+      firstRoutes["GET /v2/demo/manifests/check"] = %*{
+        "status": 200, "body": "{}", "save_authorization": firstCapture}
+      firstRoutes["GET /v2/demo/manifests/" & imageDigest] = route(302, "", %*{"Location": secondRoot & "/challenge"})
+      let (first, _) = startRegistry(dir, firstRoutes, firstPort)
+      let (second, _) = startRegistry(secondDir, %*{
+        "GET /challenge": {"status": 401, "body": "denied", "headers": {
+          "Www-Authenticate": "Bearer realm=\"" & secondRoot & "/token\""}},
+        "GET /token": {"status": 200, "body": "{\"token\":\"public\"}", "save_authorization": captured},
+      }, secondPort)
+      try:
+        withRegistryAccess(newAuthFileRegistryAccess(credentials)):
+          discard manifestGet(parseImage(registry & "/demo:check"), "application/json")
+          assertEq(readFile(firstCapture), "Basic dXNlcjpwYXNz")
+          try:
+            discard manifestGet(parseImage(registry & "/demo@" & imageDigest), "application/json")
+          except RegistryResponseError:
+            discard
+        doAssert not fileExists(captured) or readFile(captured) == "",
+                 "default auth-file access sent registry credentials to a redirected challenge realm"
+      finally:
+        stopRegistry(first)
+        stopRegistry(second)
+
     block abortedTlsCannotSendCredentialsOverHttp:
       let port = freePort()
       let captured = dir / "aborted-tls-authorization"
@@ -598,10 +633,7 @@ proc main() =
       let port = freePort()
       let (p, _) = startRegistry(dir, routes, port)
       try:
-        let access = newAuthFileRegistryAccess(authFile)
-        access.budget = some(HttpBudget(deadline: getMonoTime() + initDuration(seconds = 3),
-                                       maxBodyBytes: maxPodmanSbomBytes))
-        withRegistryAccess(access):
+        withRegistryAccess(newAuthFileRegistryAccess(authFile)):
           let image = parseImage("127.0.0.1:" & $port & "/demo@" & imageDigest)
           let document = image.referrersGet()
           doAssert document != nil
