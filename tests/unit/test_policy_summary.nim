@@ -26,7 +26,7 @@ proc finding(policyId: string, kind = "violation", image = "nginx:1.27",
 proc policy(id, effectiveMode, res: string, findings: seq[PolicyFinding] = @[],
             onError = "allow"): PolicyResult =
   PolicyResult(id: id, mode: effectiveMode, effectiveMode: effectiveMode, onError: onError,
-               modeSource: "default", result: res, findings: findings, hints: @[golden])
+               result: res, findings: findings, hints: @[golden])
 
 proc testAuditViolation() =
   let md = renderPolicySummary(
@@ -41,8 +41,8 @@ proc testAuditViolation() =
            "Use an approved golden image |" in md
   doAssert "**How to fix:** Use an approved golden image. Allowed: " &
            "`docker.io/library/alpine:*`, `cgr.dev/chainguard/*`" in md
-  doAssert "<details><summary>Policy details</summary>\n\n| Policy | Mode | Why this mode | Result | Findings |" in md
-  doAssert "| golden-images@1 | audit | default mode | violation | 1 |" in md
+  doAssert "<details><summary>Policy details</summary>\n\n| Policy | Mode | Scope | Result | Findings |" in md
+  doAssert "| golden-images@1 | audit | all repos | violation | 1 |" in md
   doAssert "- Chalk version: `1.3.0`" in md
   doAssert "- Repository" notin md
   doAssert "Policy report" notin md
@@ -53,7 +53,7 @@ proc testBlocked() =
     @[policy("golden-images@1", "enforce", "blocked", @[finding("golden-images@1")])], build())
   doAssert md.startsWith("> [!CAUTION]\n> **Blocked** — `docker build` stopped before building: " &
                          "1 image is not an approved golden image (policy `golden-images@1`, enforce).\n")
-  doAssert "| golden-images@1 | enforce | default mode | blocked | 1 |" in md
+  doAssert "| golden-images@1 | enforce | all repos | blocked | 1 |" in md
   let push = renderPolicySummary(
     @[policy("", "enforce", "blocked", @[finding(""), finding("", image = "busybox")])],
     build("push", @["r/app:1", "r/app:2", "r/app:3"]))
@@ -86,7 +86,7 @@ proc testPass() =
   doAssert md.startsWith("> [!TIP]\n> All base images are approved golden images (1 policy checked).\n")
   doAssert "| Image |" notin md
   doAssert "How to fix" notin md
-  doAssert "| p | enforce | default mode | pass | 0 |" in md
+  doAssert "| p | enforce | all repos | pass | 0 |" in md
   var custom = policy("a", "audit", "pass")
   custom.hints = @[]
   doAssert "All images passed the build policy (2 policies checked)." in
@@ -101,9 +101,9 @@ proc testMultiplePolicies() =
   ], build())
   doAssert md.startsWith("> [!CAUTION]\n")
   doAssert "(policy `golden-images@3`, enforce)" in md
-  doAssert "| golden-images@3 | enforce | default mode | blocked | 1 |" in md
-  doAssert "| chainguard-only@1 | audit | default mode | violation | 1 |" in md
-  doAssert "| other | audit | default mode | pass | 0 |" in md
+  doAssert "| golden-images@3 | enforce | all repos | blocked | 1 |" in md
+  doAssert "| chainguard-only@1 | audit | all repos | violation | 1 |" in md
+  doAssert "| other | audit | all repos | pass | 0 |" in md
   doAssert "| COPY --from (stage build) | chainguard-only@1 |" in md
   doAssert "**How to fix:** (`golden-images@3`) Use an approved golden image." in md
   doAssert "**How to fix:** (`chainguard-only@1`) Use an approved golden image." in md
@@ -125,21 +125,21 @@ proc testUsedAs() =
   doAssert "`busybox@sha256:6784fb0834aa…`" in
            renderPolicySummary(@[policy("p", "audit", "violation", @[bare])], build())
 
-proc testEnforceRepos() =
-  var settings = PolicyConfig(id: "p", mode: "audit", onError: "allow",
-                              effectiveMode: "enforce", modeSource: "enforce_repos",
+proc testTargetRepos() =
+  var settings = PolicyConfig(id: "p", mode: "enforce", onError: "allow",
+                              effectiveMode: "enforce",
                               repo: "github.com/acme/app",
-                              enforceRepos: @[("glob", "github.com/acme/*")])
+                              targetRepos: @[("glob", "github.com/acme/*")])
   let res = evaluatePolicy(settings, @[], PolicyInput(), @[finding("")])
   doAssert res.effectiveMode == "enforce" and res.result == "blocked"
   let md = renderPolicySummary(@[res], build())
-  doAssert "| p | enforce | enforce_repos match (`github.com/acme/app`) | blocked | 1 |" in md
+  doAssert "| p | enforce | target_repos match (`github.com/acme/app`) | blocked | 1 |" in md
   doAssert "- Repository: `github.com/acme/app`" in md
+  settings.mode = "audit"
   settings.effectiveMode = "audit"
-  settings.modeSource = "default"
   settings.repo = ""
   let unknown = renderPolicySummary(@[evaluatePolicy(settings, @[], PolicyInput())], build())
-  doAssert "| p | audit | repo unknown → default mode | pass | 0 |" in unknown
+  doAssert "| p | audit | repo unknown → on_unknown_repo: apply | pass | 0 |" in unknown
   doAssert "- Repository: `unknown`" in unknown
 
 proc testHintsFromRules() =
@@ -160,7 +160,7 @@ proc testEscaping() =
                  @[finding("x|y", image = "img|`x`", reason = "line1\nline2 | <b> a\\|b")])
   p.hints = @[]
   let md = renderPolicySummary(@[p], build())
-  doAssert "| x\\|y | audit | default mode | violation | 1 |" in md
+  doAssert "| x\\|y | audit | all repos | violation | 1 |" in md
   doAssert "| `img\\|'x'@sha256:6784fb0834aa…` |" in md
   doAssert "line1 line2 \\| &lt;b&gt; a\\\\\\|b |" in md
   for line in md.splitLines():
@@ -191,7 +191,7 @@ proc testRowCaps() =
     policies.add(policy("q" & $i, "audit", "pass"))
   let md = renderPolicySummary(policies, build())
   doAssert $(maxFindingRows + 7) & " images are not approved golden images" in md
-  doAssert "| p | audit | default mode | violation | " & $len(findings) & " |" in md
+  doAssert "| p | audit | all repos | violation | " & $len(findings) & " |" in md
   doAssert "`img" & $(maxFindingRows - 1) & "@" in md
   doAssert "`img" & $maxFindingRows & "@" notin md
   doAssert "_7 more findings not shown, see the policy report._" in md
@@ -236,7 +236,7 @@ testErrorOnly()
 testPass()
 testMultiplePolicies()
 testUsedAs()
-testEnforceRepos()
+testTargetRepos()
 testHintsFromRules()
 testEscaping()
 testTruncation()

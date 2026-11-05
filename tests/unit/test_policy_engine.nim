@@ -225,11 +225,11 @@ proc testContextCollectedOnlyWhenRequired() =
 
 proc testConfigErrorHonorsDeclaredMode() =
   # rules never run on a broken policy; its declared mode, on_error and
-  # enforce_repos decide whether the configuration error blocks
+  # target_repos decide whether the configuration error blocks
   let doc = """{"policies":[
     {"id":"strict","mode":"enforce","on_error":"block","golden_images":{"enabled":1}},
-    {"id":"rollout","mode":"off","on_error":"block",
-     "enforce_repos":[["glob","github.com/acme/*"]],"golden_images":{"enabled":1}},
+    {"id":"rollout","mode":"enforce","on_error":"block",
+     "target_repos":[["glob","github.com/acme/*"]],"golden_images":{"enabled":1}},
     {"id":"off","mode":"off","on_error":"block","golden_images":{"enabled":1}}
   ]}"""
   setPolicyJson(doc)

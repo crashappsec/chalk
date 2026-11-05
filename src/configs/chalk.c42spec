@@ -2586,14 +2586,14 @@ treats it as a violation. In both cases the error is reported.
 """
   }
 
-  field enforce_repos {
+  field target_repos {
     type:     list[tuple[string, string]]
     default:  []
-    shortdoc: "Repositories where the policy is enforced"
+    shortdoc: "Repositories the policy applies to"
     doc: """
-Repositories in which the policy is evaluated in `enforce` mode whatever
-`mode` says, so enforcement can be rolled out repository by repository
-while `mode` (`audit` or `off`) applies everywhere else. Entries are
+Repositories in which the policy is evaluated, in its `mode`; in every
+other repository it is not evaluated, as in mode `off`. Empty (the
+default) applies the policy to every repository. Entries are
 `(kind, value)` tuples like `golden_images.allowed`; the supported kind is
 `glob`, matched against the repository as `host/owner/name` in lowercase,
 e.g. `("glob", "github.com/acme/*")`. Entries of other kinds never match.
@@ -2601,7 +2601,21 @@ e.g. `("glob", "github.com/acme/*")`. Entries of other kinds never match.
 The repository is the git origin of the docker build context (of the
 working directory for `docker push`), or else the CI job's repository
 (`GITHUB_SERVER_URL`/`GITHUB_REPOSITORY`, `CI_PROJECT_URL`). When it cannot
-be determined, `mode` applies.
+be determined, `on_unknown_repo` decides.
+"""
+  }
+
+  field on_unknown_repo {
+    type:     string
+    default:  "skip"
+    choices:  ["skip", "apply"]
+    shortdoc: "Whether a policy with target_repos applies in an unknown repository"
+    doc: """
+Only used when `target_repos` is not empty and the repository cannot be
+determined:
+
+* `skip` - the policy is not evaluated and a warning is logged
+* `apply` - the policy is evaluated in its `mode`
 """
   }
 
@@ -2633,7 +2647,7 @@ con4m, with tuples written as JSON arrays:
   "id": "golden-images@3",
   "mode": "enforce",
   "on_error": "allow",
-  "enforce_repos": [["glob", "github.com/acme/app"]],
+  "target_repos": [["glob", "github.com/acme/app"]],
   "golden_images": {
     "enabled": true,
     "check_copy_from": true,
@@ -2651,9 +2665,10 @@ non-empty `id`. Each policy is evaluated with its own `mode` and
 
 Missing fields take their defaults. A policy with unknown fields or wrongly
 typed values is reported as a policy evaluation error and no rule runs. It
-keeps the `mode`, `on_error` and `enforce_repos` it declares when those are
-valid, so in `enforce` mode with `on_error` set to `block` it blocks the
-build, and in mode `off` it is not evaluated. Without a valid `mode`, and
+keeps the `mode`, `on_error`, `target_repos` and `on_unknown_repo` it
+declares when those are valid, so in `enforce` mode with `on_error` set to
+`block` it blocks the build where it applies, and in mode `off` it is not
+evaluated. Without a valid `mode`, and
 for a value that cannot be used as a whole (not a JSON object, or an
 invalid `policies` list), the error is reported in `audit` mode and never
 blocks. An invalid entry of a `policies` list (including a

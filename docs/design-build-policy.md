@@ -17,9 +17,9 @@ Build policies are disabled by default. With the default configuration
 - `chalk docker` behaves exactly as before, including falling back to running
   docker without chalk when chalk itself fails.
 
-Policies only take effect once `policy.mode` is set to `audit` or `enforce`,
-or `policy.enforce_repos` lists repositories in which to enforce them (see
-[Per-repository enforcement](#per-repository-enforcement)).
+Policies only take effect once `policy.mode` is set to `audit` or `enforce`.
+`policy.target_repos` can limit them to some repositories (see
+[Repository scoping](#repository-scoping)).
 
 ## Motivation
 
@@ -36,8 +36,9 @@ images", without changing how developers invoke docker.
 | `audit`   | yes       | yes           | no                    |
 | `enforce` | yes       | yes           | on violation (exit 1) |
 
-`mode` applies to every repository unless `enforce_repos` enforces the policy
-in some of them, see [Per-repository enforcement](#per-repository-enforcement).
+`mode` alone decides whether a policy is enforced. `target_repos` only decides
+in which repositories the policy is evaluated at all, see
+[Repository scoping](#repository-scoping).
 
 A policy report is published for every evaluation, including when every
 policy passes (`_POLICY_RESULT` is then `pass`), so consumers see every
@@ -117,7 +118,8 @@ policy {
 | `policy.id`                            | `string`                                          | `""`              |
 | `policy.config_json`                   | `string` (JSON object, see below)                 | `""`              |
 | `policy.on_error`                      | `string`, one of `allow`, `block`                 | `"allow"`         |
-| `policy.enforce_repos`                 | `list[tuple[string, string]]` (kind, value)       | `[]`              |
+| `policy.target_repos`                  | `list[tuple[string, string]]` (kind, value)       | `[]`              |
+| `policy.on_unknown_repo`               | `string`, one of `skip`, `apply`                  | `"skip"`          |
 | `policy.report_template`               | `string`                                          | `"policy_report"` |
 | `policy.custom_check`                  | `func (string, string, string, string) -> string` | unset             |
 | `policy.golden_images.enabled`         | `bool`                                            | `false`           |
@@ -145,7 +147,7 @@ names and types match con4m, with tuples written as arrays:
   "id": "golden-images@3",
   "mode": "enforce",
   "on_error": "allow",
-  "enforce_repos": [["glob", "github.com/acme/payments"]],
+  "target_repos": [["glob", "github.com/acme/payments"]],
   "golden_images": {
     "enabled": true,
     "check_copy_from": true,
@@ -161,9 +163,10 @@ names and types match con4m, with tuples written as arrays:
 Missing fields take their defaults. The document is validated strictly: invalid
 JSON, unknown fields, wrong types or invalid choices are reported as a single
 `config` evaluation error (kind `error`) and no rule runs. The policy keeps the
-`mode`, `on_error` and `enforce_repos` it declares when those are themselves
-valid, so `on_error` decides as for any other error: an `enforce` policy with
-`on_error = "block"` blocks the build, and a policy in mode `off` stays off.
+`mode`, `on_error`, `target_repos` and `on_unknown_repo` it declares when those
+are themselves valid, so `on_error` decides as for any other error: an
+`enforce` policy with `on_error = "block"` blocks the build where it applies,
+and a policy in mode `off` stays off.
 A policy that declares no valid `mode`, like a document that cannot be used as
 a whole (not JSON, not an object, an invalid `policies` list), is audited: the error is reported and never blocks. An invalid
 `on_error` is `allow`. Only policy settings can be expressed,
@@ -211,8 +214,9 @@ same fields as the single-policy document above:
 - An entry that is invalid (not an object, unknown fields, wrong types,
   invalid choices, missing or duplicate `id`) is reported as a `config`
   evaluation error of that entry (`policy_id` is its `id`, when it has a
-  string one), which blocks only as the entry's own valid `mode`, `on_error`
-  and `enforce_repos` say (see above). The other entries are still evaluated.
+  string one), which blocks only as the entry's own valid `mode`, `on_error`,
+  `target_repos` and `on_unknown_repo` say (see above). The other entries are
+  still evaluated.
   An entry with a duplicate `id` invalidates every entry using that `id`.
 - `policies` cannot be combined with other top-level fields; such a document,
   or one whose `policies` is not an array, is invalid as a whole.
@@ -224,16 +228,17 @@ same fields as the single-policy document above:
 The single-object form remains supported and behaves as a one-entry list
 whose `id` may be empty.
 
-### Per-repository enforcement
+### Repository scoping
 
-To roll out enforcement gradually, a policy can be enforced in some
-repositories while `mode` applies everywhere else:
+To roll a policy out gradually, `target_repos` limits it to some
+repositories. It is evaluated in its `mode` there and not at all anywhere
+else:
 
 ```json
 {
   "id": "golden-images@3",
-  "mode": "audit",
-  "enforce_repos": [
+  "mode": "enforce",
+  "target_repos": [
     ["glob", "github.com/acme/payments"],
     ["glob", "github.com/acme/platform-*"]
   ],
@@ -244,30 +249,41 @@ repositories while `mode` applies everywhere else:
 }
 ```
 
-`enforce_repos` is available in con4m too (`policy.enforce_repos`, a list of
-`(kind, value)` tuples), in the single-policy document and in every entry of
-`policies`.
+To audit everywhere while enforcing in some repositories, configure two
+policies (see [Several policies](#several-policies)): one in `enforce` mode
+with `target_repos` and one in `audit` mode without.
 
-- A command whose repository matches any entry is evaluated in `enforce`
-  mode; in every other repository the policy uses `mode`. With `mode: "off"`
-  the policy is enforced in the listed repositories and not evaluated
-  anywhere else. Without `enforce_repos` (or with an empty list) `mode`
-  applies everywhere, as before.
+`target_repos` and `on_unknown_repo` are available in con4m too
+(`policy.target_repos`, a list of `(kind, value)` tuples, and
+`policy.on_unknown_repo`), in the single-policy document and in every entry
+of `policies`.
+
+- Without `target_repos` (or with an empty list) the policy applies to every
+  repository and chalk does not determine the repository.
+- When the command's repository matches any entry, the policy is evaluated in
+  its `mode`. Otherwise it is not evaluated: like a policy in mode `off`, it
+  is omitted from `_POLICY_RESULTS` and never blocks.
+- `mode` still decides: a policy in mode `off` is never evaluated, whatever
+  `target_repos` says.
+- When the repository cannot be determined, `on_unknown_repo` decides:
+  `skip` (the default) does not evaluate the policy and logs a warning,
+  `apply` evaluates it in its `mode`. Any other value makes the policy
+  invalid.
 - Entries use the matcher kinds of `golden_images.allowed`. Only `glob`
   applies to repositories; a glob without `*` or `?` matches one repository
   exactly. Entries of other kinds (including `digest`) never match and are
-  logged as warnings, so they can never enforce a policy by accident. Values
-  are normalized like repositories (see below), so
-  `https://github.com/Acme/App.git` and `github.com/acme/app` are equivalent,
-  except that glob characters are kept: `github.com/acme/app?` matches
-  `github.com/acme/app1`, not `github.com/acme/app`. Only a numeric port is
-  removed, so a glob in the port position (`github.com:*/acme/app`) never
-  matches.
-- An `enforce_repos` that is not a list of `[kind, value]` string pairs makes
+  logged as warnings. Values are normalized like repositories (see below),
+  so `https://github.com/Acme/App.git` and `github.com/acme/app` are
+  equivalent, except that glob characters are kept: `github.com/acme/app?`
+  matches `github.com/acme/app1`, not `github.com/acme/app`. Only a numeric
+  port is removed, so a glob in the port position (`github.com:*/acme/app`)
+  never matches.
+- A `target_repos` that is not a list of `[kind, value]` string pairs makes
   the policy invalid: it is reported as a `config` evaluation error, like any
-  other invalid policy, with its `mode` and `on_error` and no `enforce_repos`.
-  A valid `enforce_repos` of a policy that is invalid otherwise still applies,
-  so the error can block (`on_error = "block"`) in the listed repositories.
+  other invalid policy, with its `mode` and `on_error` and no `target_repos`,
+  so in every repository. A valid `target_repos` of a policy that is invalid
+  otherwise still applies, so the error is only reported (and can only
+  block, with `on_error = "block"`) in the listed repositories.
 
 The repository is identified as `host/path`, lowercase, without scheme,
 credentials, port or `.git` suffix, e.g. `github.com/acme/app` (GitLab
@@ -288,12 +304,11 @@ same identity. Chalk determines it before docker runs, in this order:
    `GITHUB_REPOSITORY` (GitHub Actions, `GITHUB_SERVER_URL` defaulting to
    `https://github.com`), else `CI_PROJECT_URL` (GitLab CI).
 
-Chalk only determines the repository when some policy has `enforce_repos`.
-When it cannot be determined (for example a context from stdin or a
-directory outside any git repository, outside CI) the policy is never
-escalated to `enforce`: it uses `mode` and its `_POLICY_RESULTS` entry has an
-empty `repo` and `mode_source` `default`. A warning is logged unless `mode` is
-`off`.
+Chalk only determines the repository when some policy that is not in mode
+`off` has `target_repos`. When it cannot be determined (for example a context
+from stdin or a directory outside any git repository, outside CI),
+`on_unknown_repo` decides, as above; a policy it applies has an empty `repo`
+in its `_POLICY_RESULTS` entry.
 
 As with every policy, this is a guardrail rather than a security boundary:
 whoever controls the build can also change the git remote or CI variables.
@@ -1428,18 +1443,17 @@ The `policy_report` template includes:
 | `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy is enforced, else `audit`                                                                 |
 | `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                                                      |
 | `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error` if any, else `pass`                        |
-| `_POLICY_RESULTS`  | `list[dict[string, any]]`    | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `mode_source`, `repo`, `rules`                  |
+| `_POLICY_RESULTS`  | `list[dict[string, any]]`    | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `repo`, `rules`                                 |
 | `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`, `subject`, `location`, `severity` |
 | `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                                                |
 
-`_POLICY_RESULTS` lists every evaluated policy (effective mode `audit` or
-`enforce`) in configuration order, including those that passed; policies not
-evaluated (mode `off` and not enforced by `enforce_repos`) are omitted. `mode`
-is the configured mode, `effective_mode` the mode the policy was evaluated
-in, `mode_source` is `enforce_repos` when the repository matched
-`enforce_repos` and `default` otherwise, and `repo` is the repository matched
-against `enforce_repos` (empty when the policy has none or the repository
-could not be determined). `result` is one of `pass`, `violation`, `blocked`
+`_POLICY_RESULTS` lists every evaluated policy (mode `audit` or `enforce`) in
+configuration order, including those that passed; policies not evaluated
+(mode `off`, or `target_repos` not applying them) are omitted. `mode` is the
+configured mode and `effective_mode` the mode the policy was evaluated in,
+which is always `mode`. `repo` is the repository matched against
+`target_repos` (empty when the policy has none or the repository could not
+be determined). `result` is one of `pass`, `violation`, `blocked`
 or `error`. A policy's `result` is `blocked` only for enforced policies,
 `violation` for a non-blocking violation and `error` when it only produced
 non-blocking evaluation errors. `rules` lists the rules the policy evaluated
@@ -1464,7 +1478,6 @@ policies above and `FROM busybox`:
       "on_error": "allow",
       "result": "blocked",
       "effective_mode": "enforce",
-      "mode_source": "default",
       "repo": "",
       "rules": ["golden_images"]
     },
@@ -1474,7 +1487,6 @@ policies above and `FROM busybox`:
       "on_error": "block",
       "result": "violation",
       "effective_mode": "audit",
-      "mode_source": "default",
       "repo": "",
       "rules": ["golden_images"]
     }
@@ -1568,11 +1580,12 @@ shown here and also make chalk write the section. The section has:
   how each is used (`FROM`, `COPY --from`, `RUN --mount from` and the stage) and
   why (the policy's `message`, else the finding's reason), and a "How to fix"
   line with the `message` and up to 10 allowed patterns;
-- a collapsed "Policy details" block with each evaluated policy's mode, why it
-  has that mode (`enforce_repos` match, default, or unknown repository), result
-  and finding count, the chalk version, the repository used for
-  `enforce_repos`, and the location of the uploaded policy report when the
-  `policy` topic goes to a `presign` sink (without the presigned query string).
+- a collapsed "Policy details" block with each evaluated policy's mode, scope
+  (all repositories, `target_repos` match, or unknown repository applied by
+  `on_unknown_repo`), result and finding count, the chalk version, the
+  repository used for `target_repos`, and the location of the uploaded policy
+  report when the `policy` topic goes to a `presign` sink (without the
+  presigned query string).
 
 Sections are appended, never truncated, so several chalk invocations in one
 step each add theirs. Rows are capped (50 findings, 50 policies) to stay well

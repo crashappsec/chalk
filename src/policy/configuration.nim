@@ -18,11 +18,14 @@ type
     configError*: string
     ## the policy's object in `policy.config_json`, nil for con4m
     json*: JsonNode
-    ## repositories in which the policy is enforced whatever its `mode`
-    enforceRepos*: seq[(string, string)]
-    ## set by `resolveMode` for policies with `enforceRepos`
+    ## repositories the policy applies to, every repository when empty
+    targetRepos*:   seq[(string, string)]
+    ## "skip" or "apply": whether a policy with `targetRepos` applies when
+    ## the repository cannot be determined
+    onUnknownRepo*: string
+    ## set by `resolveMode` for policies with `targetRepos`: `mode`, or
+    ## `off` where the policy does not apply
     effectiveMode*: string
-    modeSource*:    string # "default" or "enforce_repos"
     repo*:          string # normalized repository, empty when unknown
 
   PolicyJsonField* = object
@@ -40,11 +43,12 @@ type
 
 const
   policyJsonFields = [
-    PolicyJsonField(name: "id",            kind: JString),
-    PolicyJsonField(name: "mode",          kind: JString, choices: @["off", "audit", "enforce"]),
-    PolicyJsonField(name: "on_error",      kind: JString, choices: @["allow", "block"]),
-    PolicyJsonField(name: "enforce_repos", kind: JArray),
-    PolicyJsonField(name: "golden_images", kind: JObject),
+    PolicyJsonField(name: "id",              kind: JString),
+    PolicyJsonField(name: "mode",            kind: JString, choices: @["off", "audit", "enforce"]),
+    PolicyJsonField(name: "on_error",        kind: JString, choices: @["allow", "block"]),
+    PolicyJsonField(name: "target_repos",    kind: JArray),
+    PolicyJsonField(name: "on_unknown_repo", kind: JString, choices: @["skip", "apply"]),
+    PolicyJsonField(name: "golden_images",   kind: JObject),
   ]
   goldenImagesJsonFields = [
     PolicyJsonField(name: "enabled",         kind: JBool),
@@ -120,25 +124,27 @@ proc validatePolicy(node: JsonNode, path: string) =
   base.validateFields(policyJsonFields, path)
   for (section, value) in sections:
     section.validate(value, path & section.name & ".")
-  node{"enforce_repos"}.validatePairs(path & "enforce_repos")
+  node{"target_repos"}.validatePairs(path & "target_repos")
   if node.hasKey("golden_images"):
     let golden = node["golden_images"]
     golden.validateFields(goldenImagesJsonFields, path & "golden_images.")
     golden{"allowed"}.validatePairs(path & "golden_images.allowed")
 
 proc invalidPolicy(id, reason: string,
-                   mode = "", onError = "",
-                   enforceRepos: seq[(string, string)] = @[]): PolicyConfig =
+                   mode = "", onError = "", onUnknownRepo = "",
+                   targetRepos: seq[(string, string)] = @[]): PolicyConfig =
   ## Rules never run on a configuration that cannot be read, which is only
-  ## reported as an error. The `mode`, `on_error` and `enforce_repos` it
-  ## validly declares are kept, so an enforced policy with `on_error: block`
-  ## blocks and one in mode `off` stays off. Without a declared mode it
-  ## is audited, so the error is reported but never blocks.
-  PolicyConfig(id:           id,
-               mode:         (if mode != "": mode else: "audit"),
-               onError:      (if onError != "": onError else: "allow"),
-               enforceRepos: enforceRepos,
-               configError:  reason)
+  ## reported as an error. The `mode`, `on_error`, `target_repos` and
+  ## `on_unknown_repo` it validly declares are kept, so an enforced policy
+  ## with `on_error: block` blocks where it applies and one in mode `off`
+  ## stays off. Without a declared mode it is audited, so the error is
+  ## reported but never blocks.
+  PolicyConfig(id:            id,
+               mode:          (if mode != "": mode else: "audit"),
+               onError:       (if onError != "": onError else: "allow"),
+               targetRepos:   targetRepos,
+               onUnknownRepo: (if onUnknownRepo != "": onUnknownRepo else: "skip"),
+               configError:   reason)
 
 proc jsonPairs*(node: JsonNode): seq[(string, string)] =
   for entry in node.getElems():
@@ -157,26 +163,28 @@ proc declaredChoice(node: JsonNode, name: string): string =
 proc invalidJsonPolicy(node: JsonNode, reason: string): PolicyConfig =
   if node.kind != JObject:
     return invalidPolicy("", reason)
-  var enforceRepos: seq[(string, string)]
-  let repos = node{"enforce_repos"}
+  var targetRepos: seq[(string, string)]
+  let repos = node{"target_repos"}
   if repos != nil and repos.kind == JArray:
     try:
-      repos.validatePairs("enforce_repos")
-      enforceRepos = repos.jsonPairs()
+      repos.validatePairs("target_repos")
+      targetRepos = repos.jsonPairs()
     except ValueError:
       discard
   invalidPolicy(node{"id"}.getStr(), reason,
-                mode         = node.declaredChoice("mode"),
-                onError      = node.declaredChoice("on_error"),
-                enforceRepos = enforceRepos)
+                mode          = node.declaredChoice("mode"),
+                onError       = node.declaredChoice("on_error"),
+                onUnknownRepo = node.declaredChoice("on_unknown_repo"),
+                targetRepos   = targetRepos)
 
 proc toPolicyConfig(node: JsonNode): PolicyConfig =
   PolicyConfig(
-    id:           node{"id"}.getStr(),
-    mode:         node{"mode"}.getStr("off"),
-    onError:      node{"on_error"}.getStr("allow"),
-    json:         node,
-    enforceRepos: node{"enforce_repos"}.jsonPairs(),
+    id:            node{"id"}.getStr(),
+    mode:          node{"mode"}.getStr("off"),
+    onError:       node{"on_error"}.getStr("allow"),
+    json:          node,
+    targetRepos:   node{"target_repos"}.jsonPairs(),
+    onUnknownRepo: node{"on_unknown_repo"}.getStr("skip"),
   )
 
 proc isPolicyList(doc: JsonNode): bool =
@@ -332,36 +340,34 @@ proc policyConfigs*(): seq[PolicyConfig] =
   if policyJsonSet:
     return policyJsonConfigs
   let
-    id      = attrGetOpt[string]("policy.id").get("")
-    mode    = attrGetOpt[string]("policy.mode").get("off")
-    onError = attrGetOpt[string]("policy.on_error").get("allow")
-  var enforceRepos: seq[(string, string)]
+    id            = attrGetOpt[string]("policy.id").get("")
+    mode          = attrGetOpt[string]("policy.mode").get("off")
+    onError       = attrGetOpt[string]("policy.on_error").get("allow")
+    onUnknownRepo = attrGetOpt[string]("policy.on_unknown_repo").get("skip")
+  var targetRepos: seq[(string, string)]
   try:
-    enforceRepos = attrPairs("policy.enforce_repos")
+    targetRepos = attrPairs("policy.target_repos")
   except CatchableError:
-    return @[invalidPolicy(id, getCurrentExceptionMsg(), mode = mode, onError = onError)]
+    return @[invalidPolicy(id, getCurrentExceptionMsg(), mode = mode, onError = onError,
+                           onUnknownRepo = onUnknownRepo)]
   return @[PolicyConfig(
-    id:           id,
-    mode:         mode,
-    onError:      onError,
-    enforceRepos: enforceRepos,
+    id:            id,
+    mode:          mode,
+    onError:       onError,
+    targetRepos:   targetRepos,
+    onUnknownRepo: onUnknownRepo,
   )]
 
 proc activeMode*(policy: PolicyConfig): string =
-  ## `mode`, unless `enforce_repos` resolved it for the current repository
+  ## `mode`, or `off` when `target_repos` excludes the current repository
   if policy.effectiveMode != "": policy.effectiveMode else: policy.mode
 
 proc isEvaluated*(policy: PolicyConfig): bool =
   policy.activeMode() in ["audit", "enforce"]
 
-proc mayBeEvaluated*(policy: PolicyConfig): bool =
-  ## whether the policy is evaluated in some repository, as `enforce_repos`
-  ## can turn on a policy whose `mode` is `off`
-  policy.isEvaluated() or len(policy.enforceRepos) > 0
-
 proc policyEnabled*(): bool =
   for policy in policyConfigs():
-    if policy.mayBeEvaluated():
+    if policy.isEvaluated():
       return true
   return false
 

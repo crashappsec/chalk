@@ -48,10 +48,9 @@ type
     mode*:     string # as configured
     onError*:  string
     result*:   string # "pass", "violation", "blocked" or "error"
-    effectiveMode*: string # "audit" or "enforce", see `enforce_repos`
-    modeSource*:    string # "default" or "enforce_repos"
-    repo*:          string # repository `enforce_repos` was matched against
-    hasEnforceRepos*: bool
+    effectiveMode*: string # "audit" or "enforce", same as `mode`
+    repo*:          string # repository `target_repos` was matched against
+    hasTargetRepos*: bool
     rules*:    seq[string] # rules it evaluated, named as `rule` in findings
     hints*:    seq[PolicyHint]
     notices*:  seq[PolicyNotice]
@@ -101,7 +100,6 @@ proc asDict(self: PolicyResult): ChalkDict =
   result["on_error"] = pack(self.onError)
   result["result"]   = pack(self.result)
   result["effective_mode"] = pack(self.effectiveMode)
-  result["mode_source"]    = pack(self.modeSource)
   result["repo"]           = pack(self.repo)
   result["rules"]          = pack(self.rules)
 
