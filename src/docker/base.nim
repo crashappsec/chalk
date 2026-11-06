@@ -64,9 +64,7 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
     quitChalk(exitCode)
 
 proc dockerPolicyBlocked*(ctx: DockerInvocation) {.noreturn.} =
-  if ctx.buildAttempted:
-    ctx.dockerFailsafe()
-  # A policy refusal before launch must not run the original command.
+  # A policy refusal must not run the original command.
   var exitCode = 1
   try:
     error("docker: " & getCurrentExceptionMsg())
