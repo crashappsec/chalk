@@ -915,6 +915,10 @@ proc main() =
   doAssert not isCancellation(ChildResult(kind: ceSpawnFailed, exitCode: 127))
   assertEq(cancellationExit(ChildResult(kind: ceSignaled, signal: 2)), 130)
   assertEq(childStatus(ChildResult(kind: ceExited, exitCode: 17)), 17)
+  assertEq(childStatus(ChildResult(kind: ceSpawnFailed)), 127)
+  let timedOut = ChildResult(kind: ceSignaled, signal: 9, timedOut: true)
+  doAssert not isCancellation(timedOut)
+  assertEq(childStatus(timedOut), 137)
 
   when defined(posix):
     for code in [130, 143]:
