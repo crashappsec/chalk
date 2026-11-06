@@ -260,7 +260,7 @@ proc chalkInstructionBlock(spec: podman_types.PodmanBuildSpec,
                            contextName: string): string =
   let plan = spec.startupPlan.get()
   # A usable /bin/sh and unoccupied reserved paths are part of the supported
-  # instrumentation envelope. Failure here makes the caller retry unchanged.
+  # instrumentation envelope. A failed guard ends the single build attempt.
   #
   # This test needs no network, but podman sets up a network namespace for
   # every RUN, and in restricted CI containers that setup is what fails --

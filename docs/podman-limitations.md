@@ -1,7 +1,7 @@
 # Podman preparation limits
 
 Podman instrumentation wraps selected local Linux builds. Unsupported invocations
-run through the native engine. A successful native build or retry can therefore
+run through the native engine. A successful native fallback can therefore
 produce an image without a Chalk mark. Check the mark and application behavior
 when assessing an instrumented build.
 
@@ -14,9 +14,17 @@ image whose contents contradict its own platform metadata.
 The command-line classifier supports an explicit set of build options. Other
 options, unsupported Containerfile forms, unavailable startup configuration,
 reserved image paths, and unsupported context arrangements can prevent
-instrumentation. The wrapper emits a refusal or retries the original command
-when an injected build fails. Native retry preserves the user's build result;
-it does not provide an instrumented image.
+instrumentation. Before an instrumented build launch, the wrapper can refuse
+instrumentation or fall back to the original command. After attempting the
+launch, the wrapper never repeats the original build, including when process
+startup or termination is indeterminate. It preserves a known engine result
+through optional collection, reporting, and cleanup failures. An unknown
+post-launch outcome fails nonzero.
+
+The reserved-path check currently requires `/bin/sh`. The check can fail in a
+scratch or shell-free image, or when a customer file occupies a reserved path.
+That failure ends the single attempt without producing a successful native
+fallback image. Existing cancellation and timeout handling remains in effect.
 
 The oldest supported Podman and Buildah versions have not been established.
 Version-specific successful comparisons establish observations for those

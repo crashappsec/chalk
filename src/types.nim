@@ -494,6 +494,8 @@ type
     processedFlags*:          OrderedTable[string, FlagSpec]
     newCmdLine*:              seq[string] # Rewritten command line
     newStdIn*:                string
+    buildAttempted*:          bool
+    buildExitCode*:           Option[int]
 
     cmdName*:                 string
     case cmd*:                DockerCmd

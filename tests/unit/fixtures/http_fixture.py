@@ -60,12 +60,16 @@ class Handler(BaseHTTPRequestHandler):
         for name, value in headers.items():
             self.send_header(name, value)
         if "Content-Type" not in headers:
-            self.send_header("Content-Type", route.get("content_type", "application/json"))
+            self.send_header(
+                "Content-Type", route.get("content_type", "application/json")
+            )
         chunked = route.get("chunked", False)
         if chunked:
             self.send_header("Transfer-Encoding", "chunked")
         elif "Content-Length" not in headers:
-            self.send_header("Content-Length", str(route.get("content_length", len(body))))
+            self.send_header(
+                "Content-Length", str(route.get("content_length", len(body)))
+            )
         self.end_headers()
         if method == "HEAD":
             return
@@ -78,7 +82,7 @@ class Handler(BaseHTTPRequestHandler):
         chunk = int(drip["chunk"]) if drip else 65536
         delay = drip["delay_ms"] / 1000.0 if drip else 0
         for start in range(0, len(body), chunk):
-            piece = body[start:start + chunk]
+            piece = body[start : start + chunk]
             if chunked:
                 self.wfile.write(b"%x\r\n%s\r\n" % (len(piece), piece))
             else:
@@ -98,7 +102,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class FixtureServer(ThreadingHTTPServer):
-    address_family = socket.AF_INET6 if routes.get("__bind__") == "::1" else socket.AF_INET
+    address_family = (
+        socket.AF_INET6 if routes.get("__bind__") == "::1" else socket.AF_INET
+    )
 
     def get_request(self):
         while True:
@@ -114,9 +120,11 @@ server = FixtureServer((routes.get("__bind__", "127.0.0.1"), port), Handler)
 if len(sys.argv) > 4 and sys.argv[4] != "abort-tls":
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(sys.argv[4], sys.argv[5])
+
     def record_sni(connection, server_name, initial_context):
         with open(sys.argv[6], "a") as names:
             names.write((server_name or "") + "\n")
+
     context.set_servername_callback(record_sni)
     server.socket = context.wrap_socket(server.socket, server_side=True)
 server.serve_forever()

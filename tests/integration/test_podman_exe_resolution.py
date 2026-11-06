@@ -20,6 +20,7 @@ Three layouts are checked because they fail differently:
 Each must reach the genuine command exactly once, and chalk must never exec
 itself.
 """
+
 import json
 import os
 from pathlib import Path
@@ -30,28 +31,28 @@ import tempfile
 
 binary = Path(sys.argv[1]).resolve()
 assert binary.is_file(), binary
-out = Path('artifacts/podman/exe-resolution')
+out = Path("artifacts/podman/exe-resolution")
 out.mkdir(parents=True, exist_ok=True)
 checks = []
 
 
 def check(name, value):
-    checks.append({'name': name, 'passed': bool(value)})
+    checks.append({"name": name, "passed": bool(value)})
     assert value, name
 
 
-with tempfile.TemporaryDirectory(prefix='chalk-exe-resolution-') as temp:
+with tempfile.TemporaryDirectory(prefix="chalk-exe-resolution-") as temp:
     root = Path(temp)
-    real_dir = root / 'real'
+    real_dir = root / "real"
     real_dir.mkdir()
-    calls = root / 'calls.jsonl'
+    calls = root / "calls.jsonl"
 
     # Stands in for the genuine podman. Records that it ran, so "chalk fell
     # through correctly" is observable rather than inferred from an exit code.
-    real = real_dir / 'podman'
+    real = real_dir / "podman"
     real.write_text(
-        '#!/usr/bin/env python3\n'
-        'import json, os, sys\n'
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
         "with open(os.environ['EXE_RESOLUTION_CALLS'], 'a') as f:\n"
         "    f.write(json.dumps({'argv': sys.argv[1:]}) + '\\n')\n"
         'print("genuine-podman")\n'
@@ -59,38 +60,42 @@ with tempfile.TemporaryDirectory(prefix='chalk-exe-resolution-') as temp:
     real.chmod(0o755)
 
     layouts = {}
-    for name in ('copy', 'symlink', 'link_to_copy'):
-        wrap = root / ('wrap_' + name)
+    for name in ("copy", "symlink", "link_to_copy"):
+        wrap = root / ("wrap_" + name)
         wrap.mkdir()
         # Only ever chmod a real file. chmod on a symlink follows it, and the
         # binary under test may be a read-only mount.
-        if name == 'copy':
-            shutil.copy2(binary, wrap / 'podman')
-            (wrap / 'podman').chmod(0o755)
-        elif name == 'symlink':
-            (wrap / 'podman').symlink_to(binary)
+        if name == "copy":
+            shutil.copy2(binary, wrap / "podman")
+            (wrap / "podman").chmod(0o755)
+        elif name == "symlink":
+            (wrap / "podman").symlink_to(binary)
         else:
-            local = root / 'local_copy_podman'
+            local = root / "local_copy_podman"
             if not local.exists():
                 shutil.copy2(binary, local)
                 local.chmod(0o755)
-            (wrap / 'podman').symlink_to(local)
+            (wrap / "podman").symlink_to(local)
         layouts[name] = wrap
 
     results = {}
     for name, wrap in layouts.items():
-        calls.write_text('')
+        calls.write_text("")
         env = dict(
             os.environ,
-            PATH=f'{wrap}{os.pathsep}{real_dir}{os.pathsep}' + os.environ['PATH'],
+            PATH=f"{wrap}{os.pathsep}{real_dir}{os.pathsep}" + os.environ["PATH"],
             EXE_RESOLUTION_CALLS=str(calls),
         )
         # --version is a pass-through: chalk must hand it to the real command.
         # A timeout here is itself a failure -- it means chalk exec'd itself.
         try:
-            proc = subprocess.run([str(wrap / 'podman'), '--version'],
-                                  env=env, capture_output=True, text=True,
-                                  timeout=60)
+            proc = subprocess.run(
+                [str(wrap / "podman"), "--version"],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
             timed_out = False
         except subprocess.TimeoutExpired:
             proc = None
@@ -98,27 +103,38 @@ with tempfile.TemporaryDirectory(prefix='chalk-exe-resolution-') as temp:
 
         records = [json.loads(line) for line in calls.read_text().splitlines()]
         results[name] = {
-            'timed_out': timed_out,
-            'returncode': None if proc is None else proc.returncode,
-            'genuine_executions': len(records),
-            'stdout': '' if proc is None else proc.stdout.strip(),
+            "timed_out": timed_out,
+            "returncode": None if proc is None else proc.returncode,
+            "genuine_executions": len(records),
+            "stdout": "" if proc is None else proc.stdout.strip(),
         }
 
-        check(f'{name}: did not hang (chalk did not exec itself)', not timed_out)
-        check(f'{name}: exited 0, not 127 "no command found"',
-              proc is not None and proc.returncode == 0)
-        check(f'{name}: reached the genuine podman exactly once',
-              len(records) == 1)
-        check(f'{name}: genuine podman produced the output',
-              proc is not None and 'genuine-podman' in proc.stdout)
+        check(f"{name}: did not hang (chalk did not exec itself)", not timed_out)
+        check(
+            f'{name}: exited 0, not 127 "no command found"',
+            proc is not None and proc.returncode == 0,
+        )
+        check(f"{name}: reached the genuine podman exactly once", len(records) == 1)
+        check(
+            f"{name}: genuine podman produced the output",
+            proc is not None and "genuine-podman" in proc.stdout,
+        )
 
-(out / 'evidence.json').write_text(json.dumps({
-    'schema_version': 1,
-    'source_sha': os.environ.get('CI_COMMIT_SHA'),
-    'binary_sha256': __import__('hashlib').sha256(binary.read_bytes()).hexdigest(),
-    'results': results,
-    'checks': checks,
-    'passed': all(c['passed'] for c in checks),
-}, indent=2) + '\n')
+(out / "evidence.json").write_text(
+    json.dumps(
+        {
+            "schema_version": 1,
+            "source_sha": os.environ.get("CI_COMMIT_SHA"),
+            "binary_sha256": __import__("hashlib")
+            .sha256(binary.read_bytes())
+            .hexdigest(),
+            "results": results,
+            "checks": checks,
+            "passed": all(c["passed"] for c in checks),
+        },
+        indent=2,
+    )
+    + "\n"
+)
 
-print(f'exe resolution: {len(checks)} checks passed across {len(layouts)} layouts')
+print(f"exe resolution: {len(checks)} checks passed across {len(layouts)} layouts")
