@@ -78,7 +78,7 @@ proc runCmdDocker*(args: seq[string]) =
   try:
     if exitCode == 0:
       reporting.doReporting("report")
-    elif policyOutcome != nil:
+    elif ctx.buildAttempted or policyOutcome != nil:
       reporting.doReporting("fail")
     showConfigValues()
   except:
