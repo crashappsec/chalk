@@ -1,5 +1,5 @@
 import std/[os, options, strutils]
-import ../../src/[confload, types]
+import ../../src/[commands, confload, types]
 import ../../src/docker/base
 
 loadAllConfigs()
