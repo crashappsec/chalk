@@ -59,6 +59,14 @@ proc doPodmanReporting(spec: podman_types.PodmanBuildSpec, topic: string,
   finally:
     restoreHostCollection()
 
+proc reportAttemptFailure(spec: podman_types.PodmanBuildSpec, status: int): int =
+  setExitCode(status)
+  try:
+    doPodmanReporting(spec, "fail")
+  except:
+    discard
+  return status
+
 proc failOpenOriginal(exe: string, spec: podman_types.PodmanBuildSpec,
                       step: PodmanAttemptStep,
                       attemptStatus = none(int)): int =
@@ -71,12 +79,7 @@ proc failOpenOriginal(exe: string, spec: podman_types.PodmanBuildSpec,
     emitPodmanRetryResult(NativeRetryResult(kind: nrSucceeded))
   else:
     emitPodmanRetryResult(NativeRetryResult(kind: nrExited, status: status))
-  setExitCode(status)
-  try:
-    doPodmanReporting(spec, "fail")
-  except:
-    discard
-  return status
+  return reportAttemptFailure(spec, status)
 
 proc writeMark(spec: podman_types.PodmanBuildSpec,
                ws: podman_types.PodmanWorkspace,
@@ -272,16 +275,18 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   if isSubscribedKey("_IMAGE_SBOM") and hasNativeSbomDocument(spec.sbom):
     snapshots = snapshotSbomHostOutputs(spec.sbom, workingDir)
 
-  let injected = runAttached(exe, makeInjectedArgs(spec, ws))
+  # Calling the launch adapter ends fallback eligibility, even if it cannot
+  # determine whether the child ran (including ceSpawnFailed after waitpid).
+  var injected: podman_types.ChildResult
+  try:
+    injected = runAttached(exe, makeInjectedArgs(spec, ws))
+  except:
+    error("podman build outcome is unknown: " & getCurrentExceptionMsg())
+    return reportAttemptFailure(spec, 1)
   if isCancellation(injected):
     return cancellationExit(injected)
-  if injected.kind == podman_types.ceSpawnFailed:
-    return failOpenOriginal(exe, spec, pasInstrumentedBuildStart)
-  if injected.kind != podman_types.ceExited:
-    return childStatus(injected)
-  if injected.exitCode != 0:
-    return failOpenOriginal(exe, spec, pasInstrumentedBuildRun,
-                            some(injected.exitCode))
+  if injected.kind != podman_types.ceExited or injected.exitCode != 0:
+    return reportAttemptFailure(spec, childStatus(injected))
 
   try:
     let status = finalizeImage(exe, spec, ws, chalk, snapshots, workingDir,

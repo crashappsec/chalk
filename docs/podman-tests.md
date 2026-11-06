@@ -21,4 +21,7 @@ Engine integration tests require compatible native engine capabilities. The
 platform integration cases exercise an amd64 builder and ARM emulation and do
 not establish native arm64 support. Registry cases require a registry. Engine
 checks and registry checks are independent of backend report acceptance. A
-successful native retry does not establish successful instrumentation.
+successful pre-launch native fallback does not establish successful instrumentation.
+Once Chalk attempts the instrumented build launch, Podman and Docker never
+replay the original build. Injected failures can therefore leave the single
+attempt unsuccessful, including the current shell guard in scratch images.

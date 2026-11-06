@@ -25,9 +25,20 @@ import "."/[
 ]
 
 proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
-  # If our mundged docker invocation fails, then we conservatively
-  # assume we made some big mistake, and run Docker the way it
-  # was originally called.
+  if ctx.buildAttempted:
+    let status = ctx.buildExitCode.get(1)
+    try:
+      setExitCode(status)
+      doReporting(if status == 0: "report" else: "fail")
+      showConfigValues()
+    except:
+      error("docker post-command: " & getCurrentExceptionMsg())
+    finally:
+      try:
+        writePolicySummary()
+      except:
+        discard
+      quitChalkWithStatus(status)
   var exitCode = 1
   try:
     let
@@ -42,12 +53,18 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
     doReporting("fail")
     showConfigValues()
   finally:
+    if ctx.cmd == DockerCmd.build:
+      try:
+        writePolicySummary()
+      except:
+        discard
+      quitChalkWithStatus(exitCode)
     # no-op unless reporting did not get to write it
     writePolicySummary()
     quitChalk(exitCode)
 
 proc dockerPolicyBlocked*(ctx: DockerInvocation) {.noreturn.} =
-  # unlike other failures, docker must not be re-run without chalk
+  # A policy refusal must not run the original command.
   var exitCode = 1
   try:
     error("docker: " & getCurrentExceptionMsg())
@@ -68,7 +85,10 @@ template withDockerFailsafe*(ctx: DockerInvocation, code: untyped) =
   except PolicyViolation:
     ctx.dockerPolicyBlocked()
   except:
-    error("docker: retrying without chalk due to: " & getCurrentExceptionMsg())
+    if ctx.buildAttempted:
+      error("docker post-launch: " & getCurrentExceptionMsg())
+    else:
+      error("docker: retrying without chalk due to: " & getCurrentExceptionMsg())
     dumpExOnDebug()
     ctx.dockerFailsafe()
 

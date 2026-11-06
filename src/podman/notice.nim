@@ -61,9 +61,7 @@ type
     pasHostInspection,
     pasCollectionInitialization,
     pasWorkspacePreparation,
-    pasMarkCreation,
-    pasInstrumentedBuildStart,
-    pasInstrumentedBuildRun
+    pasMarkCreation
 
   NativeRetryKind* = enum
     nrSucceeded, nrExited
@@ -257,10 +255,6 @@ proc formatPodmanRetryStart*(step: PodmanAttemptStep,
     failure = "Chalk workspace preparation"
   of pasMarkCreation:
     failure = "Chalk mark creation"
-  of pasInstrumentedBuildStart:
-    failure = "the instrumented Podman build startup"
-  of pasInstrumentedBuildRun:
-    failure = "the instrumented Podman build"
 
   if status.isSome():
     failure.add(" exited with status " & $status.get())

@@ -9,10 +9,9 @@ import tempfile
 import time
 import unittest
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
-PROBE_SOURCE = r'''
+PROBE_SOURCE = r"""
 #define _POSIX_C_SOURCE 200809L
 
 #include <errno.h>
@@ -152,7 +151,7 @@ int main(int argc, char **argv)
   }
   return 79;
 }
-'''
+"""
 
 
 def wait_for_state(pid, timeout):
@@ -172,11 +171,22 @@ class TestPodmanRun(unittest.TestCase):
         cls.probe = Path(cls.temp.name) / "probe"
         source = Path(cls.temp.name) / "probe.c"
         source.write_text(PROBE_SOURCE)
-        subprocess.run([
-            os.environ.get("CC", "cc"), "-std=c11", "-Wall", "-Wextra",
-            "-Werror", "-I", str(ROOT / "src"), str(source),
-            str(ROOT / "src/podman/run.c"), "-o", str(cls.probe),
-        ], check=True)
+        subprocess.run(
+            [
+                os.environ.get("CC", "cc"),
+                "-std=c11",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-I",
+                str(ROOT / "src"),
+                str(source),
+                str(ROOT / "src/podman/run.c"),
+                "-o",
+                str(cls.probe),
+            ],
+            check=True,
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -199,8 +209,16 @@ class TestPodmanRun(unittest.TestCase):
                     os.setpgid(0, 0)
                     signal.signal(signal.SIGTTOU, signal.SIG_DFL)
                     signal.signal(signal.SIGTTIN, signal.SIG_DFL)
-                    os.execv(self.probe, [str(self.probe), "runner-tty", scenario,
-                                           str(read_fd), str(controller_pgrp)])
+                    os.execv(
+                        self.probe,
+                        [
+                            str(self.probe),
+                            "runner-tty",
+                            scenario,
+                            str(read_fd),
+                            str(controller_pgrp),
+                        ],
+                    )
                 os.close(read_fd)
                 os.setpgid(runner, runner)
                 if scenario != "initial-background":
@@ -214,13 +232,17 @@ class TestPodmanRun(unittest.TestCase):
                     valid = valid and os.tcgetpgrp(0) == controller_pgrp
                 else:
                     status = wait_for_state(runner, 3)
-                    valid = os.WIFSTOPPED(status) and os.WSTOPSIG(status) == signal.SIGSTOP
+                    valid = (
+                        os.WIFSTOPPED(status) and os.WSTOPSIG(status) == signal.SIGSTOP
+                    )
                     os.tcsetpgrp(0, controller_pgrp)
                     if scenario == "foreground":
                         os.tcsetpgrp(0, runner)
                     os.kill(runner, signal.SIGCONT)
                     status = wait_for_state(runner, 3)
-                    valid = valid and os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+                    valid = (
+                        valid and os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+                    )
                     expected = runner if scenario == "foreground" else controller_pgrp
                     valid = valid and os.tcgetpgrp(0) == expected
                 os.tcsetpgrp(0, controller_pgrp)
@@ -294,7 +316,9 @@ class TestPodmanRun(unittest.TestCase):
                 if mirrored_stop:
                     os.kill(process.pid, signal.SIGCONT)
                 self.assertEqual(process.wait(timeout=3), 0)
-                self.assertFalse(mirrored_stop, "wrapper mirrored a child stop without a tty")
+                self.assertFalse(
+                    mirrored_stop, "wrapper mirrored a child stop without a tty"
+                )
             finally:
                 for pid in (child, process.pid):
                     if pid:
@@ -305,8 +329,9 @@ class TestPodmanRun(unittest.TestCase):
 
     def test_forwarded_cancellation_controls_exit(self):
         for sent_signal in (signal.SIGINT, signal.SIGTERM):
-            with self.subTest(signal=sent_signal.name), \
-                 tempfile.TemporaryDirectory(prefix="chalk-podman-cancel-") as temp:
+            with self.subTest(signal=sent_signal.name), tempfile.TemporaryDirectory(
+                prefix="chalk-podman-cancel-"
+            ) as temp:
                 pidfile = Path(temp) / "child.pid"
                 process = subprocess.Popen(
                     [str(self.probe), "runner-cancel", str(pidfile), str(sent_signal)],
