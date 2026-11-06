@@ -16,7 +16,7 @@ int __wrap_chalk_podman_run_attached(const char *exe, char *const argv[],
     for (int i = 0; argv[i]; ++i) {
         if (strcmp(argv[i], "--build-context") == 0) injected = 1;
     }
-    if (ledger) {
+    if (ledger && argv[1] && strcmp(argv[1], "build") == 0) {
         FILE *stream = fopen(ledger, "a");
         if (!stream) abort();
         fprintf(stream, "%s\n", injected ? "injected" : argv[1]);
