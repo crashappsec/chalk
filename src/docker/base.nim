@@ -53,6 +53,12 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
     doReporting("fail")
     showConfigValues()
   finally:
+    if ctx.cmd == DockerCmd.build:
+      try:
+        writePolicySummary()
+      except:
+        discard
+      quitChalkWithStatus(exitCode)
     # no-op unless reporting did not get to write it
     writePolicySummary()
     quitChalk(exitCode)

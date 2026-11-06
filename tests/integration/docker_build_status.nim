@@ -7,7 +7,7 @@ let status = getEnv("STAGE_TERMINAL_STATUS", "unknown")
 let ctx = DockerInvocation(
   cmd: DockerCmd.build,
   originalArgs: @["build", "stage01-original-must-not-run"],
-  buildAttempted: true,
+  buildAttempted: getEnv("STAGE_PRELAUNCH") != "true",
   buildExitCode: if status == "unknown": none(int) else: some(parseInt(status)),
 )
 ctx.withDockerFailsafe():
