@@ -114,7 +114,7 @@ os.execv(os.environ['PODMAN_TEST_REAL'], [os.environ['PODMAN_TEST_REAL'], *sys.a
                    PODMAN_TEST_REAL=real_podman, PODMAN_TEST_CALLS=str(calls),
                    PODMAN_TEST_SECRET='environment-secret-must-not-be-reported')
         try:
-            for mode in ('ordinary', 'wrapped', 'fallback', 'setup-failure', 'unsupported',
+            for mode in ('ordinary', 'wrapped', 'setup-failure', 'unsupported',
                          'sidecar-containerignore', 'sidecar-dockerignore',
                          'report-failure', 'report-failure-writable', 'postzero'):
                 source.chmod(0o755)
@@ -164,8 +164,6 @@ os.execv(os.environ['PODMAN_TEST_REAL'], [os.environ['PODMAN_TEST_REAL'], *sys.a
                 builds = [args for args in recorded if args and args[0] == 'build']
                 if mode in ('wrapped', 'report-failure', 'report-failure-writable', 'postzero'):
                     check(mode + ' one instrumented build', len(builds) == 1 and '--build-context' in builds[0])
-                elif mode == 'fallback':
-                    check('one injected attempt and one original retry', len(builds) == 2 and '--build-context' in builds[0] and builds[1] == argv)
                 elif mode == 'setup-failure':
                     check('setup failure runs original once', builds == [argv])
                 elif mode == 'unsupported' or mode.startswith('sidecar-'):
@@ -289,14 +287,17 @@ os.execv(os.environ['PODMAN_TEST_REAL'], [os.environ['PODMAN_TEST_REAL'], *sys.a
                         '--platform', 'linux/amd64', '--format', 'oci', '.',
                     ]
                     calls.write_text('')
-                    run([str(wrapped_dir / 'podman'), *reserved_argv],
-                        cwd=reserved, env=env)
+                    refused = subprocess.run([str(wrapped_dir / 'podman'), *reserved_argv],
+                                             cwd=reserved, env=env, capture_output=True,
+                                             text=True, timeout=180)
+                    check(name + ' guard refuses the single attempt', refused.returncode != 0)
                     records = [json.loads(line) for line in calls.read_text().splitlines()]
                     builds = [record['args'] for record in records
                               if record['args'][:1] == ['build']]
-                    check(name + ' injected attempt then one original retry',
-                          len(builds) == 2 and '--build-context' in builds[0] and
-                          builds[1] == reserved_argv)
+                    check(name + ' one instrumented attempt without replay',
+                          len(builds) == 1 and '--build-context' in builds[0])
+                    # A separate native control verifies the original recipe's content.
+                    run([real_podman, *reserved_argv], cwd=reserved)
                     info = json.loads(run([real_podman, 'image', 'inspect', tag]))[0]
                     if name == 'entrypoint-chalk':
                         check(name + ' preserves application entrypoint',

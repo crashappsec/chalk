@@ -272,16 +272,18 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   if isSubscribedKey("_IMAGE_SBOM") and hasNativeSbomDocument(spec.sbom):
     snapshots = snapshotSbomHostOutputs(spec.sbom, workingDir)
 
-  let injected = runAttached(exe, makeInjectedArgs(spec, ws))
+  # Calling the launch adapter ends fallback eligibility, even if it cannot
+  # determine whether the child ran (including ceSpawnFailed after waitpid).
+  var injected: podman_types.ChildResult
+  try:
+    injected = runAttached(exe, makeInjectedArgs(spec, ws))
+  except:
+    error("podman build outcome is unknown: " & getCurrentExceptionMsg())
+    return 1
   if isCancellation(injected):
     return cancellationExit(injected)
-  if injected.kind == podman_types.ceSpawnFailed:
-    return failOpenOriginal(exe, spec, pasInstrumentedBuildStart)
-  if injected.kind != podman_types.ceExited:
+  if injected.kind != podman_types.ceExited or injected.exitCode != 0:
     return childStatus(injected)
-  if injected.exitCode != 0:
-    return failOpenOriginal(exe, spec, pasInstrumentedBuildRun,
-                            some(injected.exitCode))
 
   try:
     let status = finalizeImage(exe, spec, ws, chalk, snapshots, workingDir,

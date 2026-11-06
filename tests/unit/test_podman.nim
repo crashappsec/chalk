@@ -295,8 +295,8 @@ proc main() =
            )),
            "chalk: skipped Podman build processing: Containerfile is outside " &
            "the build context.")
-  assertEq(formatPodmanRetryStart(pasInstrumentedBuildRun, some(17)),
-           "chalk: the instrumented Podman build exited with status 17; " &
+  assertEq(formatPodmanRetryStart(pasHostInspection, some(17)),
+           "chalk: Podman host inspection exited with status 17; " &
            "retrying the original build without instrumentation.")
   assertEq(formatPodmanRetryResult(NativeRetryResult(kind: nrSucceeded)),
            "chalk: Build succeeded; Chalk did not instrument this build.")

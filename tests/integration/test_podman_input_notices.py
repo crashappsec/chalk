@@ -490,47 +490,20 @@ with tempfile.TemporaryDirectory(prefix='podman-input-notices-') as temp:
                      'exit_code': result.returncode,
                      'native_executions': len(seen)})
 
-    def assert_retry(result, seen, native_status):
-        assert seen[0] == ['info', '--format', 'json'], seen
+    for native_status in (0, 23):
+        result, seen = run(['build', str(supported)], env={
+            'PODMAN_INJECTED_EXIT': '17',
+            'PODMAN_NATIVE_EXIT': str(native_status),
+        })
         builds = [argv for argv in seen if argv and argv[0] == 'build']
-        assert len(builds) == 2, seen
-        assert '--build-context' in builds[0], builds
-        assert builds[1] == ['build', str(supported)], builds
-        assert result.returncode == native_status, result
-        expected_stdout = (b'stdout:injected-build\x00\n' +
-                           b'stdout:native-build\x00\n')
-        assert result.stdout == expected_stdout, {
-            'actual_length': len(result.stdout),
-            'actual_sha256': hashlib.sha256(result.stdout).hexdigest(),
-            'expected_length': len(expected_stdout),
-            'expected_sha256': hashlib.sha256(expected_stdout).hexdigest(),
-        }
-        assert native_stderr(result.stderr) == (b'stderr:injected-build\xff\n' +
-                                                b'stderr:native-build\xff\n')
-
-    result, seen = run(['build', str(supported)], env={
-        'PODMAN_INJECTED_EXIT': '17',
-        'PODMAN_NATIVE_EXIT': '0',
-    })
-    assert_retry(result, seen, 0)
-    retry_notices = notice_lines(result.stderr)
-    assert any('instrumented Podman build' in line and '17' in line and
-               'retry' in line for line in retry_notices), retry_notices
-    assert 'chalk: Build succeeded; Chalk did not instrument this build.' in retry_notices
-    evidence.append({'case': 'retry-succeeded', 'exit_code': result.returncode,
-                     'build_executions': 2})
-
-    result, seen = run(['build', str(supported)], env={
-        'PODMAN_INJECTED_EXIT': '17',
-        'PODMAN_NATIVE_EXIT': '23',
-    })
-    assert_retry(result, seen, 23)
-    retry_notices = notice_lines(result.stderr)
-    assert any('instrumented Podman build' in line and '17' in line and
-               'retry' in line for line in retry_notices), retry_notices
-    assert any('native Podman retry' in line and '23' in line for line in retry_notices), retry_notices
-    evidence.append({'case': 'retry-failed', 'exit_code': result.returncode,
-                     'build_executions': 2})
+        assert len(builds) == 1 and '--build-context' in builds[0], seen
+        assert result.returncode == 17, result
+        assert result.stdout == b'stdout:injected-build\x00\n', result
+        assert native_stderr(result.stderr) == b'stderr:injected-build\xff\n', result
+        assert not any('retry' in line or 'Build succeeded' in line
+                       for line in notice_lines(result.stderr)), result
+        evidence.append({'case': 'failed-single-attempt-native-' + str(native_status),
+                         'exit_code': result.returncode, 'build_executions': 1})
 
     for cancelled_status in (130, 143):
         result, seen = run(['build', str(supported)], env={
