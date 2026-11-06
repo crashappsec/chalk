@@ -87,10 +87,11 @@ proc runCmdDocker*(args: seq[string]) =
     error("docker post-command: " & getCurrentExceptionMsg())
   finally:
     # no-op unless reporting did not get to write it
-    try:
-      writePolicySummary()
-    except:
-      error("docker post-command: " & getCurrentExceptionMsg())
     if ctx.buildAttempted:
+      try:
+        writePolicySummary()
+      except:
+        error("docker post-command: " & getCurrentExceptionMsg())
       quitChalkWithStatus(ctx.buildExitCode.get(1))
+    writePolicySummary()
     quitChalk()
