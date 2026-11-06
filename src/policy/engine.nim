@@ -45,9 +45,8 @@ proc evaluatePolicy*(settings: PolicyConfig,
     mode:          settings.mode,
     onError:       settings.onError,
     effectiveMode: mode,
-    modeSource:    (if settings.modeSource != "": settings.modeSource else: "default"),
     repo:          settings.repo,
-    hasEnforceRepos: len(settings.enforceRepos) > 0,
+    hasTargetRepos: len(settings.targetRepos) > 0,
   )
   for rule in rules:
     result.rules.add(rule.name)
@@ -194,12 +193,13 @@ proc configError(settings: PolicyConfig): PolicyFinding =
   PolicyFinding(rule: configRule, kind: "error", reason: settings.configError)
 
 proc resolveModes(configs: seq[PolicyConfig], resolver: PolicyRepoResolver): seq[PolicyConfig] =
-  ## the repository is only looked up when a policy has `enforce_repos`
+  ## the repository is only looked up when an evaluated policy has
+  ## `target_repos`
   var
     repo     = ""
     resolved = false
   for p in configs:
-    if len(p.enforceRepos) == 0:
+    if len(p.targetRepos) == 0 or not p.isEvaluated():
       result.add(p)
       continue
     if not resolved:
@@ -209,7 +209,7 @@ proc resolveModes(configs: seq[PolicyConfig], resolver: PolicyRepoResolver): seq
           repo = resolver()
         except CatchableError:
           warn("policy: could not determine repository: " & getCurrentExceptionMsg())
-      trace("policy: repository for enforce_repos: " & (if repo != "": repo else: "unknown"))
+      trace("policy: repository for target_repos: " & (if repo != "": repo else: "unknown"))
     result.add(p.resolveMode(repo))
 
 proc evaluatePolicies*(build:          ChalkDict,

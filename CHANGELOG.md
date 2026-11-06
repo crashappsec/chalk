@@ -37,13 +37,14 @@
   introduced the violation, and `BUILD_REF`, which names the pull request
   (`refs/pull/N/merge`) when `_COMMIT_ID` is its synthetic merge commit. See
   `docs/design-build-policy.md`.
-  A policy can be enforced in selected repositories only via `enforce_repos`
+  A policy can be limited to selected repositories via `target_repos`
   (glob entries over the normalized `host/owner/name` of the git origin of the
   build context, or of the working directory for `docker push`, falling back
-  to the CI job's repository), while `mode` applies
-  elsewhere; an undeterminable repository never escalates to `enforce`.
-  `_POLICY_RESULTS` entries report `effective_mode`, `mode_source` and `repo`.
-  Glob characters in `enforce_repos` entries are kept when the entry is
+  to the CI job's repository): it is evaluated in its `mode` there and not
+  evaluated elsewhere. `on_unknown_repo` (`skip` by default, or `apply`)
+  decides when the repository cannot be determined. `mode` alone decides
+  enforcement. `_POLICY_RESULTS` entries report `effective_mode` and `repo`.
+  Glob characters in `target_repos` entries are kept when the entry is
   normalized, so `github.com/acme/app?` matches `github.com/acme/app1`
   rather than being cut at the `?` like a URL query.
   In GitHub Actions (`GITHUB_STEP_SUMMARY` set), the policy outcome is also

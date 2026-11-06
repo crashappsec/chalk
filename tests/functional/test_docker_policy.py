@@ -131,7 +131,6 @@ def test_enforce_allows_golden_image(chalk: Chalk, random_hex: str):
             "on_error": "allow",
             "result": "pass",
             "effective_mode": "enforce",
-            "mode_source": "default",
             "repo": "",
             "rules": ["golden_images", "custom_check"],
         }
@@ -744,7 +743,6 @@ def test_config_json_enforces(chalk: Chalk, random_hex: str):
             "on_error": "allow",
             "result": "blocked",
             "effective_mode": "enforce",
-            "mode_source": "default",
             "repo": "",
             "rules": ["golden_images"],
         }
@@ -829,7 +827,6 @@ def test_config_json_multi_audit_violation_does_not_block(
             "on_error": "allow",
             "result": "pass",
             "effective_mode": "enforce",
-            "mode_source": "default",
             "repo": "",
             "rules": ["golden_images"],
         },
@@ -839,7 +836,6 @@ def test_config_json_multi_audit_violation_does_not_block(
             "on_error": "block",
             "result": "violation",
             "effective_mode": "audit",
-            "mode_source": "default",
             "repo": "",
             "rules": ["golden_images"],
         },
@@ -909,17 +905,17 @@ def test_config_json_multi_invalid_entry_is_isolated(chalk: Chalk, random_hex: s
     )
 
 
-ENFORCED_REPO = "github.com/crashappsec/dummy-deployments"
+TARGET_REPO = "github.com/crashappsec/dummy-deployments"
 # the CI job running the tests must not decide which repository is built
 NO_CI_REPO = {"GITHUB_SERVER_URL": "", "GITHUB_REPOSITORY": "", "CI_PROJECT_URL": ""}
 
 
-def rollout_policy(mode: str = "audit", policy_id: str = "golden-images@3") -> dict:
+def rollout_policy(mode: str = "enforce", policy_id: str = "golden-images@3") -> dict:
     config = json.loads(POLICY_CONFIG.read_text())
     config["id"] = policy_id
     config["mode"] = mode
-    config["enforce_repos"] = [
-        ["glob", ENFORCED_REPO],
+    config["target_repos"] = [
+        ["glob", TARGET_REPO],
         ["glob", "github.com/crashappsec/other-*"],
     ]
     return config
@@ -991,45 +987,48 @@ def test_report_no_commit_id_outside_git(
 
 @pytest.mark.parametrize("form", ["single", "list"])
 @pytest.mark.parametrize(
-    "remote",
+    "remote, mode",
     [
-        "git@github.com:crashappsec/dummy-deployments.git",
-        "https://github.com/CrashAppSec/dummy-deployments",
+        ("git@github.com:crashappsec/dummy-deployments.git", "enforce"),
+        ("https://github.com/CrashAppSec/dummy-deployments", "enforce"),
+        ("git@github.com:crashappsec/dummy-deployments.git", "audit"),
     ],
 )
-def test_enforce_repos_blocks_listed_repo(
-    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str, remote: str
+def test_target_repos_applies_in_listed_repo(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str, remote: str, mode: str
 ):
+    blocks = mode == "enforce"
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
-        as_form(rollout_policy(), form),
+        as_form(rollout_policy(mode), form),
         random_hex,
         tag=random_hex,
         context=git_context(tmp_data_dir, remote),
         env=NO_CI_REPO,
-        expected_success=False,
+        expected_success=not blocks,
     )
-    assert result.exit_code == 1
-    assert not image_exists(random_hex)
+    assert result.exit_code == (1 if blocks else 0)
+    assert image_exists(random_hex) != blocks
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_MODE="enforce", _POLICY_RESULT="blocked")
+    assert report.has(
+        _POLICY_MODE=mode, _POLICY_RESULT="blocked" if blocks else "violation"
+    )
     assert report["_POLICY_RESULTS"] == [
         {
             "id": "golden-images@3",
-            "mode": "audit",
+            "mode": mode,
             "on_error": "allow",
-            "result": "blocked",
-            "effective_mode": "enforce",
-            "mode_source": "enforce_repos",
-            "repo": ENFORCED_REPO,
+            "result": "blocked" if blocks else "violation",
+            "effective_mode": mode,
+            "repo": TARGET_REPO,
             "rules": ["golden_images"],
         }
     ]
 
 
 @pytest.mark.parametrize("form", ["single", "list"])
-def test_enforce_repos_audits_other_repos(
+def test_target_repos_skips_other_repos(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str
 ):
     _, result = build_json(
@@ -1043,48 +1042,69 @@ def test_enforce_repos_audits_other_repos(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation")
-    assert report["_POLICY_RESULTS"] == [
-        {
-            "id": "golden-images@3",
-            "mode": "audit",
-            "on_error": "allow",
-            "result": "violation",
-            "effective_mode": "audit",
-            "mode_source": "default",
-            "repo": "github.com/crashappsec/chalk",
-            "rules": ["golden_images"],
-        }
-    ]
+    assert policy_reports(random_hex) == []
 
 
-@pytest.mark.parametrize("form", ["single", "list"])
-def test_enforce_repos_unknown_repo_never_enforces(
-    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str
+def test_empty_target_repos_applies_everywhere(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
 ):
+    config = rollout_policy()
+    config["target_repos"] = []
     # the context is not a git repository and there is no CI repository
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
-        as_form(rollout_policy(), form),
+        json.dumps(config),
+        random_hex,
+        tag=random_hex,
+        context=tmp_data_dir,
+        env=NO_CI_REPO,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report["_POLICY_RESULTS"][0]["result"] == "blocked"
+    assert report["_POLICY_RESULTS"][0]["repo"] == ""
+
+
+@pytest.mark.parametrize("form", ["single", "list"])
+@pytest.mark.parametrize("on_unknown_repo", [None, "skip", "apply"])
+def test_target_repos_unknown_repo(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    form: str,
+    on_unknown_repo: Optional[str],
+):
+    config = rollout_policy()
+    if on_unknown_repo:
+        config["on_unknown_repo"] = on_unknown_repo
+    applies = on_unknown_repo == "apply"
+    # the context is not a git repository and there is no CI repository
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(config, form),
         random_hex,
         tag=random_hex,
         context=tmp_data_dir,
         env=NO_CI_REPO,
         ignore_errors=True,
+        expected_success=not applies,
     )
-    assert result.exit_code == 0
-    assert image_exists(random_hex)
+    assert result.exit_code == (1 if applies else 0)
+    if not applies:
+        assert image_exists(random_hex)
+        assert policy_reports(random_hex) == []
+        return
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation")
+    assert report.has(_POLICY_MODE="enforce", _POLICY_RESULT="blocked")
     assert report["_POLICY_RESULTS"][0] == {
         "id": "golden-images@3",
-        "mode": "audit",
+        "mode": "enforce",
         "on_error": "allow",
-        "result": "violation",
-        "effective_mode": "audit",
-        "mode_source": "default",
+        "result": "blocked",
+        "effective_mode": "enforce",
         "repo": "",
         "rules": ["golden_images"],
     }
@@ -1106,22 +1126,22 @@ def push_json(chalk: Chalk, image: str, config_json: str, random_hex: str, **kwa
 # https://github.com/crashappsec/chalk/issues/776: push has no build context,
 # so the repository comes from the working directory
 @pytest.mark.parametrize(
-    "base, remote, expected_exit, effective_mode",
+    "base, remote, expected_exit, evaluated",
     [
-        ("busybox", f"https://{ENFORCED_REPO}.git", 1, "enforce"),
-        ("busybox", "https://github.com/crashappsec/chalk.git", 0, "audit"),
+        ("busybox", f"https://{TARGET_REPO}.git", 1, True),
+        ("busybox", "https://github.com/crashappsec/chalk.git", 0, False),
         # passes every policy: still reported
-        ("alpine", f"https://{ENFORCED_REPO}.git", 0, None),
+        ("alpine", f"https://{TARGET_REPO}.git", 0, True),
     ],
 )
-def test_enforce_repos_docker_push(
+def test_target_repos_docker_push(
     chalk: Chalk,
     random_hex: str,
     tmp_data_dir: Path,
     base: str,
     remote: str,
     expected_exit: int,
-    effective_mode: str | None,
+    evaluated: bool,
 ):
     tag = f"{REGISTRY}/{random_hex}"
     build(chalk, f"FROM {base}\nCMD true\n", "off", random_hex, tag=tag)
@@ -1137,19 +1157,20 @@ def test_enforce_repos_docker_push(
     )
     assert result.exit_code == expected_exit
     assert (registry_tags(random_hex) != []) == (expected_exit == 0)
-    if effective_mode is None:
+    if not evaluated:
+        assert policy_reports(random_hex) == []
+        return
+    if expected_exit == 0:
         passed_report(random_hex)
         return
     (report,) = policy_reports(random_hex)
-    assert report["_POLICY_RESULTS"][0]["effective_mode"] == effective_mode
-    assert report["_POLICY_RESULTS"][0]["repo"] == remote.removeprefix(
-        "https://"
-    ).removesuffix(".git")
+    assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
+    assert report["_POLICY_RESULTS"][0]["repo"] == TARGET_REPO
 
 
 # a relative origin is a local path to git and identifies no repository
 @pytest.mark.parametrize("origin", [None, "mirrors/crashappsec/chalk.git"])
-def test_enforce_repos_falls_back_to_ci_repo(
+def test_target_repos_falls_back_to_ci_repo(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path, origin: str | None
 ):
     context = git_context(tmp_data_dir, origin) if origin else tmp_data_dir
@@ -1169,54 +1190,40 @@ def test_enforce_repos_falls_back_to_ci_repo(
     )
     assert result.exit_code == 1
     (report,) = policy_reports(random_hex)
-    assert report["_POLICY_RESULTS"][0]["mode_source"] == "enforce_repos"
-    assert report["_POLICY_RESULTS"][0]["repo"] == ENFORCED_REPO
+    assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
+    assert report["_POLICY_RESULTS"][0]["repo"] == TARGET_REPO
 
 
-def test_enforce_repos_with_mode_off_only_enforces_listed_repos(
+def test_target_repos_with_mode_off_is_off(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path
 ):
-    config = as_form(rollout_policy(mode="off"), "list")
-    other = tmp_data_dir / "other"
-    other.mkdir()
+    config = rollout_policy(mode="off")
+    config["on_unknown_repo"] = "apply"
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
-        config,
+        as_form(config, "list"),
         random_hex,
         tag=random_hex,
-        context=git_context(other, "git@github.com:crashappsec/chalk.git"),
+        context=git_context(
+            tmp_data_dir, "git@github.com:crashappsec/other-service.git"
+        ),
         env=NO_CI_REPO,
     )
     assert result.exit_code == 0
+    assert image_exists(random_hex)
     assert policy_reports(random_hex) == []
-
-    listed = tmp_data_dir / "listed"
-    listed.mkdir()
-    _, result = build_json(
-        chalk,
-        "FROM busybox\nCMD true\n",
-        config,
-        random_hex,
-        tag=f"{random_hex}-listed",
-        context=git_context(listed, "git@github.com:crashappsec/other-service.git"),
-        env=NO_CI_REPO,
-        expected_success=False,
-    )
-    assert result.exit_code == 1
-    (report,) = policy_reports(random_hex)
-    assert report["_POLICY_RESULTS"][0]["mode"] == "off"
-    assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
 
 
 @pytest.mark.parametrize("on_error", ["allow", "block"])
-def test_enforce_repos_invalid_honors_on_error(
+def test_target_repos_invalid_honors_on_error(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path, on_error: str
 ):
-    config = rollout_policy(mode="enforce")
+    config = rollout_policy()
     config["on_error"] = on_error
-    # dropped as invalid, so the declared enforce mode applies everywhere
-    config["enforce_repos"] = ENFORCED_REPO
+    # dropped as invalid, so the policy applies everywhere, even outside the
+    # repositories it meant to target
+    config["target_repos"] = TARGET_REPO
     blocks = on_error == "block"
     _, result = build_json(
         chalk,
@@ -1224,7 +1231,7 @@ def test_enforce_repos_invalid_honors_on_error(
         json.dumps(config),
         random_hex,
         tag=random_hex,
-        context=git_context(tmp_data_dir, f"https://{ENFORCED_REPO}.git"),
+        context=git_context(tmp_data_dir, "https://github.com/crashappsec/chalk.git"),
         env=NO_CI_REPO,
         expected_success=not blocks,
         ignore_errors=True,
@@ -1235,7 +1242,44 @@ def test_enforce_repos_invalid_honors_on_error(
     assert report.contains(
         {"_POLICY_FINDINGS": [{"rule": "config", "kind": "error", "reason": ANY}]}
     )
-    assert "policy.enforce_repos" in report["_POLICY_FINDINGS"][0]["reason"]
+    assert "policy.target_repos" in report["_POLICY_FINDINGS"][0]["reason"]
+
+
+@pytest.mark.parametrize(
+    "remote, blocks",
+    [
+        (f"https://{TARGET_REPO}.git", True),
+        ("https://github.com/crashappsec/chalk.git", False),
+    ],
+)
+def test_invalid_on_unknown_repo_is_config_error(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, remote: str, blocks: bool
+):
+    config = rollout_policy()
+    config["on_error"] = "block"
+    config["on_unknown_repo"] = "always"
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        json.dumps(config),
+        random_hex,
+        tag=random_hex,
+        context=git_context(tmp_data_dir, remote),
+        env=NO_CI_REPO,
+        expected_success=not blocks,
+        ignore_errors=True,
+    )
+    assert result.exit_code == (1 if blocks else 0)
+    if not blocks:
+        # the valid target_repos still scopes the configuration error
+        assert policy_reports(random_hex) == []
+        return
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="blocked")
+    assert report.contains(
+        {"_POLICY_FINDINGS": [{"rule": "config", "kind": "error", "reason": ANY}]}
+    )
+    assert "policy.on_unknown_repo" in report["_POLICY_FINDINGS"][0]["reason"]
 
 
 # the golden-images policy chalkapi serves to the test workspace
@@ -1344,7 +1388,7 @@ def test_step_summary_audit_violation(chalk: Chalk, random_hex: str, tmp_path: P
         "`docker.io/library/alpine:*`, `cgr.dev/chainguard/*`" in text
     )
     assert "<details><summary>Policy details</summary>" in text
-    assert "| (unnamed) | audit | default mode | violation | 1 |" in text
+    assert "| (unnamed) | audit | all repos | violation | 1 |" in text
     assert "- Chalk version: `" in text
     assert "[!CAUTION]" not in text
 
@@ -1366,7 +1410,7 @@ def test_step_summary_enforce_blocked(chalk: Chalk, random_hex: str, tmp_path: P
         "> [!CAUTION]\n> **Blocked** — `docker build` stopped before building: "
         "1 image is not an approved golden image (enforce)." in text
     )
-    assert "| (unnamed) | enforce | default mode | blocked | 1 |" in text
+    assert "| (unnamed) | enforce | all repos | blocked | 1 |" in text
 
 
 def test_step_summary_pass_skipped_by_default(
@@ -1408,7 +1452,7 @@ def test_step_summary_pass(chalk: Chalk, random_hex: str, tmp_path: Path):
         in text
     )
     assert "| Image |" not in text
-    assert "| (unnamed) | enforce | default mode | pass | 0 |" in text
+    assert "| (unnamed) | enforce | all repos | pass | 0 |" in text
 
 
 def test_step_summary_disabled(chalk: Chalk, random_hex: str, tmp_path: Path):
@@ -2634,7 +2678,7 @@ def test_dependency_review_unavailable_only_warns(
         "policy.vulnerabilities cannot check the dependencies this pull request "
         "adds for vulnerabilities: " in text
     )
-    assert "| vulns@1 | enforce | default mode | pass | 0 |" in text
+    assert "| vulns@1 | enforce | all repos | pass | 0 |" in text
 
 
 @pytest.mark.parametrize("on_error, exit_code", [("allow", 0), ("block", 1)])

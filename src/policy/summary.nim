@@ -299,12 +299,12 @@ proc howToFix(policies: seq[PolicyResult]): seq[string] =
     result.add("**How to fix:** " & line)
     result.add("")
 
-proc whyThisMode(p: PolicyResult): string =
-  if p.modeSource == "enforce_repos":
-    return "enforce_repos match (" & mdCode(p.repo, 100) & ")"
-  if p.hasEnforceRepos and p.repo == "":
-    return "repo unknown → default mode"
-  "default mode"
+proc scope(p: PolicyResult): string =
+  if not p.hasTargetRepos:
+    return "all repos"
+  if p.repo == "":
+    return "repo unknown → on_unknown_repo: apply"
+  "target_repos match (" & mdCode(p.repo, 100) & ")"
 
 proc renderPolicySummary*(policies:        seq[PolicyResult],
                           build:           ChalkDict,
@@ -351,16 +351,16 @@ proc renderPolicySummary*(policies:        seq[PolicyResult],
 
   lines.add("<details><summary>Policy details</summary>")
   lines.add("")
-  lines.add("| Policy | Mode | Why this mode | Result | Findings |")
+  lines.add("| Policy | Mode | Scope | Result | Findings |")
   lines.add("| --- | --- | --- | --- | --- |")
   var repo = ""
   for i, p in policies:
-    if p.hasEnforceRepos and repo == "":
+    if p.hasTargetRepos and repo == "":
       repo = if p.repo != "": p.repo else: "unknown"
     if i >= maxPolicyRows:
       continue
     lines.add("| " & mdText(policyName(p.id)) & " | " & mdText(p.effectiveMode) & " | " &
-              p.whyThisMode() & " | " & mdText(p.result) & " | " & $len(p.findings) & " |")
+              p.scope() & " | " & mdText(p.result) & " | " & $len(p.findings) & " |")
   if len(policies) > maxPolicyRows:
     lines.add("")
     lines.add("_" & $(len(policies) - maxPolicyRows) & " more policies not shown._")

@@ -108,45 +108,60 @@ proc testMatchesRepoKeepsGlobs() =
 
 proc testResolveMode() =
   let repos = @[("glob", "github.com/crashappsec/dummy-deployments")]
-  for mode in ["off", "audit", "enforce"]:
-    let p = PolicyConfig(id: "p", mode: mode, onError: "allow", enforceRepos: repos)
+  for mode in ["audit", "enforce"]:
+    let p = PolicyConfig(id: "p", mode: mode, onError: "allow", targetRepos: repos,
+                         onUnknownRepo: "skip")
     let listed = p.resolveMode("github.com/crashappsec/dummy-deployments")
-    doAssert listed.activeMode() == "enforce" and listed.modeSource == "enforce_repos"
-    doAssert listed.mode == mode and listed.isEvaluated()
+    doAssert listed.activeMode() == mode and listed.isEvaluated()
+    doAssert listed.repo == "github.com/crashappsec/dummy-deployments"
     let other = p.resolveMode("github.com/crashappsec/chalk")
-    doAssert other.activeMode() == mode and other.modeSource == "default"
-    # an unknown repository never escalates
+    doAssert not other.isEvaluated()
+    # an unknown repository is skipped by default
     let unknown = p.resolveMode("")
-    doAssert unknown.activeMode() == mode and unknown.modeSource == "default"
-    doAssert unknown.repo == ""
-    doAssert p.mayBeEvaluated()
-  doAssert not PolicyConfig(mode: "off").mayBeEvaluated()
-  # without enforce_repos the repository does not matter
-  let plain = PolicyConfig(mode: "audit").resolveMode("github.com/crashappsec/dummy-deployments")
-  doAssert plain.activeMode() == "audit" and plain.modeSource == "default"
-  # an invalid policy keeps its valid enforce_repos, so on_error decides
-  # whether its configuration error blocks where it is enforced
-  let invalid = PolicyConfig(mode: "off", configError: "broken", enforceRepos: repos)
-  doAssert invalid.mayBeEvaluated()
+    doAssert not unknown.isEvaluated() and unknown.repo == ""
+    var apply = p
+    apply.onUnknownRepo = "apply"
+    doAssert apply.resolveMode("").activeMode() == mode
+    doAssert not apply.resolveMode("github.com/crashappsec/chalk").isEvaluated()
+  # mode off is off everywhere
+  let off = PolicyConfig(mode: "off", targetRepos: repos, onUnknownRepo: "apply")
+  doAssert not off.isEvaluated()
+  doAssert not off.resolveMode("github.com/crashappsec/dummy-deployments").isEvaluated()
+  doAssert not off.resolveMode("").isEvaluated()
+  # without target_repos the repository does not matter
+  for repo in ["github.com/crashappsec/dummy-deployments", ""]:
+    let plain = PolicyConfig(mode: "audit").resolveMode(repo)
+    doAssert plain.activeMode() == "audit"
+  # an invalid policy keeps its valid target_repos, so its configuration
+  # error is only reported where the policy applies
+  let invalid = PolicyConfig(mode: "enforce", configError: "broken", targetRepos: repos)
   doAssert invalid.resolveMode("github.com/crashappsec/dummy-deployments").activeMode() == "enforce"
   doAssert not invalid.resolveMode("github.com/crashappsec/chalk").isEvaluated()
 
 proc testJsonValidation() =
-  for doc in ["""{"enforce_repos": {}}""",
-              """{"enforce_repos": ["github.com/a/b"]}""",
-              """{"enforce_repos": [["glob"]]}""",
-              """{"enforce_repos": [["glob", 1]]}"""]:
+  for doc in ["""{"target_repos": {}}""",
+              """{"target_repos": ["github.com/a/b"]}""",
+              """{"target_repos": [["glob"]]}""",
+              """{"target_repos": [["glob", 1]]}"""]:
     let configs = parsePolicyJson(doc)
-    doAssert "policy.enforce_repos" in configs[0].configError, configs[0].configError
-    doAssert configs[0].enforceRepos.len == 0
+    doAssert "policy.target_repos" in configs[0].configError, configs[0].configError
+    doAssert configs[0].targetRepos.len == 0
   let policies = parsePolicyJson("""{"policies": [
-    {"id": "a", "mode": "audit", "enforce_repos": "github.com/a/b"},
-    {"id": "b", "mode": "audit", "enforce_repos": [["glob", "github.com/a/*"]]}
+    {"id": "a", "mode": "audit", "target_repos": "github.com/a/b"},
+    {"id": "b", "mode": "audit", "target_repos": [["glob", "github.com/a/*"]]},
+    {"id": "c", "mode": "audit", "on_unknown_repo": "apply"},
+    {"id": "d", "mode": "audit"}
   ]}""")
-  doAssert "policy.policies[0].enforce_repos" in policies[0].configError
-  doAssert policies[0].mode == "audit" and policies[0].enforceRepos.len == 0
+  doAssert "policy.policies[0].target_repos" in policies[0].configError
+  doAssert policies[0].mode == "audit" and policies[0].targetRepos.len == 0
   doAssert policies[1].configError == ""
-  doAssert policies[1].enforceRepos == @[("glob", "github.com/a/*")]
+  doAssert policies[1].targetRepos == @[("glob", "github.com/a/*")]
+  doAssert policies[2].configError == "" and policies[2].onUnknownRepo == "apply"
+  doAssert policies[3].onUnknownRepo == "skip"
+  for value in ["\"block\"", "\"Skip\"", "true"]:
+    let configs = parsePolicyJson("""{"mode": "enforce", "on_unknown_repo": """ & value & "}")
+    doAssert "policy.on_unknown_repo" in configs[0].configError, configs[0].configError
+    doAssert configs[0].onUnknownRepo == "skip"
 
 proc build(): ChalkDict =
   result = ChalkDict()
@@ -184,32 +199,38 @@ proc firstResult(): TableRef[string, string] =
       result[k] = unpack[string](v)
 
 const
-  single = """{"id": "golden@1", "mode": "audit",
-    "enforce_repos": [["glob", "github.com/crashappsec/dummy-deployments"]],
+  single = """{"id": "golden@1", "mode": "enforce",
+    "target_repos": [["glob", "github.com/crashappsec/dummy-deployments"]],
     "golden_images": {"enabled": true, "allowed": [["glob", "alpine:*"]]}}"""
   listed = "github.com/crashappsec/dummy-deployments"
 
-proc testEnforcedInListedRepo() =
-  var (blocked, resolved) = evaluate(single, listed)
+proc testAppliesInListedRepo() =
+  for mode in ["enforce", "audit"]:
+    let doc = single.replace("\"enforce\"", "\"" & mode & "\"")
+    var (blocked, resolved) = evaluate(doc, listed)
+    doAssert blocked == (mode == "enforce") and resolved == 1
+    doAssert policyOutcome.mode == mode
+    doAssert policyOutcome.result == (if mode == "enforce": "blocked" else: "violation")
+    var r = firstResult()
+    doAssert r["mode"] == mode and r["effective_mode"] == mode
+    doAssert r["repo"] == listed and "mode_source" notin r
+    doAssert policyOutcome.policies[0].rules == @["golden_images"]
+
+    # not evaluated, so nothing is reported
+    (blocked, resolved) = evaluate(doc, "github.com/crashappsec/chalk")
+    doAssert not blocked and resolved == 1 and policyOutcome == nil
+
+proc testUnknownRepo() =
+  # skipped by default
+  var (blocked, resolved) = evaluate(single, "")
+  doAssert not blocked and resolved == 1 and policyOutcome == nil
+  (blocked, resolved) = evaluate(single.replace("\"mode\"", "\"on_unknown_repo\": \"skip\", \"mode\""), "")
+  doAssert not blocked and policyOutcome == nil
+  # applied in mode
+  (blocked, resolved) = evaluate(single.replace("\"mode\"", "\"on_unknown_repo\": \"apply\", \"mode\""), "")
   doAssert blocked and resolved == 1
-  doAssert policyOutcome.mode == "enforce" and policyOutcome.result == "blocked"
-  var r = firstResult()
-  doAssert r["mode"] == "audit" and r["effective_mode"] == "enforce"
-  doAssert r["mode_source"] == "enforce_repos" and r["repo"] == listed
-  doAssert r["result"] == "blocked"
-  doAssert policyOutcome.policies[0].rules == @["golden_images"]
-
-  (blocked, resolved) = evaluate(single, "github.com/crashappsec/chalk")
-  doAssert not blocked
-  doAssert policyOutcome.mode == "audit" and policyOutcome.result == "violation"
-  r = firstResult()
-  doAssert r["effective_mode"] == "audit" and r["mode_source"] == "default"
-  doAssert r["repo"] == "github.com/crashappsec/chalk"
-
-  (blocked, resolved) = evaluate(single, "")
-  doAssert not blocked
-  r = firstResult()
-  doAssert r["effective_mode"] == "audit" and r["mode_source"] == "default" and r["repo"] == ""
+  let r = firstResult()
+  doAssert r["effective_mode"] == "enforce" and r["repo"] == ""
 
 proc testResolverFailureIsUnknownRepo() =
   setPolicyJson(single)
@@ -224,13 +245,12 @@ proc testResolverFailureIsUnknownRepo() =
                      proc(): string = raise newException(ValueError, "boom"))
   except PolicyViolation:
     blocked = true
-  doAssert not blocked
-  doAssert firstResult()["mode_source"] == "default"
+  doAssert not blocked and policyOutcome == nil
 
-proc testOffEnforcesOnlyListedRepos() =
+proc testOnlyTargetedPolicyIsScoped() =
   let doc = """{"policies": [
-    {"id": "rollout@1", "mode": "off",
-     "enforce_repos": [["glob", "github.com/crashappsec/dummy-*"]],
+    {"id": "rollout@1", "mode": "enforce",
+     "target_repos": [["glob", "github.com/crashappsec/dummy-*"]],
      "golden_images": {"enabled": true, "allowed": [["glob", "alpine:*"]]}},
     {"id": "audit@1", "mode": "audit",
      "golden_images": {"enabled": true, "allowed": [["glob", "alpine:*"]]}}
@@ -238,12 +258,9 @@ proc testOffEnforcesOnlyListedRepos() =
   var (blocked, resolved) = evaluate(doc, listed)
   doAssert blocked and resolved == 1
   doAssert policyOutcome.policies.len == 2
-  doAssert policyOutcome.policies[0].mode == "off"
-  doAssert policyOutcome.policies[0].effectiveMode == "enforce"
   doAssert policyOutcome.policies[0].result == "blocked"
-  # the policy without enforce_repos is unaffected
+  # the policy without target_repos is unaffected
   doAssert policyOutcome.policies[1].effectiveMode == "audit"
-  doAssert policyOutcome.policies[1].modeSource == "default"
   doAssert policyOutcome.policies[1].repo == ""
 
   (blocked, resolved) = evaluate(doc, "github.com/crashappsec/chalk")
@@ -251,37 +268,54 @@ proc testOffEnforcesOnlyListedRepos() =
   doAssert policyOutcome.policies.len == 1
   doAssert policyOutcome.policies[0].id == "audit@1"
 
-  # off everywhere else: nothing evaluated, nothing reported
-  let offOnly = """{"id": "rollout@1", "mode": "off",
-    "enforce_repos": [["glob", "github.com/crashappsec/dummy-*"]],
+proc testOffWithTargetReposIsOff() =
+  let doc = """{"id": "rollout@1", "mode": "off", "on_unknown_repo": "apply",
+    "target_repos": [["glob", "github.com/crashappsec/dummy-*"]],
     "golden_images": {"enabled": true}}"""
-  setPolicyJson(offOnly)
-  doAssert policyEnabled()
-  (blocked, resolved) = evaluate(offOnly, "github.com/crashappsec/chalk")
-  doAssert not blocked and resolved == 1 and policyOutcome == nil
-  (blocked, resolved) = evaluate(offOnly, "")
-  doAssert not blocked and policyOutcome == nil
+  setPolicyJson(doc)
+  doAssert not policyEnabled()
+  for repo in [listed, "github.com/crashappsec/chalk", ""]:
+    let (blocked, resolved) = evaluate(doc, repo)
+    doAssert not blocked and resolved == 0 and policyOutcome == nil
 
-proc testRepoNotResolvedWithoutEnforceRepos() =
-  let doc = """{"mode": "audit", "golden_images": {"enabled": true}}"""
-  let (blocked, resolved) = evaluate(doc, listed)
-  doAssert not blocked and resolved == 0
-  let r = firstResult()
-  doAssert r["effective_mode"] == "audit" and r["mode_source"] == "default" and r["repo"] == ""
+proc testRepoNotResolvedWithoutTargetRepos() =
+  for doc in ["""{"mode": "audit", "golden_images": {"enabled": true}}""",
+              """{"mode": "audit", "target_repos": [], "golden_images": {"enabled": true}}"""]:
+    let (blocked, resolved) = evaluate(doc, listed)
+    doAssert not blocked and resolved == 0
+    let r = firstResult()
+    doAssert r["effective_mode"] == "audit" and r["repo"] == ""
 
-proc testInvalidEnforceRepos() =
-  # the policy is invalid and only reports, with its declared mode and on_error
+proc testInvalidTargetRepos() =
+  # the policy is invalid and only reports, with its declared mode and
+  # on_error, in every repository
   let doc = """{"mode": "enforce", "on_error": "block",
-    "enforce_repos": [["glob"]], "golden_images": {"enabled": true}}"""
+    "target_repos": [["glob"]], "golden_images": {"enabled": true}}"""
   var (blocked, resolved) = evaluate(doc, listed)
   doAssert blocked and resolved == 0
   doAssert policyOutcome.result == "blocked"
   doAssert policyOutcome.findings.len == 1
   doAssert policyOutcome.findings[0].rule == "config"
-  doAssert "policy.enforce_repos" in policyOutcome.findings[0].reason
+  doAssert "policy.target_repos" in policyOutcome.findings[0].reason
   (blocked, resolved) = evaluate(doc.replace("\"enforce\"", "\"audit\""), listed)
   doAssert not blocked and resolved == 0
   doAssert policyOutcome.result == "error"
+
+proc testInvalidOnUnknownRepo() =
+  # an invalid on_unknown_repo makes the policy invalid; its valid
+  # target_repos still scopes the configuration error
+  let doc = """{"mode": "enforce", "on_error": "block", "on_unknown_repo": "always",
+    "target_repos": [["glob", "github.com/crashappsec/dummy-*"]],
+    "golden_images": {"enabled": true, "allowed": [["glob", "alpine:*"]]}}"""
+  var (blocked, resolved) = evaluate(doc, listed)
+  doAssert blocked and resolved == 1
+  doAssert policyOutcome.findings.len == 1
+  doAssert policyOutcome.findings[0].rule == "config"
+  doAssert "policy.on_unknown_repo" in policyOutcome.findings[0].reason
+  (blocked, resolved) = evaluate(doc, "github.com/crashappsec/chalk")
+  doAssert not blocked and policyOutcome == nil
+  (blocked, resolved) = evaluate(doc, "")
+  doAssert not blocked and policyOutcome == nil
 
 testNormalizeRepo()
 testRepoFromEnv()
@@ -290,8 +324,11 @@ testMatchesRepoKeepsGlobs()
 testLocalOriginFallsBackToCiRepo()
 testResolveMode()
 testJsonValidation()
-testEnforcedInListedRepo()
+testAppliesInListedRepo()
+testUnknownRepo()
 testResolverFailureIsUnknownRepo()
-testOffEnforcesOnlyListedRepos()
-testRepoNotResolvedWithoutEnforceRepos()
-testInvalidEnforceRepos()
+testOnlyTargetedPolicyIsScoped()
+testOffWithTargetReposIsOff()
+testRepoNotResolvedWithoutTargetRepos()
+testInvalidTargetRepos()
+testInvalidOnUnknownRepo()
