@@ -38,21 +38,26 @@ proc request(self: Get, query = ""): JsonNode =
                            acceptStatusCodes = @[200..200])
 
     trace("Signing Key Provider Service URL: " & url)
-    trace("Signing Key Provider Service status code: " & response.status)
-    trace("Signing Key Provider Service response[:15]: " & response.bodyStream.peekStr(15)) # truncate not to leak secrets
+    trace("Signing Key Provider Service status code: " & $int(response.code))
+  except HttpStatusError as e:
+    let message = "Signing Key Provider Service returned HTTP " & $e.code
+    error(message)
+    raise newHttpException(e.code, message)
   except:
-    error("Could not call Signing Key Provider Service: " & getCurrentExceptionMsg())
-    raise
+    let message = "Could not call Signing Key Provider Service"
+    error(message)
+    raise newException(IOError, message)
 
   if not response.code.is2xx():
-    error("Signing Key Provider Service returned invalid response: " & response.status)
+    error("Signing Key Provider Service returned invalid response: HTTP " & $int(response.code))
     raise newException(ValueError, "API Error")
 
   try:
     return parseJson(response.body())
   except:
-    error("Signing Key Provider Service returned invalid response: " & getCurrentExceptionMsg())
-    raise
+    let message = "Signing Key Provider Service returned invalid JSON"
+    error(message)
+    raise newException(ValueError, message)
 
 proc initCallback(this: AttestationKeyProvider) =
   let
