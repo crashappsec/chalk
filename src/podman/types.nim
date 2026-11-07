@@ -158,6 +158,7 @@ type
     listDigest*:  string
 
   PodmanArtifactCache* = ref object of RootRef
+    imageMetadata*:   JsonNode
     publications*:    seq[PodmanPublication]
     sbom*:            Option[PodmanSbomDocument]
     sbomDiagnostic*:  Option[PodmanSbomDiagnostic]

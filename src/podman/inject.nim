@@ -270,6 +270,16 @@ proc chalkInstructionBlock(spec: podman_types.PodmanBuildSpec,
     " [\"" & helperRoot & "/chalk\", \"" & podmanGuardCommand & "\"]\n"
   result.add("COPY --from=" & contextName & " --chmod=0755 chalk /chalk\n")
   result.add("COPY --from=" & contextName & " --chmod=0444 chalk.json /chalk.json\n")
+  # Docker's hook removes a parent's identity from an unwrapped descendant.
+  # Use the same internal command and restore the configured image user.
+  let user = plan.user
+  let hasUser = user != "" and user != "root" and user != "0" and user != "0:0"
+  if hasUser:
+    result.add("ONBUILD USER 0:0\n")
+  result.add("ONBUILD RUN [\"/chalk\", \"--no-use-embedded-config\", " &
+             "\"--no-use-external-config\", \"__\", \"onbuild\"]\n")
+  if hasUser:
+    result.add("ONBUILD USER " & user & "\n")
   # An entrypoint that is already `/chalk exec ...` came from a chalked base
   # image; re-wrapping it would make chalk exec chalk. The binary and mark
   # above are still refreshed, which is what re-chalking a derived image means.
@@ -397,6 +407,9 @@ proc makeInjectedArgs*(spec: podman_types.PodmanBuildSpec;
                        ws: podman_types.PodmanWorkspace): seq[string] =
   result = spec.originalArgs
   var extras: seq[string]
+  if spec.imageFormat == "":
+    # OCI discards ONBUILD; inherited-mark handling requires Docker config.
+    extras.add("--format=docker")
   if spec.fileValueIndex >= 0:
     if spec.fileEqualsPrefix != "":
       result[spec.fileValueIndex] = spec.fileEqualsPrefix & ws.derivedContainerfile

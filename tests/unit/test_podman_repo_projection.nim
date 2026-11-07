@@ -120,4 +120,24 @@ proc main() =
   for key in ["_REPO_DIGESTS", "_REPO_LIST_DIGESTS", "_REPO_TAGS"]:
     doAssert key notin emptyReported
 
+  subscribedKeys = Table[string, bool]()
+  for key in ["_IMAGE_OS", "_IMAGE_ARCHITECTURE", "_IMAGE_VARIANT",
+              "DOCKER_PLATFORM", "_IMAGE_USER", "_IMAGE_CONFIG_DIGEST"]:
+    subscribedKeys[key] = true
+  let metadata = %*{"Os": "linux", "Architecture": "arm64", "Variant": "v8",
+                    "Config": {"User": "10001:10001"}}
+  let image = ChalkObj(imageId: "sha256:config-digest",
+                       cache: RootRef(PodmanArtifactCache(imageMetadata: metadata)))
+  let imageFields = podmanGetRunTimeArtifactInfo(Plugin(nil), image, false)
+  assertEq(unpack[string](imageFields["_IMAGE_OS"]), "linux")
+  assertEq(unpack[string](imageFields["_IMAGE_ARCHITECTURE"]), "arm64")
+  assertEq(unpack[string](imageFields["_IMAGE_USER"]), "10001:10001")
+  assertEq(unpack[string](imageFields["_IMAGE_CONFIG_DIGEST"]), "config-digest")
+  metadata.delete("Os")
+  metadata.delete("Architecture")
+  let unknown = podmanGetRunTimeArtifactInfo(Plugin(nil), image, false)
+  doAssert "_IMAGE_OS" notin unknown
+  doAssert "_IMAGE_ARCHITECTURE" notin unknown
+  doAssert "DOCKER_PLATFORM" notin unknown
+
 main()

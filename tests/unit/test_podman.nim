@@ -142,39 +142,39 @@ proc main() =
   expectPass(@["build", "https://example.invalid/context.git"])
   expectPass(@["build", "--unknown-valid-in-future", "opaque", "."])
   expectPass(@["image", "build", "--file", "Containerfile", "--tag", "t",
-              "--platform", "linux/amd64", "--format", "oci", "."])
+              "--platform", "linux/amd64", "--format", "docker", "."])
   expectPass(@["build", "--file", "Containerfile", "--tag", "t",
-              "--platform", "linux/amd64", "--format", "oci"])
+              "--platform", "linux/amd64", "--format", "docker"])
   expectPass(@["build", "--file", "Containerfile", "--file", "Other",
-              "--tag", "t", "--platform", "linux/amd64", "--format", "oci", "."])
+              "--tag", "t", "--platform", "linux/amd64", "--format", "docker", "."])
   expectBuild(@["build", "--file", "Containerfile", "--tag", "t", "--tag", "other",
-                "--platform", "linux/amd64", "--format", "oci", "."])
+                "--platform", "linux/amd64", "--format", "docker", "."])
   expectPass(@["build", "--file", "Containerfile", "--tag", "t",
               "--platform", "linux/amd64", "--platform", "linux/amd64",
-              "--format", "oci", "."])
+              "--format", "docker", "."])
   expectPass(@["build", "--file", "Containerfile", "--tag", "t",
-              "--platform", "linux/amd64", "--format", "oci", "--format", "oci", "."])
+              "--platform", "linux/amd64", "--format", "docker", "--format", "docker", "."])
   expectPass(@["build", "--file", "Containerfile", "--tag", "t",
               "--platform", "linux/amd64", "--format"])
   expectPass(@["build", "--file", "-", "--tag", "t",
-              "--platform", "linux/amd64", "--format", "oci", "."])
+              "--platform", "linux/amd64", "--format", "docker", "."])
   expectPass(@["build", "--file", "Containerfile", "--tag", "t",
-              "--platform", "linux/amd64", "--format", "oci", ".", "extra"])
+              "--platform", "linux/amd64", "--format", "docker", ".", "extra"])
   expectBuild(@["build", "--iidfile", "x", "--file", "Containerfile", "--tag", "t",
-                "--platform", "linux/amd64", "--format", "oci", "."])
+                "--platform", "linux/amd64", "--format", "docker", "."])
   expectBuild(@["build", "--build-context", "extra=dir", "--file", "Containerfile",
-                "--tag", "t", "--platform", "linux/amd64", "--format", "oci", "."])
+                "--tag", "t", "--platform", "linux/amd64", "--format", "docker", "."])
 
   expectBuild(@["build", "--file", "Containerfile", "--tag", "t",
-                "--platform", "linux/amd64", "--format", "oci", "."])
+                "--platform", "linux/amd64", "--format", "docker", "."])
   expectBuild(@["build", "-f", "Containerfile", "-t", "t",
-                "--platform", "linux/amd64", "--format", "oci", "."])
+                "--platform", "linux/amd64", "--format", "docker", "."])
   expectBuild(@["build", "--file=Containerfile", "--tag=t",
-                "--platform=linux/amd64", "--format=oci", "."])
-  expectBuild(@["build", "--format", "oci", "--platform", "linux/amd64",
+                "--platform=linux/amd64", "--format=docker", "."])
+  expectBuild(@["build", "--format", "docker", "--platform", "linux/amd64",
                 "--tag", "t", "--file", "Containerfile", "."])
   expectBuild(@["build", "--file", "Containerfile", "--tag", "t",
-                "--platform", "linux/amd64", "--format", "oci", "--", "."])
+                "--platform", "linux/amd64", "--format", "docker", "--", "."])
 
   # Omitted options whose podman default is one we can instrument. Each of
   # these was a pass-through while all four flags were mandatory.
@@ -182,7 +182,7 @@ proc main() =
   expectBuild(@["build", "--tag", "foo", "."])
   expectBuild(@["build", "--tag=foo", "."])
   expectBuild(@["build", "-t", "foo", "--platform", "linux/amd64", "."])
-  expectBuild(@["build", "-t", "foo", "--format", "oci", "."])
+  expectBuild(@["build", "-t", "foo", "--format", "docker", "."])
   expectBuild(@["build", "-f", "Containerfile", "-t", "foo", "."])
   expectBuild(@["build", "-t", "foo", "--", "."])
   expectBuildUntagged(@["build", "."])
@@ -190,8 +190,8 @@ proc main() =
 
   # An option that IS given must still name something we can instrument.
   expectBuild(@["build", "-t", "foo", "--platform", "linux/arm64", "."])
-  expectPass(@["build", "-t", "foo", "--format", "docker", "."])
-  expectPass(@["build", "--format", "docker", "."])
+  expectPass(@["build", "-t", "foo", "--format", "oci", "."])
+  expectPass(@["build", "--format", "oci", "."])
   expectPass(@["build", "-t", "foo", "-f", "-", "."])
   expectBuild(@["build", "-t", "foo", "-t", "bar", "."])
   expectBuild(@["build", "-t", "foo", "--no-cache", "."])
@@ -385,7 +385,7 @@ proc main() =
 
   let withDash = classifyPodmanArgs(@[
     "build", "--file", "Containerfile", "--tag", "t",
-    "--platform", "linux/amd64", "--format", "oci", "--", "."
+    "--platform", "linux/amd64", "--format", "docker", "--", "."
   ])
   doAssert withDash.kind == prInstrument
   doAssert withDash.spec.dashDashIndex >= 0
@@ -402,7 +402,7 @@ proc main() =
 
   let split = classifyPodmanArgs(@[
     "build", "--file", "Containerfile", "--tag", "t",
-    "--platform", "linux/amd64", "--format", "oci", "."
+    "--platform", "linux/amd64", "--format", "docker", "."
   ])
   let injected2 = makeInjectedArgs(split.spec, ws)
   doAssert injected2[split.spec.fileValueIndex] == ws.derivedContainerfile

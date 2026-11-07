@@ -17,6 +17,7 @@ import ".."/[
 ]
 import "../docker"/ids
 import "../podman"/types as podman_types
+import "../podman"/image
 
 type
   PodmanRepoDigests* =
@@ -100,6 +101,8 @@ proc podmanGetRunTimeArtifactInfo(self: Plugin, chalk: ChalkObj, ins: bool):
     result.setIfNeeded("PODMAN_IMAGE_ID", chalk.imageId)
   if chalk.cache != nil:
     let cache = podman_types.PodmanArtifactCache(chalk.cache)
+    if cache.imageMetadata != nil:
+      result.merge(inspectedImageFields(cache.imageMetadata, chalk.imageId))
     let projection = projectPodmanRepos(cache.publications)
     result.setIfNeeded("_REPO_DIGESTS", projection.digests)
     result.setIfNeeded("_REPO_LIST_DIGESTS", projection.listDigests)

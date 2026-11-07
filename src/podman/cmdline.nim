@@ -584,7 +584,7 @@ proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
     return passThrough(args, invalidFlagReason("--file"))
   if platformSeen and parseCommandPlatform(platform).isNone():
     return passThrough(args, invalidFlagReason("--platform"))
-  if formatSeen and imageFormat != "oci":
+  if formatSeen and imageFormat != "docker":
     return passThrough(args, invalidFlagReason("--format"))
   if len(positionals) != 1:
     return passThrough(args, PodmanSkipReason(kind: psrOperandUnavailable))

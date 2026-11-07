@@ -3,6 +3,21 @@ import std/[json, os, posix]
 
 const podmanGuardCommand* = "__.podman_reserved_paths"
 
+proc recognizableMark(value: JsonNode): bool =
+  return value != nil and value.kind == JObject and value.hasKey("MAGIC") and
+    value["MAGIC"].kind == JString and
+    value["MAGIC"].getStr() == "dadfedabbadabbed"
+
+proc recognizablePodmanMark*(value: JsonNode): bool =
+  if recognizableMark(value):
+    return true
+  if value == nil or value.kind != JObject or value.hasKey("CHALK_ID") or
+      not value.hasKey("EMBEDDED_CHALK"):
+    return false
+  let embedded = value["EMBEDDED_CHALK"]
+  return embedded.kind == JArray and embedded.len == 1 and
+    recognizableMark(embedded[0])
+
 proc reservedPathsAvailable*(root = "/"): bool =
   var binary, mark: Stat
   let
@@ -25,8 +40,6 @@ proc reservedPathsAvailable*(root = "/"): bool =
     return false
   try:
     let value = parseFile(markPath)
-    return value.kind == JObject and value.hasKey("MAGIC") and
-      value["MAGIC"].kind == JString and
-      value["MAGIC"].getStr() == "dadfedabbadabbed"
+    return recognizablePodmanMark(value)
   except CatchableError:
     return false

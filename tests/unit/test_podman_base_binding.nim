@@ -188,6 +188,7 @@ proc chalkBlock(contextName: string): string =
     " [\"/__" & contextName & "/chalk\", \"__.podman_reserved_paths\"]\n" &
     "COPY --from=" & contextName & " --chmod=0755 chalk /chalk\n" &
     "COPY --from=" & contextName & " --chmod=0444 chalk.json /chalk.json\n" &
+    "ONBUILD RUN [\"/chalk\", \"--no-use-embedded-config\", \"--no-use-external-config\", \"__\", \"onbuild\"]\n" &
     "ENTRYPOINT [\"/chalk\",\"exec\",\"--heartbeat\",\"--\"]\n"
 
 proc derive(text: string,

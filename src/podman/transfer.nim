@@ -31,8 +31,8 @@
 ##   * chalk.iterPushTags() fan-out  additional tags are not retagged/pushed
 ##   * completeBuildContextUploads() src/docker/context_upload.nim
 ##   * docker forces DOCKER_PLATFORM into the chalk keys at push so METADATA_*
-##     stays unique per platform; we do not know the platform of a scanned
-##     image.
+##     stays unique per platform; Podman collects the scanned image platform
+##     but does not force that key at push.
 
 import ".."/[
   attestation_api,
