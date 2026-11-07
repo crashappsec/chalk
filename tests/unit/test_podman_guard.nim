@@ -11,6 +11,7 @@ try:
   writeFile(root / "chalk.json", "{\"MAGIC\":\"dadfedabbadabbed\"}")
   doAssert reservedPathsAvailable(root)
   removeFile(root / "chalk")
+  doAssert reservedPathsAvailable(root)
   createDir(root / "chalk")
   doAssert not reservedPathsAvailable(root)
   removeDir(root / "chalk")

@@ -18,10 +18,10 @@ proc reservedPathsAvailable*(root = "/"): bool =
     return false
   if binaryStatus != 0 and markStatus != 0:
     return true
-  # Refresh only a regular inherited executable paired with a recognizable mark.
-  # In particular, lstat refuses dangling links and directories before any COPY.
-  if binaryStatus != 0 or markStatus != 0 or
-      not S_ISREG(binary.st_mode) or not S_ISREG(mark.st_mode):
+  # Docker can mark an image without installing a wrapper executable. Accept
+  # that inherited mark, but refuse links and directories before either COPY.
+  if markStatus != 0 or not S_ISREG(mark.st_mode) or
+      (binaryStatus == 0 and not S_ISREG(binary.st_mode)):
     return false
   try:
     let value = parseFile(markPath)
