@@ -229,28 +229,6 @@ proc collectRepos*(exe, image: string, chalk: ChalkObj,
     trace("podman: " & image &
           " has no reachable registry manifests; nothing to attest")
 
-proc collectInspectedMetadata*(chalk: ChalkObj, img: JsonNode) =
-  ## Image platform fields come only from image inspection, never the host.
-  for (source, key) in [("Os", "_IMAGE_OS"),
-                         ("Architecture", "_IMAGE_ARCHITECTURE"),
-                         ("Variant", "_IMAGE_VARIANT")]:
-    chalk.collectedData.setIfNeeded(key, img{source}.getStr())
-  let os = img{"Os"}.getStr()
-  let arch = img{"Architecture"}.getStr()
-  let variant = img{"Variant"}.getStr()
-  if os != "" and arch != "":
-    chalk.platform = DockerPlatform(os: os, architecture: arch, variant: variant)
-    chalk.collectedData.setIfNeeded("DOCKER_PLATFORM", $chalk.platform.normalize())
-  chalk.collectedData.setIfNeeded("_IMAGE_CONFIG_DIGEST", chalk.imageId.extractDockerHash())
-  let config = img{"Config"}
-  if config != nil and config.kind == JObject:
-    for (source, key) in [("User", "_IMAGE_USER"),
-                           ("Entrypoint", "_IMAGE_ENTRYPOINT"),
-                           ("Cmd", "_IMAGE_CMD"),
-                           ("OnBuild", "_IMAGE_ONBUILD")]:
-      if config{source} != nil:
-        chalk.collectedData.setIfNeeded(key, config{source})
-
 proc collectLocalImageMetadata*(exe: string, chalk: ChalkObj,
                                cancellation: var Option[podman_types.ChildResult]) =
   let r = runCaptured(exe, @["image", "inspect", chalk.imageId, "--format", "json"])
@@ -262,7 +240,15 @@ proc collectLocalImageMetadata*(exe: string, chalk: ChalkObj,
   let inspected = parseInspectedBaseImage(r.stdout)
   if inspected.isNone() or inspected.get().imageId.extractDockerHash() != chalk.imageId.extractDockerHash():
     return
-  collectInspectedMetadata(chalk, parseJson(r.stdout)[0])
+  let img = parseJson(r.stdout)[0]
+  if chalk.cache == nil:
+    chalk.cache = RootRef(podman_types.PodmanArtifactCache())
+  podman_types.PodmanArtifactCache(chalk.cache).imageMetadata = img
+  let os = img{"Os"}.getStr()
+  let arch = img{"Architecture"}.getStr()
+  if os != "" and arch != "":
+    chalk.platform = DockerPlatform(os: os, architecture: arch, variant: img{"Variant"}.getStr())
+  chalk.collectedData.merge(inspectedImageFields(img, chalk.imageId))
 
 proc scanPodmanImage*(exe, image: string,
                       cancellation: var Option[podman_types.ChildResult]):

@@ -14,6 +14,8 @@
 import std/[options, sets, strutils]
 import ".."/[
   types,
+  chalkjson,
+  run_management,
   utils/json,
 ]
 import "../docker"/ids
@@ -336,3 +338,26 @@ proc fetchBaseImage*(exe, image: string,
     if cancellation.isSome() or pulled.isNone():
       return none(InspectedBaseImage)
     return inspectPulled(exe, pulled.get(), cancellation)
+
+proc inspectedImageFields*(img: JsonNode, imageId: string): ChalkDict =
+  result = ChalkDict()
+  ## Image platform fields come only from image inspection, never the host.
+  for (source, key) in [("Os", "_IMAGE_OS"),
+                         ("Architecture", "_IMAGE_ARCHITECTURE"),
+                         ("Variant", "_IMAGE_VARIANT")]:
+    result.setIfNeeded(key, img{source}.getStr())
+  let os = img{"Os"}.getStr()
+  let arch = img{"Architecture"}.getStr()
+  let variant = img{"Variant"}.getStr()
+  if os != "" and arch != "":
+    let platform = DockerPlatform(os: os, architecture: arch, variant: variant)
+    result.setIfNeeded("DOCKER_PLATFORM", $platform.normalize())
+  result.setIfNeeded("_IMAGE_CONFIG_DIGEST", imageId.extractDockerHash())
+  let config = img{"Config"}
+  if config != nil and config.kind == JObject:
+    for (source, key) in [("User", "_IMAGE_USER"),
+                           ("Entrypoint", "_IMAGE_ENTRYPOINT"),
+                           ("Cmd", "_IMAGE_CMD"),
+                           ("OnBuild", "_IMAGE_ONBUILD")]:
+      if config{source} != nil:
+        result.setIfNeeded(key, config{source})
