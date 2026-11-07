@@ -25,6 +25,8 @@ import ".."/[
   utils/json,
   utils/sets,
 ]
+import "./image"
+import "./guard"
 import "../docker"/[
   ids,
   manifest,
@@ -211,8 +213,8 @@ proc collectRepos*(exe, image: string, chalk: ChalkObj,
       let
         # asImageRepo needs only the manifest digest, so the config blob is
         # not fetched -- it is a separate round trip and an extra failure mode.
-        fetched   = fetchImageManifest(parsedRef, DockerPlatform(nil),
-                                       ifManySystemPlatform = true,
+        fetched   = fetchImageManifest(parsedRef, chalk.platform,
+                                       ifManySystemPlatform = false,
                                        fetchConfig          = false)
         imageRepo = fetched.asImageRepo(tags = @[parsedRef.tag])
       chalk.repos[parsedRef.repo] =
@@ -226,6 +228,27 @@ proc collectRepos*(exe, image: string, chalk: ChalkObj,
   if len(chalk.repos) == 0:
     trace("podman: " & image &
           " has no reachable registry manifests; nothing to attest")
+
+proc collectLocalImageMetadata*(exe: string, chalk: ChalkObj,
+                               cancellation: var Option[podman_types.ChildResult]) =
+  let r = runCaptured(exe, @["image", "inspect", chalk.imageId, "--format", "json"])
+  if isCancellation(r.child):
+    cancellation = some(r.child)
+    return
+  if r.child.kind != podman_types.ceExited or r.child.exitCode != 0:
+    return
+  let inspected = parseInspectedBaseImage(r.stdout)
+  if inspected.isNone() or inspected.get().imageId.extractDockerHash() != chalk.imageId.extractDockerHash():
+    return
+  let img = parseJson(r.stdout)[0]
+  if chalk.cache == nil:
+    chalk.cache = RootRef(podman_types.PodmanArtifactCache())
+  podman_types.PodmanArtifactCache(chalk.cache).imageMetadata = img
+  let os = img{"Os"}.getStr()
+  let arch = img{"Architecture"}.getStr()
+  if os != "" and arch != "":
+    chalk.platform = DockerPlatform(os: os, architecture: arch, variant: img{"Variant"}.getStr())
+  chalk.collectedData.merge(inspectedImageFields(img, chalk.imageId))
 
 proc scanPodmanImage*(exe, image: string,
                       cancellation: var Option[podman_types.ChildResult]):
@@ -248,12 +271,17 @@ proc scanPodmanImage*(exe, image: string,
     cache        = RootRef(podman_types.PodmanArtifactCache()),
   )
   chalk.cachedEndingHash = id
+  collectLocalImageMetadata(exe, chalk, cancellation)
+  if cancellation.isSome():
+    return none(ChalkObj)
 
   let mark = extractImageMark(exe, image, cancellation)
   if cancellation.isSome():
     return none(ChalkObj)
   if mark.isSome():
     try:
+      if not recognizablePodmanMark(parseJson(mark.get())):
+        raise newException(ValueError, "unrecognized mark")
       let extracted = extractOneChalkJson(mark.get(), image)
       chalk.collectedData.update(extracted)
       chalk.extract    = extracted

@@ -505,7 +505,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
                     f"FROM {alpine_index} AS base\n"
                     "FROM --platform=linux/arm64 base\n"
                 ),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "instrument": False,
                 "inspect_base": False,
                 "prime_amd64_index": True,
@@ -526,7 +526,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
                     'ENTRYPOINT ["/bin/busybox", "echo"]\n'
                     'CMD ["scratch-default"]\n'
                 ),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "instrument": False,
                 "inspect_base": False,
                 "no_chalk_pull": True,
@@ -543,7 +543,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
                     f"FROM --platform=$CHALK_REVIEW_PLATFORM {alpine_index}\n"
                     "ENV CHALK_REVIEW_PLATFORM=linux/amd64\n"
                 ),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "instrument": False,
                 "inspect_base": False,
                 "prime_amd64_index": True,
@@ -560,7 +560,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
                     f"FROM --platform=$CHALK_REVIEW_CALLER_PLATFORM "
                     f"{alpine_index}\n"
                 ),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "ambient": {
                     "CHALK_REVIEW_CALLER_PLATFORM": "linux/amd64",
                 },
@@ -581,7 +581,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
                     f"{alpine_index}\n"
                     "ARG CHALK_REVIEW_STAGE_PLATFORM=linux/amd64\n"
                 ),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "instrument": False,
                 "inspect_base": False,
                 "prime_amd64_index": True,
@@ -598,7 +598,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
                     "FROM $CHALK_REVIEW_BASE\n"
                     f"ENV CHALK_REVIEW_BASE={amd64_alpine}\n"
                 ),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "instrument": False,
                 "inspect_base": False,
                 "no_chalk_pull": True,
@@ -609,7 +609,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
             {
                 "name": "automatic-targetplatform",
                 "contents": containerfile(f"--platform=$TARGETPLATFORM {alpine_index}"),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "ambient": {"TARGETPLATFORM": "linux/arm64"},
                 "instrument": False,
                 "inspect_base": False,
@@ -623,7 +623,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
             {
                 "name": "automatic-buildplatform",
                 "contents": containerfile(f"--platform=$BUILDPLATFORM {alpine_index}"),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "ambient": {"BUILDPLATFORM": "linux/arm64"},
                 "instrument": False,
                 "inspect_base": False,
@@ -637,7 +637,7 @@ os.execv(os.environ['PODMAN_PLATFORM_REAL'],
             {
                 "name": "index-cached-arm64-implicit-amd64",
                 "contents": containerfile(alpine_index),
-                "argv": ["build", "--format", "oci", "-t", None, "."],
+                "argv": ["build", "--format", "docker", "-t", None, "."],
                 "instrument": False,
                 "inspect_base": True,
                 "prime_arm64_index": True,

@@ -14,11 +14,13 @@ type
     entrypoint*: JsonNode
     cmd*:        JsonNode
     platform*:   DeclaredPlatform
+    user*:       string
     binding*:    BaseBinding
 
   StartupPlan* = object
     entrypoint*:    JsonNode
     cmd*:           JsonNode
+    user*:          string
     alreadyWrapped*: bool
     emitCmd*:       bool
     platform*:      DeclaredPlatform
@@ -69,6 +71,7 @@ proc planStartup*(config: FinalExecConfig,
   return StartupPlanResult(
     kind: sprPlan,
     plan: StartupPlan(
+      user:           (if config.user != "": config.user else: root.user),
       entrypoint:     entrypoint,
       cmd:            cmd,
       alreadyWrapped: alreadyWrapped,
