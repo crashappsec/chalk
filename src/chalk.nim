@@ -13,6 +13,7 @@ when cprofiling:
 {.warning[UnusedImport]: off.}
 import std/[
   posix,
+  os,
 ]
 import "."/[
   attestation_api,
@@ -29,7 +30,15 @@ import "."/[
   utils/terminal,
 ]
 
+import ./podman/guard
+
 when isMainModule:
+  if paramCount() == 1 and paramStr(1) == podmanGuardCommand:
+    if reservedPathsAvailable():
+      quit(0)
+    stderr.writeLine("podman: reserved Chalk paths are occupied or unreadable")
+    quit(1)
+
   setupSignalHandlers()    # utils/terminal.nim
   setupTerminal()          # utils/terminal.nim
   ioSetup()                # sinks.nim
