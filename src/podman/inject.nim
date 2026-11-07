@@ -407,6 +407,9 @@ proc makeInjectedArgs*(spec: podman_types.PodmanBuildSpec;
                        ws: podman_types.PodmanWorkspace): seq[string] =
   result = spec.originalArgs
   var extras: seq[string]
+  if spec.imageFormat == "":
+    # OCI discards ONBUILD; inherited-mark handling requires Docker config.
+    extras.add("--format=docker")
   if spec.fileValueIndex >= 0:
     if spec.fileEqualsPrefix != "":
       result[spec.fileValueIndex] = spec.fileEqualsPrefix & ws.derivedContainerfile
