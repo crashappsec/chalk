@@ -1136,7 +1136,7 @@ plugin podman {
                      "DOCKER_BASE_IMAGE_NAME", "DOCKER_BASE_IMAGE_TAG",
                      "DOCKER_BASE_IMAGE_DIGEST", "DOCKER_BASE_IMAGE_CONFIG_DIGEST",
                      "DOCKER_BASE_IMAGE_CHALK", "DOCKER_BASE_IMAGE_METADATA_ID"]
-    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "PODMAN_IMAGE_ID", "DOCKER_PLATFORM",
+    post_chalk_keys: ["_CURRENT_HASH", "_OP_ARTIFACT_TYPE", "PODMAN_IMAGE_ID",
                       "_REPO_TAGS", "_REPO_DIGESTS", "_REPO_LIST_DIGESTS",
                       "_IMAGE_SBOM", "_IMAGE_OS", "_IMAGE_ARCHITECTURE", "_IMAGE_VARIANT",
                       "_IMAGE_CONFIG_DIGEST", "_IMAGE_USER", "_IMAGE_ENTRYPOINT",
