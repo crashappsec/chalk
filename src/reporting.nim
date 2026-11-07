@@ -22,9 +22,14 @@ import "."/[
   utils/sink_impls,
 ]
 
-proc topicSubscribe*(args: seq[Box], unused = ConfigState(nil)): Option[Box] =
+proc topicSubscribe*(args: seq[Box], state = ConfigState(nil)): Option[Box] =
   if doingTestRun:
     return some(pack(true))
+
+  if state != nil:
+    let level = attrGetOpt[string](state, "log_level")
+    if level.isSome():
+      setLogLevel(level.get())
 
   let
     topic  = unpack[string](args[0])

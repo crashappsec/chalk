@@ -103,6 +103,9 @@ proc podmanGetRunTimeArtifactInfo(self: Plugin, chalk: ChalkObj, ins: bool):
     let cache = podman_types.PodmanArtifactCache(chalk.cache)
     if cache.imageMetadata != nil:
       result.merge(inspectedImageFields(cache.imageMetadata, chalk.imageId))
+      # Inspection already supplies this chalk-time key before reporting.
+      # Runtime callbacks cannot declare chalk-time artifact keys.
+      result.del("DOCKER_PLATFORM")
     let projection = projectPodmanRepos(cache.publications)
     result.setIfNeeded("_REPO_DIGESTS", projection.digests)
     result.setIfNeeded("_REPO_LIST_DIGESTS", projection.listDigests)

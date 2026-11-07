@@ -67,24 +67,6 @@ if env_exists("CI") and env_exists("GITLAB_CI") {
 
 cmd := command_name()
 
-subscribe("report",   "default_out")
-subscribe("audit",    "default_out")
-subscribe("policy",   "default_out")
-subscribe("version",  "console_out")
-subscribe("virtual",  "virtual_chalk_log")
-subscribe("help",     "console_out")
-
-if cmd.starts_with("dump") {
-  args := command_argv()
-  if len(args) == 0 {
-    subscribe("confdump", "console_out")
-  } else {
-    sink_config.dump_out.enabled  = true
-    sink_config.dump_out.filename = args[0]
-    subscribe("confdump", "dump_out")
-  }
-}
-
 if cmd == "docker" or default_command == "docker" {
   # initial docker log level
   # cmd_docker sets its final verbosity after all configs are loaded
@@ -101,6 +83,24 @@ if cmd == "docker" or default_command == "docker" {
   }
 } else {
   log_level: "info"
+}
+
+subscribe("report",   "default_out")
+subscribe("audit",    "default_out")
+subscribe("policy",   "default_out")
+subscribe("version",  "console_out")
+subscribe("virtual",  "virtual_chalk_log")
+subscribe("help",     "console_out")
+
+if cmd.starts_with("dump") {
+  args := command_argv()
+  if len(args) == 0 {
+    subscribe("confdump", "console_out")
+  } else {
+    sink_config.dump_out.enabled  = true
+    sink_config.dump_out.filename = args[0]
+    subscribe("confdump", "dump_out")
+  }
 }
 
 
