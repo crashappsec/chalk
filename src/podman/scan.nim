@@ -213,8 +213,8 @@ proc collectRepos*(exe, image: string, chalk: ChalkObj,
       let
         # asImageRepo needs only the manifest digest, so the config blob is
         # not fetched -- it is a separate round trip and an extra failure mode.
-        fetched   = fetchImageManifest(parsedRef, DockerPlatform(nil),
-                                       ifManySystemPlatform = true,
+        fetched   = fetchImageManifest(parsedRef, chalk.platform,
+                                       ifManySystemPlatform = false,
                                        fetchConfig          = false)
         imageRepo = fetched.asImageRepo(tags = @[parsedRef.tag])
       chalk.repos[parsedRef.repo] =
