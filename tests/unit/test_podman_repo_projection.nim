@@ -133,6 +133,9 @@ proc main() =
   assertEq(unpack[string](imageFields["_IMAGE_ARCHITECTURE"]), "arm64")
   assertEq(unpack[string](imageFields["_IMAGE_USER"]), "10001:10001")
   assertEq(unpack[string](imageFields["_IMAGE_CONFIG_DIGEST"]), "config-digest")
+  doAssert "DOCKER_PLATFORM" notin imageFields
+  let collected = inspectedImageFields(metadata, image.imageId)
+  assertEq(unpack[string](collected["DOCKER_PLATFORM"]), "linux/arm64")
   metadata.delete("Os")
   metadata.delete("Architecture")
   let unknown = podmanGetRunTimeArtifactInfo(Plugin(nil), image, false)
