@@ -384,3 +384,16 @@ block:
     "CMD []\n" &
     "ENTRYPOINT [\"/app\"]\n"
   )
+
+# The hook restores the selected stage's user, including inherited users.
+block:
+  let parsed = getFinalExecConfig("FROM base AS one\nUSER 10001:10001\nFROM one AS selected\nFROM scratch AS discarded\nUSER 999\n", "selected")
+  doAssert parsed.config.isSome()
+  doAssert parsed.config.get().user == "10001:10001"
+  let planned = planStartup(parsed.config.get(), BaseExec(user: "2000", cmd: %*["/app"]))
+  doAssert planned.kind == sprPlan
+  doAssert planned.plan.user == "10001:10001"
+block:
+  let parsed = getFinalExecConfig("FROM base\n")
+  let planned = planStartup(parsed.config.get(), BaseExec(user: "2000", cmd: %*["/app"]))
+  doAssert planned.plan.user == "2000"

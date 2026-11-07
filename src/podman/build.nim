@@ -33,6 +33,7 @@ import "./notice"
 import "./platform"
 import "./report"
 import "./run"
+import "./scan"
 import "./sbom"
 import "./transfer"
 import "./types" as podman_types
@@ -83,13 +84,27 @@ proc failOpenOriginal(exe: string, spec: podman_types.PodmanBuildSpec,
 
 proc writeMark(spec: podman_types.PodmanBuildSpec,
                ws: podman_types.PodmanWorkspace,
-               target: ChalkPlatform): Option[ChalkObj] =
+               target: ChalkPlatform, baseChalk: ChalkObj): Option[ChalkObj] =
   let chalk = newChalk(
     name         = primaryTag(spec),
     resourceType = {ResourceImage},
     codec        = getPluginByName("podman"),
     chalkId      = dockerGenerateChalkId(),
   )
+  chalk.baseChalk = baseChalk
+  let baseImage = parseImage(spec.startup.rootImage, defaultTag = "")
+  let dict = chalk.collectedData
+  dict.setIfNeeded("DOCKER_BASE_IMAGE", spec.startup.rootImage)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO", baseImage.repo)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REGISTRY", baseImage.registry)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_NAME", baseImage.name)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG", baseImage.tag)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST", baseImage.digest)
+  if baseChalk != nil:
+    dict.setIfNeeded("DOCKER_BASE_IMAGE_CONFIG_DIGEST", baseChalk.imageId.extractDockerHash())
+    if baseChalk.extract != nil:
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK", baseChalk.extract)
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA_ID", baseChalk.extract.getOrDefault("METADATA_ID"))
   chalk.collectedData.setIfNeeded("DOCKER_FILE", spec.containerfileText)
   chalk.collectedData.setIfNeeded("DOCKER_FILE_CHALKED", ws.derivedText)
   chalk.collectedData.setIfNeeded("DOCKERFILE_PATH", spec.resolvedContainerfile)
@@ -133,6 +148,9 @@ proc finalizeImage(exe: string, spec: podman_types.PodmanBuildSpec,
     if chalk.name == "":
       # An untagged build has no other handle for the artifact.
       chalk.name = imageId
+  collectLocalImageMetadata(exe, chalk, cancellation)
+  if cancellation.isSome():
+    return cancellationExit(cancellation.get())
   chalk.addToAllChalks()
   chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
   maybeCollectNativeSbom(exe, spec, chalk, snapshots, workingDir, cancellation)
@@ -264,7 +282,16 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
 
   var chalkOpt: Option[ChalkObj]
   try:
-    chalkOpt = writeMark(spec, ws, resolved.target)
+    var baseChalk: ChalkObj
+    if inspected.isSome():
+      let scanned = scanPodmanImage(exe, inspected.get().imageId, cancellation)
+      if cancellation.isSome():
+        return cancellationExit(cancellation.get())
+      if scanned.isSome():
+        baseChalk = scanned.get()
+        baseChalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("base")
+        baseChalk.addToAllArtifacts()
+    chalkOpt = writeMark(spec, ws, resolved.target, baseChalk)
   except:
     return failOpenOriginal(exe, spec, pasMarkCreation)
   if chalkOpt.isNone():
