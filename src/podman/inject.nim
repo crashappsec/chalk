@@ -19,6 +19,7 @@ import "../docker"/[
   dockerfile,
 ]
 import "./binding"
+import "./guard"
 import "./chalk_platform"
 import "./notice"
 import "./types" as podman_types
@@ -259,28 +260,14 @@ proc unusedContextName*(reserved: HashSet[string],
 proc chalkInstructionBlock(spec: podman_types.PodmanBuildSpec,
                            contextName: string): string =
   let plan = spec.startupPlan.get()
-  # A usable /bin/sh and unoccupied reserved paths are part of the supported
-  # instrumentation envelope. A failed guard ends the single build attempt.
-  #
-  # This test needs no network, but podman sets up a network namespace for
-  # every RUN, and in restricted CI containers that setup is what fails --
-  # pasta exits 127 and the injected build dies before the test ever runs.
-  # Opting out per-instruction cannot affect RUN steps in the customer's own
-  # Containerfile, unlike a build-wide --network=none. Gated on the buildah
-  # version because an older parser would reject the flag outright.
-  let guardFlags = if spec.guardNoNetwork: "--network=none " else: ""
-  # Reserved paths must be free, OR already hold a chalk mark of ours -- which
-  # is what a chalked base image looks like, and re-chalking a derived image is
-  # legitimate. Discriminating on content rather than existence keeps the
-  # protection that matters (a customer application living at /chalk, which is
-  # what this guard was added for) while no longer refusing to build on top of
-  # our own output. Symlinks are refused either way; the common fresh-image
-  # case short-circuits before grep is ever needed.
-  result =
-    "RUN " & guardFlags & "[\"/bin/sh\", \"-c\", \"test -x / && " &
-    "test ! -L /chalk && test ! -L /chalk.json && " &
-    "{ { test ! -e /chalk && test ! -e /chalk.json; } || " &
-    "grep -q " & magicUTF8 & " /chalk.json; }\"]\n"
+  let
+    guardFlags = if spec.guardNoNetwork: "--network=none " else: ""
+    helperRoot = "/__" & contextName
+  # Buildah removes this read-only context mount after RUN. Check reserved paths
+  # before COPY; exec form needs neither an image shell nor a configured shell.
+  result = "RUN " & guardFlags &
+    "--mount=type=bind,from=" & contextName & ",source=.,target=" & helperRoot &
+    " [\"" & helperRoot & "/chalk\", \"" & podmanGuardCommand & "\"]\n"
   result.add("COPY --from=" & contextName & " --chmod=0755 chalk /chalk\n")
   result.add("COPY --from=" & contextName & " --chmod=0444 chalk.json /chalk.json\n")
   # An entrypoint that is already `/chalk exec ...` came from a chalked base

@@ -12,6 +12,7 @@ import ../../src/norecurse
 import ../../src/podman/binding
 import ../../src/podman/cmdline
 import ../../src/podman/exec
+import ../../src/podman/guard
 import ../../src/podman/host
 import ../../src/podman/inject
 import ../../src/podman/notice
@@ -983,10 +984,9 @@ proc main() =
       doAssert workspacePath != sourcePath
       doAssert not workspacePath.startsWith(sourcePath & $DirSep)
       let
-        reservedGuard = "RUN [\"/bin/sh\", \"-c\", \"test -x / && " &
-          "test ! -L /chalk && test ! -L /chalk.json && " &
-          "{ { test ! -e /chalk && test ! -e /chalk.json; } || " &
-          "grep -q dadfedabbadabbed /chalk.json; }\"]"
+        reservedGuard = "RUN --mount=type=bind,from=" & workspace.get().contextName &
+          ",source=.,target=/__" & workspace.get().contextName & " [\"/__" &
+          workspace.get().contextName & "/chalk\", \"" & podmanGuardCommand & "\"]"
         firstCopy = workspace.get().derivedText.find("COPY --from=")
       doAssert reservedGuard in workspace.get().derivedText
       doAssert workspace.get().derivedText.find(reservedGuard) < firstCopy
@@ -996,7 +996,7 @@ proc main() =
       assertEq(readFile(markerPath), "unchanged\n")
       assertEq(toSeq(walkDir(source)).len, 1)
 
-      # Default spec: plain RUN, exactly as before.
+      # Network isolation applies only when supported by the engine.
       doAssert "RUN --network=none" notin workspace.get().derivedText
 
       # guardNoNetwork set: the flag rides on our guard and nothing else.
@@ -1012,7 +1012,7 @@ proc main() =
       ))
       doAssert netWorkspace.isSome()
       let netText = netWorkspace.get().derivedText
-      doAssert "RUN --network=none [\"/bin/sh\", \"-c\", \"test -x / && " in netText
+      doAssert "RUN --network=none --mount=type=bind,from=" in netText
       assertEq(netText.count("--network=none"), 1)
       # the customer's own instructions are untouched
       doAssert "FROM scratch\nENTRYPOINT [\"/bin/true\"]\n" in netText

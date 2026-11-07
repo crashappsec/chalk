@@ -184,10 +184,8 @@ delEnv("PODMAN_BASE_BINDING_MISSING")
 
 proc chalkBlock(contextName: string): string =
   return
-    "RUN [\"/bin/sh\", \"-c\", \"test -x / && " &
-    "test ! -L /chalk && test ! -L /chalk.json && " &
-    "{ { test ! -e /chalk && test ! -e /chalk.json; } || " &
-    "grep -q dadfedabbadabbed /chalk.json; }\"]\n" &
+    "RUN --mount=type=bind,from=" & contextName & ",source=.,target=/__" & contextName &
+    " [\"/__" & contextName & "/chalk\", \"__.podman_reserved_paths\"]\n" &
     "COPY --from=" & contextName & " --chmod=0755 chalk /chalk\n" &
     "COPY --from=" & contextName & " --chmod=0444 chalk.json /chalk.json\n" &
     "ENTRYPOINT [\"/chalk\",\"exec\",\"--heartbeat\",\"--\"]\n"
@@ -210,7 +208,7 @@ proc derive(text: string,
 
 proc expectDerived(text, target, expectedPrefix, expectedSuffix: string) =
   let derived = derive(text, target)
-  let marker = derived.find("RUN [\"/bin/sh\"")
+  let marker = derived.find("RUN --mount=type=bind,from=")
   doAssert marker >= 0
   let contextMarker = "COPY --from="
   let contextStart = derived.find(contextMarker, marker) + len(contextMarker)
