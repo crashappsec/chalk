@@ -40,6 +40,7 @@ permissions:
   packages: write
 
 env:
+  TEST_DOCKER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.suite == 'fast' && '29.2.1' || '25' }}
   SSH_KEY: ${{ secrets.SSH_KEY }}
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID_TEST }}
@@ -122,10 +123,12 @@ jobs:
           if [ "$MANUAL_FAST" = true ]; then
             arch=$(docker version --format '{{.Server.Arch}}')
             docker buildx bake --allow=fs.read=../nimutils chalk server tests --load \
-              --set '*.args.DOCKER_VERSION=29.2.1' \
+              --set 'tests.args.DOCKER_VERSION=29.2.1' \
               --set "tests.cache-from=type=registry,ref=ghcr.io/crashappsec/chalk_tests:cache-linux-$arch" \
               --set "tests.cache-to=type=registry,ref=ghcr.io/crashappsec/chalk_tests:cache-linux-$arch"
-            docker compose run --rm --no-deps --entrypoint docker tests --version | grep -F 'Docker version 29.2.1,'
+            client_version=$(docker compose run --rm --no-deps --entrypoint docker tests --version)
+            printf '%s\n' "$client_version"
+            printf '%s\n' "$client_version" | grep -F 'Docker version 29.2.1,'
           else
             docker buildx bake --allow=fs.read=../nimutils chalk server tests --load
           fi

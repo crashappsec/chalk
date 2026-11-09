@@ -5,6 +5,8 @@ import ../../src/attestation/[get, utils]
 ioSetup()
 loadAllConfigs()
 echo "STAGE02_SOURCE " & getChalkCommitId()
+echo "Build OS " & hostOS
+echo "Build CPU " & hostCPU
 
 if getEnv("STAGE02_OPERATION") == "mint":
   let key = mintAttestationKeyToDisk(getEnv("STAGE02_KEY_PATH"))

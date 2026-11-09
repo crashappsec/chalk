@@ -31,7 +31,8 @@ python3 tests/unit/test_podman_run.py
 
 docker compose run --rm --no-deps chalk nimble build -y
 test -x chalk
-python3 tests/integration/test_podman_input_notices.py "$root/chalk"
+PODMAN_INPUT_EVIDENCE="$root/.developer-diagnostics/evidence/input-notices.json" \
+  python3 tests/integration/test_podman_input_notices.py "$root/chalk"
 
 docker compose run --rm --no-deps chalk \
   nim c -d:debug --opt:none \
