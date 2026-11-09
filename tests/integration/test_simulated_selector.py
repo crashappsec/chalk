@@ -101,6 +101,13 @@ def run_cases(selector, env, files, binary, select):
 def main():
     selector = load_selector()
     owned = []
+    evidence = {
+        "source": SOURCE_SHA,
+        "machine": os.uname().machine,
+        "cases": [],
+        "cleanup": [],
+        "passed": False,
+    }
     real = shutil.which("podman")
     assert real, "podman is not on PATH"
     version = subprocess.run(
@@ -185,19 +192,36 @@ def main():
         captured = stdout.getvalue() + stderr.getvalue()
         assert "synthetic-stage05-token" not in captured
         receipt = json.loads(stderr.getvalue())
-        return {
+        record = {
             "status": status,
             "output": stdout.getvalue(),
             "receipt": receipt,
             "downloads": downloads,
+            "corrupt_component": corrupt,
+            "setup_failure": fail_setup,
         }
+        evidence["cases"].append(record)
+        return record
 
     raw, env, files = bundle(binary, SOURCE_SHA)
     try:
         run_cases(selector, env, files, binary, select)
+        evidence["passed"] = True
     finally:
         for directory in owned:
             shutil.rmtree(directory, ignore_errors=True)
+            evidence["cleanup"].append(
+                {"path": str(directory), "removed": not directory.exists()}
+            )
+        evidence["passed"] = evidence["passed"] and all(
+            item["removed"] for item in evidence["cleanup"]
+        )
+        out = ROOT / ".developer-diagnostics/evidence"
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "simulated-selector.json").write_text(
+            json.dumps(evidence, indent=2) + "\n"
+        )
+    assert evidence["passed"], evidence["cleanup"]
 
 
 if __name__ == "__main__":
