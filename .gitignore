@@ -2,6 +2,7 @@ CLAUDE.md
 .TODO
 /bin
 /chalk
+/.developer-diagnostics/
 /src/utils/pingttl
 /src/getlibpath
 /deps

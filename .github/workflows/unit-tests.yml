@@ -29,6 +29,7 @@ on:
         default: all
         options:
           - all
+          - developer-regressions
           - podman-sbom-http
           - bounded-http
 
@@ -53,10 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: linux
-            runs-on: ubuntu-22.04
-            arch: x86_64
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && (github.event.inputs.suite == 'all' || github.event.inputs.suite == 'developer-regressions' || github.event.inputs.suite == '') && '[{"os":"linux","runs-on":"ubuntu-24.04","arch":"x86_64"},{"os":"linux","runs-on":"ubuntu-24.04-arm","arch":"aarch64"}]' || '[{"os":"linux","runs-on":"ubuntu-22.04","arch":"x86_64"}]') }}
 
     name: "${{ matrix.os }}-${{ matrix.arch }}"
     runs-on: ${{ matrix.runs-on }}
@@ -65,12 +63,16 @@ jobs:
       # only allow one job per PR running
       # older pending jobs will be cancelled not to waste CI minutes
       # cannot use github.job here https://github.com/community/community/discussions/13496
-      group: ${{ github.workflow }}-unit-${{ github.ref }}
+      group: ${{ github.workflow }}-unit-${{ github.ref }}-${{ matrix.arch }}-${{ inputs.suite || 'all' }}
       cancel-in-progress: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+
+      - name: Pin manual Docker engine
+        if: github.event_name == 'workflow_dispatch' && (inputs.suite == 'all' || inputs.suite == 'developer-regressions')
+        run: sh tests/integration/install-docker-engine.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # 3.3.0
@@ -103,7 +105,17 @@ jobs:
         run: |
           case "$UNIT_SUITE" in
             all) make unit-tests ;;
+            developer-regressions) tests/integration/run-developer-regressions.sh ;;
             podman-sbom-http) make unit-tests args="--verbose pattern tests/unit/test_podman_sbom_http.nim" ;;
             bounded-http) make unit-tests args="--verbose pattern tests/unit/test_bounded_http.nim" ;;
             *) exit 2 ;;
           esac
+
+      - name: Retain developer regression evidence
+        if: always() && inputs.suite == 'developer-regressions'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: developer-regressions-${{ matrix.arch }}
+          path: .developer-diagnostics/evidence/
+          include-hidden-files: true
+          if-no-files-found: error
