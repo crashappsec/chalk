@@ -118,4 +118,4 @@ jobs:
           name: developer-regressions-${{ matrix.arch }}
           path: .developer-diagnostics/evidence/
           include-hidden-files: true
-          if-no-files-found: error
+          if-no-files-found: warn
