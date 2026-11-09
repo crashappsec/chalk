@@ -56,7 +56,14 @@ def main():
     assert_elf(DIAGNOSTIC)
     binary_commit, _ = commit_of(BINARY)
     assert binary_commit == SOURCE_SHA
-    evidence = {"commands": [], "requests": [], "cases": []}
+    evidence = {
+        "source": SOURCE_SHA,
+        "arch": host_cpu(),
+        "passed": False,
+        "commands": [],
+        "requests": [],
+        "cases": [],
+    }
 
     def run(argv, env, cwd):
         result = subprocess.run(
@@ -254,10 +261,16 @@ attestation {
                         assert "Signing Key Provider Service status code: 200" in output
                     if status != 200:
                         assert str(status) in output, record
+        evidence["passed"] = True
     finally:
         if server:
             server.shutdown()
             server.server_close()
+        out = Path(__file__).resolve().parents[2] / ".developer-diagnostics/evidence"
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "signing-provider.json").write_text(
+            json.dumps(evidence, indent=2) + "\n"
+        )
 
 
 if __name__ == "__main__":

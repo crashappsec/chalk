@@ -67,6 +67,10 @@ from .utils.os import run
 
 logger = get_logger()
 
+NATIVE_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}.get(
+    platform.machine(), platform.machine()
+)
+
 SHA256 = re.compile(r"^[a-f0-9]{64}$")
 
 
@@ -652,7 +656,7 @@ def test_onbuild(chalk: Chalk, base: Path, test: Path, random_hex: str):
         ("public.ecr.aws/lambda/python:3.11", "/lambda-entrypoint.sh"),
         ("quay.io/cilium/alpine-curl", "/usr/bin/curl"),
         ("registry.k8s.io/pause:3.9", "/pause"),
-        ("k8s.gcr.io/pause", "/pause"),
+        ("k8s.gcr.io/pause:3.9", "/pause"),
         ("ghcr.io/crashappsec/pgcli:3.5.0", "pgcli"),
         ("nginx:1.27", "/docker-entrypoint.sh"),
         (f"{REGISTRY_PROXY}/library/nginx:1.27", "/docker-entrypoint.sh"),
@@ -1236,12 +1240,9 @@ def test_wrap_entrypoint(
         buildkit=buildkit,
         buildx=buildx,
     )
-    assert Docker.inspect(docker_digests.id).has(
-        Config={
-            "Entrypoint": docker_entrypoint,
-            "Cmd": cmd,
-        }
-    )
+    config = Docker.inspect(docker_digests.id)["Config"]
+    assert config.get("Entrypoint") == docker_entrypoint
+    assert config["Cmd"] == cmd
     _, docker_output = Docker.run(docker_digests.id, expected_success=runnable)
 
     digests, result = chalk.docker_build(
@@ -1884,8 +1885,8 @@ def test_retagging(chalk: Chalk, random_hex: str):
     Docker.tag("alpine", tag)
     # this pushes only a single platform
     Docker.push(tag)
-    registry_digests = Docker.crane_digests(tag, architecture="amd64")
-    hub_digests = Docker.crane_digests("alpine", architecture="amd64")
+    registry_digests = Docker.crane_digests(tag, architecture=NATIVE_ARCH)
+    hub_digests = Docker.crane_digests("alpine", architecture=NATIVE_ARCH)
     extract = chalk.extract(tag)
     assert extract.mark.has(
         _REPO_TAGS={
@@ -1918,48 +1919,49 @@ def test_retagging(chalk: Chalk, random_hex: str):
 
 
 def test_remanifest(chalk: Chalk, random_hex: str):
+    other_arch = "arm64" if NATIVE_ARCH == "amd64" else "amd64"
     name = f"remanifest_{random_hex}"
     tag_base = f"{REGISTRY}/{name}"
     tag_list1 = "list1"
     tag_list2 = "list2"
-    tag_amd64 = "amd64"
-    tag_arm64 = "arm64"
-    digests_amd64, _ = Docker.build(
+    tag_native = NATIVE_ARCH
+    tag_other = other_arch
+    digests_native, _ = Docker.build(
         content="FROM alpine",
-        tag=f"{tag_base}:{tag_amd64}",
+        tag=f"{tag_base}:{tag_native}",
         push=True,
-        platforms=["linux/amd64"],
+        platforms=[f"linux/{NATIVE_ARCH}"],
     )
-    digests_arm64, _ = Docker.build(
+    digests_other, _ = Docker.build(
         content="FROM alpine",
-        tag=f"{tag_base}:{tag_arm64}",
+        tag=f"{tag_base}:{tag_other}",
         push=True,
-        platforms=["linux/arm64"],
+        platforms=[f"linux/{other_arch}"],
     )
     Docker.manifest_create(
         f"{tag_base}:{tag_list1}",
-        f"{tag_base}@sha256:{digests_amd64.registry_digest}",
-        f"{tag_base}@sha256:{digests_arm64.registry_digest}",
+        f"{tag_base}@sha256:{digests_native.registry_digest}",
+        f"{tag_base}@sha256:{digests_other.registry_digest}",
     )
     Docker.manifest_create(
         f"{tag_base}:{tag_list2}",
-        f"{tag_base}@sha256:{digests_amd64.registry_digest}",
+        f"{tag_base}@sha256:{digests_native.registry_digest}",
     )
     list1_digests = Docker.crane_digests(
         f"{tag_base}:{tag_list1}",
-        digests=digests_amd64,
-        architecture="amd64",
+        digests=digests_native,
+        architecture=NATIVE_ARCH,
     )
     list2_digests = Docker.crane_digests(
         f"{tag_base}:{tag_list2}",
-        digests=digests_amd64,
-        architecture="amd64",
+        digests=digests_native,
+        architecture=NATIVE_ARCH,
     )
-    assert digests_amd64.config == list1_digests.config
-    assert digests_amd64.config == list2_digests.config
-    Docker.pull(f"{tag_base}:{tag_list1}", platform="linux/amd64")
-    Docker.pull(f"{tag_base}:{tag_list2}", platform="linux/amd64")
-    Docker.pull(f"{tag_base}:{tag_amd64}", platform="linux/amd64")
+    assert digests_native.config == list1_digests.config
+    assert digests_native.config == list2_digests.config
+    Docker.pull(f"{tag_base}:{tag_list1}", platform=f"linux/{NATIVE_ARCH}")
+    Docker.pull(f"{tag_base}:{tag_list2}", platform=f"linux/{NATIVE_ARCH}")
+    Docker.pull(f"{tag_base}:{tag_native}", platform=f"linux/{NATIVE_ARCH}")
     extract = chalk.extract(f"{tag_base}:{tag_list1}")
     assert extract.mark.has(
         _CURRENT_HASH=list1_digests.either_registry_ids,
@@ -1999,7 +2001,7 @@ def test_remanifest(chalk: Chalk, random_hex: str):
                     else {
                         tag_list1: list1_digests.registry,
                         tag_list2: list2_digests.registry,
-                        tag_amd64: digests_amd64.registry,
+                        tag_native: digests_native.registry,
                     }
                 )
             }
@@ -2023,14 +2025,13 @@ def test_push_without_buildx(
         tag=tag,
     )
 
-    # passing `buildkit=False` is not enough since
-    # that still allows the use of buildx commands
-    # whereas running in isolcated container without
-    # buildx being installed we can test push flow
-    # without any buildx support
+    client, _ = Docker.build(
+        content="FROM docker:29.2.1-cli\n"
+        "RUN rm -f /usr/local/libexec/docker/cli-plugins/docker-buildx "
+        "/usr/local/lib/docker/cli-plugins/docker-buildx && ! docker buildx version\n",
+    )
     _, program = Docker.run(
-        # this image doesnt have buildx installed
-        "docker:19",
+        client.id,
         entrypoint="/chalk",
         params=["--log-level=trace", "docker", "push", tag],
         volumes={

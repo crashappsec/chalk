@@ -138,6 +138,7 @@ try:
         ]["rootless"]
         assert os.getuid() != 0
     else:
+        run([real, "buildx", "use", "default"])
         assert (
             run([real, "version", "--format", "{{.Client.Version}}"]).stdout.strip()
             == "29.2.1"
