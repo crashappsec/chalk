@@ -1448,7 +1448,7 @@ def test_heartbeat(chalk_copy: Chalk, random_hex: str):
     exec heartbeat from inside docker
     """
     tag = f"test_image_{random_hex}"
-    chalk_copy.load(CONFIGS / "docker_heartbeat.c4m", use_embedded=False)
+    chalk_copy.load(CONFIGS / "docker_heartbeat.c4m", use_embedded=False, replace=False)
 
     # build dockerfile with chalk docker entrypoint wrapping
     chalk_copy.docker_build(
