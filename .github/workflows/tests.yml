@@ -26,12 +26,22 @@ on:
       - "!src/docs/**"
       - Dockerfile
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Manual suite
+        type: choice
+        default: full
+        options:
+          - full
+          - fast
 
 permissions:
   contents: read
   packages: write
 
 env:
+  TEST_DOCKER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.suite == 'fast' && '29.2.1' || '25' }}
+  TEST_BUILDX_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.suite == 'fast' && '0.38.1' || '0.14.0' }}
   SSH_KEY: ${{ secrets.SSH_KEY }}
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID_TEST }}
@@ -41,7 +51,12 @@ env:
 
 jobs:
   pytest:
-    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && github.event.inputs.suite == 'fast' && '["ubuntu-24.04","ubuntu-24.04-arm"]' || '["ubuntu-22.04"]') }}
+    name: pytest-${{ matrix.runs-on }}
+    runs-on: ${{ matrix.runs-on }}
 
     if: |
       (
@@ -59,7 +74,7 @@ jobs:
       # only allow one job per PR running
       # older pending jobs will be cancelled not to waste CI minutes
       # cannot use github.job here https://github.com/community/community/discussions/13496
-      group: ${{ github.workflow }}-pytest-${{ github.ref }}
+      group: ${{ github.workflow }}-pytest-${{ github.ref }}-${{ matrix.runs-on }}
       cancel-in-progress: true
 
     steps:
@@ -73,6 +88,10 @@ jobs:
         with:
           app_id: ${{ secrets.CHALK_GITHUB_APP_ID }}
           private_key: ${{ secrets.CHALK_GITHUB_APP_PRIVATE_KEY }}
+
+      - name: Pin manual Docker engine
+        if: github.event_name == 'workflow_dispatch' && inputs.suite == 'fast'
+        run: sh tests/integration/install-docker-engine.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # 3.3.0
@@ -99,32 +118,44 @@ jobs:
         run: make nimble.paths
 
       - name: Bake Images
+        env:
+          MANUAL_FAST: ${{ github.event_name == 'workflow_dispatch' && inputs.suite == 'fast' }}
         run: |
-          docker buildx bake --allow=fs.read=../nimutils chalk server tests --load
+          if [ "$MANUAL_FAST" = true ]; then
+            arch=$(docker version --format '{{.Server.Arch}}')
+            docker buildx bake --allow=fs.read=../nimutils chalk server tests --load \
+              --set 'tests.args.DOCKER_VERSION=29.2.1' \
+              --set 'tests.args.BUILDX_VERSION=0.38.1' \
+              --set "tests.cache-from=type=registry,ref=ghcr.io/crashappsec/chalk_tests:cache-linux-$arch" \
+              --set "tests.cache-to=type=registry,ref=ghcr.io/crashappsec/chalk_tests:cache-linux-$arch"
+            client_version=$(docker compose run --rm --no-deps --entrypoint docker tests --version)
+            printf '%s\n' "$client_version"
+            printf '%s\n' "$client_version" | grep -F 'Docker version 29.2.1,'
+            buildx_version=$(docker compose run --rm --no-deps --entrypoint docker tests buildx version)
+            printf '%s\n' "$buildx_version"
+            printf '%s\n' "$buildx_version" | grep -F 'github.com/docker/buildx v0.38.1 '
+          else
+            docker buildx bake --allow=fs.read=../nimutils chalk server tests --load
+          fi
 
       - name: Test pingttl
-        if: inputs.chalk_url == ''
         run: |
           make src/utils/pingttl
 
       - name: Compile Chalk
-        if: inputs.chalk_url == ''
         run: |
           make
-
-      - name: Download Chalk
-        if: inputs.chalk_url != ''
-        run: |
-          curl -L "${{ inputs.chalk_url }}" > chalk
-          chmod +x chalk
-          ./chalk version
 
       - name: Run tests (Fast)
         # run fast tests by default on PRs when
         # "tests:--slow" is missing in PR description
         if: |
-          github.event_name == 'pull_request' && (
+          (
+            github.event_name == 'pull_request' &&
             !contains(github.event.pull_request.body, 'tests:--slow')
+          ) || (
+            github.event_name == 'workflow_dispatch' &&
+            github.event.inputs.suite == 'fast'
           )
         env:
           GITHUB_TOKEN: ${{ steps.org-token.outputs.token }}
@@ -137,8 +168,12 @@ jobs:
         # run slow tests on non-PR builds and when
         # PR description has "tests:--slow"
         if: |
-          github.event_name != 'pull_request' || (
+          (
+            github.event_name != 'pull_request' ||
             contains(github.event.pull_request.body, 'tests:--slow')
+          ) && !(
+            github.event_name == 'workflow_dispatch' &&
+            github.event.inputs.suite == 'fast'
           )
         env:
           GITHUB_TOKEN: ${{ steps.org-token.outputs.token }}

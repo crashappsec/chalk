@@ -44,15 +44,17 @@ fi
 
 insecure_builder=insecure_builder
 if ! docker buildx inspect $insecure_builder &> /dev/null; then
+    buildkit_config=$(mktemp)
+    envsubst < "$FILEDIR/data/templates/docker/buildkitd.toml" | tee "$buildkit_config" >&2
     docker buildx create \
         --use \
-        --config=<(cat $FILEDIR/data/templates/docker/buildkitd.toml | envsubst | tee /dev/stderr) \
+        --config="$buildkit_config" \
         --name $insecure_builder \
         node-amd64 \
         > /dev/null
     docker buildx create \
         --append \
-        --config=<(cat $FILEDIR/data/templates/docker/buildkitd.toml | envsubst) \
+        --config="$buildkit_config" \
         --name $insecure_builder \
         node-arm64 \
         > /dev/null

@@ -9,10 +9,14 @@ import sys
 import tempfile
 import time
 
+HOST_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}[os.uname().machine]
+
 binary = Path(sys.argv[1]).resolve()
 binary_sha256 = hashlib.sha256(binary.read_bytes()).hexdigest()
 evidence = []
-output = Path("artifacts/podman/input-notices.json")
+output = Path(
+    os.environ.get("PODMAN_INPUT_EVIDENCE", "artifacts/podman/input-notices.json")
+)
 output.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -21,7 +25,8 @@ def record_failure(kind, error, traceback):
         json.dumps(
             {
                 "schema_version": 1,
-                "source_sha": os.environ.get("CI_COMMIT_SHA"),
+                "source_sha": os.environ.get("CI_COMMIT_SHA")
+                or os.environ.get("GITHUB_SHA"),
                 "binary_sha256": binary_sha256,
                 "binary_unchanged": hashlib.sha256(binary.read_bytes()).hexdigest()
                 == binary_sha256,
@@ -52,7 +57,10 @@ with open(os.environ['PODMAN_CALLS'], 'a') as stream:
                              'cwd': os.getcwd()}) + '\n')
 
 if argv == ['info', '--format', 'json']:
-    sys.stdout.write(os.environ.get('PODMAN_INFO', '{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.43.1"}}'))
+    native_arch = {'x86_64': 'amd64', 'aarch64': 'arm64'}[os.uname().machine]
+    default_info = {'host': {'os': 'linux', 'arch': native_arch,
+                             'serviceIsRemote': False, 'buildahVersion': '1.43.1'}}
+    sys.stdout.write(os.environ.get('PODMAN_INFO', json.dumps(default_info)))
     sys.stderr.write(os.environ.get('PODMAN_INFO_STDERR', ''))
     sys.exit(int(os.environ.get('PODMAN_INFO_EXIT', '0')))
 
@@ -432,7 +440,15 @@ with tempfile.TemporaryDirectory(prefix="podman-input-notices-") as temp:
         ),
         (
             "os",
-            '{"host":{"os":"os-secret-must-not-be-reported","arch":"amd64","serviceIsRemote":false}}',
+            json.dumps(
+                {
+                    "host": {
+                        "os": "os-secret-must-not-be-reported",
+                        "arch": HOST_ARCH,
+                        "serviceIsRemote": False,
+                    }
+                }
+            ),
             "operating system",
             "os-secret-must-not-be-reported",
         ),
@@ -444,7 +460,9 @@ with tempfile.TemporaryDirectory(prefix="podman-input-notices-") as temp:
         ),
         (
             "remote",
-            '{"host":{"os":"linux","arch":"amd64","serviceIsRemote":true}}',
+            json.dumps(
+                {"host": {"os": "linux", "arch": HOST_ARCH, "serviceIsRemote": True}}
+            ),
             "remote",
             "",
         ),
@@ -872,7 +890,8 @@ output.write_text(
     json.dumps(
         {
             "schema_version": 1,
-            "source_sha": os.environ.get("CI_COMMIT_SHA"),
+            "source_sha": os.environ.get("CI_COMMIT_SHA")
+            or os.environ.get("GITHUB_SHA"),
             "binary_sha256": binary_sha256,
             "binary_unchanged": binary_unchanged,
             "cases": evidence,
