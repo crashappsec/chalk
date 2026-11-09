@@ -105,7 +105,7 @@ if [ -n "$show_attestation" ]; then
 fi
 
 layer_digest=$(echo "$attestation" | jq -r '.layers[0].digest')
-layer=$(inspect "$name@$layer_digest")
+layer=$(crane blob --insecure "$name@$layer_digest")
 if [ -n "$show_layer" ]; then
     echo "LAYER" > /dev/stderr
     echo "$layer" | jq
