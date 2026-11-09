@@ -95,14 +95,27 @@ fi
 PATH=$bin_dir:$PATH \
 CONTAINERS_CONF=$conf \
 XDG_RUNTIME_DIR=$runtime \
-python3 - "$podman" <<'PY'
-import json, subprocess, sys
+python3 - "$podman" "$root/.developer-diagnostics/evidence/engine.json" <<'PY'
+import json, os, subprocess, sys
+from pathlib import Path
 podman = sys.argv[1]
-version = subprocess.run([podman, '--version'], check=True, capture_output=True, text=True)
+output = Path(sys.argv[2])
+output.parent.mkdir(parents=True, exist_ok=True)
+evidence = {'machine': os.uname().machine, 'uid': os.getuid(), 'commands': []}
+def probe(args):
+    result = subprocess.run(args, capture_output=True, text=True)
+    evidence['commands'].append({'args': args, 'status': result.returncode,
+                                 'stdout': result.stdout, 'stderr': result.stderr})
+    output.write_text(json.dumps(evidence, indent=2)+'\n')
+    if result.returncode:
+        sys.stderr.write(result.stdout + result.stderr)
+        raise SystemExit('pinned podman: engine probe failed')
+    return result
+version = probe([podman, '--version'])
 if version.stdout.strip() != 'podman version 6.1.4':
     sys.stderr.write(version.stdout + version.stderr)
     raise SystemExit('pinned podman: expected podman version 6.1.4')
-info = subprocess.run([podman, 'info', '--format', 'json'], check=True, capture_output=True, text=True)
+info = probe([podman, 'info', '--format', 'json'])
 parsed = json.loads(info.stdout)
 if parsed['host']['buildahVersion'] != '1.45.2':
     raise SystemExit('pinned podman: expected Buildah 1.45.2')

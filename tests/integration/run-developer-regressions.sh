@@ -4,6 +4,8 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$root"
 mkdir -p .developer-diagnostics
+engine_env=$root/.developer-diagnostics/engines.env
+tests/integration/install-pinned-engines.sh "$engine_env"
 
 make nimble.paths
 
@@ -73,8 +75,6 @@ IDENTITY
 
 python3 tests/integration/test_signing_provider.py
 
-engine_env=$root/.developer-diagnostics/engines.env
-tests/integration/install-pinned-engines.sh "$engine_env"
 . "$engine_env"
 
 python3 tests/integration/test_build_outcomes.py podman
