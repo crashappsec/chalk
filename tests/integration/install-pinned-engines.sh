@@ -54,6 +54,8 @@ conf=$prefix/etc/containers/containers.conf
 mkdir -p "$(dirname "$conf")" "$prefix/usr/local/libexec/podman" "$prefix/usr/local/lib/podman"
 cat > "$conf" <<EOF
 [engine]
+runtime = "$bin_dir/crun"
+conmon_path = ["$prefix/usr/local/lib/podman/conmon"]
 cgroup_manager = "cgroupfs"
 events_logger = "file"
 helper_binaries_dir = ["$prefix/usr/local/libexec/podman", "$prefix/usr/local/lib/podman", "$bin_dir"]
@@ -131,6 +133,11 @@ if version.stdout.strip() != 'podman version 6.1.4':
     raise SystemExit('pinned podman: expected podman version 6.1.4')
 info = probe([podman, 'info', '--format', 'json'])
 parsed = json.loads(info.stdout)
+prefix = Path(podman).parent
+if parsed['host']['ociRuntime']['path'] != str(prefix / 'crun'):
+    raise SystemExit('pinned podman: OCI runtime is not from the verified archive')
+if parsed['host']['conmon']['path'] != str(prefix.parent / 'lib/podman/conmon'):
+    raise SystemExit('pinned podman: conmon is not from the verified archive')
 if parsed['host']['buildahVersion'] != '1.45.2':
     raise SystemExit('pinned podman: expected Buildah 1.45.2')
 if not parsed['host']['security']['rootless']:
