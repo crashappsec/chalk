@@ -1,6 +1,6 @@
 # Developer regression coverage
 
-The GitHub developer suite runs process-adapter diagnostics, direct signing-provider checks, and simulated consumer selection. The GitLab customer rig downloads production Chalk and compares native and instrumented workloads. Diagnostic executables stay inside GitHub test jobs. Only JSON evidence leaves those jobs.
+The GitHub developer suite runs process-adapter diagnostics, direct signing-provider checks, and simulated consumer selection. The GitLab customer rig downloads production Chalk and compares native and instrumented workloads. Diagnostic executables stay inside GitHub test jobs. Job artifacts contain JSON reports and the text AppArmor profile; they exclude executables.
 
 <!-- markdown-link-check-disable -->
 
@@ -32,7 +32,7 @@ The developer script also runs the original Podman unit files, Python process pr
 
 ## Native versions and replacements
 
-Manual fast functional jobs and manual full-unit or developer jobs pin Docker 29.2.1. The fast functional image uses that Docker client and an architecture-specific test cache. Automatic workflow behavior retains its existing runner, selection, and defaults.
+Manual fast functional jobs and manual full-unit or developer jobs pin Docker 29.2.1. The fast functional image uses that Docker client, Buildx 0.38.1, and an architecture-specific test cache. Automatic workflow behavior retains its existing runner, selection, and defaults.
 
 The developer job installs checksum-pinned Podman 6.1.4 archives for x86-64 or ARM64 and verifies rootless operation and Buildah 1.45.2 through `podman info`. Customer jobs use independently proven native fixtures. Both locations generalize ELF, reported CPU, and Linux checks to the executing architecture.
 

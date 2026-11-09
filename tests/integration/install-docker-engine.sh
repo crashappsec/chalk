@@ -16,6 +16,10 @@ version=$(apt-cache madison docker-ce | awk '$3 ~ /:29[.]2[.]1-/ {print $3; exit
 test -n "$version"
 sudo apt-get install -y --allow-downgrades "docker-ce=$version" "docker-ce-cli=$version" \
   containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl restart docker
+if ! sudo systemctl restart docker; then
+  sudo systemctl status docker containerd --no-pager || true
+  sudo journalctl -u docker -u containerd --since '-5 minutes' --no-pager || true
+  exit 1
+fi
 test "$(docker version --format '{{.Client.Version}}')" = 29.2.1
 test "$(docker version --format '{{.Server.Version}}')" = 29.2.1
