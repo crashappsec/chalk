@@ -92,6 +92,20 @@ if ! command -v newuidmap >/dev/null 2>&1; then
   fi
 fi
 
+if [ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ] && \
+   [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" != 0 ]; then
+  mkdir -p "$root/.developer-diagnostics/evidence"
+  profile=$root/.developer-diagnostics/evidence/podman-userns.apparmor
+  cat > "$profile" <<EOF
+abi <abi/4.0>,
+include <tunables/global>
+"$podman" flags=(unconfined) {
+  userns,
+}
+EOF
+  sudo apparmor_parser -r "$profile"
+fi
+
 PATH=$bin_dir:$PATH \
 CONTAINERS_CONF=$conf \
 XDG_RUNTIME_DIR=$runtime \
