@@ -1456,20 +1456,37 @@ def test_heartbeat(chalk_copy: Chalk, random_hex: str):
         tag=tag,
     )
 
-    _, result = Docker.run(
+    container, _ = Docker.run(
         image=tag,
-        check=False,
+        name=f"heartbeat_{random_hex}",
+        env={"SLEEP": "120"},
+        attach=False,
     )
-    chalk_result = ChalkProgram.from_program(result)
+    try:
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            result = run(["docker", "logs", container])
+            chalk_result = ChalkProgram.from_program(result)
+            try:
+                reports = chalk_result.reports
+            except json.JSONDecodeError:
+                reports = []
+            if len(reports) > 1:
+                break
+            time.sleep(0.2)
+        else:
+            pytest.fail(
+                "No exec and heartbeat reports before the deadline: " + result.text
+            )
 
-    exec_report = chalk_result.reports[0]
-    assert exec_report["_OPERATION"] == "exec"
-
-    # there should be a few heartbeats
-    assert len(chalk_result.reports) > 1
-    for heartbeat_report in chalk_result.reports[1:]:
-        assert heartbeat_report["_OPERATION"] == "heartbeat"
-        assert exec_report.mark.contains(heartbeat_report.mark)
+        exec_report = reports[0]
+        assert exec_report["_OPERATION"] == "exec"
+        assert len(reports) > 1
+        for heartbeat_report in reports[1:]:
+            assert heartbeat_report["_OPERATION"] == "heartbeat"
+            assert exec_report.mark.contains(heartbeat_report.mark)
+    finally:
+        Docker.stop_containers([container])
 
 
 def test_postexec(chalk_copy: Chalk, server_cert: Path):

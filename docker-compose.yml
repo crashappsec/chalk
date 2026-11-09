@@ -170,6 +170,7 @@ services:
       args:
         BASE: ${BASE:-ubuntu}
         DOCKER_VERSION: ${TEST_DOCKER_VERSION:-25}
+        BUILDX_VERSION: ${TEST_BUILDX_VERSION:-0.14.0}
     entrypoint: $PWD/tests/functional/entrypoint.sh
     cap_add:
       - SYS_PTRACE # for gdb
