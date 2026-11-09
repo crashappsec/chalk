@@ -1755,6 +1755,8 @@ def test_build_and_push(
 ):
     chalk_copy.setup(cosign=cosign)
 
+    if name:
+        tag = f"{tag or 'latest'}-{random_hex}"
     name = name or f"{test_file}_{random_hex}"
     repo = f"{registry}/{name}"
     tag = tag or "latest"
