@@ -12,6 +12,17 @@ proc header(target: ChalkPlatform): string =
   result[6] = '\x01'
   result[18] = if target == cpLinuxAmd64: '\x3e' else: '\xb7'
 
+proc hostInfo(arch: string, remote = false): JsonNode =
+  return %*{
+    "host": {
+      "os": "linux",
+      "arch": arch,
+      "serviceIsRemote": remote,
+      "buildahVersion": "1.45.2",
+    },
+    "version": {"Version": "6.1.4"},
+  }
+
 let root = createTempDir("podman-platform-matrix-", "")
 try:
   writeFile(root / "Containerfile", "FROM scratch\nENTRYPOINT [\"/bin/true\"]\n")
@@ -23,9 +34,9 @@ try:
     let nativeArch = if target == cpLinuxAmd64: "amd64" else: "arm64"
     let alias = if target == cpLinuxAmd64: "x86_64" else: "aarch64"
     for arch in [nativeArch, alias]:
-      let info = %*{"host": {"os": "linux", "arch": arch, "serviceIsRemote": false}}
+      let info = hostInfo(arch)
       doAssert checkPodmanHost($info, target).kind == phrSupported
-    let remote = %*{"host": {"os": "linux", "arch": nativeArch, "serviceIsRemote": true}}
+    let remote = hostInfo(nativeArch, remote = true)
     doAssert checkPodmanHost($remote, target).reason.kind == psrRemoteHost
     doAssert checkPodmanHost("{}", target).reason.kind == psrHostInfoInvalid
     for command in ChalkPlatform:
@@ -51,7 +62,7 @@ try:
     for imagePlatform in ChalkPlatform:
       let declared = parseDeclaredPlatform($imagePlatform)
       let arch = if imagePlatform == cpLinuxAmd64: "amd64" else: "arm64"
-      let info = %*{"host": {"os": "linux", "arch": arch, "serviceIsRemote": false}}
+      let info = hostInfo(arch)
       doAssert (checkPodmanHost($info, target).kind == phrSupported) == (imagePlatform == target)
       doAssert declaredPlatformSkip(declared, target).isNone() == (imagePlatform == target)
       let image = some(InspectedBaseImage(

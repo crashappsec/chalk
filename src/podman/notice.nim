@@ -35,6 +35,7 @@ type
     psrHostPlatformMismatch,
     psrContainerfileIssue,
     psrHostInfoInvalid,
+    psrEngineVersionUnsupported,
     psrUnsupportedHostOs,
     psrUnsupportedHostArch,
     psrRemoteHost,
@@ -212,6 +213,8 @@ proc formatReason(skip: PodmanSkip): string =
     return formatContainerfileIssue(skip.reason.issue)
   of psrHostInfoInvalid:
     return "Podman host information is invalid"
+  of psrEngineVersionUnsupported:
+    return "Podman and Buildah release pair has not passed the instrumentation capability probe"
   of psrUnsupportedHostOs:
     return "host operating system is unsupported"
   of psrUnsupportedHostArch:
@@ -242,6 +245,12 @@ proc writeOperationalNotice*(message: string) =
 
 proc emitPodmanSkip*(skip: PodmanSkip) =
   writeOperationalNotice(formatPodmanSkip(skip))
+
+proc formatPodmanVirtualChalkError*(): string =
+  return "chalk: virtual_chalk is not supported for Podman builds."
+
+proc emitPodmanVirtualChalkError*() =
+  writeOperationalNotice(formatPodmanVirtualChalkError())
 
 proc formatPodmanRetryStart*(step: PodmanAttemptStep,
                              status: Option[int] = none(int)): string =

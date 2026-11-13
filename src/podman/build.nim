@@ -170,8 +170,27 @@ proc beginAcceptedCollection(spec: podman_types.PodmanBuildSpec) =
   loadAttestation(forceLoad = true, withPrivateKey = true)
   initCollection()
 
+proc podmanWrapEntrypointEnabled(): bool =
+  # Some unit tests call runPodmanCommand without loading the configuration
+  # stack. Preserve the production default in that narrow test environment.
+  if con4mRuntime == nil:
+    return true
+  return attrGetOpt[bool]("podman.wrap_entrypoint").get(true)
+
+proc virtualChalkEnabled(): bool =
+  if con4mRuntime == nil:
+    return false
+  return attrGetOpt[bool]("virtual_chalk").get(false)
+
 proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   let route = classifyPodmanArgs(args)
+  # Podman virtual chalk is unsupported even when a build flag makes the
+  # command ineligible for instrumentation. Reject before native execution so
+  # virtual mode cannot mutate an image through the pass-through path.
+  if len(args) > 0 and args[0] == "build" and virtualChalkEnabled():
+    emitPodmanVirtualChalkError()
+    return 2
+
   if exe == "":
     var operation = none(PodmanOperation)
     case route.kind
@@ -190,6 +209,9 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
         reason: PodmanSkipReason(kind: psrNativeExecutableUnavailable),
       ))
     return 127
+
+  if route.kind == prInstrument and not podmanWrapEntrypointEnabled():
+    execReplacingSelf(exe, route.spec.originalArgs)
 
   if route.kind == prInstrument:
     installPodmanReportArgs(route.spec)

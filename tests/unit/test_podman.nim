@@ -208,15 +208,28 @@ proc main() =
 
   # Host gate. Rootful podman -- an ordinary CI container running as root -- must
   # instrument; only os/arch and a remote service are real limits.
-  proc info(os, arch: string, remote, rootless: bool): string =
-    """{"host":{"os":"""" & os & """","arch":"""" & arch &
-    """","serviceIsRemote":""" & $remote &
-    ""","security":{"rootless":""" & $rootless & """}}}"""
+  proc info(os, arch: string, remote, rootless: bool,
+            podman = "6.1.4", buildah = "1.45.2"): string =
+    return $(%*{
+      "host": {
+        "os": os,
+        "arch": arch,
+        "serviceIsRemote": remote,
+        "security": {"rootless": rootless},
+        "buildahVersion": buildah,
+      },
+      "version": {"Version": podman},
+    })
 
-  proc expectHost(raw, platform: string) =
+  proc expectHost(raw, platform: string,
+                  engines = PodmanEnginePair(
+                    podman: "6.1.4", buildah: "1.45.2")) =
     let checked = checkPodmanHost(raw, target = cpLinuxAmd64)
     assertEq(checked.kind, phrSupported)
     assertEq($checked.platform, platform)
+    assertEq(checked.engines, engines)
+    assertEq(checked.fixtureId, "podman-build-capabilities-v1")
+    assertEq(checked.evidenceId, "gitlab-pipeline-3066104239")
 
   proc expectHostRefusal(raw: string, reason: PodmanSkipReasonKind) =
     let checked = checkPodmanHost(raw, target = cpLinuxAmd64)
@@ -226,6 +239,20 @@ proc main() =
   expectHost(info("linux", "amd64", false, false), "linux/amd64")
   expectHost(info("linux", "amd64", false, true), "linux/amd64")
   expectHost(info("linux", "x86_64", false, false), "linux/amd64")
+  for engines in [
+    PodmanEnginePair(podman: "4.9.4", buildah: "1.33.7"),
+    PodmanEnginePair(podman: "5.0.3", buildah: "1.35.4"),
+    PodmanEnginePair(podman: "5.2.5", buildah: "1.37.5"),
+    PodmanEnginePair(podman: "5.4.2", buildah: "1.39.4"),
+    PodmanEnginePair(podman: "5.6.2", buildah: "1.41.5"),
+    PodmanEnginePair(podman: "6.1.4", buildah: "1.45.2"),
+  ]:
+    expectHost(
+      info("linux", "amd64", false, true,
+           podman = engines.podman, buildah = engines.buildah),
+      "linux/amd64",
+      engines,
+    )
   expectHostRefusal(info("linux", "arm64", false, true),
                     psrHostPlatformMismatch)
   expectHostRefusal(info("darwin", "amd64", false, true),
@@ -233,19 +260,57 @@ proc main() =
   expectHostRefusal(info("linux", "amd64", true, true), psrRemoteHost)
   expectHostRefusal("not json at all", psrHostInfoInvalid)
   expectHostRefusal("{}", psrHostInfoInvalid)
+  expectHostRefusal(info("linux", "amd64", false, true,
+                         podman = "6.1.3", buildah = "1.45.1"),
+                    psrEngineVersionUnsupported)
+  expectHostRefusal(info("linux", "amd64", false, true,
+                         podman = "6.1.4", buildah = "1.45.1"),
+                    psrEngineVersionUnsupported)
+  expectHostRefusal(info("linux", "amd64", false, true,
+                         podman = "6.1.3", buildah = "1.45.2"),
+                    psrEngineVersionUnsupported)
+  expectHostRefusal(info("linux", "amd64", false, true,
+                         podman = "7.0.0", buildah = "2.0.0"),
+                    psrEngineVersionUnsupported)
+  expectHostRefusal(info("linux", "amd64", false, true,
+                         podman = "4.9.3", buildah = "1.33.7"),
+                    psrEngineVersionUnsupported)
+  expectHostRefusal(info("linux", "amd64", false, true,
+                         podman = "4.9.4", buildah = "1.35.4"),
+                    psrEngineVersionUnsupported)
+  for prerelease in ["6.1.4-rc1", "6.1.4+build", "v6.1.4"]:
+    expectHostRefusal(info("linux", "amd64", false, true,
+                           podman = prerelease), psrHostInfoInvalid)
+  expectHostRefusal(info("linux", "amd64", false, true,
+                         buildah = "not-a-version"), psrHostInfoInvalid)
+  expectHostRefusal(
+    """{"host":{"os":"linux","arch":"amd64","buildahVersion":"1.45.2"},"version":{}}""",
+    psrHostInfoInvalid,
+  )
+  expectHostRefusal(
+    """{"host":{"os":"linux","arch":"amd64"},"version":{"Version":"6.1.4"}}""",
+    psrHostInfoInvalid,
+  )
   # rootless absent entirely (podman omits the key in some versions)
   expectHost(
-    """{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false}}""",
+    """{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.45.2"},"version":{"Version":"6.1.4"}}""",
     "linux/amd64",
   )
-  expectHost("""{"host":{"os":"linux","arch":"amd64"}}""",
+  expectHost("""{"host":{"os":"linux","arch":"amd64","buildahVersion":"1.45.2"},"version":{"Version":"6.1.4"}}""",
              "linux/amd64")
-  expectHost("""{"host":{"os":"linux","arch":"amd64","serviceIsRemote":"unknown"}}""",
+  expectHost("""{"host":{"os":"linux","arch":"amd64","serviceIsRemote":"unknown","buildahVersion":"1.45.2"},"version":{"Version":"6.1.4"}}""",
              "linux/amd64")
   expectHostRefusal("""{"host":{"os":2,"arch":"amd64"}}""",
                     psrHostInfoInvalid)
   expectHostRefusal("""{"host":{"os":"linux","arch":2}}""",
                     psrHostInfoInvalid)
+  let parsedPair = parsePodmanEnginePair(info("linux", "amd64", false, true))
+  doAssert parsedPair.isSome()
+  assertEq(parsedPair.get(),
+           PodmanEnginePair(podman: "6.1.4", buildah: "1.45.2"))
+  assertEq(podmanCompatibilityFixtures.len, 6)
+  for fixture in podmanCompatibilityFixtures:
+    assertEq(fixture.evidenceId, "gitlab-pipeline-3066104239")
 
   assertEq(formatPodmanSkip(PodmanSkip(
              operation: poBuild,
@@ -305,6 +370,14 @@ proc main() =
                                                       status: 23)),
            "chalk: the native Podman retry exited with status 23; " &
            "Chalk did not instrument this build.")
+  assertEq(formatPodmanSkip(PodmanSkip(
+             operation: poBuild,
+             reason: PodmanSkipReason(kind: psrEngineVersionUnsupported),
+           )),
+           "chalk: skipped Podman build processing: Podman and Buildah " &
+           "release pair has not passed the instrumentation capability probe.")
+  assertEq(formatPodmanVirtualChalkError(),
+           "chalk: virtual_chalk is not supported for Podman builds.")
 
   # Guard network opt-out is feature-detected on the buildah version, never
   # assumed: an older parser would reject the flag and fail every build.

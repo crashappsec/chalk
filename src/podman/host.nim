@@ -11,7 +11,10 @@
 ## than in build.nim so they can be unit tested without linking the whole Chalk
 ## runtime.
 
-import std/options
+import std/[
+  options,
+  strutils,
+]
 import ".."/[
   utils/json,
   utils/semver,
@@ -21,6 +24,15 @@ import "./notice"
 import "./chalk_platform"
 
 type
+  PodmanEnginePair* = object
+    podman*: string
+    buildah*: string
+
+  PodmanCompatibilityFixture* = object
+    pair*:        PodmanEnginePair
+    fixtureId*:   string
+    evidenceId*:  string
+
   PodmanHostResultKind* = enum
     phrSupported, phrRefused
 
@@ -28,6 +40,9 @@ type
     case kind*: PodmanHostResultKind
     of phrSupported:
       platform*: ChalkPlatform
+      engines*:  PodmanEnginePair
+      fixtureId*: string
+      evidenceId*: string
     of phrRefused:
       reason*: PodmanSkipReason
 
@@ -37,21 +52,84 @@ proc refusedHost(kind: PodmanSkipReasonKind): PodmanHostResult =
     reason: PodmanSkipReason(kind: kind),
   )
 
-# TODO(podman-version-floor): the host check below also required Podman 5.8.2
-# and Buildah 1.43.1 by exact string equality -- the versions in the one pinned
-# CI fixture the original demo was validated against, which rejected 5.8.1 and
-# every release newer than 5.8.2 alike. Removed so the gate covers only host
-# properties we actually depend on. A real minimum still has to be measured;
-# see REMAINING_TODO.txt section 6 for the features to test against and the
-# method. Until then a too-old host fails its injected build and falls back to
-# the original command (failOpenOriginal), costing a wasted build rather than
-# producing a wrong image.
+const podmanCompatibilityFixtures* = [
+  PodmanCompatibilityFixture(
+    pair: PodmanEnginePair(podman: "4.9.4", buildah: "1.33.7"),
+    fixtureId: "podman-build-capabilities-v1",
+    evidenceId: "gitlab-pipeline-3066104239",
+  ),
+  PodmanCompatibilityFixture(
+    pair: PodmanEnginePair(podman: "5.0.3", buildah: "1.35.4"),
+    fixtureId: "podman-build-capabilities-v1",
+    evidenceId: "gitlab-pipeline-3066104239",
+  ),
+  PodmanCompatibilityFixture(
+    pair: PodmanEnginePair(podman: "5.2.5", buildah: "1.37.5"),
+    fixtureId: "podman-build-capabilities-v1",
+    evidenceId: "gitlab-pipeline-3066104239",
+  ),
+  PodmanCompatibilityFixture(
+    pair: PodmanEnginePair(podman: "5.4.2", buildah: "1.39.4"),
+    fixtureId: "podman-build-capabilities-v1",
+    evidenceId: "gitlab-pipeline-3066104239",
+  ),
+  PodmanCompatibilityFixture(
+    pair: PodmanEnginePair(podman: "5.6.2", buildah: "1.41.5"),
+    fixtureId: "podman-build-capabilities-v1",
+    evidenceId: "gitlab-pipeline-3066104239",
+  ),
+  PodmanCompatibilityFixture(
+    pair: PodmanEnginePair(podman: "6.1.4", buildah: "1.45.2"),
+    fixtureId: "podman-build-capabilities-v1",
+    evidenceId: "gitlab-pipeline-3066104239",
+  ),
+]
 
-# The oldest Buildah we have ACTUALLY VERIFIED accepts a per-instruction
-# `RUN --network=none`, not the oldest that supports it. Verified by hand on
-# 1.39.3 in two independent environments. Lowering this is a measurement task,
-# not a guess -- see REMAINING_TODO.txt section 6. Erring high is safe: an
-# older host simply keeps the plain RUN it has today.
+# Every pair above passed the same executable fixture on linux/amd64 and
+# linux/arm64 in the recorded pipeline. Keep exact pairs: the results do not
+# establish a version floor or support for combinations the matrix did not run.
+
+proc parseStableEngineVersion(value: string): Option[string] =
+  ## Accept only a complete stable x.y.z release. Exact fixture matching below
+  ## rejects otherwise valid but unmeasured releases.
+  let parts = value.split('.')
+  if len(parts) != 3:
+    return none(string)
+  for part in parts:
+    if part == "":
+      return none(string)
+    for c in part:
+      if c notin {'0' .. '9'}:
+        return none(string)
+  return some(value)
+
+proc parsePodmanEnginePair*(raw: string): Option[PodmanEnginePair] =
+  try:
+    let
+      parsed = parseJson(raw)
+      podman = parseStableEngineVersion(parsed{"version"}{"Version"}.getStr())
+      buildah = parseStableEngineVersion(
+        parsed{"host"}{"buildahVersion"}.getStr(),
+      )
+    if podman.isNone() or buildah.isNone():
+      return none(PodmanEnginePair)
+    return some(PodmanEnginePair(
+      podman: podman.get(),
+      buildah: buildah.get(),
+    ))
+  except:
+    return none(PodmanEnginePair)
+
+proc compatibilityFixture(pair: PodmanEnginePair):
+                          Option[PodmanCompatibilityFixture] =
+  for fixture in podmanCompatibilityFixtures:
+    if fixture.pair == pair:
+      return some(fixture)
+  return none(PodmanCompatibilityFixture)
+
+# Buildah 1.39.3 is the oldest release measured to accept a per-instruction
+# `RUN --network=none`. Hosts below that measured threshold keep the plain RUN
+# guard, so this optional optimization does not depend on an unmeasured parser.
 const verifiedRunNetworkBuildah = "1.39.3"
 
 proc checkPodmanHost*(raw: string, target: ChalkPlatform): PodmanHostResult =
@@ -89,8 +167,19 @@ proc checkPodmanHost*(raw: string, target: ChalkPlatform): PodmanHostResult =
     # privileged CI container is a completely ordinary way to build. Requiring
     # it silently refused to instrument exactly that case.
     #
-    return PodmanHostResult(kind: phrSupported,
-                            platform: target)
+    let engines = parsePodmanEnginePair(raw)
+    if engines.isNone():
+      return refusedHost(psrHostInfoInvalid)
+    let fixture = compatibilityFixture(engines.get())
+    if fixture.isNone():
+      return refusedHost(psrEngineVersionUnsupported)
+    return PodmanHostResult(
+      kind:      phrSupported,
+      platform:  target,
+      engines:   engines.get(),
+      fixtureId: fixture.get().fixtureId,
+      evidenceId: fixture.get().evidenceId,
+    )
   except:
     return refusedHost(psrHostInfoInvalid)
 
