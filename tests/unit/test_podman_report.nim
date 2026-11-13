@@ -550,3 +550,46 @@ proc main() =
   )
 
 main()
+
+block redactionPreservesUnrelatedReportData:
+  for (argument, contents) in [
+    ("APP_VERSION=2.0.1", "FROM scratch\nARG APP_VERSION\nENTRYPOINT [\"/bin/true\"]\n"),
+    ("BASE_IMAGE=alpine:3.19", "ARG BASE_IMAGE\nFROM ${BASE_IMAGE}\nRUN apk add alpine-sdk\n"),
+  ]:
+    let route = classifyPodmanArgs(@["build", "--build-arg", argument, "."])
+    let data = chalk_types.ChalkDict()
+    data["DOCKER_FILE"] = chalk_types.pack(contents)
+    redactPodmanReportFields(data, route.spec.confidentialArgs)
+    doAssert chalk_types.unpack[string](data["DOCKER_FILE"]) == contents,
+      "redaction removed Containerfile text without the confidential value"
+  let route = classifyPodmanArgs(@[
+    "push", "--creds", "user:pass", "registry.example/user/pass-app:1",
+  ])
+  let data = chalk_types.ChalkDict()
+  data["_OP_ARGV"] = chalk_types.pack(route.reportArgs)
+  redactPodmanReportFields(data, route.confidentialArgs)
+  doAssert chalk_types.unpack[seq[string]](data["_OP_ARGV"])[^1] ==
+    "registry.example/user/pass-app:1", "redaction removed a non-confidential operand"
+
+block copiedRepresentationsStillRedact:
+  let secret = "repr-copy-canary\nwith-quote\"and-backslash\\end"
+  var copied = newString(secret.len)
+  for index, character in secret:
+    copied[index] = character
+  let confidential = @[PodmanConfidentialArg(flag: "--creds", value: secret)]
+  let data = chalk_types.ChalkDict()
+  data["REPR_COPY"] = chalk_types.pack("retained: " & repr(copied))
+  data["REPR_SEQUENCE"] = chalk_types.pack("retained: " & repr(@[copied]))
+  data["JSON_VALUE"] = chalk_types.pack("retained: " & chalk_types.pack(copied).boxToJson())
+  redactPodmanReportFields(data, confidential)
+  doAssert chalk_types.unpack[string](data["REPR_COPY"]) == redactedArgText
+  doAssert chalk_types.unpack[string](data["REPR_SEQUENCE"]) == redactedArgText
+  doAssert chalk_types.unpack[string](data["JSON_VALUE"]) == redactedArgText
+
+block flagNamesAreNotConfidentialValues:
+  let data = chalk_types.ChalkDict()
+  let text = "Documentation for the supported flag --creds"
+  data["DOCKER_FILE"] = chalk_types.pack(text)
+  redactPodmanReportFields(data, @[PodmanConfidentialArg(flag: "--creds", value: "user:private-value")])
+  doAssert chalk_types.unpack[string](data["DOCKER_FILE"]) == text,
+    "redaction removed a flag name without its confidential value"

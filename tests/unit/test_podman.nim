@@ -1451,7 +1451,6 @@ block heredocRefusalBeforeParsing:
     "FROM scratch\n# RUN <<EOF\nCMD [\"ok\"]\n",
     "FROM scratch\nRUN echo \"literal <<EOF\"\nCMD [\"ok\"]\n",
     "FROM scratch\nRUN echo 'literal <<EOF'\nCMD [\"ok\"]\n",
-    "FROM scratch\nRUN echo ok # <<EOF\nCMD [\"ok\"]\n",
   ]:
     doAssert getFinalExecConfig(recipe).config.isSome(), recipe
   let continued = getFinalExecConfig(
@@ -1470,3 +1469,17 @@ block escapeDirectivesNeverReachStartupPlanning:
       doAssert parsed.issue.isSome()
       assertEq(parsed.issue.get().kind, cfikUnsupportedForm)
       assertEq(parsed.issue.get().line, some(1))
+
+block heredocWhitespaceAndInlineHashAreNotShellComments:
+  for opener in ["RUN\v<<EOF", "RUN\f<<EOF", "RUN echo ok\r<<EOF",
+                 "RUN echo ok # <<EOF", "RUN echo ok # <<#"]:
+    let delimiter = if opener.endsWith("<<#"): "#" else: "EOF"
+    let recipe = "FROM scratch\n" & opener & "\n" &
+                 "FROM forged\nUSER forged\nENTRYPOINT [\"/forged\"]\n" &
+                 delimiter & "\nCMD [\"/ok\"]\n"
+    for target in ["", "unused"]:
+      let parsed = getFinalExecConfig(recipe, target)
+      doAssert parsed.config.isNone(), "a potential heredoc reached startup planning"
+      doAssert parsed.issue.isSome()
+      assertEq(parsed.issue.get().kind, cfikUnsupportedForm)
+      assertEq(parsed.issue.get().line, some(2))

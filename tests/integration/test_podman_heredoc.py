@@ -33,12 +33,36 @@ else:
     sys.exit(99)
 """)
     executable.chmod(0o755)
-    for instruction in ("RUN", "COPY", "custom-escape-RUN"):
+    for instruction in (
+        "RUN",
+        "COPY",
+        "custom-escape-RUN",
+        "vertical-tab",
+        "form-feed",
+        "carriage-return",
+        "inline-hash",
+    ):
         for target in ([], ["--target", "selected"]):
             recipe = root / "Containerfile"
             if instruction == "custom-escape-RUN":
                 contents = (
                     "# escape=`\nFROM scratch AS selected\nRUN cat `\n<<EOF\n"
+                    'ENTRYPOINT ["/forged"]\nEOF\nCMD ["/ok"]\n'
+                )
+            elif instruction in {
+                "vertical-tab",
+                "form-feed",
+                "carriage-return",
+                "inline-hash",
+            }:
+                opener = {
+                    "vertical-tab": "RUN\v<<EOF",
+                    "form-feed": "RUN\f<<EOF",
+                    "carriage-return": "RUN echo ok\r<<EOF",
+                    "inline-hash": "RUN echo ok # <<EOF",
+                }[instruction]
+                contents = (
+                    "FROM scratch AS selected\n" + opener + "\n"
                     'ENTRYPOINT ["/forged"]\nEOF\nCMD ["/ok"]\n'
                 )
             else:
@@ -83,4 +107,4 @@ else:
                 "bin",
                 "calls.jsonl",
             ], list(root.iterdir())
-print("6 Podman heredoc native pass-through cases passed")
+print("14 Podman heredoc native pass-through cases passed")

@@ -1667,30 +1667,27 @@ proc firstHeredocLine(contents: string): Option[int] =
   var continued = false
   var acceptsHeredoc = false
   var lineNumber = 0
-  for physicalLine in contents.splitLines():
+  for physicalLine in contents.split('\n'):
     inc lineNumber
-    let line = strutils.strip(physicalLine)
+    var line = unicode.strip(physicalLine)
+    if lineNumber == 1 and line.startsWith("\xEF\xBB\xBF"):
+      line = unicode.strip(line[3 .. ^1])
     if line.len == 0 or line.startsWith("#"):
       continue
-    var argumentAt = 0
+    var arguments = line
     if not continued:
-      while argumentAt < line.len and line[argumentAt] notin {' ', '\t'}:
-        inc argumentAt
-      let instruction = line[0 ..< argumentAt].toUpperAscii()
+      let (instruction, rest) = topLevelCmdParse(line)
+      arguments = rest
       acceptsHeredoc = instruction in ["RUN", "COPY", "ADD"]
       if instruction == "ONBUILD":
-        while argumentAt < line.len and line[argumentAt] in {' ', '\t'}:
-          inc argumentAt
-        let nestedAt = argumentAt
-        while argumentAt < line.len and line[argumentAt] notin {' ', '\t'}:
-          inc argumentAt
-        acceptsHeredoc = line[nestedAt ..< argumentAt].toUpperAscii() in
-                          ["RUN", "COPY", "ADD"]
+        let (nested, nestedRest) = topLevelCmdParse(rest)
+        arguments = nestedRest
+        acceptsHeredoc = nested in ["RUN", "COPY", "ADD"]
     var quote = '\0'
     var escaped = false
-    var i = argumentAt
-    while acceptsHeredoc and i < line.len:
-      let c = line[i]
+    var i = 0
+    while acceptsHeredoc and i < arguments.len:
+      let c = arguments[i]
       if escaped:
         escaped = false
       elif c == '\\' and quote != '\'':
@@ -1700,9 +1697,7 @@ proc firstHeredocLine(contents: string): Option[int] =
           quote = '\0'
       elif c in {'\'', '"'}:
         quote = c
-      elif c == '#' and (i == 0 or line[i - 1] in {' ', '\t'}):
-        break
-      elif c == '<' and i + 1 < line.len and line[i + 1] == '<':
+      elif c == '<' and i + 1 < arguments.len and arguments[i + 1] == '<':
         return some(lineNumber)
       inc i
     var trailingSlashes = 0
