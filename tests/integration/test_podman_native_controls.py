@@ -245,7 +245,7 @@ try:
             calls = [json.loads(line) for line in ledger.read_text().splitlines()]
             assert calls == [escaped_args], calls
             assert passthrough.returncode == native.returncode, "heredoc native status"
-            assert (escaped / "Containerfile").read_text() == escaped_recipe
+            assert (escaped / "Containerfile").read_bytes() == escaped_recipe.encode()
             if passthrough.returncode == 0:
                 images.append(wrapped_image)
                 original_config = json.loads(

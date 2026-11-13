@@ -101,7 +101,7 @@ else:
             assert calls == [args], calls
             assert result.stdout == b"native stdout\x00\n", result.stdout
             assert b"native stderr\xff\n" in result.stderr, result.stderr
-            assert recipe.read_text() == contents
+            assert recipe.read_bytes() == contents.encode()
             assert sorted(path.name for path in root.iterdir()) == [
                 "Containerfile",
                 "bin",
