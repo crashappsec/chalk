@@ -357,31 +357,161 @@ proc matchBuildFlag(args: seq[string], i: int): FlagMatch =
   result.kind = fmNone
   result.consumed = 0
 
-# Flags that take no value, so skipping them cannot swallow the image operand.
-# Deliberately short: a bare flag we do not recognise might or might not consume
-# the next token, and guessing wrong would mean scanning the wrong image.
-const transferBooleanFlags = [
-  "-q", "--quiet",
-  "-a", "--all-tags",
-  "--compress",
-  "--disable-content-trust",
-  "--remove-signatures",
-  "--tls-verify",
+type
+  TransferFlagArity = enum
+    tfaBoolean,
+    tfaValue
+  TransferFlagRole = enum
+    tfrForward,
+    tfrAuthfile,
+    tfrConfidential
+  TransferFlagSpec = object
+    names:      seq[string]
+    operations: set[PodmanRouteKind]
+    arity:      TransferFlagArity
+    role:       TransferFlagRole
+  TransferFlagMatch = object
+    spec:         TransferFlagSpec
+    found:        bool
+    valid:        bool
+    value:        string
+    valueIndex:   int
+    equalsPrefix: string
+    consumed:     int
+    flagName:     string
+
+const transferFlags = [
+  # Options shared by podman-push(1) and podman-pull(1).
+  TransferFlagSpec(names: @["--authfile"],
+                   operations: {prPush, prPull}, arity: tfaValue,
+                   role: tfrAuthfile),
+  TransferFlagSpec(names: @["--cert-dir"],
+                   operations: {prPush, prPull}, arity: tfaValue,
+                   role: tfrForward),
+  TransferFlagSpec(names: @["--creds"],
+                   operations: {prPush, prPull}, arity: tfaValue,
+                   role: tfrConfidential),
+  TransferFlagSpec(names: @["--disable-content-trust"],
+                   operations: {prPush, prPull}, arity: tfaBoolean,
+                   role: tfrForward),
+  TransferFlagSpec(names: @["-q", "--quiet"],
+                   operations: {prPush, prPull}, arity: tfaBoolean,
+                   role: tfrForward),
+  TransferFlagSpec(names: @["--retry"],
+                   operations: {prPush, prPull}, arity: tfaValue,
+                   role: tfrForward),
+  TransferFlagSpec(names: @["--retry-delay"],
+                   operations: {prPush, prPull}, arity: tfaValue,
+                   role: tfrForward),
+  TransferFlagSpec(names: @["--tls-verify"],
+                   operations: {prPush, prPull}, arity: tfaBoolean,
+                   role: tfrForward),
+
+  # podman-pull(1) options.
+  TransferFlagSpec(names: @["-a", "--all-tags"], operations: {prPull},
+                   arity: tfaBoolean, role: tfrForward),
+  TransferFlagSpec(names: @["--arch"], operations: {prPull},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--decryption-key"], operations: {prPull},
+                   arity: tfaValue, role: tfrConfidential),
+  TransferFlagSpec(names: @["--os"], operations: {prPull},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--platform"], operations: {prPull},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--policy"], operations: {prPull},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--variant"], operations: {prPull},
+                   arity: tfaValue, role: tfrForward),
+
+  # podman-push(1) options.
+  TransferFlagSpec(names: @["--compress"], operations: {prPush},
+                   arity: tfaBoolean, role: tfrForward),
+  TransferFlagSpec(names: @["--compression-format"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--compression-level"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--digestfile"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--encrypt-layer"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--encryption-key"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--force-compression"], operations: {prPush},
+                   arity: tfaBoolean, role: tfrForward),
+  TransferFlagSpec(names: @["-f", "--format"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--remove-signatures"], operations: {prPush},
+                   arity: tfaBoolean, role: tfrForward),
+  TransferFlagSpec(names: @["--sign-by"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--sign-by-sigstore"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--sign-by-sigstore-private-key"],
+                   operations: {prPush}, arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--sign-by-sq-fingerprint"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
+  TransferFlagSpec(names: @["--sign-passphrase-file"], operations: {prPush},
+                   arity: tfaValue, role: tfrForward),
 ]
+
+proc canonicalTransferFlag(spec: TransferFlagSpec): string =
+  for name in spec.names:
+    if name.startsWith("--"):
+      return name
+  return spec.names[0]
+
+proc matchTransferFlag(args: seq[string], i: int,
+                       operation: PodmanRouteKind): TransferFlagMatch =
+  let cur = args[i]
+  for spec in transferFlags:
+    if operation notin spec.operations:
+      continue
+    for name in spec.names:
+      let prefix = name & "="
+      if cur == name:
+        result.found = true
+        result.valid = true
+        result.spec = spec
+        result.flagName = canonicalTransferFlag(spec)
+        result.consumed = 1
+        result.valueIndex = -1
+        if spec.arity == tfaValue:
+          if i + 1 >= len(args) or args[i + 1] == "--" or
+              (args[i + 1].startsWith("-") and args[i + 1] != "-"):
+            result.valid = false
+          else:
+            result.value = args[i + 1]
+            result.valueIndex = i + 1
+            result.consumed = 2
+        return
+      if cur.startsWith(prefix):
+        result.found = true
+        result.valid = true
+        result.spec = spec
+        result.flagName = canonicalTransferFlag(spec)
+        result.value = cur[len(prefix) .. ^1]
+        result.valueIndex = i
+        result.equalsPrefix = prefix
+        result.consumed = 1
+        if spec.arity == tfaBoolean and not isExplicitBool(result.value):
+          result.valid = false
+        return
 
 proc classifyTransfer(args: seq[string], kind: PodmanRouteKind,
                       maxPositionals: int): PodmanRoute =
   ## Find the image operand of a push or pull.
   ##
-  ## `--flag=value` is self-contained and safe to skip. `--authfile` is
-  ## captured in both forms and still forwarded unchanged. Any other
-  ## unrecognised flag passes the command through rather than risk
-  ## mis-identifying which operand is the image.
+  ## Only documented options with known arity are consumed. Any other option
+  ## passes through because guessing its arity could mistake its value for the
+  ## image operand. Confidential option values remain in originalArgs for the
+  ## engine and are replaced in reportArgs before collection starts.
   var
-    positionals: seq[string]
-    i           = 1
-    afterDash   = false
-    authfile    = ""
+    positionals:     seq[string]
+    confidential:    seq[PodmanConfidentialArg]
+    reportArgs       = args
+    i                = 1
+    afterDash        = false
+    authfile         = ""
   while i < len(args):
     let cur = args[i]
     if not afterDash and cur == "--":
@@ -389,24 +519,29 @@ proc classifyTransfer(args: seq[string], kind: PodmanRouteKind,
       i += 1
       continue
     if not afterDash and cur.startsWith("-") and cur != "-":
-      if cur == "--authfile":
-        if i + 1 >= len(args) or args[i + 1] == "--" or
-            (args[i + 1].startsWith("-") and args[i + 1] != "-"):
-          return passThrough(args, invalidFlagReason("--authfile"))
-        authfile = args[i + 1]
-        i += 2
-        continue
-      if cur.startsWith("--authfile="):
-        authfile = cur["--authfile=".len .. ^1]
-        i += 1
-        continue
-      if "=" in cur:
-        i += 1
-        continue
-      if cur in transferBooleanFlags:
-        i += 1
-        continue
-      return passThrough(args, unsupportedFlagReason(cur))
+      let matched = matchTransferFlag(args, i, kind)
+      if not matched.found:
+        return passThrough(args, unsupportedFlagReason(cur))
+      if not matched.valid:
+        return passThrough(args, invalidFlagReason(matched.flagName))
+      case matched.spec.role
+      of tfrForward:
+        discard
+      of tfrAuthfile:
+        authfile = matched.value
+      of tfrConfidential:
+        if matched.value != "":
+          confidential.add(PodmanConfidentialArg(
+            flag: matched.flagName,
+            value: matched.value,
+          ))
+          if matched.equalsPrefix != "":
+            reportArgs[matched.valueIndex] =
+              matched.equalsPrefix & redactedArgText
+          else:
+            reportArgs[matched.valueIndex] = redactedArgText
+      i += matched.consumed
+      continue
     positionals.add(cur)
     i += 1
 
@@ -416,10 +551,12 @@ proc classifyTransfer(args: seq[string], kind: PodmanRouteKind,
   if image == "" or image == "-" or "://" in image:
     return passThrough(args, PodmanSkipReason(kind: psrUnsupportedReference))
   return PodmanRoute(
-    kind:         kind,
-    originalArgs: args,
-    image:        image,
-    authfile:     authfile,
+    kind:             kind,
+    originalArgs:     args,
+    reportArgs:       reportArgs,
+    confidentialArgs: confidential,
+    image:            image,
+    authfile:         authfile,
     destination: (
       if kind == prPush and len(positionals) == 2:
         some(positionals[1])
@@ -593,9 +730,11 @@ proc classifyPodmanArgs*(args: seq[string]): PodmanRoute =
     return passThrough(args, PodmanSkipReason(kind: psrNonLocalContext))
 
   return PodmanRoute(
-    kind:         prInstrument,
-    originalArgs: args,
-    authfile:     authfile,
+    kind:             prInstrument,
+    originalArgs:     args,
+    reportArgs:       reportArgs,
+    confidentialArgs: confidentialArgs,
+    authfile:         authfile,
     spec: PodmanBuildSpec(
       originalArgs:       args,
       reportArgs:         reportArgs,

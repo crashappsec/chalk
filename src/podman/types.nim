@@ -131,10 +131,12 @@ type
     authfile*:              string
 
   PodmanRoute* = object
-    originalArgs*: seq[string]
-    image*:        string  ## operand of a push/pull; empty otherwise
-    destination*:  Option[string]  ## optional destination operand of a push
-    authfile*:     string  ## last --authfile; empty when the flag is absent
+    originalArgs*:     seq[string]
+    reportArgs*:       seq[string]
+    confidentialArgs*: seq[PodmanConfidentialArg]
+    image*:            string  ## operand of a push/pull; empty otherwise
+    destination*:      Option[string]  ## optional destination operand of a push
+    authfile*:         string  ## last --authfile; empty when the flag is absent
     case kind*: PodmanRouteKind
     of prPassThrough:
       skip*: Option[PodmanSkip]

@@ -15,7 +15,6 @@ import ".."/[
   config,
   plugin_api,
   reportcache,
-  reporting,
   run_management,
   types,
   utils/files,
@@ -40,25 +39,20 @@ import "./types" as podman_types
 
 proc redactCollectedArgs(spec: podman_types.PodmanBuildSpec,
                          chalk: ChalkObj = nil) =
-  redactPodmanReportFields(hostInfo, spec.confidentialArgs)
+  redactPodmanRetainedState(spec.confidentialArgs)
   if chalk != nil:
     redactPodmanReportFields(chalk.collectedData, spec.confidentialArgs)
 
-proc installPodmanReportArgs(spec: podman_types.PodmanBuildSpec) =
-  setArgs(spec.reportArgs)
-
 proc doPodmanReporting(spec: podman_types.PodmanBuildSpec, topic: string,
                        chalk: ChalkObj = nil) =
-  collectRunTimeHostInfo()
-  redactCollectedArgs(spec, chalk)
-  suspendHostCollection()
-  try:
-    if spec.quietOutput:
-      doReportingWithStdoutRedirected(topic)
-    else:
-      doReporting(topic)
-  finally:
-    restoreHostCollection()
+  if chalk != nil:
+    redactPodmanReportFields(chalk.collectedData, spec.confidentialArgs)
+  doPodmanReporting(
+    spec.reportArgs,
+    spec.confidentialArgs,
+    topic,
+    spec.quietOutput,
+  )
 
 proc reportAttemptFailure(spec: podman_types.PodmanBuildSpec, status: int): int =
   setExitCode(status)
@@ -160,7 +154,7 @@ proc finalizeImage(exe: string, spec: podman_types.PodmanBuildSpec,
   try:
     doPodmanReporting(spec, "report", chalk)
   except:
-    error("podman post-command: " & getCurrentExceptionMsg())
+    error("podman post-command: reporting failed")
   return 0
 
 proc beginAcceptedCollection(spec: podman_types.PodmanBuildSpec) =
@@ -213,8 +207,9 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   if route.kind == prInstrument and not podmanWrapEntrypointEnabled():
     execReplacingSelf(exe, route.spec.originalArgs)
 
-  if route.kind == prInstrument:
-    installPodmanReportArgs(route.spec)
+  if route.kind in {prInstrument, prPush, prPull}:
+    setArgs(route.reportArgs)
+
 
   if route.kind == prPassThrough:
     if route.skip.isSome():
@@ -330,7 +325,7 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   try:
     injected = runAttached(exe, makeInjectedArgs(spec, ws))
   except:
-    error("podman build outcome is unknown: " & getCurrentExceptionMsg())
+    error("podman build outcome is unknown")
     return reportAttemptFailure(spec, 1)
   if isCancellation(injected):
     return cancellationExit(injected)
@@ -343,7 +338,7 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
     if status != 0:
       return status
   except:
-    error("podman post-command: " & getCurrentExceptionMsg())
+    error("podman post-command: collection failed")
   return 0
 
 proc runPodman*(args: seq[string]): int =
