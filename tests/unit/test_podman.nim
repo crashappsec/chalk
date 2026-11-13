@@ -1459,3 +1459,14 @@ block heredocRefusalBeforeParsing:
   doAssert continued.config.isNone()
   assertEq(continued.issue.get().kind, cfikUnsupportedForm)
   assertEq(continued.issue.get().line, some(3))
+
+block escapeDirectivesNeverReachStartupPlanning:
+  for declaration in ["# escape=`", "# EsCaPe = `", "\xEF\xBB\xBF# escape=`"]:
+    let recipe = declaration & "\nFROM scratch AS selected\nRUN cat `\n<<EOF\n" &
+                 "ENTRYPOINT [\"/forged\"]\nEOF\nCMD [\"/ok\"]\n"
+    for target in ["", "selected"]:
+      let parsed = getFinalExecConfig(recipe, target)
+      doAssert parsed.config.isNone(), "escape directive reached startup planning"
+      doAssert parsed.issue.isSome()
+      assertEq(parsed.issue.get().kind, cfikUnsupportedForm)
+      assertEq(parsed.issue.get().line, some(1))

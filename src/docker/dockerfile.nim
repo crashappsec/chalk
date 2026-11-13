@@ -1713,6 +1713,24 @@ proc firstHeredocLine(contents: string): Option[int] =
     continued = trailingSlashes mod 2 == 1
   return none(int)
 
+proc firstEscapeDirectiveLine(contents: string): Option[int] =
+  # Escape directives change continuation boundaries. Defer the whole recipe
+  # before the line parser can interpret a continued heredoc body as startup.
+  var lineNumber = 0
+  for physicalLine in contents.splitLines():
+    inc lineNumber
+    var line = unicode.strip(physicalLine)
+    if lineNumber == 1 and line.startsWith("\xEF\xBB\xBF"):
+      line = unicode.strip(line[3 .. ^1])
+    if not line.startsWith("#"):
+      continue
+    let declaration = line[1 .. ^1]
+    let equalsAt = declaration.find('=')
+    if equalsAt >= 0 and
+        unicode.strip(declaration[0 ..< equalsAt]).toLowerAscii() == "escape":
+      return some(lineNumber)
+  return none(int)
+
 proc getFinalExecConfig*(contents: string, target = ""): tuple[
     config: Option[FinalExecConfig],
     errors: seq[string],
@@ -1723,6 +1741,12 @@ proc getFinalExecConfig*(contents: string, target = ""): tuple[
             some(ContainerfileIssue(kind: cfikUnsupportedForm,
                                     instruction: none(ContainerInstruction),
                                     line: heredocLine)))
+  let escapeLine = firstEscapeDirectiveLine(contents)
+  if escapeLine.isSome():
+    return (none(FinalExecConfig), @["escape directive is unsupported"],
+            some(ContainerfileIssue(kind: cfikUnsupportedForm,
+                                    instruction: none(ContainerInstruction),
+                                    line: escapeLine)))
   var
     errors: seq[string] = @[]
     issues: seq[ContainerfileIssue]
@@ -1734,14 +1758,6 @@ proc getFinalExecConfig*(contents: string, target = ""): tuple[
   let
     offsets = lineStartOffsets(contents)
     selectingTarget = target != ""
-
-  if selectingTarget:
-    for tok in parse.tokens:
-      if tok.kind == tltDirective and tok.directive.name == "escape":
-        errors.add("escape directive is unsupported for --target")
-        issues.addIssue(cfikUnsupportedForm, none(ContainerInstruction),
-                        some(tok.startLine + 1))
-        break
 
   var
     aliases    = initHashSet[string]()

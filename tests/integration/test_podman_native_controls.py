@@ -209,6 +209,49 @@ try:
                 }
             )
             save()
+        escaped = root / "custom-escape"
+        escaped.mkdir()
+        escaped_recipe = (
+            f"# escape=`\nFROM {DEFAULT_BASE_IMAGE}\nRUN cat `\n<<EOF\n"
+            'ENTRYPOINT ["/forged"]\nEOF\nCMD ["/bin/true"]\n'
+        )
+        (escaped / "Containerfile").write_text(escaped_recipe)
+        native_image = "localhost/chalk-native-escape-" + uuid.uuid4().hex
+        wrapped_image = "localhost/chalk-wrapped-escape-" + uuid.uuid4().hex
+        native = run(
+            [engine, "build", "--pull=never", "--tag", native_image, str(escaped)],
+            required=False,
+        )
+        if native.returncode == 0:
+            images.append(native_image)
+        escaped_args = ["build", "--pull=never", "--tag", wrapped_image, str(escaped)]
+        ledger.write_text("")
+        passthrough = run([*prefix, "podman", *escaped_args], env=env, required=False)
+        calls = [json.loads(line) for line in ledger.read_text().splitlines()]
+        assert calls == [escaped_args], calls
+        assert (
+            passthrough.returncode == native.returncode
+        ), "custom escape native status"
+        assert (escaped / "Containerfile").read_text() == escaped_recipe
+        if passthrough.returncode == 0:
+            images.append(wrapped_image)
+            original_config = json.loads(
+                run([engine, "image", "inspect", native_image]).stdout
+            )[0]["Config"]
+            actual_config = json.loads(
+                run([engine, "image", "inspect", wrapped_image]).stdout
+            )[0]["Config"]
+            for key in ("Entrypoint", "Cmd", "User", "OnBuild"):
+                assert actual_config.get(key) == original_config.get(key), key
+        record["cases"].append(
+            {
+                "name": "custom-escape-native-passthrough",
+                "passed": True,
+                "native_status": native.returncode,
+                "calls": calls,
+            }
+        )
+        save()
         image = "localhost/chalk-native-virtual-" + uuid.uuid4().hex
         ledger.write_text("")
         virtual = run(
