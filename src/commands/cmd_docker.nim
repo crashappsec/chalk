@@ -89,7 +89,7 @@ proc runCmdDocker*(args: seq[string]) =
   try:
     if exitCode == 0:
       reporting.doReporting("report")
-    elif ctx.buildAttempted or policyOutcome != nil:
+    elif policyOutcome != nil:
       reporting.doReporting("fail")
     showConfigValues()
   except:
@@ -98,11 +98,5 @@ proc runCmdDocker*(args: seq[string]) =
     error("docker post-command: " & getCurrentExceptionMsg())
   finally:
     # no-op unless reporting did not get to write it
-    if ctx.buildAttempted:
-      try:
-        writePolicySummary()
-      except:
-        error("docker post-command: " & getCurrentExceptionMsg())
-      quitChalkWithStatus(ctx.buildExitCode.get(1))
     writePolicySummary()
     quitChalk()

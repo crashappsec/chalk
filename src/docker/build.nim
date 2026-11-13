@@ -795,10 +795,7 @@ proc dockerBuild*(ctx: DockerInvocation): int =
     updatedDockerignore = ctx.updateDockerignoreFile()
 
   try:
-    ctx.buildAttempted = true
-    result = ctx.runMungedDockerInvocation()
-    ctx.buildExitCode = some(result)
-    setExitCode(result)
+    result = setExitCode(ctx.runMungedDockerInvocation())
   finally:
     if updatedDockerignore:
       ctx.revertDockerignoreFile()
@@ -811,7 +808,10 @@ proc dockerBuild*(ctx: DockerInvocation): int =
   if result != 0:
     cleanupUploadedBlobs(uploadedBlobs)
     cleanupLocalTars(localTarPaths)
-    return
+    raise newException(
+      ValueError,
+      "wrapped docker build exited with " & $result
+    )
 
   # build succeeded so safe to add these chalks to all chalks
   # as otherwise if we add too early chalkmark might be reported
