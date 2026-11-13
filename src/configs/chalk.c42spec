@@ -3998,6 +3998,18 @@ configuration parameter `dump.params`
 
 }
 
+singleton podman {
+  user_def_ok: false
+  doc: "Configuration for Podman build instrumentation."
+
+  field wrap_entrypoint {
+    type:     bool
+    default:  true
+    shortdoc: "Instrument supported Podman builds"
+    doc:      "When true, Chalk instruments supported Podman builds and wraps image startup. When false, Chalk runs the original Podman build unchanged. This setting does not change Docker build behavior."
+  }
+}
+
 singleton exec {
   user_def_ok:   false
   doc: """
@@ -5027,6 +5039,7 @@ root {
   allow tool
   allow extract
   allow docker
+  allow podman
   allow buildkit
   allow exec
   allow load

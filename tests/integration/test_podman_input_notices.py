@@ -52,7 +52,7 @@ with open(os.environ['PODMAN_CALLS'], 'a') as stream:
                              'cwd': os.getcwd()}) + '\n')
 
 if argv == ['info', '--format', 'json']:
-    sys.stdout.write(os.environ.get('PODMAN_INFO', '{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.43.1"}}'))
+    sys.stdout.write(os.environ.get('PODMAN_INFO', '{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.45.2"},"version":{"Version":"6.1.4"}}'))
     sys.stderr.write(os.environ.get('PODMAN_INFO_STDERR', ''))
     sys.exit(int(os.environ.get('PODMAN_INFO_EXIT', '0')))
 

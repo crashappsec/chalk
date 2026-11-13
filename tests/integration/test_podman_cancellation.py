@@ -88,7 +88,8 @@ def wait_if(name):
 
 if argv == ['info', '--format', 'json']:
     sys.stdout.write('{"host":{"os":"linux","arch":"amd64",'
-                     '"serviceIsRemote":false,"buildahVersion":"1.43.1"}}')
+                     '"serviceIsRemote":false,"buildahVersion":"1.45.2"},'
+                     '"version":{"Version":"6.1.4"}}')
     sys.exit(0)
 
 if argv == ['image', 'inspect', base, '--format', 'json']:

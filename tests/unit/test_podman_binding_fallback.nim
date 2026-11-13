@@ -41,9 +41,23 @@ proc fakePodman() =
   let scenario = getEnv("PODMAN_BINDING_FALLBACK_SCENARIO")
   writeCall(getEnv("PODMAN_BINDING_FALLBACK_LOG"), argv)
   if argv == @["info", "--format", "json"]:
-    stdout.write(
-      """{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.43.1"}}""",
-    )
+    case scenario
+    of "unsupported-version":
+      stdout.write(
+        """{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.45.1"},"version":{"Version":"6.1.4"}}""",
+      )
+    of "missing-version":
+      stdout.write(
+        """{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.45.2"},"version":{}}""",
+      )
+    of "prerelease-version":
+      stdout.write(
+        """{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.45.2"},"version":{"Version":"6.1.4-rc1"}}""",
+      )
+    else:
+      stdout.write(
+        """{"host":{"os":"linux","arch":"amd64","serviceIsRemote":false,"buildahVersion":"1.45.2"},"version":{"Version":"6.1.4"}}""",
+      )
     quit(0)
   if argv.len >= 2 and argv[0 .. 1] == @["pull", "--quiet"]:
     let proof = "@sha256:" in argv[^1]
@@ -222,7 +236,29 @@ for scenario in ["initial-cancel", "proof-cancel"]:
         "mirror.example/library/alpine@" & Digest],
     ]
 
+for scenario in ["unsupported-version", "missing-version", "prerelease-version"]:
+  writeFile(log, "")
+  if fileExists(iid):
+    removeFile(iid)
+  if fileExists(statusPath):
+    removeFile(statusPath)
+  putEnv("PODMAN_BINDING_FALLBACK_SCENARIO", scenario)
+  putEnv("PODMAN_BINDING_FALLBACK_MODE", "runner")
+  let native = runAttached(getAppFilename(), @[])
+  doAssert native.kind == ceExited
+  doAssert native.exitCode == 0
+  let nativeCalls = recordedCalls(log)
+  doAssert nativeCalls == @[
+    @["info", "--format", "json"],
+    originalArgs(),
+  ]
+  doAssert nativeCalls.countIt(it.len > 0 and it[0] == "build") == 1
+  doAssert "--build-context" notin nativeCalls[^1]
+  doAssert readFile(iid) == "native\n"
+  doAssert not fileExists(statusPath)
+
 removeFile(log)
-removeFile(statusPath)
+if fileExists(statusPath):
+  removeFile(statusPath)
 removeFile(fakeElf)
 removeDir(root)
