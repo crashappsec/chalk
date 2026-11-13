@@ -25,20 +25,9 @@ import "."/[
 ]
 
 proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
-  if ctx.buildAttempted:
-    let status = ctx.buildExitCode.get(1)
-    try:
-      setExitCode(status)
-      doReporting(if status == 0: "report" else: "fail")
-      showConfigValues()
-    except:
-      error("docker post-command: " & getCurrentExceptionMsg())
-    finally:
-      try:
-        writePolicySummary()
-      except:
-        discard
-      quitChalkWithStatus(status)
+  # If our mundged docker invocation fails, then we conservatively
+  # assume we made some big mistake, and run Docker the way it
+  # was originally called.
   var exitCode = 1
   try:
     let
@@ -53,12 +42,6 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
     doReporting("fail")
     showConfigValues()
   finally:
-    if ctx.cmd == DockerCmd.build:
-      try:
-        writePolicySummary()
-      except:
-        discard
-      quitChalkWithStatus(exitCode)
     # no-op unless reporting did not get to write it
     writePolicySummary()
     quitChalk(exitCode)
@@ -85,10 +68,7 @@ template withDockerFailsafe*(ctx: DockerInvocation, code: untyped) =
   except PolicyViolation:
     ctx.dockerPolicyBlocked()
   except:
-    if ctx.buildAttempted:
-      error("docker post-launch: " & getCurrentExceptionMsg())
-    else:
-      error("docker: retrying without chalk due to: " & getCurrentExceptionMsg())
+    error("docker: retrying without chalk due to: " & getCurrentExceptionMsg())
     dumpExOnDebug()
     ctx.dockerFailsafe()
 
