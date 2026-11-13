@@ -247,7 +247,7 @@ proc emitPodmanSkip*(skip: PodmanSkip) =
   writeOperationalNotice(formatPodmanSkip(skip))
 
 proc formatPodmanVirtualChalkError*(): string =
-  return "chalk: virtual_chalk is not supported for Podman builds."
+  return "chalk: virtual_chalk is not supported for Podman commands."
 
 proc emitPodmanVirtualChalkError*() =
   writeOperationalNotice(formatPodmanVirtualChalkError())

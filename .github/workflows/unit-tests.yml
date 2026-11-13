@@ -7,6 +7,8 @@ on:
     paths:
       - src/**
       - tests/unit/**
+      - tests/integration/**
+      - .github/workflows/unit-tests.yml
       - config.nims
       - "*.nimble"
       # ignore docs not to waste CI minutes
@@ -16,6 +18,8 @@ on:
     paths:
       - src/**
       - tests/unit/**
+      - tests/integration/**
+      - .github/workflows/unit-tests.yml
       - config.nims
       - "*.nimble"
       # ignore docs not to waste CI minutes
@@ -107,3 +111,24 @@ jobs:
             bounded-http) make unit-tests args="--verbose pattern tests/unit/test_bounded_http.nim" ;;
             *) exit 2 ;;
           esac
+
+      - name: Run process and platform contract checks
+        if: ${{ (inputs.suite || 'all') == 'all' }}
+        run: |
+          python3 tests/unit/test_podman_run.py
+          python3 tests/integration/test_podman_platform_proof.py
+
+      - name: Build wrapper contract executables
+        if: ${{ (inputs.suite || 'all') == 'all' }}
+        run: |
+          mkdir -p .developer-diagnostics
+          docker compose run --rm --no-deps chalk nimble build -y
+          docker compose run --rm --no-deps chalk nim c -d:debug --out:.developer-diagnostics/docker-build-status tests/integration/docker_build_status.nim
+
+      - name: Verify Docker fallback and Podman pre-launch controls
+        if: ${{ (inputs.suite || 'all') == 'all' }}
+        run: |
+          python3 tests/integration/test_docker_fallback.py .developer-diagnostics/docker-build-status --chalk "$PWD/chalk"
+          python3 tests/integration/test_podman_controls.py "$PWD/chalk"
+          python3 tests/integration/test_podman_heredoc.py "$PWD/chalk"
+          python3 tests/integration/test_podman_security.py "$PWD/chalk"

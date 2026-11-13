@@ -7,7 +7,6 @@ import subprocess
 import sys
 import tempfile
 
-
 binary = Path(sys.argv[1]).resolve()
 output = Path("artifacts/podman/controls.json")
 output.parent.mkdir(parents=True, exist_ok=True)
@@ -24,7 +23,7 @@ def elf_architecture(path):
 binary_arch = elf_architecture(binary)
 
 
-FAKE_PODMAN = r'''#!/usr/bin/env python3
+FAKE_PODMAN = r"""#!/usr/bin/env python3
 import hashlib
 import json
 import os
@@ -80,7 +79,7 @@ if argv[:2] == ["image", "inspect"]:
 
 sys.stderr.write("unexpected fake Podman invocation: " + repr(argv) + "\n")
 sys.exit(99)
-'''
+"""
 
 
 def records(path):
@@ -115,8 +114,7 @@ def invoke(
     config.write_text(
         'log_format = "plain"\n'
         "custom_report.terminal_chalk_time.enabled = false\n"
-        "custom_report.terminal_other_op.enabled = false\n"
-        + config_text
+        "custom_report.terminal_other_op.enabled = false\n" + config_text
     )
     calls.write_text("")
     before = workspaces()
@@ -280,7 +278,7 @@ with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
     assert virtual_case["context_files"] == ["Containerfile"]
     assert (
         virtual_case["result"].stderr
-        == "chalk: virtual_chalk is not supported for Podman builds.\n"
+        == "chalk: virtual_chalk is not supported for Podman commands.\n"
     ), virtual_case["result"].stderr
     evidence.append(
         {
@@ -292,6 +290,26 @@ with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
         }
     )
 
+    for spelling, build_args in [
+        ("global-option", ["--root", str(root / "unused-engine-root"), "build", "."]),
+        ("image-build-alias", ["image", "build", "."]),
+    ]:
+        virtual_form = invoke(
+            root,
+            fake_dir,
+            calls,
+            "virtual-" + spelling,
+            'FROM scratch\nENTRYPOINT ["/bin/true"]\n',
+            extra_flags=("--virtual",),
+            build_argv=build_args,
+        )
+        assert virtual_form["result"].returncode == 2, spelling
+        assert virtual_form["calls"] == [], spelling
+        assert virtual_form["new_workspaces"] == [], spelling
+        evidence.append(
+            {"case": "virtual-" + spelling, "exit_code": 2, "engine_calls": 0}
+        )
+
     virtual_unsupported_case = invoke(
         root,
         fake_dir,
@@ -301,15 +319,15 @@ with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
         extra_flags=("--virtual",),
         build_argv=["build", "--from", "must-not-run", "."],
     )
-    assert virtual_unsupported_case["result"].returncode == 2, (
-        virtual_unsupported_case["result"]
-    )
+    assert virtual_unsupported_case["result"].returncode == 2, virtual_unsupported_case[
+        "result"
+    ]
     assert virtual_unsupported_case["calls"] == [], virtual_unsupported_case
     assert virtual_unsupported_case["new_workspaces"] == []
     assert virtual_unsupported_case["context_files"] == ["Containerfile"]
     assert (
         virtual_unsupported_case["result"].stderr
-        == "chalk: virtual_chalk is not supported for Podman builds.\n"
+        == "chalk: virtual_chalk is not supported for Podman commands.\n"
     ), virtual_unsupported_case["result"].stderr
     evidence.append(
         {

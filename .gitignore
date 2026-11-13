@@ -58,3 +58,5 @@ log
 .audit/
 strace-*
 nimbledeps
+
+.developer-diagnostics/
