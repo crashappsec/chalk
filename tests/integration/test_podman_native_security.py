@@ -16,7 +16,6 @@ import time
 import urllib.error
 import urllib.request
 
-
 # Keep this identical to podman_compatibility_probe.DEFAULT_BASE_IMAGE. The
 # digest is the Alpine 3.22.1 multi-platform index used on AMD64 and ARM64.
 DEFAULT_BASE_IMAGE = (
@@ -63,7 +62,7 @@ FORGED_VALUES = (
     "X_FORGED_UNDECLARED_FIELD",
 )
 
-ENGINE_RECORDER = r'''#!/usr/bin/env python3
+ENGINE_RECORDER = r"""#!/usr/bin/env python3
 import json
 import os
 from pathlib import Path
@@ -79,7 +78,7 @@ if real_home:
     os.environ["HOME"] = real_home
 real = os.environ["CHALK_NATIVE_SECURITY_REAL_PODMAN"]
 os.execv(real, [real, *sys.argv[1:]])
-'''
+"""
 
 
 class NativeSecurityFailure(RuntimeError):
@@ -408,29 +407,29 @@ class NativeSecurityRunner:
         config = case_root / "native-security.c4m"
         config.write_text(
             'log_format = "plain"\n'
-            'sink_config native_security_additional_report {\n'
-            '  enabled: true\n'
+            "sink_config native_security_additional_report {\n"
+            "  enabled: true\n"
             '  sink: "file"\n'
             '  filename: env("CHALK_NATIVE_SECURITY_ADDITIONAL_REPORT")\n'
-            '  use_search_path: false\n'
-            '}\n'
-            'sink_config native_security_log {\n'
-            '  enabled: true\n'
+            "  use_search_path: false\n"
+            "}\n"
+            "sink_config native_security_log {\n"
+            "  enabled: true\n"
             '  sink: "file"\n'
             '  filename: env("CHALK_NATIVE_SECURITY_LOG")\n'
-            '  use_search_path: false\n'
+            "  use_search_path: false\n"
             '  filters: ["fix_new_line"]\n'
-            '}\n'
-            'sink_config native_security_failure {\n'
-            '  enabled: true\n'
+            "}\n"
+            "sink_config native_security_failure {\n"
+            "  enabled: true\n"
             '  sink: "post"\n'
             '  uri: "http://127.0.0.1:1/podman-native-security"\n'
-            '  disable_after_errors: 1\n'
-            '}\n'
+            "  disable_after_errors: 1\n"
+            "}\n"
             'subscribe("report", "native_security_additional_report")\n'
             'subscribe("logs", "native_security_log")\n'
             'subscribe("report", "native_security_failure")\n'
-            'use_report_cache = true\n'
+            "use_report_cache = true\n"
             'report_cache_location = env("CHALK_NATIVE_SECURITY_CACHE")\n'
         )
         return config, additional_report, custom_log, report_cache
@@ -488,8 +487,8 @@ class NativeSecurityRunner:
         artifact = artifacts[0]
         image_id = inspected.get("Id", "")
         config = inspected.get("Config") or {}
-        expected_platform = inspected.get("Os", "") + "/" + inspected.get(
-            "Architecture", ""
+        expected_platform = (
+            inspected.get("Os", "") + "/" + inspected.get("Architecture", "")
         )
         variant = inspected.get("Variant", "")
         if variant:
@@ -583,9 +582,7 @@ class NativeSecurityRunner:
         for value in FORGED_VALUES:
             self.require(case, "forged field exclusion", value not in serialized)
 
-    def case_environment(
-        self, case_root, additional_report, custom_log, report_cache
-    ):
+    def case_environment(self, case_root, additional_report, custom_log, report_cache):
         home = case_root / "home"
         (home / ".local" / "chalk").mkdir(parents=True)
         env = dict(os.environ)
@@ -854,18 +851,21 @@ class NativeSecurityRunner:
         self.output.parent.mkdir(parents=True, exist_ok=True)
         serialized = json.dumps(self.receipt, indent=2) + "\n"
         if PUBLIC_CREDENTIAL in serialized or PUBLIC_PASSWORD in serialized:
-            serialized = json.dumps(
-                {
-                    "schema_version": 1,
-                    "test": "podman-native-security",
-                    "passed": False,
-                    "failure": {
-                        "case": "artifact",
-                        "field": "credential confinement",
+            serialized = (
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "test": "podman-native-security",
+                        "passed": False,
+                        "failure": {
+                            "case": "artifact",
+                            "field": "credential confinement",
+                        },
                     },
-                },
-                indent=2,
-            ) + "\n"
+                    indent=2,
+                )
+                + "\n"
+            )
         self.output.write_text(serialized)
 
 

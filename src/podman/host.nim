@@ -55,33 +55,33 @@ proc refusedHost(kind: PodmanSkipReasonKind): PodmanHostResult =
 const podmanCompatibilityFixtures* = [
   PodmanCompatibilityFixture(
     pair: PodmanEnginePair(podman: "4.9.4", buildah: "1.33.7"),
-    fixtureId: "podman-build-capabilities-v1",
-    evidenceId: "gitlab-pipeline-3066104239",
+    fixtureId: "podman-build-capabilities-v2",
+    evidenceId: "gitlab-pipeline-3066209923",
   ),
   PodmanCompatibilityFixture(
     pair: PodmanEnginePair(podman: "5.0.3", buildah: "1.35.4"),
-    fixtureId: "podman-build-capabilities-v1",
-    evidenceId: "gitlab-pipeline-3066104239",
+    fixtureId: "podman-build-capabilities-v2",
+    evidenceId: "gitlab-pipeline-3066209923",
   ),
   PodmanCompatibilityFixture(
     pair: PodmanEnginePair(podman: "5.2.5", buildah: "1.37.5"),
-    fixtureId: "podman-build-capabilities-v1",
-    evidenceId: "gitlab-pipeline-3066104239",
+    fixtureId: "podman-build-capabilities-v2",
+    evidenceId: "gitlab-pipeline-3066209923",
   ),
   PodmanCompatibilityFixture(
     pair: PodmanEnginePair(podman: "5.4.2", buildah: "1.39.4"),
-    fixtureId: "podman-build-capabilities-v1",
-    evidenceId: "gitlab-pipeline-3066104239",
+    fixtureId: "podman-build-capabilities-v2",
+    evidenceId: "gitlab-pipeline-3066209923",
   ),
   PodmanCompatibilityFixture(
     pair: PodmanEnginePair(podman: "5.6.2", buildah: "1.41.5"),
-    fixtureId: "podman-build-capabilities-v1",
-    evidenceId: "gitlab-pipeline-3066104239",
+    fixtureId: "podman-build-capabilities-v2",
+    evidenceId: "gitlab-pipeline-3066209923",
   ),
   PodmanCompatibilityFixture(
     pair: PodmanEnginePair(podman: "6.1.4", buildah: "1.45.2"),
-    fixtureId: "podman-build-capabilities-v1",
-    evidenceId: "gitlab-pipeline-3066104239",
+    fixtureId: "podman-build-capabilities-v2",
+    evidenceId: "gitlab-pipeline-3066209923",
   ),
 ]
 

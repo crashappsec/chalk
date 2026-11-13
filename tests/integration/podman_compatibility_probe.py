@@ -10,12 +10,11 @@ import re
 import subprocess
 import tempfile
 
-
 DEFAULT_BASE_IMAGE = (
     "docker.io/library/alpine:3.22.1@"
     "sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1"
 )
-DEFAULT_FIXTURE_ID = "podman-build-capabilities-v1"
+DEFAULT_FIXTURE_ID = "podman-build-capabilities-v2"
 PINNED_IMAGE = re.compile(r"@sha256:[0-9a-f]{64}$")
 STABLE_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 
@@ -75,7 +74,9 @@ def inspect_image(receipt, podman, reference):
         values = json.loads(inspected.stdout)
         value = values[0]
     except (IndexError, KeyError, TypeError, json.JSONDecodeError) as error:
-        raise ProbeFailure(f"Podman returned invalid image metadata for {reference}") from error
+        raise ProbeFailure(
+            f"Podman returned invalid image metadata for {reference}"
+        ) from error
     return {
         "reference": reference,
         "id": value.get("Id", ""),
@@ -101,25 +102,30 @@ def write_fixture(root, base_image, base_tag):
     final_context.mkdir()
     asset_context.mkdir()
     (asset_context / "payload").write_text("named-context\n")
+    helper = asset_context / "probe-helper"
+    helper.write_text(
+        "#!/bin/sh\nset -eu\n"
+        'test "$(cat /probe-assets/payload)" = named-context\n'
+        "cp /probe-assets/payload /probe-mounted-context\n"
+    )
+    helper.chmod(0o755)
     (base_context / "Containerfile").write_text(
         f"FROM {base_image}\n"
         "RUN printf base-ready > /probe-base-ready\n"
-        "ONBUILD RUN [\"/bin/sh\", \"-eu\", \"-c\", "
-        "\"test \\\"$(cat /probe-base-ready)\\\" = base-ready; "
-        "printf inherited-onbuild > /probe-inherited-onbuild\"]\n"
+        'ONBUILD RUN ["/bin/sh", "-eu", "-c", '
+        '"test \\"$(cat /probe-base-ready)\\" = base-ready; '
+        'printf inherited-onbuild > /probe-inherited-onbuild"]\n'
     )
     (final_context / "Containerfile").write_text(
         f"FROM {base_tag}\n"
         "RUN --mount=type=bind,from=probe_assets,source=.,target=/probe-assets "
-        "[\"/bin/sh\", \"-eu\", \"-c\", "
-        "\"test \\\"$(cat /probe-assets/payload)\\\" = named-context; "
-        "cp /probe-assets/payload /probe-mounted-context\"]\n"
+        '["/probe-assets/probe-helper"]\n'
         "COPY --chmod=0555 --from=probe_assets payload /probe-copied-context\n"
-        "RUN [\"/bin/sh\", \"-eu\", \"-c\", "
-        "\"test \\\"$(cat /probe-inherited-onbuild)\\\" = inherited-onbuild; "
-        "test \\\"$(cat /probe-mounted-context)\\\" = named-context; "
-        "test \\\"$(cat /probe-copied-context)\\\" = named-context; "
-        "test \\\"$(stat -c %a /probe-copied-context)\\\" = 555\"]\n"
+        'RUN ["/bin/sh", "-eu", "-c", '
+        '"test \\"$(cat /probe-inherited-onbuild)\\" = inherited-onbuild; '
+        'test \\"$(cat /probe-mounted-context)\\" = named-context; '
+        'test \\"$(cat /probe-copied-context)\\" = named-context; '
+        'test \\"$(stat -c %a /probe-copied-context)\\" = 555"]\n'
     )
     return base_context, final_context, asset_context
 
@@ -170,7 +176,9 @@ def main():
                 "remote": host.get("serviceIsRemote", False),
             }
         except (KeyError, TypeError, json.JSONDecodeError) as error:
-            raise ProbeFailure("podman info returned an incomplete JSON document") from error
+            raise ProbeFailure(
+                "podman info returned an incomplete JSON document"
+            ) from error
         receipt["engine"] = engine
         if engine["podman"] != args.expect_podman:
             raise ProbeFailure(
@@ -238,9 +246,7 @@ def main():
                     str(final_context),
                 ],
             )
-            receipt["images"]["result"] = inspect_image(
-                receipt, args.podman, final_tag
-            )
+            receipt["images"]["result"] = inspect_image(receipt, args.podman, final_tag)
             run(
                 receipt,
                 [
@@ -252,10 +258,10 @@ def main():
                     final_tag,
                     "-eu",
                     "-c",
-                    "test \"$(cat /probe-inherited-onbuild)\" = inherited-onbuild; "
-                    "test \"$(cat /probe-mounted-context)\" = named-context; "
-                    "test \"$(cat /probe-copied-context)\" = named-context; "
-                    "test \"$(stat -c %a /probe-copied-context)\" = 555",
+                    'test "$(cat /probe-inherited-onbuild)" = inherited-onbuild; '
+                    'test "$(cat /probe-mounted-context)" = named-context; '
+                    'test "$(cat /probe-copied-context)" = named-context; '
+                    'test "$(stat -c %a /probe-copied-context)" = 555',
                 ],
             )
 

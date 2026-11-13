@@ -228,8 +228,8 @@ proc main() =
     assertEq(checked.kind, phrSupported)
     assertEq($checked.platform, platform)
     assertEq(checked.engines, engines)
-    assertEq(checked.fixtureId, "podman-build-capabilities-v1")
-    assertEq(checked.evidenceId, "gitlab-pipeline-3066104239")
+    assertEq(checked.fixtureId, "podman-build-capabilities-v2")
+    assertEq(checked.evidenceId, "gitlab-pipeline-3066209923")
 
   proc expectHostRefusal(raw: string, reason: PodmanSkipReasonKind) =
     let checked = checkPodmanHost(raw, target = cpLinuxAmd64)
@@ -310,7 +310,7 @@ proc main() =
            PodmanEnginePair(podman: "6.1.4", buildah: "1.45.2"))
   assertEq(podmanCompatibilityFixtures.len, 6)
   for fixture in podmanCompatibilityFixtures:
-    assertEq(fixture.evidenceId, "gitlab-pipeline-3066104239")
+    assertEq(fixture.evidenceId, "gitlab-pipeline-3066209923")
 
   assertEq(formatPodmanSkip(PodmanSkip(
              operation: poBuild,

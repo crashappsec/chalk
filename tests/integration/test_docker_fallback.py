@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import tempfile
 
-
 ORIGINAL_ARGS = [
     "build",
     "--diagnostic-original=kept",
@@ -25,7 +24,7 @@ WRAPPED_ARGS = [
 ]
 WRAPPED_STDIN = b"FROM scratch\nRUN printf 'wrapped stdin'\n"
 
-FAKE_DOCKER = r'''#!/usr/bin/env python3
+FAKE_DOCKER = r"""#!/usr/bin/env python3
 import base64
 import json
 import os
@@ -87,7 +86,7 @@ if args[:2] == ["context", "inspect"]:
     print('{"Name":"default"}')
     sys.exit(0)
 sys.exit(1)
-'''
+"""
 
 
 @dataclass
@@ -292,9 +291,7 @@ def check_functional_cases(binary, root, real_docker):
             target_context=context,
         )
         builds = [
-            call
-            for call in observation.calls
-            if call["kind"] in ("wrapped", "native")
+            call for call in observation.calls if call["kind"] in ("wrapped", "native")
         ]
         assert [call["kind"] for call in builds] == ["wrapped", "native"], observation
         wrapped, native = builds

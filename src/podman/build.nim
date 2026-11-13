@@ -178,10 +178,9 @@ proc virtualChalkEnabled(): bool =
 
 proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   let route = classifyPodmanArgs(args)
-  # Podman virtual chalk is unsupported even when a build flag makes the
-  # command ineligible for instrumentation. Reject before native execution so
-  # virtual mode cannot mutate an image through the pass-through path.
-  if len(args) > 0 and args[0] == "build" and virtualChalkEnabled():
+  # Virtual output is unsupported for Podman. Reject before routing can pass
+  # an unrecognized build spelling or global-option form to the native engine.
+  if virtualChalkEnabled():
     emitPodmanVirtualChalkError()
     return 2
 

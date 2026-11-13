@@ -93,6 +93,19 @@
 
 ### Bug Fixes
 
+- Restore the established Docker build fallback. A failed rewritten build or
+  non-policy wrapping exception runs the original Docker command and returns
+  its result. Policy refusals remain terminal. Podman keeps its separate rule
+  against replay after an injected build or transfer launch.
+- Protect confidential Podman transfer arguments across reports and caches,
+  preserve native push when instrumentation preparation fails, and prevent
+  embedded marks from overriding current engine observations.
+- Pass heredoc Containerfiles through before parsing their bodies. Instrument
+  only Podman and Buildah release pairs demonstrated by the capability fixtures.
+- Add independent `podman.wrap_entrypoint`, enabled by default. Disable it to
+  run an unchanged native Podman build. Unsupported virtual Podman builds now
+  fail before engine invocation.
+
 - Component variable parameters (`parameter var`) now use configured values,
   including values supplied via `chalk load --params`. Previously parameters
   with defaults always used them (e.g. a custom heartbeat interval from
