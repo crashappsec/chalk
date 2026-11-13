@@ -33,14 +33,20 @@ else:
     sys.exit(99)
 """)
     executable.chmod(0o755)
-    for instruction in ("RUN", "COPY"):
+    for instruction in ("RUN", "COPY", "custom-escape-RUN"):
         for target in ([], ["--target", "selected"]):
             recipe = root / "Containerfile"
-            contents = (
-                f"FROM scratch AS selected\n{instruction} <<'EOF'\n"
-                'FROM forged\nUSER forged\nCMD ["forged"]\n'
-                'ENTRYPOINT ["forged"]\nEOF\n'
-            )
+            if instruction == "custom-escape-RUN":
+                contents = (
+                    "# escape=`\nFROM scratch AS selected\nRUN cat `\n<<EOF\n"
+                    'ENTRYPOINT ["/forged"]\nEOF\nCMD ["/ok"]\n'
+                )
+            else:
+                contents = (
+                    f"FROM scratch AS selected\n{instruction} <<'EOF'\n"
+                    'FROM forged\nUSER forged\nCMD ["forged"]\n'
+                    'ENTRYPOINT ["forged"]\nEOF\n'
+                )
             recipe.write_text(contents)
             ledger.write_text("")
             args = ["build", *target, "-f", str(recipe), str(root)]
@@ -77,4 +83,4 @@ else:
                 "bin",
                 "calls.jsonl",
             ], list(root.iterdir())
-print("4 Podman heredoc native pass-through cases passed")
+print("6 Podman heredoc native pass-through cases passed")

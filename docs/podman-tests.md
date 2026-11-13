@@ -35,6 +35,9 @@ and runs native build, authenticated registry, and capability checks on
 AMD64 and ARM64 with pinned Podman 6.1.4 and Buildah 1.45.2. These checks do not
 establish connected backend delivery.
 
+Containerfiles with heredocs or explicit escape directives pass through before
+startup planning. Chalk does not generate a derived recipe for those inputs.
+
 ## Configure Podman wrapping
 
 Set `podman.wrap_entrypoint = false` in a Chalk configuration file to run the
