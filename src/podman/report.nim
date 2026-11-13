@@ -11,6 +11,7 @@ import ".."/[
   reporting,
   run_management,
   types,
+  utils/json,
 ]
 import "./types" as podman_types
 
@@ -236,40 +237,21 @@ proc redactRetainedText(
     text: string,
     confidential: openArray[podman_types.PodmanConfidentialArg],
 ): string =
-  result = redactPodmanArgv(@[text], confidential)[0]
-  if result != text:
-    return
+  result = text
   for arg in confidential:
     if arg.value == "":
       continue
-    # Error formatting often applies repr() to argv or to a value before it is
-    # retained. Match escaped forms and ordered alphanumeric fragments because
-    # Nim's repr() may include addresses and numeric control-character escapes.
-    if escape(arg.value) in text or repr(arg.value) in text:
-      return redactedArgText
-    var
-      fragments: seq[string]
-      fragment = ""
-    for character in arg.value:
-      if character in {'a' .. 'z', 'A' .. 'Z', '0' .. '9'}:
-        fragment.add(character)
-      else:
-        if len(fragment) >= 3:
-          fragments.add(fragment)
-        fragment = ""
-    if len(fragment) >= 3:
-      fragments.add(fragment)
-    var
-      searchFrom = 0
-      matchedCharacters = 0
-    for item in fragments:
-      let found = text.find(item, searchFrom)
-      if found < 0:
-        matchedCharacters = 0
-        break
-      matchedCharacters += len(item)
-      searchFrom = found + len(item)
-    if matchedCharacters >= 8:
+    # repr() prefixes strings with an address, which changes when a string is
+    # copied. Match the complete quoted representation without that address.
+    # Matching fragments would also erase unrelated keys and image operands.
+    let represented = repr(arg.value)
+    let quotedAt = represented.find('"')
+    let stableRepresentation =
+      if quotedAt >= 0: represented[quotedAt .. ^1]
+      else: ""
+    if arg.value in text or escape(arg.value) in text or
+        ($newJString(arg.value)) in text or
+        (stableRepresentation != "" and stableRepresentation in text):
       return redactedArgText
 
 proc redactRetainedBox(
