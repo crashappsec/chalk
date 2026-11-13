@@ -8,6 +8,7 @@
 import std/[
   json,
   net,
+  strutils,
 ]
 import ".."/[
   run_management,
@@ -69,6 +70,26 @@ proc extractDockerHash*(value: Box): Box =
 
 proc getSystemBuildPlatform*(): DockerPlatform =
   return DockerPlatform(os: hostOS, architecture: hostCPU)
+
+type
+  DeclaredPlatformKind* = enum
+    dpkAbsent,
+    dpkKnown,
+    dpkRequested,
+    dpkUnresolved
+
+  DeclaredPlatform* = object
+    ## A platform declared by a Containerfile instruction.
+    ##
+    ## Absent means the instruction named no platform. Requested records a
+    ## literal flag on a stage reference whose inherited stage had no platform
+    ## fact; that request does not establish the resulting image platform.
+    ## Unresolved means the declarations do not identify one platform.
+    case kind*: DeclaredPlatformKind
+    of dpkKnown, dpkRequested:
+      platform*: DockerPlatform
+    of dpkAbsent, dpkUnresolved:
+      discard
 
 proc normalize*(self: DockerPlatform): DockerPlatform =
   # https://github.com/containerd/containerd/blob/83031836b2cf55637d7abf847b17134c51b38e53/platforms/platforms.go
@@ -200,6 +221,32 @@ proc parseDockerPlatform*(platform: string): DockerPlatform =
   else:
     raise newException(ValueError, "Invalid docker platform: " & platform)
 
+proc parseDeclaredPlatform*(value: string): DeclaredPlatform =
+  ## Parse a platform declared by an image instruction without consulting the
+  ## host OS or CPU. Docker's general parser keeps its existing host defaults.
+  let stripped = value.strip().toLowerAscii()
+  if stripped == "":
+    return DeclaredPlatform(kind: dpkUnresolved)
+  let parts = stripped.split('/')
+  if len(parts) > 3:
+    return DeclaredPlatform(kind: dpkUnresolved)
+  if len(parts) == 1 and
+      parts[0] in ["linux", "darwin", "macos", "windows"]:
+    return DeclaredPlatform(kind: dpkUnresolved)
+  let platform =
+    case len(parts)
+    of 1:
+      DockerPlatform(os: "linux", architecture: parts[0])
+    of 2:
+      DockerPlatform(os: parts[0], architecture: parts[1])
+    of 3:
+      DockerPlatform(os: parts[0], architecture: parts[1], variant: parts[2])
+    else:
+      DockerPlatform()
+  if not platform.isKnown():
+    return DeclaredPlatform(kind: dpkUnresolved)
+  return DeclaredPlatform(kind: dpkKnown, platform: platform.normalize())
+
 proc contains*[T](self: TableRef[DockerPlatform, T], key: DockerPlatform): bool =
   for k, _ in self:
     if k == key:
@@ -274,7 +321,7 @@ proc withDigest*(items: seq[DockerImage], digest: string): seq[DockerImage] =
   for i in items:
     result.add(i.withDigest(digest))
 
-proc isFullyQualified(self: DockerImage): bool =
+proc isFullyQualified*(self: DockerImage): bool =
   ## determine if the docker image is a fully qualified image name (contains domain)
   ## and all interactions should go there or registry is implicitly
   ## docker hub when not fully qualified (e.g. docker pull alpine).
@@ -338,6 +385,9 @@ proc normalize*(self: DockerImage): DockerImage =
     self.tag,
     self.digest,
   )
+
+proc canonicalRepository*(self: DockerImage): string =
+  return self.normalize().repo
 
 proc registry*(self: DockerImage): string =
   let parts = self.normalize().repo.split('/', maxsplit = 1)

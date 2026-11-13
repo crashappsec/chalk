@@ -16,7 +16,19 @@ import "."/[
 const recursionEnvVar = "__CHALK_INVOCATIONS__"
 const recursionLimit  = 3
 
+var
+  recursionMarkerCaptured = false
+  recursionMarkerExisted  = false
+  recursionMarkerValue    = ""
+  recursionMarkerRestored = false
+
 proc recursionCheck*() =
+  if not recursionMarkerCaptured:
+    recursionMarkerCaptured = true
+    recursionMarkerExisted = existsEnv(recursionEnvVar)
+    if recursionMarkerExisted:
+      recursionMarkerValue = getEnv(recursionEnvVar)
+
   if not existsEnv(recursionEnvVar):
     putEnv(recursionEnvVar, "1")
     return
@@ -39,3 +51,12 @@ set, then there's probably a bug.
       putEnv(recursionEnvVar, $(num + 1))
   except:
     putEnv(recursionEnvVar, "1")
+
+proc restoreChalkRecursionMarker*() =
+  if not recursionMarkerCaptured or recursionMarkerRestored:
+    return
+  if recursionMarkerExisted:
+    putEnv(recursionEnvVar, recursionMarkerValue)
+  else:
+    delEnv(recursionEnvVar)
+  recursionMarkerRestored = true

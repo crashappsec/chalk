@@ -12,7 +12,7 @@ default_key_priority := 4611686018427387904  # 2^62.
 
 # These are the valid command-line commands.
 valid_chalk_cmds     := ["help", "insert", "extract", "delete", "config",
-                         "load", "dump", "docker", "version", "env", "exec",
+                         "load", "dump", "docker", "podman", "version", "env", "exec",
                          "setup", "docgen", "__"]
 
 all_cmds_that_insert := ["insert", "build", "push", "load", "setup"]
@@ -1774,6 +1774,34 @@ but when you push, we will add a signed attestation using the Sigstore
 standard.  Such marks are MUCH faster to access reliably and are the
 preferred method. See the `chalk setup` command.
 """
+
+  field podman_image {
+    type:     string
+    default:  ""
+    shortdoc: "Local Podman image for extract podman"
+    doc:      "Local Podman image whose mark and config digest are read."
+  }
+
+  field podman_registry_reference {
+    type:     string
+    default:  ""
+    shortdoc: "Published Podman image digest reference"
+    doc:      "REGISTRY/REPOSITORY@sha256:DIGEST of the published image manifest."
+  }
+
+  field podman_authfile {
+    type:     string
+    default:  ""
+    shortdoc: "Auth file for extract podman"
+    doc:      "Podman registry auth file. REGISTRY_AUTH_FILE is used when empty."
+  }
+
+  field podman_sbom_attachment {
+    type:     string
+    default:  ""
+    shortdoc: "SPDX attachment digest"
+    doc:      "Required when more than one application/spdx+json attachment exists."
+  }
 }
 
 singleton docker {
@@ -3985,6 +4013,18 @@ configuration parameter `dump.params`
 
 }
 
+singleton podman {
+  user_def_ok: false
+  doc: "Configuration for Podman build instrumentation."
+
+  field wrap_entrypoint {
+    type:     bool
+    default:  true
+    shortdoc: "Instrument supported Podman builds"
+    doc:      "When true, Chalk instruments supported Podman builds and wraps image startup. When false, Chalk runs the original Podman build unchanged. This setting does not change Docker build behavior."
+  }
+}
+
 singleton exec {
   user_def_ok:   false
   doc: """
@@ -5014,6 +5054,7 @@ root {
   allow tool
   allow extract
   allow docker
+  allow podman
   allow buildkit
   allow exec
   allow load
@@ -5163,6 +5204,17 @@ problem where it had to restart the operation without chalk.
     shortdoc: "Docker Log Level"
     doc: """
 Default log level to use when running docker commands.
+Standard `log_level` overwrites logging verbosity otherwise.
+"""
+  }
+
+  field podman_log_level {
+    type:     string
+    default:  "error"
+    choice:   valid_log_levels
+    shortdoc: "Podman Log Level"
+    doc: """
+Default log level to use when running podman commands.
 Standard `log_level` overwrites logging verbosity otherwise.
 """
   }
@@ -5473,6 +5525,19 @@ Note that, when chalk is invoked with 'docker' as its EXE name, the default IO c
 """
   }
 
+  field podman_exe {
+    type:     string
+    require:  false
+    shortdoc: "Podman command location"
+    doc: """
+When running the 'podman' command, this tells chalk where to look for the podman executable to exec.
+
+If this is not provided, or if the file is not found, chalk will search the PATH for the first instance of 'podman' that is not itself (We generally expect renaming chalk to podman and using this variable to point to the actual podman EXE will be the most seamless approach).
+
+Note that, when chalk is invoked with 'podman' as its EXE name, the default IO configuration is to *NOT* log anything chalk-specific on the console.
+"""
+  }
+
   field chalk_contained_items {
     type:    bool
     default: false
@@ -5537,6 +5602,17 @@ A few important notes:
 5. If this is off, there is no check for previously cached data.
 
 Note that this field is set on the command line with --use-report-cache / --no-use-report-cache.
+"""
+  }
+
+  field sbom_handoff {
+    type:       string
+    default:    ""
+    shortdoc:   "Podman SPDX handoff file"
+    doc:        """
+Path to a customer-written SPDX handoff JSON file. Set with
+`--sbom-handoff`. Used when wrapping `podman push`. Chalk does not
+create this file.
 """
   }
 

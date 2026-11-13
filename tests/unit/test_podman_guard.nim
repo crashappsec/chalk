@@ -1,0 +1,31 @@
+import std/[os, tempfiles]
+import ../../src/podman/guard
+
+let root = createTempDir("podman-guard-", "")
+try:
+  doAssert reservedPathsAvailable(root)
+  writeFile(root / "chalk", "customer binary")
+  doAssert not reservedPathsAvailable(root)
+  writeFile(root / "chalk.json", "customer mark")
+  doAssert not reservedPathsAvailable(root)
+  writeFile(root / "chalk.json", "{\"MAGIC\":\"dadfedabbadabbed\"}")
+  doAssert reservedPathsAvailable(root)
+  writeFile(root / "chalk.json", "{\"EMBEDDED_CHALK\":[{\"MAGIC\":\"dadfedabbadabbed\",\"CHALK_ID\":\"parent\"}]}")
+  doAssert reservedPathsAvailable(root)
+  writeFile(root / "chalk.json", "{\"EMBEDDED_CHALK\":[{\"MAGIC\":\"wrong\"}]}")
+  doAssert not reservedPathsAvailable(root)
+  writeFile(root / "chalk.json", "{\"MAGIC\":\"dadfedabbadabbed\"}")
+  removeFile(root / "chalk")
+  doAssert reservedPathsAvailable(root)
+  createDir(root / "chalk")
+  doAssert not reservedPathsAvailable(root)
+  removeDir(root / "chalk")
+  createSymlink("absent", root / "chalk")
+  doAssert not reservedPathsAvailable(root)
+  removeFile(root / "chalk")
+  writeFile(root / "chalk", "binary")
+  removeFile(root / "chalk.json")
+  createSymlink("absent", root / "chalk.json")
+  doAssert not reservedPathsAvailable(root)
+finally:
+  removeDir(root)

@@ -1,0 +1,69 @@
+name: podman-contracts
+
+on:
+  pull_request:
+    paths:
+      - src/**
+      - tests/unit/**
+      - tests/integration/**
+      - config.nims
+      - '*.nimble'
+      - Dockerfile
+      - .github/workflows/podman-contracts.yml
+      - '!src/docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-podman:
+    name: native-podman-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    concurrency:
+      group: podman-contracts-${{ matrix.arch }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # 3.3.0
+      - name: Checkout pinned dependencies
+        run: make nimble.paths
+      - name: Build pinned Linux compiler image
+        run: docker buildx build --build-context nimutils=../nimutils --target deps --tag chalk-contracts:local --load .
+      - name: Build candidate
+        run: docker run --rm -v "$PWD:$PWD" -v "$PWD/../nimutils:$PWD/../nimutils" -v "$PWD/../con4m:$PWD/../con4m" -w "$PWD" chalk-contracts:local nimble build -y
+      - name: Record exact candidate identity
+        run: |
+          mkdir -p artifacts/podman
+          git rev-parse HEAD > artifacts/podman/source-sha.txt
+          sha256sum chalk > artifacts/podman/binary-sha256.txt
+          ./chalk version > artifacts/podman/candidate-version.txt
+      - name: Install pinned rootless Podman
+        run: tests/integration/install-pinned-engines.sh "$RUNNER_TEMP/podman.env"
+      - name: Run native Podman contract tests
+        run: |
+          . "$RUNNER_TEMP/podman.env"
+          python3 tests/integration/podman_compatibility_probe.py --expect-podman 6.1.4 --expect-buildah 1.45.2 --output artifacts/podman/compatibility-probe.json
+          python3 tests/integration/test_podman_native_controls.py "$PWD/chalk"
+          python3 tests/integration/test_podman_native_security.py "$PWD/chalk"
+      - name: Upload contract evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # 4.6.2
+        with:
+          name: podman-contracts-${{ matrix.arch }}
+          path: |
+            artifacts/podman/
+            .developer-diagnostics/evidence/

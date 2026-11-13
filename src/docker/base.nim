@@ -47,7 +47,7 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
     quitChalk(exitCode)
 
 proc dockerPolicyBlocked*(ctx: DockerInvocation) {.noreturn.} =
-  # unlike other failures, docker must not be re-run without chalk
+  # A policy refusal must not run the original command.
   var exitCode = 1
   try:
     error("docker: " & getCurrentExceptionMsg())

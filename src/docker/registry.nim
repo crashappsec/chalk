@@ -15,6 +15,8 @@
 import std/[
   nativesockets,
   net,
+  options,
+  os,
   strscans,
   uri,
 ]
@@ -24,12 +26,14 @@ import pkg/[
 ]
 import ".."/[
   types,
+  utils/bounded_http,
   utils/files,
   utils/ip,
   utils/json,
   utils/http,
   utils/sets,
   utils/strings,
+  utils/times,
   utils/uri,
   utils/www_authenticate,
 ]
@@ -42,6 +46,13 @@ import "."/[
 
 type
   RegistryResponseError* = object of ValueError
+    ## `statusCode` is the HTTP status the registry answered with, or 0
+    ## when the failure was not an HTTP status.
+    statusCode*: int
+  RegistryTlsError* = object of RegistryResponseError
+  RegistryTimeoutError* = object of RegistryResponseError
+  RegistryOversizedError* = object of RegistryResponseError
+  RegistryReferrersError* = object of RegistryResponseError
 
   # depending on use, mirror is allowed to be used or not
   # for read-only docker can consult mirrors
@@ -50,6 +61,21 @@ type
   RegistryUseCase* = enum
     ReadWrite
     ReadOnly # allows use of mirrors
+
+  RegistryJsonCacheKey = tuple[image: DockerImage, httpMethod: HttpMethod,
+                               path: string, useCase: RegistryUseCase, requireSameOrigin: bool]
+
+  RegistryAccess* = ref object
+    ## Registry HTTP state isolated to one operation.
+    discoverDocker*:       bool
+    authFile*:             string
+    authConfig*:           JsonNode
+    budget*:               Option[HttpBudget]
+    strictReferrerLinks*:  bool
+    lastRequestUri*:       Uri
+    configByRegistry*:     Table[(RegistryUseCase, string), RegistryConfig]
+    jsonCache*:            Table[RegistryJsonCacheKey, (string, Response, Uri)]
+    referrersCache*:       Table[string, bool]
 
   RegistryConfig = ref object
     source*:      string
@@ -67,6 +93,56 @@ type
 
 const
   TIMEOUT = 3000 # ms
+
+proc newRegistryAccess(): RegistryAccess =
+  RegistryAccess(
+    discoverDocker:   true,
+    budget:           none(HttpBudget),
+    configByRegistry: initTable[(RegistryUseCase, string), RegistryConfig](),
+    jsonCache:        initTable[RegistryJsonCacheKey, (string, Response, Uri)](),
+    referrersCache:   initTable[string, bool](),
+  )
+
+proc loadRegistryAuthFile(path: string): JsonNode =
+  result = newJObject()
+  if path == "":
+    return
+  try:
+    let data = tryToLoadFile(path)
+    if data == "":
+      return
+    result = parseJson(data).assertIs(JObject, "bad registry auth file type")
+  except:
+    trace("registry: could not read auth file " & path & " due to: " &
+          getCurrentExceptionMsg())
+
+proc newAuthFileRegistryAccess*(authFile = ""): RegistryAccess =
+  ## Registry HTTP that uses only `authFile` or `REGISTRY_AUTH_FILE`.
+  ## Does not read Docker daemon, Buildx, or ~/.docker/config.json.
+  var path = authFile
+  if path == "":
+    path = getEnv("REGISTRY_AUTH_FILE")
+  result = newRegistryAccess()
+  result.discoverDocker = false
+  result.authFile = path
+  result.authConfig = loadRegistryAuthFile(path)
+
+var
+  dockerRegistryAccess* = newRegistryAccess()
+  currentRegistryAccess = dockerRegistryAccess
+
+proc registryUsesDockerDiscovery*(): bool =
+  currentRegistryAccess.discoverDocker
+
+template withRegistryAccess*(access: RegistryAccess, body: untyped) =
+  let previousAccess = currentRegistryAccess
+  currentRegistryAccess = access
+  try:
+    body
+  finally:
+    currentRegistryAccess = previousAccess
+
+const
   CONTENT_TYPE_MAPPING* = {
     "application/vnd.docker.distribution.manifest.list.v2+json": DockerManifestType.list,
     "application/vnd.docker.distribution.manifest.v2+json": DockerManifestType.image,
@@ -99,13 +175,18 @@ proc usesWwwAuth(self: RegistryConfig): bool =
 proc uri(self: RegistryConfig): Uri =
   return parseUri(self.scheme & self.registry)
 
+proc authJson(access: RegistryAccess): JsonNode =
+  if access.authConfig != nil:
+    return access.authConfig
+  return getDockerAuthConfig()
+
 proc withAuth(self: RegistryConfig): RegistryConfig =
   result       = self
   self.wwwAuth = newTable[string, TableRef[bool, HttpHeaders]]()
   self.auth    = newTable[string, string]()
   let
     uri        = self.uri().withPort()
-    config     = getDockerAuthConfig()
+    config     = currentRegistryAccess.authJson()
   if "auths" notin config:
     return
   try:
@@ -440,7 +521,6 @@ proc iterBuildxRegistryConfigs(self: DockerImage,
         trace("docker: cannot inspect buildx config due to: " & getCurrentExceptionMsg())
   )
 
-var configByRegistry = initTable[(RegistryUseCase, string), RegistryConfig]()
 iterator getConfigs(self: DockerImage, useCase: RegistryUseCase): RegistryConfig =
   ## get all plausible configs for iteracting with the registry
   ## note this is explicitly implemented as an iterator
@@ -454,55 +534,70 @@ iterator getConfigs(self: DockerImage, useCase: RegistryUseCase): RegistryConfig
     # some configs could be duplicates such as if there are multiple buildx
     # nodex they might all have equivalent configs
     checkedConfigs = newSeq[RegistryConfig]()
+    access = currentRegistryAccess
 
-  if (useCase, self.registry) in configByRegistry:
-    cached = configByRegistry[(useCase, self.registry)]
+  if (useCase, self.registry) in access.configByRegistry:
+    cached = access.configByRegistry[(useCase, self.registry)]
     checkedConfigs.add(cached)
     yield cached
 
   # if the cached registry config is a mirror,
   # we need to provide a way to fallthrough to upstream registry
   if cached == nil or cached.fallthrough:
-    let isBuildx = (
-      dockerInvocation != nil and
-      dockerInvocation.cmd == build and
-      dockerInvocation.foundBuildx
-    )
-    template generateConfigs(generators: seq[() -> seq[() -> seq[RegistryConfig]]]) =
-      for generator in generators:
-        try:
-          let generated = generator()
-          for configGenerator in generated:
-            try:
-              let configs = configGenerator()
-              for config in configs:
-                if config notin checkedConfigs:
-                  let config = config.withAuth()
-                  checkedConfigs.add(config)
-                  yield config
-            except:
-              trace("docker: " & getCurrentExceptionMsg())
-        except:
-          trace("docker: " & getCurrentExceptionMsg())
-    # when running buildx, buildx nodes configs should take precedence
-    # over daemon configs but we still scan both just in case
-    if isBuildx:
-      generateConfigs(self.iterBuildxRegistryConfigs(useCase = useCase))
-    generateConfigs(self.iterDaemonRegistryConfigs(useCase = useCase))
-    if not isBuildx:
-      generateConfigs(self.iterBuildxRegistryConfigs(useCase = useCase))
-
-var jsonCache = initTable[
-  (DockerImage, HttpMethod, string, RegistryUseCase),
-  (string, Response)
-]()
-var referrersCache = initTable[string, bool]()
+    if not access.discoverDocker:
+      let httpsConfig = RegistryConfig(
+        source:     "authfile",
+        scheme:     "https://",
+        registry:   self.registry,
+        verifyMode: CVerifyPeer,
+      ).withAuth()
+      if httpsConfig notin checkedConfigs:
+        checkedConfigs.add(httpsConfig)
+        yield httpsConfig
+      if self.domain in ["localhost", "127.0.0.1", "[::1]"]:
+        let httpConfig = RegistryConfig(
+          source:     "authfile",
+          scheme:     "http://",
+          registry:   self.registry,
+          verifyMode: CVerifyNone,
+        ).withAuth()
+        if httpConfig notin checkedConfigs:
+          yield httpConfig
+    else:
+      let isBuildx = (
+        dockerInvocation != nil and
+        dockerInvocation.cmd == build and
+        dockerInvocation.foundBuildx
+      )
+      template generateConfigs(generators: seq[() -> seq[() -> seq[RegistryConfig]]]) =
+        for generator in generators:
+          try:
+            let generated = generator()
+            for configGenerator in generated:
+              try:
+                let configs = configGenerator()
+                for config in configs:
+                  if config notin checkedConfigs:
+                    let config = config.withAuth()
+                    checkedConfigs.add(config)
+                    yield config
+              except:
+                trace("docker: " & getCurrentExceptionMsg())
+          except:
+            trace("docker: " & getCurrentExceptionMsg())
+      # when running buildx, buildx nodes configs should take precedence
+      # over daemon configs but we still scan both just in case
+      if isBuildx:
+        generateConfigs(self.iterBuildxRegistryConfigs(useCase = useCase))
+      generateConfigs(self.iterDaemonRegistryConfigs(useCase = useCase))
+      if not isBuildx:
+        generateConfigs(self.iterBuildxRegistryConfigs(useCase = useCase))
 
 proc checkReferrersSupport(image: DockerImage, response: Response) =
   if not response.headers.hasKey("OCI-Subject"):
     return
   let key = image.withBare().asRepoRef()
-  referrersCache[key] = true
+  currentRegistryAccess.referrersCache[key] = true
 
 proc request(self:              DockerImage,
              httpMethod:        HttpMethod,
@@ -515,13 +610,23 @@ proc request(self:              DockerImage,
              range              = 0 .. 0,
              size               = 0,
              timeout            = TIMEOUT,
+             requireSameOrigin  = false,
              acceptStatusCodes: openArray[Slice[int]] = @[200..299],
              ): (string, Response) =
-  let cacheKey = (self, httpMethod, path, useCase)
-  if cacheKey in jsonCache:
-    return jsonCache[cacheKey]
+  let
+    access   = currentRegistryAccess
+    cacheKey = (self, httpMethod, path & "\t" & $url, useCase, requireSameOrigin)
+  if not access.discoverDocker and access.budget.isNone():
+    access.budget = some(HttpBudget(
+      deadline: getMonoTime() + initDuration(seconds = 30),
+      maxBodyBytes: 32 * 1024 * 1024,
+    ))
+  if cacheKey in access.jsonCache:
+    let (message, response, effectiveUri) = access.jsonCache[cacheKey]
+    access.lastRequestUri = effectiveUri
+    return (message, response)
   var
-    registryError  = ""
+    failure:       ref RegistryResponseError
     ignoredErrors: seq[string] = @[]
   for config in self.getConfigs(useCase = useCase):
     let
@@ -541,41 +646,56 @@ proc request(self:              DockerImage,
       msg &= " " & $config.verifyMode
       if config.certPath != "":
         msg &= "@" & config.certPath
-    var invalid = false
     try:
-      try:
-        var headers = newHttpHeaders()
-        if accept != "":
-          headers["Accept"] = accept
-        if body != "":
-          if contentType != "":
-            headers["Content-Type"] = contentType
-          # OCI distribution spec requires "{first}-{last}" format (no "bytes " prefix,
-          # no "/{total}" suffix). See:
-          # https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-blobs
-          # Only include for chunked uploads; omit for monolithic uploads because
-          # some registries (e.g. ghcr) reject Content-Range on monolithic PUT.
-          let
-            hasRange    = range.a > 0 or range.b > 0
-            isPartial   = range.b - range.a + 1 != size
-          if hasRange and isPartial:
-            headers["Content-Range"] = $range.a & "-" & $range.b
-          headers["Content-Length"] = $len(body)
-        for k, v in headers.pairs():
-          msg &= " " & k & ":" & v
-        trace("docker: " & msg)
+      var headers = newHttpHeaders()
+      if accept != "":
+        headers["Accept"] = accept
+      if body != "":
+        if contentType != "":
+          headers["Content-Type"] = contentType
+        # OCI distribution spec requires "{first}-{last}" format (no "bytes " prefix,
+        # no "/{total}" suffix). See:
+        # https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pushing-blobs
+        # Only include for chunked uploads; omit for monolithic uploads because
+        # some registries (e.g. ghcr) reject Content-Range on monolithic PUT.
         let
-          isGet   = httpMethod in [HttpHead, HttpGet]
-          wwwAuth = (
-            config.wwwAuth
-            .mgetOrPut(normalized.repo, newTable[bool, HttpHeaders]())
-            .mgetOrPut(isGet,           newHttpHeaders())
-          )
-          (authHeaders, response) = authHeadersSafeRequest(
-            uri,
-            httpMethod,
+          hasRange    = range.a > 0 or range.b > 0
+          isPartial   = range.b - range.a + 1 != size
+        if hasRange and isPartial:
+          headers["Content-Range"] = $range.a & "-" & $range.b
+        headers["Content-Length"] = $len(body)
+      for k, v in headers.pairs():
+        msg &= " " & k & ":" & v
+      trace("docker: " & msg)
+      if requireSameOrigin and not sameOrigin(uri, defaultUri):
+        raise newException(HttpOriginError, "referrer pagination left the registry origin")
+      let
+        isGet = httpMethod in [HttpHead, HttpGet]
+        sendConfigAuth = access.discoverDocker or sameOrigin(uri, defaultUri)
+        wwwAuth = (
+          config.wwwAuth
+          .mgetOrPut(normalized.repo, newTable[bool, HttpHeaders]())
+          .mgetOrPut(isGet,           newHttpHeaders())
+        )
+        requestHeaders = headers
+      if sendConfigAuth:
+        discard requestHeaders.update(config.authHeadersFor(normalized)).update(wwwAuth)
+      let (authHeaders, response, effectiveUri) =
+        if access.budget.isSome():
+          authHeadersBoundedRequest(
+            uri, httpMethod, access.budget.get(),
             body              = body,
-            headers           = headers.update(config.authHeadersFor(normalized)).update(wwwAuth),
+            headers           = requestHeaders,
+            pinnedCert        = config.pinnedCert,
+            verifyMode        = config.verifyMode,
+            sameOriginRedirects = requireSameOrigin,
+            acceptStatusCodes = acceptStatusCodes,
+          )
+        else:
+          let (auth, response) = authHeadersSafeRequest(
+            uri, httpMethod,
+            body              = body,
+            headers           = requestHeaders,
             pinnedCert        = config.pinnedCert,
             verifyMode        = config.verifyMode,
             timeout           = timeout,
@@ -583,50 +703,81 @@ proc request(self:              DockerImage,
             connectRetries    = 2,
             acceptStatusCodes = acceptStatusCodes,
           )
+          (auth, response, uri)
+      if sendConfigAuth:
         config.wwwAuth[normalized.repo][isGet] = wwwAuth.update(authHeaders)
-        var respMsg = "docker: " & $response.status
-        for k, v in response.headers.pairs():
-          if k notin ["authorization"]:
-            respMsg &= " " & k & ":" & v
-        trace(respMsg)
-        for u in useCase.uses():
-          discard configByRegistry.hasKeyOrPut((u, normalized.registry), config)
-          discard configByRegistry.hasKeyOrPut((u, self.registry), config)
-        if isGet:
-          jsonCache[cacheKey] = (msg, response)
-        return (msg, response)
-      except ValueError:
-        # ValueError is only raised when status code fails
-        # for non-mirror registry:
-        # as we can talk to the registry, any errors from this point on
-        # mean image doesnt exist in the registry or invalid config such as
-        # invalid auth which we cant improve even if we attempt other configs
-        # for mirror registry:
-        # as mirror might be missing the image, on 404s docker reattempts
-        # to fetch the image from upstream registry bypassing the mirror
-        # hence we need to fallthrough to the next config
-        invalid = not config.fallthrough
-        raise
-    except:
-      if invalid:
-        for u in useCase.uses():
-          discard configByRegistry.hasKeyOrPut((u, normalized.registry), config)
-          discard configByRegistry.hasKeyOrPut((u, self.registry), config)
-        # cannot raise exception here directly due to loop being an inline iterator
-        # the exception is caught by the iterator inner functions
-        # therefore have to use break to exit the loop and throw exception
-        # outside the config iterator
-        registryError = getCurrentExceptionMsg()
+      var respMsg = "docker: " & $response.status
+      for k, v in response.headers.pairs():
+        if k notin ["authorization"]:
+          respMsg &= " " & k & ":" & v
+      trace(respMsg)
+      for u in useCase.uses():
+        discard access.configByRegistry.hasKeyOrPut((u, normalized.registry), config)
+        discard access.configByRegistry.hasKeyOrPut((u, self.registry), config)
+      access.lastRequestUri = effectiveUri
+      if isGet:
+        access.jsonCache[cacheKey] = (msg, response, effectiveUri)
+      return (msg, response)
+    # exceptions cannot be raised from inside this loop as the config
+    # iterator catches them; a definitive failure is kept and raised after it
+    except HttpTlsProtocolError:
+      ignoredErrors.add("registry endpoint did not complete TLS")
+    except HttpTlsError as error:
+      failure = (ref RegistryTlsError)(msg: error.msg)
+      break
+    except HttpOriginError:
+      failure = (ref RegistryReferrersError)(msg: "referrer pagination left the registry origin")
+      break
+    except SslError as error:
+      if not access.discoverDocker and not isTlsProtocolMismatch(error.msg):
+        failure = (ref RegistryTlsError)(msg: "registry TLS peer identity verification failed")
         break
+      ignoredErrors.add(error.msg)
+    except HttpDeadlineError:
+      failure = (ref RegistryTimeoutError)(msg: "registry request timed out")
+      break
+    except HttpBodyTooLargeError:
+      failure = (ref RegistryOversizedError)(msg: "registry response exceeds the size limit")
+      break
+    except ValueError as e:
+      if not access.discoverDocker and not (e of HttpStatusError):
+        failure = (ref RegistryResponseError)(msg: e.msg)
+        break
+      # A final HTTP status identifies the selected non-mirror registry.
+      # for non-mirror registry:
+      # as we can talk to the registry, any errors from this point on
+      # mean image doesnt exist in the registry or invalid config such as
+      # invalid auth which we cant improve even if we attempt other configs
+      # for mirror registry:
+      # as mirror might be missing the image, on 404s docker reattempts
+      # to fetch the image from upstream registry bypassing the mirror
+      # hence we need to fallthrough to the next config
+      if config.fallthrough:
+        trace("docker: ignoring error: " & e.msg)
+        ignoredErrors.add(e.msg)
       else:
-        let msg = getCurrentExceptionMsg()
-        trace("docker: ignoring error: " & msg)
-        ignoredErrors.add(msg)
-  if registryError != "":
-    raise newException(RegistryResponseError, registryError)
+        for u in useCase.uses():
+          discard access.configByRegistry.hasKeyOrPut((u, normalized.registry), config)
+          discard access.configByRegistry.hasKeyOrPut((u, self.registry), config)
+        failure = (ref RegistryResponseError)(
+          msg:        e.msg,
+          statusCode: (if e of HttpStatusError: (ref HttpStatusError)(e).code else: 0),
+        )
+        break
+    except:
+      if not access.discoverDocker:
+        failure = newException(RegistryResponseError, "registry transport request failed")
+        break
+      let msg = getCurrentExceptionMsg()
+      trace("docker: ignoring error: " & msg)
+      ignoredErrors.add(msg)
+  if failure != nil:
+    raise failure
   var errMsg = "could not find working registry configuration for " & $self
   if ignoredErrors.len > 0:
     errMsg &= ": " & ignoredErrors.join("; ")
+  if not access.discoverDocker:
+    raise newException(RegistryResponseError, "registry transport request failed")
   raise newException(ValueError, errMsg)
 
 proc validateDigest(digest: string): string =
@@ -1050,42 +1201,120 @@ proc manifestPut*(image:       DockerImage,
       size      = len(body),
     )
 
+proc originKey(url: Uri): string =
+  let value = uriOrigin(url)
+  return value.scheme & "://" & value.hostname & ":" & value.port
+
+proc resolveReferrerNextLink*(current: Uri, link: string): Option[Uri] =
+  return resolveSameOrigin(current, link)
+
+proc descriptorDigest(item: JsonNode): string =
+  if item == nil or item.kind != JObject:
+    return ""
+  return item{"digest"}.getStr()
+
 proc referrersGet*(image:        DockerImage,
                    artifactType = "",
                   ): DockerDigestedJson =
   ## Returns the OCI referrers index for image, or nil if the registry
   ## does not support the referrers API.  image.digest must be set.
   ## artifactType filters the result to referrers with a matching artifactType.
-  let path =
-    if artifactType != "":
-      "/referrers/" & image.imageRef & "?artifactType=" & encodeUrl(artifactType, usePlus = false)
-    else:
-      "/referrers/" & image.imageRef
-  try:
-    let (_, response) = image.request(
-      useCase           = RegistryUseCase.ReadOnly,
-      httpMethod        = HttpGet,
-      path              = path,
-      accept            = "application/vnd.oci.image.index.v1+json",
-      acceptStatusCodes = @[200..299, 404..404],
+  ## Under strictReferrerLinks, same-origin `Link: rel="next"` pages are
+  ## merged and malformed pages raise RegistryReferrersError.
+  var
+    path = (
+      if artifactType != "":
+        "/referrers/" & image.imageRef & "?artifactType=" &
+          encodeUrl(artifactType, usePlus = false)
+      else:
+        "/referrers/" & image.imageRef
     )
-    if not response.code().is2xx():
-      return nil
+    nextUrl = initUri()
+    all     = newJArray()
+    pages   = 0
+    seenPages = initHashSet[string]()
+    seenDigests = initHashSet[string]()
+    access = currentRegistryAccess
+  try:
+    while true:
+      inc pages
+      let (_, response) = image.request(
+        useCase           = RegistryUseCase.ReadOnly,
+        httpMethod        = HttpGet,
+        path              = path,
+        url               = nextUrl,
+        accept            = "application/vnd.oci.image.index.v1+json",
+        acceptStatusCodes = @[200..299, 404..404],
+        requireSameOrigin = access.strictReferrerLinks,
+      )
+      if not response.code().is2xx():
+        if pages == 1:
+          return nil
+        raise newException(RegistryReferrersError, "referrer pagination is incomplete")
+      if not access.strictReferrerLinks:
+        return newDockerDigestedJson(
+          data      = response.body(),
+          digest    = response.body().sha256Hex(),
+          mediaType = "application/vnd.oci.image.index.v1+json",
+        )
+      let parsed = parseJson(response.body())
+      if access.strictReferrerLinks:
+        let mediaType = parsed{"mediaType"}.getStr()
+        if mediaType != "" and mediaType != "application/vnd.oci.image.index.v1+json":
+          raise newException(RegistryReferrersError, "referrer index has the wrong media type")
+      for item in parsed{"manifests"}.getElems():
+        if access.strictReferrerLinks:
+          let digest = descriptorDigest(item)
+          if digest == "" or digest in seenDigests:
+            continue
+          seenDigests.incl(digest)
+        all.add(item)
+      let pageKey = originKey(access.lastRequestUri) & access.lastRequestUri.path &
+                    "?" & access.lastRequestUri.query
+      if pageKey in seenPages:
+        raise newException(RegistryReferrersError, "referrer pagination repeated a page")
+      seenPages.incl(pageKey)
+      let link =
+        if response.headers.hasKey("Link"):
+          nextLink(response.headers["Link"])
+        else:
+          ""
+      if link == "":
+        break
+      if pages >= 32:
+        raise newException(RegistryReferrersError, "referrer pagination is incomplete")
+      let resolved = resolveReferrerNextLink(access.lastRequestUri, link)
+      if resolved.isNone():
+        raise newException(RegistryReferrersError, "referrer pagination left the registry origin")
+      nextUrl = resolved.get()
+      path = ""
+    let merged = %*{
+      "schemaVersion": 2,
+      "mediaType":     "application/vnd.oci.image.index.v1+json",
+      "manifests":     all,
+    }
+    let body = $merged
     return newDockerDigestedJson(
-      data      = response.body(),
-      digest    = response.body().sha256Hex(),
+      data      = merged,
+      digest    = body.sha256Hex(),
       mediaType = "application/vnd.oci.image.index.v1+json",
     )
+  except RegistryTimeoutError:
+    raise
   except:
     dumpExOnDebug()
+    if access.strictReferrerLinks:
+      raise
     return nil
 
 proc supportsReferrers*(image: DockerImage): bool =
-  let key = image.withBare().asRepoRef()
-  if key in referrersCache:
-    return referrersCache[key]
+  let
+    access = currentRegistryAccess
+    key    = image.withBare().asRepoRef()
+  if key in access.referrersCache:
+    return access.referrersCache[key]
   result = referrersGet(image) != nil
-  referrersCache[key] = result
+  access.referrersCache[key] = result
   if result:
     trace("attestation: registry supports OCI referrers API for " & $image)
   else:
@@ -1118,5 +1347,5 @@ proc toChalkDict(self: RegistryConfig): ChalkDict =
 
 proc getUsedRegistryConfigs*(): ChalkDict =
   result = ChalkDict()
-  for _, config in configByRegistry.pairs():
+  for _, config in currentRegistryAccess.configByRegistry.pairs():
     result[config.registry] = pack(config.toChalkDict())

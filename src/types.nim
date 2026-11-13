@@ -28,6 +28,7 @@ import pkg/[
 ]
 import "."/[
   con4mwrap,
+  utils/app_path,
   utils/chalkdict,
   utils/file_string_stream,
   utils/json,
@@ -39,8 +40,9 @@ import "."/[
 export chalkdict # ChalkDict
 export con4mwrap # con4m accessors/etc
 export logging   # error()/trace()/etc
-export nimutils  # Box
+export nimutils except getMyAppPath # Box
 export options   # .get()/etc for accessing chalk Option() vars
+export app_path
 export streams   # Stream()
 export strings   # string split/etc
 export sugar     # easier calling functions
@@ -613,6 +615,7 @@ const
   artTypeEAR*             = "EAR"
   artTypeDockerImage*     = "Docker Image"
   artTypeDockerContainer* = "Docker Container"
+  artTypePodmanImage*     = "Podman Image"
   artTypePyc*             = "Python Bytecode"
   artTypeMachO*           = "Mach-O executable"
   artTypeSafetensors*     = "SafeTensors model"

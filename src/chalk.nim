@@ -13,6 +13,7 @@ when cprofiling:
 {.warning[UnusedImport]: off.}
 import std/[
   posix,
+  os,
 ]
 import "."/[
   attestation_api,
@@ -29,7 +30,15 @@ import "."/[
   utils/terminal,
 ]
 
+import ./podman/guard
+
 when isMainModule:
+  if paramCount() == 1 and paramStr(1) == podmanGuardCommand:
+    if reservedPathsAvailable():
+      quit(0)
+    stderr.writeLine("podman: reserved Chalk paths are occupied or unreadable")
+    quit(1)
+
   setupSignalHandlers()    # utils/terminal.nim
   setupTerminal()          # utils/terminal.nim
   ioSetup()                # sinks.nim
@@ -54,6 +63,7 @@ when isMainModule:
   of "extract.containers": runCmdExtractContainers()
   of "extract.images":     runCmdExtractImages()
   of "extract.all":        runCmdExtractAll(attrGet[seq[string]]("artifact_search_path"))
+  of "extract.podman":     runCmdExtractPodman()
   of "insert":             runCmdInsert(attrGet[seq[string]]("artifact_search_path"))
   of "delete":             runCmdDelete(attrGet[seq[string]]("artifact_search_path"))
   of "env":                runCmdEnv()
@@ -65,6 +75,7 @@ when isMainModule:
   of "config":             showConfigValues(force = true)
   of "version":            runCmdVersion()
   of "docker":             runCmdDocker(getArgs())
+  of "podman":             runCmdPodman(getArgs())
   of "exec":               runCmdExec(getArgs())
   of "setup":              runCmdSetup()
   of "docgen":             runChalkDocGen() # in cmd_help

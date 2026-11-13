@@ -25,6 +25,17 @@ var
 proc toMs*(t: MonoTime): int64 =
   t.ticks div 1_000_000
 
+proc remainingMs*(deadline: MonoTime): int =
+  let left = (deadline - getMonoTime()).inMilliseconds
+  if left <= 0:
+    return 0
+  if left > high(int):
+    return high(int)
+  return int(left)
+
+proc timedOut*(deadline: MonoTime): bool =
+  remainingMs(deadline) <= 0
+
 template withDuration*(c: untyped) =
   let start = getMonoTime()
   c

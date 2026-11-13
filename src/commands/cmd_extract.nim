@@ -14,6 +14,7 @@ import ".."/[
   run_management,
   types,
 ]
+import "../podman"/sbom
 
 proc processDockerChalk(item: ChalkObj) =
   item.withErrorContext():
@@ -70,3 +71,6 @@ proc runCmdExtractAll*(path: seq[string]) =
   coreExtractImages()
   coreExtractContainers()
   doReporting()
+
+proc runCmdExtractPodman*() =
+  runPodmanExtractSbom()

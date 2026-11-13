@@ -44,8 +44,19 @@ proc findExePath*(cmdName:    string,
     withInternalScan():
       withOnlyCodecs(getNativeCodecs()):
         for location in foundExes:
+          # Scan what the candidate actually IS, not the name we reached it
+          # by. A chalk binary reached through a symlink is otherwise not
+          # recognised as chalk, so it is handed back as if it were the real
+          # command -- and exec'ing it re-enters chalk. Only the scan target is
+          # resolved; the caller still gets the path as found, because that is
+          # what it should exec.
+          let target =
+            try:
+              location.expandFilename()
+            except:
+              location
           let
-            subscan   = runChalkSubScan(@[location], "extract")
+            subscan   = runChalkSubScan(@[target], "extract")
             allChalks = subscan.getAllChalks()
             isChalk   = (
               len(allChalks) != 0 and

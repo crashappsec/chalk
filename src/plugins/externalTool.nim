@@ -64,6 +64,8 @@ proc runTool*(tool: string, path: string, force = false, record = true,
   if not force and key in alreadyRan:
     raise newException(AlreadyRanError, "")
   let timeout = if deadline > 0: timeoutExe() else: ""
+  if record:
+    alreadyRan.incl(key)
 
   trace("Running tool: " & tool & " - " & path)
   result = ChalkDict()
@@ -105,8 +107,6 @@ proc runTool*(tool: string, path: string, force = false, record = true,
     d.del("info")
 
   trace(tool & ": produced keys " & $(d.keys().toSeq()))
-  if record:
-    alreadyRan.incl(key)
   return d
 
 proc runOneTool(tool: string, path: string): ChalkDict =
