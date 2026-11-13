@@ -1253,3 +1253,28 @@ proc main() =
     removeDir(inputRoot)
 
 main()
+
+block heredocRefusalBeforeParsing:
+  for instruction in ["RUN", "COPY"]:
+    for opener in ["<<EOF", "<<-EOF", "<<'EOF'", "<<\"EOF\""]:
+      let recipe = "FROM scratch AS selected\n" & instruction & " " & opener & "\n" &
+                   "FROM attacker\nUSER attacker\nCMD [\"attacker\"]\n" &
+                   "ENTRYPOINT [\"attacker\"]\nEOF\n"
+      for target in ["", "selected"]:
+        let parsed = getFinalExecConfig(recipe, target)
+        doAssert parsed.config.isNone(), instruction & " " & opener & " " & target
+        doAssert parsed.issue.isSome()
+        assertEq(parsed.issue.get().kind, cfikUnsupportedForm)
+        assertEq(parsed.issue.get().line, some(2))
+  for recipe in [
+    "FROM scratch\n# RUN <<EOF\nCMD [\"ok\"]\n",
+    "FROM scratch\nRUN echo \"literal <<EOF\"\nCMD [\"ok\"]\n",
+    "FROM scratch\nRUN echo 'literal <<EOF'\nCMD [\"ok\"]\n",
+    "FROM scratch\nRUN echo ok # <<EOF\nCMD [\"ok\"]\n",
+  ]:
+    doAssert getFinalExecConfig(recipe).config.isSome(), recipe
+  let continued = getFinalExecConfig(
+    "FROM scratch\nRUN --network=none \\\n  <<EOF\nUSER attacker\nEOF\nCMD [\"ok\"]\n")
+  doAssert continued.config.isNone()
+  assertEq(continued.issue.get().kind, cfikUnsupportedForm)
+  assertEq(continued.issue.get().line, some(3))

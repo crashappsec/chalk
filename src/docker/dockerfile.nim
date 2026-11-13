@@ -1537,22 +1537,6 @@ proc lineStartOffsets(contents: string): seq[int] =
     else:
       inc i
 
-proc lineNumberAt(contents: string, offset: int): int =
-  result = 1
-  var i = 0
-  let limit = min(offset, len(contents))
-  while i < limit:
-    if contents[i] == '\r':
-      inc result
-      inc i
-      if i < limit and contents[i] == '\n':
-        inc i
-    elif contents[i] == '\n':
-      inc result
-      inc i
-    else:
-      inc i
-
 proc commandArgumentRuneOffset(line: string): Option[int] =
   let runes = line.toRunes()
   var i = 0
@@ -1678,10 +1662,67 @@ proc firstContainerfileIssue(issues: seq[ContainerfileIssue]):
     return some(issues[0])
   return none(ContainerfileIssue)
 
+proc firstHeredocLine(contents: string): Option[int] =
+  # Refuse embedded bodies before the line parser can interpret their contents.
+  var continued = false
+  var acceptsHeredoc = false
+  var lineNumber = 0
+  for physicalLine in contents.splitLines():
+    inc lineNumber
+    let line = strutils.strip(physicalLine)
+    if line.len == 0 or line.startsWith("#"):
+      continue
+    var argumentAt = 0
+    if not continued:
+      while argumentAt < line.len and line[argumentAt] notin {' ', '\t'}:
+        inc argumentAt
+      let instruction = line[0 ..< argumentAt].toUpperAscii()
+      acceptsHeredoc = instruction in ["RUN", "COPY", "ADD"]
+      if instruction == "ONBUILD":
+        while argumentAt < line.len and line[argumentAt] in {' ', '\t'}:
+          inc argumentAt
+        let nestedAt = argumentAt
+        while argumentAt < line.len and line[argumentAt] notin {' ', '\t'}:
+          inc argumentAt
+        acceptsHeredoc = line[nestedAt ..< argumentAt].toUpperAscii() in
+                          ["RUN", "COPY", "ADD"]
+    var quote = '\0'
+    var escaped = false
+    var i = argumentAt
+    while acceptsHeredoc and i < line.len:
+      let c = line[i]
+      if escaped:
+        escaped = false
+      elif c == '\\' and quote != '\'':
+        escaped = true
+      elif quote != '\0':
+        if c == quote:
+          quote = '\0'
+      elif c in {'\'', '"'}:
+        quote = c
+      elif c == '#' and (i == 0 or line[i - 1] in {' ', '\t'}):
+        break
+      elif c == '<' and i + 1 < line.len and line[i + 1] == '<':
+        return some(lineNumber)
+      inc i
+    var trailingSlashes = 0
+    var last = line.len - 1
+    while last >= 0 and line[last] == '\\':
+      inc trailingSlashes
+      dec last
+    continued = trailingSlashes mod 2 == 1
+  return none(int)
+
 proc getFinalExecConfig*(contents: string, target = ""): tuple[
     config: Option[FinalExecConfig],
     errors: seq[string],
     issue: Option[ContainerfileIssue]] =
+  let heredocLine = firstHeredocLine(contents)
+  if heredocLine.isSome():
+    return (none(FinalExecConfig), @["heredoc is unsupported"],
+            some(ContainerfileIssue(kind: cfikUnsupportedForm,
+                                    instruction: none(ContainerInstruction),
+                                    line: heredocLine)))
   var
     errors: seq[string] = @[]
     issues: seq[ContainerfileIssue]
@@ -1695,11 +1736,6 @@ proc getFinalExecConfig*(contents: string, target = ""): tuple[
     selectingTarget = target != ""
 
   if selectingTarget:
-    let heredocAt = contents.find("<<")
-    if heredocAt >= 0:
-      errors.add("heredoc is unsupported for --target")
-      issues.addIssue(cfikUnsupportedForm, none(ContainerInstruction),
-                      some(lineNumberAt(contents, heredocAt)))
     for tok in parse.tokens:
       if tok.kind == tltDirective and tok.directive.name == "escape":
         errors.add("escape directive is unsupported for --target")
