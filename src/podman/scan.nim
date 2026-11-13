@@ -48,6 +48,45 @@ const nonRegistryPushTransports = [
   "oci-archive:",
 ]
 
+const podmanCurrentImageFacts = [
+  "DOCKER_PLATFORM",
+  "PODMAN_IMAGE_ID",
+  "_IMAGE_ARCHITECTURE",
+  "_IMAGE_CMD",
+  "_IMAGE_CONFIG_DIGEST",
+  "_IMAGE_ENTRYPOINT",
+  "_IMAGE_ONBUILD",
+  "_IMAGE_OS",
+  "_IMAGE_USER",
+  "_IMAGE_VARIANT",
+]
+
+proc projectPodmanMarkHistory*(extracted, current: ChalkDict): ChalkDict =
+  ## Keep only schema-declared chalk-time history from an embedded mark.
+  ## Local inspection owns current image facts, even when inspection could not
+  ## supply a value. This prevents a mark from filling gaps with stale or
+  ## attacker-controlled runtime metadata.
+  result = ChalkDict()
+  if extracted == nil:
+    return
+  for key, value in extracted:
+    if key in podmanCurrentImageFacts or (current != nil and key in current):
+      continue
+    let section = "keyspec." & key
+    if not sectionExists(section):
+      continue
+    let
+      kind = attrGetOpt[int](section & ".kind")
+      expectedType = attrGetOpt[Con4mType](section & ".type")
+    if kind.isNone() or kind.get() notin [
+      int(KtChalkableHost),
+      int(KtChalk),
+    ]:
+      continue
+    if expectedType.isNone() or not value.checkAutoType(expectedType.get()):
+      continue
+    result[key] = value
+
 proc registryPushReference(name: string): string =
   if name.startsWith("docker://"):
     return name["docker://".len .. ^1]
@@ -275,7 +314,9 @@ proc scanPodmanImage*(exe, image: string,
   if cancellation.isSome():
     return none(ChalkObj)
 
-  let mark = extractImageMark(exe, image, cancellation)
+  # Use the same immutable config digest for metadata and mark extraction. A
+  # mutable tag may be retargeted between the two reads.
+  let mark = extractImageMark(exe, id, cancellation)
   if cancellation.isSome():
     return none(ChalkObj)
   if mark.isSome():
@@ -283,7 +324,9 @@ proc scanPodmanImage*(exe, image: string,
       if not recognizablePodmanMark(parseJson(mark.get())):
         raise newException(ValueError, "unrecognized mark")
       let extracted = extractOneChalkJson(mark.get(), image)
-      chalk.collectedData.update(extracted)
+      chalk.collectedData.merge(
+        projectPodmanMarkHistory(extracted, chalk.collectedData),
+      )
       chalk.extract    = extracted
       chalk.cachedMark = mark.get()
       chalk.marked     = true

@@ -9,7 +9,20 @@ import std/strutils
 import ../../src/podman/cmdline
 import ../../src/podman/report
 import ../../src/podman/types
+import ../../src/run_management
 import ../../src/types as chalk_types
+
+proc runCmdInsert(path: seq[string])
+    {.exportc: "runCmdInsert", cdecl.} =
+  doAssert false, "runCmdInsert unexpectedly called with " & $path
+
+proc runCmdExtract(path: seq[string])
+    {.exportc: "runCmdExtract", cdecl.} =
+  doAssert false, "runCmdExtract unexpectedly called with " & $path
+
+proc runCmdDelete(path: seq[string])
+    {.exportc: "runCmdDelete", cdecl.} =
+  doAssert false, "runCmdDelete unexpectedly called with " & $path
 
 template assertEq(a, b: untyped) =
   doAssert a == b, $a & " != " & $b
@@ -469,6 +482,71 @@ proc main() =
     ),
     @["podman", "build", "--build-arg", redactedArgText,
       "--env=" & redactedArgText, "--secret", redactedArgText, "."],
+  )
+
+  let retainedCanary = "retained-state-canary"
+  let
+    representedCanary = "represented-state-canary"
+    representedSecret = "key:\"" & representedCanary & "\npassphrase"
+  let retainedConfidential = @[
+    PodmanConfidentialArg(
+      flag: "--creds",
+      value: "user:" & retainedCanary,
+    ),
+    PodmanConfidentialArg(
+      flag: "--decryption-key",
+      value: representedSecret,
+    ),
+  ]
+  hostInfo = chalk_types.ChalkDict()
+  hostInfo["_OP_ARGV"] = chalk_types.pack(@[
+    "podman", "push", "--creds=user:" & retainedCanary, "img",
+  ])
+  hostInfo["_OP_ERRORS"] = chalk_types.pack(@[
+    "sink retained user:" & retainedCanary,
+  ])
+  hostInfo["REPR_ERROR"] = chalk_types.pack(
+    "native argv error: " & repr(representedSecret),
+  )
+  let nestedRetained = chalk_types.ChalkDict()
+  nestedRetained["message"] = chalk_types.pack(
+    "cache retained user:" & retainedCanary,
+  )
+  hostInfo["NESTED_RETAINED"] = chalk_types.pack(nestedRetained)
+  systemErrors = @["system retained user:" & retainedCanary]
+  failedKeys = chalk_types.ChalkDict()
+  failedKeys["TEST"] = chalk_types.pack(
+    "failed key retained user:" & retainedCanary,
+  )
+  let retainedChalk = newChalk(
+    name = "retained",
+    extract = chalk_types.ChalkDict(),
+  )
+  retainedChalk.extract["CHALK_ID"] = chalk_types.pack(retainedCanary)
+  retainedChalk.collectedData["ERR_INFO"] = chalk_types.pack(@[
+    "artifact retained user:" & retainedCanary,
+  ])
+  retainedChalk.failedKeys["TEST"] = chalk_types.pack(
+    "artifact failed key user:" & retainedCanary,
+  )
+  retainedChalk.err = @["artifact error user:" & retainedCanary]
+  retainedChalk.addToAllChalks()
+  retainedChalk.addToAllArtifacts()
+
+  redactPodmanRetainedState(retainedConfidential)
+
+  let retainedJson = chalk_types.pack(hostInfo).boxToJson() & "\n" &
+                     chalk_types.pack(retainedChalk.collectedData).boxToJson() & "\n" &
+                     chalk_types.pack(retainedChalk.failedKeys).boxToJson() & "\n" &
+                     chalk_types.pack(failedKeys).boxToJson() & "\n" &
+                     systemErrors.join("\n") & "\n" &
+                     retainedChalk.err.join("\n")
+  doAssert retainedCanary notin retainedJson
+  doAssert representedCanary notin retainedJson, retainedJson
+  doAssert retainedCanary in chalk_types.pack(retainedChalk.extract).boxToJson()
+  assertEq(
+    chalk_types.unpack[seq[string]](hostInfo["_OP_ARGV"]),
+    @["podman", "push", "--creds=" & redactedArgText, "img"],
   )
 
 main()

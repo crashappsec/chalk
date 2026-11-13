@@ -6,7 +6,12 @@
 ##
 
 import std/strutils
-import "../types"
+import ".."/[
+  collect,
+  reporting,
+  run_management,
+  types,
+]
 import "./types" as podman_types
 
 const redactedArgText* = "<<redact>>"
@@ -227,6 +232,78 @@ proc redactProcessArgvs(value: Box,
       processes[pid] = pack(process)
   return pack(processes)
 
+proc redactRetainedText(
+    text: string,
+    confidential: openArray[podman_types.PodmanConfidentialArg],
+): string =
+  result = redactPodmanArgv(@[text], confidential)[0]
+  if result != text:
+    return
+  for arg in confidential:
+    if arg.value == "":
+      continue
+    # Error formatting often applies repr() to argv or to a value before it is
+    # retained. Match escaped forms and ordered alphanumeric fragments because
+    # Nim's repr() may include addresses and numeric control-character escapes.
+    if escape(arg.value) in text or repr(arg.value) in text:
+      return redactedArgText
+    var
+      fragments: seq[string]
+      fragment = ""
+    for character in arg.value:
+      if character in {'a' .. 'z', 'A' .. 'Z', '0' .. '9'}:
+        fragment.add(character)
+      else:
+        if len(fragment) >= 3:
+          fragments.add(fragment)
+        fragment = ""
+    if len(fragment) >= 3:
+      fragments.add(fragment)
+    var
+      searchFrom = 0
+      matchedCharacters = 0
+    for item in fragments:
+      let found = text.find(item, searchFrom)
+      if found < 0:
+        matchedCharacters = 0
+        break
+      matchedCharacters += len(item)
+      searchFrom = found + len(item)
+    if matchedCharacters >= 8:
+      return redactedArgText
+
+proc redactRetainedBox(
+    value: Box,
+    confidential: openArray[podman_types.PodmanConfidentialArg],
+): Box =
+  if value.isNil:
+    return value
+  case value.kind
+  of MkStr:
+    return pack(redactRetainedText(unpack[string](value), confidential))
+  of MkSeq:
+    var redacted: seq[Box]
+    for item in unpack[seq[Box]](value):
+      redacted.add(redactRetainedBox(item, confidential))
+    return pack(redacted)
+  of MkTable:
+    try:
+      let source = unpack[ChalkDict](value)
+      let redacted = ChalkDict()
+      for key, item in source:
+        redacted[key] = redactRetainedBox(item, confidential)
+      return pack(redacted)
+    except CatchableError:
+      # Report state uses string-keyed dictionaries. If another table type is
+      # retained, redact the whole value when its printable form carries a
+      # confidential representation instead of risking partial traversal.
+      let printable = $value
+      if redactRetainedText(printable, confidential) != printable:
+        return pack(redactedArgText)
+      return value
+  of MkInt, MkFloat, MkBool, MkObj:
+    return value
+
 proc redactPodmanReportFields*(dict: ChalkDict,
                                confidential: openArray[podman_types.PodmanConfidentialArg]) =
   if dict == nil or len(confidential) == 0:
@@ -242,3 +319,57 @@ proc redactPodmanReportFields*(dict: ChalkDict,
     dict["_OP_ALL_PS_INFO"] = redactProcessArgvs(
       dict["_OP_ALL_PS_INFO"], confidential,
     )
+  for key, value in dict:
+    dict[key] = redactRetainedBox(value, confidential)
+
+proc redactPodmanRetainedState*(
+    confidential: openArray[podman_types.PodmanConfidentialArg],
+) =
+  ## Remove confidential command values from every report-retained state
+  ## container. ChalkObj.extract and cachedMark deliberately remain unchanged:
+  ## they describe the embedded artifact mark and never receive native argv.
+  if len(confidential) == 0:
+    return
+  setArgs(redactPodmanArgv(getArgs(), confidential))
+  redactPodmanReportFields(hostInfo, confidential)
+  redactPodmanReportFields(failedKeys, confidential)
+  for index in 0 ..< len(systemErrors):
+    systemErrors[index] = redactRetainedText(systemErrors[index], confidential)
+  for actionIndex in 0 ..< len(externalActions):
+    externalActions[actionIndex] = redactPodmanArgv(
+      externalActions[actionIndex], confidential,
+    )
+  let context = getCurrentCollectionCtx()
+  context.report = redactRetainedBox(context.report, confidential)
+  for chalk in getAllChalks() & getAllArtifacts():
+    if chalk == nil:
+      continue
+    redactPodmanReportFields(chalk.collectedData, confidential)
+    redactPodmanReportFields(chalk.failedKeys, confidential)
+    for index in 0 ..< len(chalk.err):
+      chalk.err[index] = redactRetainedText(chalk.err[index], confidential)
+
+proc doPodmanReporting*(
+    reportArgs: seq[string],
+    confidential: openArray[podman_types.PodmanConfidentialArg],
+    topic: string,
+    quietOutput = false,
+) =
+  ## Collect the last host facts, redact all report state, and prevent the
+  ## reporting layer from recollecting raw process data before serialization.
+  setArgs(reportArgs)
+  try:
+    collectRunTimeHostInfo()
+  finally:
+    redactPodmanRetainedState(confidential)
+  suspendHostCollection()
+  try:
+    if quietOutput:
+      doReportingWithStdoutRedirected(topic)
+    else:
+      doReporting(topic)
+  finally:
+    # A failing sink may retain an error after serialization starts. Scrub it
+    # before the caller can reuse or cache the collection state.
+    redactPodmanRetainedState(confidential)
+    restoreHostCollection()

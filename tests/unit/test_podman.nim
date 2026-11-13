@@ -404,6 +404,8 @@ proc main() =
     assertEq(r.image, image)
     assertEq(r.destination, destination)
     assertEq(r.originalArgs, args)
+    assertEq(r.reportArgs, args)
+    assertEq(len(r.confidentialArgs), 0)
 
   expectTransfer(@["pull", "busybox"], prPull, "busybox")
   expectTransfer(@["pull", "-q", "busybox"], prPull, "busybox")
@@ -439,11 +441,117 @@ proc main() =
     "push", "--digestfile=/tmp/digest", "sha256:abc",
     "docker://reg/dest:tag",
   ], prPush, "sha256:abc", some("docker://reg/dest:tag"))
+  expectTransfer(@["push", "--sign-by", "key", "img"], prPush, "img")
+  expectTransfer(@["push", "-f", "oci", "img"], prPush, "img")
+  expectTransfer(@["pull", "--platform", "linux/arm64", "reg/img"],
+                 prPull, "reg/img")
   expectTransfer(@["pull", "--", "busybox"], prPull, "busybox")
 
-  # A bare flag we do not recognise may or may not consume the next token, so
-  # the image operand cannot be identified safely.
-  expectPass(@["push", "--sign-by", "key", "img"])
+  let credentialCases = @[
+    (
+      args: @[
+        "push", "--creds=push-user:push-equals-canary", "img",
+      ],
+      expected: @[
+        "push", "--creds=" & redactedArgText, "img",
+      ],
+      flag: "--creds",
+      value: "push-user:push-equals-canary",
+      kind: prPush,
+    ),
+    (
+      args: @[
+        "push", "--creds", "push-user:push-separated-canary", "img",
+      ],
+      expected: @[
+        "push", "--creds", redactedArgText, "img",
+      ],
+      flag: "--creds",
+      value: "push-user:push-separated-canary",
+      kind: prPush,
+    ),
+    (
+      args: @[
+        "pull", "--creds=pull-user:pull-equals-canary", "img",
+      ],
+      expected: @[
+        "pull", "--creds=" & redactedArgText, "img",
+      ],
+      flag: "--creds",
+      value: "pull-user:pull-equals-canary",
+      kind: prPull,
+    ),
+    (
+      args: @[
+        "pull", "--creds", "pull-user:pull-separated-canary", "img",
+      ],
+      expected: @[
+        "pull", "--creds", redactedArgText, "img",
+      ],
+      flag: "--creds",
+      value: "pull-user:pull-separated-canary",
+      kind: prPull,
+    ),
+    (
+      args: @[
+        "pull", "--decryption-key=/keys/key.pem:decrypt-equals-canary", "img",
+      ],
+      expected: @[
+        "pull", "--decryption-key=" & redactedArgText, "img",
+      ],
+      flag: "--decryption-key",
+      value: "/keys/key.pem:decrypt-equals-canary",
+      kind: prPull,
+    ),
+    (
+      args: @[
+        "pull", "--decryption-key", "/keys/key.pem:decrypt-separated-canary",
+        "img",
+      ],
+      expected: @[
+        "pull", "--decryption-key", redactedArgText, "img",
+      ],
+      flag: "--decryption-key",
+      value: "/keys/key.pem:decrypt-separated-canary",
+      kind: prPull,
+    ),
+  ]
+  for credentialCase in credentialCases:
+    let credentialRoute = classifyPodmanArgs(credentialCase.args)
+    assertEq(credentialRoute.kind, credentialCase.kind)
+    assertEq(credentialRoute.image, "img")
+    assertEq(credentialRoute.originalArgs, credentialCase.args)
+    assertEq(credentialRoute.reportArgs, credentialCase.expected)
+    assertEq(credentialRoute.confidentialArgs, @[
+      PodmanConfidentialArg(
+        flag: credentialCase.flag,
+        value: credentialCase.value,
+      ),
+    ])
+    doAssert credentialCase.value in credentialRoute.originalArgs.join(" ")
+    doAssert credentialCase.value notin credentialRoute.reportArgs.join(" ")
+
+  # An unknown option can consume an operand. Chalk passes the command through
+  # and reports only the bounded flag name in its operational notice.
+  let unknownTransfer = expectSkip(
+    @[
+      "push", "--future-option=future-option-value-canary", "img",
+    ],
+    poPush,
+    psrUnsupportedFlag,
+    "--future-option",
+  )
+  doAssert "future-option-value-canary" notin formatPodmanSkip(unknownTransfer)
+  let unknownSeparated = expectSkip(
+    @[
+      "pull", "--future-option", "future-separated-value-canary", "img",
+    ],
+    poPull,
+    psrUnsupportedFlag,
+    "--future-option",
+  )
+  doAssert "future-separated-value-canary" notin
+    formatPodmanSkip(unknownSeparated)
   # operand counts
   expectPass(@["pull"])
   expectPass(@["push"])
