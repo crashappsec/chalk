@@ -1,0 +1,3 @@
+ARG BUILD_IMAGE=chalk-redbox-build:ci
+FROM ${BUILD_IMAGE}
+RUN apk add --no-cache python3

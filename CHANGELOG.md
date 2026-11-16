@@ -4,6 +4,13 @@
 
 ### New Features
 
+- Configurable Redbox Contract 2 lifecycle reports for builds, exec, and
+  heartbeats, with a domain override and explicit disablement.
+- Custom reports can opt into `report_if_empty` to emit host-only metadata
+  when no artifacts were collected, and `before_command` to publish before
+  the command report. Docker fallback reporting also covers early spawn
+  failures while preserving the underlying command result.
+
 - Opt-in build policies for `chalk docker build` and `chalk docker push`,
   disabled by default (`policy.mode = "off"`) with no change in behavior
   unless enabled. The new `policy` configuration section restricts base images (and `COPY --from`

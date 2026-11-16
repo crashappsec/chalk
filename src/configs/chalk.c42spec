@@ -1753,6 +1753,28 @@ verbatim in each report.
 """
   }
 
+  field report_if_empty {
+    type:    bool
+    default: false
+    doc:     """
+When `per_chalk` is true and no chalk objects were collected, emit one
+host-only report. This allows a lifecycle report to describe an operation
+that failed before collecting an artifact. The default preserves the
+usual behavior of emitting no per-artifact report for an empty collection.
+"""
+  }
+
+  field before_command {
+    type:    bool
+    default: false
+    doc:     """
+Publish this custom report before the command report and other custom
+reports. Use this for a small independent signal that should be attempted
+before potentially slow report sinks. Sink priority orders subscribers
+within a topic; it does not order different report topics.
+"""
+  }
+
   field doc {
     type:     string
     require:  false

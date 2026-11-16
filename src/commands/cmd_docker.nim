@@ -50,6 +50,15 @@ proc runCmdDocker*(args: seq[string]) =
     ctx      = initDockerInvocation(args)
   dockerInvocation = ctx
 
+  # Preserve the operation on early preparation/failsafe paths as well.
+  # A help invocation is a passthrough, not a build lifecycle event.
+  if "help" notin ctx.processedFlags:
+    case ctx.cmd
+    of DockerCmd.build: setFullCommandName("build")
+    of DockerCmd.push:  setFullCommandName("push")
+    of DockerCmd.pull:  setFullCommandName("pull")
+    else: discard
+
   if getDockerExeLocation() == "":
     error("docker command is missing. chalk requires docker binary installed to wrap docker commands.")
     ctx.dockerFailsafe()
