@@ -262,6 +262,15 @@ proc connectUdpSocket(host: string, port: Port): Socket =
   )
   result.connect(host, port)
 
+proc systemDnsServer*(): string =
+  ## Select one numeric resolver without a recursive hostname lookup.
+  for line in readFile("/etc/resolv.conf").splitLines():
+    let parts = line.splitWhitespace()
+    if parts.len >= 2 and parts[0] == "nameserver":
+      discard parseIpAddress(parts[1])
+      return parts[1]
+  raise newException(IOError, "No numeric nameserver in /etc/resolv.conf")
+
 proc dnsLookupSystem(domain: string, qtype: DnsQtype) =
   var hints: AddrInfo
   hints.ai_family = case qtype

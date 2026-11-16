@@ -1,3 +1,6 @@
+# The importing profile must declare a string RunTimeHost keyspec named
+# _X_WORKSPACE_ID, before or after this component. Its value is optional.
+# Do not redeclare that keyspec here: profiles may already own its type/value.
 parameter var redbox_enabled {
   default:  false
   shortdoc: "Enable rich Redbox reports"
@@ -7,7 +10,7 @@ parameter var redbox_enabled {
 parameter var redbox_domain {
   default:  "et.crashoverride.run"
   shortdoc: "Redbox DNS domain"
-  doc:      "Base domain for Contract 2 lifecycle signals; enable reporting only after registering the schemas. Requires custom-report before_command and report_if_empty support."
+  doc:      "Base domain for Contract 2 lifecycle signals; enable reporting only after registering the schemas. Requires custom-report phase and empty-report support."
 }
 
 parameter sink_config.redbox_build.domain_template {
@@ -59,36 +62,46 @@ func trunc16(v: string) {
   return lower(slice(v, 0, 16))
 }
 
+func hash_trunc19(v: string) {
+  return lower(slice(sha256(v), 0, 19))
+}
+
 func hash_trunc16(v: string) {
   return lower(slice(sha256(v), 0, 16))
 }
 
 sink_config redbox_build {
   ~sink:                    "dns"
+  ~dns_use_resolv_conf:     true
+  dns_timeout:              500
   ~missing_key_placeholder: "na"
   ~normalize._OP_CHALKER_VERSION.callback: func dot_to_hyphen
   ~normalize._X_WORKSPACE_ID.callback:     func hash_trunc16
   ~normalize.CHALK_ID.callback:            func to_lower
-  ~normalize.METADATA_ID.callback:         func to_lower
+  ~normalize.METADATA_ID.callback:         func hash_trunc19
 }
 
 sink_config redbox_exec {
   ~sink:                    "dns"
+  ~dns_use_resolv_conf:     true
+  dns_timeout:              500
   ~missing_key_placeholder: "na"
   ~normalize._OP_CHALKER_VERSION.callback:   func dot_to_hyphen
   ~normalize._EXEC_ID.callback:              func to_lower
   ~normalize._EXEC_DEPLOYMENT_ID.callback:   func trunc16
   ~normalize._X_WORKSPACE_ID.callback:       func hash_trunc16
-  ~normalize.METADATA_ID.callback:           func to_lower
+  ~normalize.METADATA_ID.callback:           func hash_trunc19
 }
 
 sink_config redbox_heartbeat {
   ~sink:     "dns"
+  ~dns_use_resolv_conf: true
+  dns_timeout:          500
   ~missing_key_placeholder: "na"
   ~normalize._OP_CHALKER_VERSION.callback: func dot_to_hyphen
   ~normalize._EXEC_ID.callback:            func to_lower
   ~normalize._X_WORKSPACE_ID.callback:     func hash_trunc16
-  ~normalize.METADATA_ID.callback:         func to_lower
+  ~normalize.METADATA_ID.callback:         func hash_trunc19
 }
 
 report_template redbox_build {
@@ -136,7 +149,7 @@ custom_report redbox_build {
   ~use_when:        ["build"]
   ~per_chalk:       true
   ~report_if_empty: true
-  ~before_command:  false
+  ~after_others:    true
 }
 
 custom_report redbox_exec {
@@ -146,7 +159,7 @@ custom_report redbox_exec {
   ~use_when:        ["exec"]
   ~per_chalk:       true
   ~report_if_empty: true
-  ~before_command:  false
+  ~after_others:    true
 }
 
 custom_report redbox_heartbeat {
@@ -156,5 +169,5 @@ custom_report redbox_heartbeat {
   ~use_when:        ["heartbeat"]
   ~per_chalk:       true
   ~report_if_empty: true
-  ~before_command:  false
+  ~after_others:    true
 }

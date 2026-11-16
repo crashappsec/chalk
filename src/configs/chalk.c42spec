@@ -1764,13 +1764,23 @@ usual behavior of emitting no per-artifact report for an empty collection.
 """
   }
 
+  field after_others {
+    type:    bool
+    default: false
+    doc:     """
+Publish this custom report after the command, ordinary custom and policy
+reports. Use this for optional telemetry that must not delay those reports.
+Cannot be combined with `before_command`. Existing report order is unchanged
+unless this field is enabled.
+"""
+  }
+
   field before_command {
     type:    bool
     default: false
     doc:     """
 Publish this custom report before the command report and other custom
-reports. Use this for a small independent signal that should be attempted
-before potentially slow report sinks. Sink priority orders subscribers
+reports. This phase still depends on collection and reporting machinery. Sink priority orders subscribers
 within a topic; it does not order different report topics.
 """
   }
@@ -6254,6 +6264,9 @@ func custom_report_extra_validation() {
   report_sects := sections("custom_report")
   for i from 0 to len(report_sects) {
     base := "custom_report." + report_sects[i] + "."
+    if attr_get(base + "before_command", bool) and attr_get(base + "after_others", bool) {
+      return "Custom Report '" + report_sects[i] + "' cannot set both before_command and after_others"
+    }
     if attr_get(base + "report_template", string) == "" {
       return "Custom Report '" + report_sects[i] + "' must set a report"
     }
@@ -6348,7 +6361,7 @@ func sink_config_check(path) {
       }
     }
     elif contains(["enabled", "use_search_path", "disallow_http", "prefer_bundled_certs",
-                   "require_chalk_mark"], conffield) {
+                   "require_chalk_mark", "dns_use_resolv_conf"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, bool) {
           return conffield + ": Field must be `true` or `false`"

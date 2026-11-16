@@ -672,6 +672,7 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
     placeholder      = cfg.params.getOrDefault("missing_key_placeholder", "x")
     recordType       = cfg.params.getOrDefault("record_type", "A")
     dnsServer        = cfg.params.getOrDefault("dns_server", "")
+    useResolvConf    = cfg.params.getOrDefault("dns_use_resolv_conf", "false") == "true"
     timeoutMs        = parseInt(cfg.params.getOrDefault("dns_timeout", "5000"))
     requireChalkMark = cfg.params.getOrDefault("require_chalk_mark", "false") == "true"
     qtype            = case recordType.toUpperAscii()
@@ -715,7 +716,7 @@ proc dnsSinkOut(msg: string, cfg: SinkConfig, t: Topic, ignored: StringTable) =
       )
       dnsLookup(
         domain    = domain,
-        server    = dnsServer,
+        server    = if dnsServer == "" and useResolvConf: systemDnsServer() else: dnsServer,
         qtype     = qtype,
         timeoutMs = timeoutMs,
       )
@@ -737,6 +738,7 @@ proc addDnsSink*() =
       "missing_key_placeholder": false,
       "dns_server":              false,
       "dns_timeout":             false,
+      "dns_use_resolv_conf":     false,
       "disable_after_errors":    false,
       "require_chalk_mark":      false,
     }.toTable()

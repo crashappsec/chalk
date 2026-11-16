@@ -5,10 +5,13 @@ Linux: python3 tests/integration/test_redbox_reporting.py ./chalk
 No production endpoints or credentials are used.
 """
 
+from contextlib import contextmanager
+import hashlib
 import http.server
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import socketserver
 import struct
@@ -36,6 +39,8 @@ class LifecycleReporting(unittest.TestCase):
         self.http_gate = None
         self.http_status = 200
         self.drop_dns = False
+        self.dns_rcode = 0
+        self.dns_answers = False
         events = self.events
         test = self
 
@@ -55,11 +60,21 @@ class LifecycleReporting(unittest.TestCase):
                     test.on_query(name)
                 if test.drop_dns:
                     return
+                answer = b""
+                if test.dns_answers and not test.dns_rcode:
+                    qtype = struct.unpack("!H", packet[offset + 1 : offset + 3])[0]
+                    data = b"\x7f\x00\x00\x01" if qtype == 1 else b"\x00" * 15 + b"\x01"
+                    answer = (
+                        b"\xc0\x0c"
+                        + struct.pack("!HHIH", qtype, 1, 0, len(data))
+                        + data
+                    )
                 response = (
                     packet[:2]
-                    + b"\x81\x80"
-                    + struct.pack("!HHHH", 1, 0, 0, 0)
+                    + struct.pack("!H", 0x8180 | test.dns_rcode)
+                    + struct.pack("!HHHH", 1, int(bool(answer)), 0, 0)
                     + packet[12:]
+                    + answer
                 )
                 sock.sendto(response, self.client_address)
 
@@ -104,16 +119,38 @@ class LifecycleReporting(unittest.TestCase):
         beacon=False,
         initial_sleep_ms=1,
         beacon_server=None,
+        workspace_id="00000000-0000-4000-8000-000000000001",
+        declare_workspace=True,
+        component=True,
+        system_resolver=False,
+        expect_success=True,
     ):
-        beacon_server = beacon_server or f"127.0.0.1:{self.dns.server_address[1]}"
+        if beacon_server is None:
+            beacon_server = (
+                "" if system_resolver else f"127.0.0.1:{self.dns.server_address[1]}"
+            )
+        workspace = ""
+        if declare_workspace:
+            value = (
+                ""
+                if workspace_id is None
+                else f"value: {json.dumps(workspace_id, ensure_ascii=False)}"
+            )
+            workspace = f"keyspec _X_WORKSPACE_ID {{ kind: RunTimeHost; type: string; {value} }}"
+        load = f'use redbox from "{ROOT / "configs/co"}"' if component else ""
+        dns = ""
+        if component:
+            dns = f'redbox_beacon.dns_server = "{beacon_server}"\n'
+            if not system_resolver:
+                dns += "\n".join(
+                    f'sink_config.redbox_{name}.dns_server = "127.0.0.1:{self.dns.server_address[1]}"'
+                    for name in ("build", "exec", "heartbeat")
+                )
+
         uri = str(ROOT / "configs/co/redbox")
         config = self.path / "profile.c4m"
-        config.write_text(f"""keyspec _X_WORKSPACE_ID {{
-  kind: RunTimeHost
-  type: string
-  value: "00000000-0000-4000-8000-000000000001"
-}}
-use redbox from "{ROOT / 'configs/co'}"
+        config.write_text(f"""{load}
+{workspace}
 use_report_cache = false
 skip_command_report = {str(not command_report).lower()}
 publish_audit = false
@@ -121,17 +158,16 @@ run_sbom_tools = false
 exec.initial_sleep_time = <<{initial_sleep_ms} msecs>>
 exec.heartbeat.rate = <<50 msecs>>
 exec.postexec.run = false
-redbox_beacon.dns_server = "{beacon_server}"
-sink_config.redbox_build.dns_server = "127.0.0.1:{self.dns.server_address[1]}"
-sink_config.redbox_exec.dns_server = "127.0.0.1:{self.dns.server_address[1]}"
-sink_config.redbox_heartbeat.dns_server = "127.0.0.1:{self.dns.server_address[1]}"
+{dns}
 {extra}
 """)
         params = [
             [False, uri, "redbox_domain", "string", "example.test"],
             [True, uri, "redbox_beacon.enabled", "bool", beacon],
         ]
-        if enabled is not None:
+        if not component:
+            params = []
+        if component and enabled is not None:
             params.append([False, uri, "redbox_enabled", "bool", enabled])
         if build_template is not None:
             params.append(
@@ -151,8 +187,10 @@ sink_config.redbox_heartbeat.dns_server = "127.0.0.1:{self.dns.server_address[1]
             str(config),
             input=json.dumps(params),
         )
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        if expect_success:
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.events.clear()
+        return result
 
     def queries(self):
         return [value for kind, value in self.events if kind == "dns"]
@@ -252,11 +290,18 @@ subscribe("report", "normal_http")
             f"while not Path({str(stop)!r}).exists(): time.sleep(0.01)\n"
         )
         executable = Path("/usr/bin/python3")
+        expected_artifact = None
         if marked:
             executable = self.path / "python3"
             shutil.copy2("/usr/bin/python3", executable)
             inserted = self.run_chalk("insert", str(executable))
             self.assertEqual(inserted.returncode, 0, inserted.stderr)
+            text = executable.read_bytes().decode("utf-8", errors="replace")
+            start = re.search(r'\{\s*"MAGIC"\s*:\s*"dadfedabbadabbed"', text)
+            self.assertIsNotNone(start)
+            mark, _ = json.JSONDecoder().raw_decode(text[start.start() :])
+            original = mark["METADATA_ID"]
+            expected_artifact = hashlib.sha256(original.encode()).hexdigest()[:19]
 
         def received(query):
             if sum(q.startswith("ch.") for q in self.queries()) >= 3:
@@ -278,6 +323,8 @@ subscribe("report", "normal_http")
         artifact = startup[0].split(".")[8]
         self.assertEqual(len(execution), 16)
         self.assertEqual(artifact == "na", not marked)
+        if marked:
+            self.assertEqual(artifact, expected_artifact)
         for index, query in enumerate(beats, 1):
             self.assertEqual(query.split(".")[6], execution)
             self.assertEqual(query.split(".")[7], artifact)
@@ -396,6 +443,9 @@ subscribe("report", "normal_http")
         self.assertLess(time.monotonic() - started, 2)
         self.assertGreaterEqual(sum(q.startswith("hs.") for q in self.queries()), 3)
         self.assertNotIn("DNS query timed out", result.stderr)
+        stamps = [int(q.split(".")[3]) for q in self.queries() if q.startswith("hs.")]
+        self.assertGreater(len(set(stamps)), 1)
+        self.assertTrue(any(stamp % 1000 for stamp in stamps))
 
     def test_independent_beacon_survives_failed_http(self):
         self.configure(
@@ -451,6 +501,123 @@ subscribe("report", "normal_http")
         result = self.run_chalk("exec", "--exec-command-name=/bin/sleep", "0.01")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.queries(), [])
+
+    @contextmanager
+    def system_resolver(self):
+        # Tests run in an isolated, network-disabled Linux container. Restore
+        # resolver configuration even if a check fails.
+        path = Path("/etc/resolv.conf")
+        original = path.read_text()
+        server = socketserver.UDPServer(("127.0.0.1", 53), self.dns.RequestHandlerClass)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            path.write_text("nameserver 127.0.0.1\noptions attempts:1 timeout:1\n")
+            yield
+        finally:
+            path.write_text(original)
+            server.shutdown()
+            server.server_close()
+
+    def test_deferred_dns_follows_custom_http_when_resolver_drops_queries(self):
+        self.configure(
+            f"""sink_config primary_http {{
+  sink: "post"
+  uri: "http://127.0.0.1:{self.http.server_address[1]}/primary"
+}}
+custom_report primary_http {{
+  report_template: "redbox_build"
+  sink_configs: ["primary_http"]
+  use_when: ["env"]
+}}
+custom_report deferred_probe {{
+  report_template: "redbox_build"
+  sink_configs: ["redbox_build"]
+  use_when: ["env"]
+  after_others: true
+}}
+""",
+            system_resolver=True,
+        )
+        self.drop_dns = True
+        with self.system_resolver():
+            started = time.monotonic()
+            result = self.run_chalk("env")
+            elapsed = time.monotonic() - started
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([kind for kind, _ in self.events], ["http", "dns"])
+        self.assertLess(elapsed, 3)
+
+    def test_default_system_resolver_success_and_failures(self):
+        self.configure(
+            """sink_config system_probe {
+  sink: "dns"
+  domain_template: "probe.example.test"
+}
+subscribe("report", "system_probe")
+""",
+            component=False,
+            command_report=True,
+        )
+        with self.system_resolver():
+            for answers, rcode, success in [
+                (True, 0, True),
+                (False, 0, False),
+                (False, 3, False),
+            ]:
+                with self.subTest(answers=answers, rcode=rcode):
+                    self.dns_answers, self.dns_rcode = answers, rcode
+                    result = self.run_chalk("env")
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(
+                        "DNS lookup failed" not in result.stderr, success, result.stderr
+                    )
+
+    def test_opaque_and_absent_workspace_values(self):
+        for value in ["sample_team/Case A", None, ""]:
+            with self.subTest(value=value):
+                self.configure(
+                    "exec.chalk_as_parent = true", workspace_id=value, beacon=True
+                )
+                result = self.run_chalk(
+                    "exec", "--exec-command-name=/bin/sleep", "0.01"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                expected = (
+                    hashlib.sha256(value.encode()).hexdigest()[:16] if value else "na"
+                )
+                queries = self.queries()
+                self.assertEqual(len(queries), 2, result.stderr)
+                self.assertTrue(any(q.startswith("ce.") for q in queries))
+                self.assertTrue(any(q.startswith("es.") for q in queries))
+                self.assertTrue(
+                    all(q.split(".")[-4] == expected for q in queries), queries
+                )
+
+    def test_missing_workspace_keyspec_has_clear_load_error(self):
+        result = self.configure(declare_workspace=False, expect_success=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("_X_WORKSPACE_ID", result.stderr)
+        self.assertIn("no matching keyspec", result.stderr)
+
+    def test_without_component_does_not_use_exception_for_disablement(self):
+        self.configure(component=False)
+        result = self.run_chalk(
+            "exec", "--log-level=trace", "--exec-command-name=/bin/sleep", "0.01"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("beacon skipped", result.stderr)
+        self.assertEqual(self.queries(), [])
+
+    def test_conflicting_custom_report_phases_are_rejected(self):
+        result = self.configure(
+            self.probe_config().replace(
+                "before_command: true", "before_command: true\n  after_others: true"
+            ),
+            expect_success=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cannot set both", result.stderr)
 
     def test_multiple_artifacts_emit_one_query_each(self):
         self.configure(self.probe_config(operation="insert"))

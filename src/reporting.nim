@@ -150,11 +150,13 @@ proc activeCustomReportTopics*(): seq[string] =
       continue
     result.add(topic)
 
-proc doCustomReporting(beforeCommand = false) =
+proc doCustomReporting(beforeCommand = false, afterOthers = false) =
   for topic in activeCustomReportTopics():
     trace(topic & ": checking custom report")
     let spec = "custom_report." & topic
     if attrGetOpt[bool](spec & ".before_command").get(false) != beforeCommand:
+      continue
+    if attrGetOpt[bool](spec & ".after_others").get(false) != afterOthers:
       continue
     var sinkConfs = attrGet[seq[string]](spec & ".sink_configs")
 
@@ -236,6 +238,8 @@ proc doReporting*(
       doCustomReporting()
     doPolicyReporting()
     doPolicySummary()
+    if not skipCustom:
+      doCustomReporting(afterOthers = true)
     if writeCache:
       writeReportCache()
     else:

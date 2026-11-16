@@ -22,7 +22,7 @@ type Beacon = object
   domain, server, version, execution, workspace: string
 
 proc beaconConfig(): Option[Beacon] =
-  if not attrGet[bool]("redbox_beacon.enabled"):
+  if not attrGetOpt[bool]("redbox_beacon.enabled").get(false):
     return none(Beacon)
   var b = Beacon(
     domain: attrGet[string]("redbox_beacon.domain"),
@@ -37,11 +37,7 @@ proc beaconConfig(): Option[Beacon] =
   if workspace != "":
     b.workspace = workspace.sha256().hex()[0 ..< 16].toLowerAscii()
   if b.server == "":
-    for line in readFile("/etc/resolv.conf").splitLines():
-      let parts = line.splitWhitespace()
-      if parts.len >= 2 and parts[0] == "nameserver":
-        b.server = parts[1]
-        break
+    b.server = systemDnsServer()
   if b.server == "":
     return none(Beacon)
   # Validate now; the delivery path must never resolve a resolver hostname.
@@ -51,7 +47,7 @@ proc beaconConfig(): Option[Beacon] =
 
 proc emit(b: Beacon, event: string, sequence: int, exitCode = "na") =
   let query = @[event, event & "1", b.version,
-                $(getTime().toUnix() * 1000), b.execution, $sequence,
+                $int64(getTime().toUnixFloat() * 1000), b.execution, $sequence,
                 exitCode, b.workspace, "chalk", b.domain].join(".")
   sendDnsDatagram(query, b.server)
 
