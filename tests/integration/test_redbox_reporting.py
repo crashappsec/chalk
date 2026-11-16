@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,6 +33,9 @@ class LifecycleReporting(unittest.TestCase):
         shutil.copy2(BINARY, self.chalk)
         self.events = []
         self.on_query = None
+        self.http_gate = None
+        self.http_status = 200
+        self.drop_dns = False
         events = self.events
         test = self
 
@@ -49,6 +53,8 @@ class LifecycleReporting(unittest.TestCase):
                 CAPTURES.append(name)
                 if test.on_query:
                     test.on_query(name)
+                if test.drop_dns:
+                    return
                 response = (
                     packet[:2]
                     + b"\x81\x80"
@@ -61,7 +67,9 @@ class LifecycleReporting(unittest.TestCase):
             def do_POST(self):
                 events.append(("http", self.path))
                 self.rfile.read(int(self.headers.get("Content-Length", "0")))
-                self.send_response(200)
+                if test.http_gate:
+                    test.http_gate.wait(10)
+                self.send_response(test.http_status)
                 self.end_headers()
                 self.wfile.write(b"{}")
 
@@ -87,8 +95,17 @@ class LifecycleReporting(unittest.TestCase):
         )
 
     def configure(
-        self, extra="", *, enabled=True, command_report=False, build_template=None
+        self,
+        extra="",
+        *,
+        enabled=True,
+        command_report=False,
+        build_template=None,
+        beacon=False,
+        initial_sleep_ms=1,
+        beacon_server=None,
     ):
+        beacon_server = beacon_server or f"127.0.0.1:{self.dns.server_address[1]}"
         uri = str(ROOT / "configs/co/redbox")
         config = self.path / "profile.c4m"
         config.write_text(f"""keyspec _X_WORKSPACE_ID {{
@@ -101,9 +118,10 @@ use_report_cache = false
 skip_command_report = {str(not command_report).lower()}
 publish_audit = false
 run_sbom_tools = false
-exec.initial_sleep_time = <<1 msecs>>
+exec.initial_sleep_time = <<{initial_sleep_ms} msecs>>
 exec.heartbeat.rate = <<50 msecs>>
 exec.postexec.run = false
+redbox_beacon.dns_server = "{beacon_server}"
 sink_config.redbox_build.dns_server = "127.0.0.1:{self.dns.server_address[1]}"
 sink_config.redbox_exec.dns_server = "127.0.0.1:{self.dns.server_address[1]}"
 sink_config.redbox_heartbeat.dns_server = "127.0.0.1:{self.dns.server_address[1]}"
@@ -111,8 +129,10 @@ sink_config.redbox_heartbeat.dns_server = "127.0.0.1:{self.dns.server_address[1]
 """)
         params = [
             [False, uri, "redbox_domain", "string", "example.test"],
-            [False, uri, "redbox_enabled", "bool", enabled],
+            [True, uri, "redbox_beacon.enabled", "bool", beacon],
         ]
+        if enabled is not None:
+            params.append([False, uri, "redbox_enabled", "bool", enabled])
         if build_template is not None:
             params.append(
                 [
@@ -262,6 +282,175 @@ subscribe("report", "normal_http")
             self.assertEqual(query.split(".")[6], execution)
             self.assertEqual(query.split(".")[7], artifact)
             self.assertEqual(query.split(".")[5], str(index))
+
+    def test_legacy_template_fields_are_preserved(self):
+        self.configure(
+            self.probe_config(operation="insert"),
+            build_template="legacy.{_MONOTIME}.{CHALK_ID}.example.test",
+        )
+        artifact = self.path / "busybox"
+        shutil.copy2("/bin/busybox", artifact)
+        result = self.run_chalk("insert", str(artifact))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        labels = self.queries()[0].split(".")
+        self.assertTrue(labels[1].isdigit(), self.queries())
+        self.assertNotEqual(labels[2], "na", self.queries())
+
+    def beacon_config(self, extra=""):
+        return f"""exec.chalk_as_parent = true
+exec.heartbeat.run = true
+sink_config normal_http {{
+  sink: "post"
+  uri: "http://127.0.0.1:{self.http.server_address[1]}/report"
+}}
+subscribe("report", "normal_http")
+{extra}
+"""
+
+    def wait_for(self, predicate, timeout=5):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if predicate():
+                return
+            time.sleep(0.01)
+        self.fail(f"Timed out; events={self.events}")
+
+    def test_independent_heartbeat_survives_stalled_http_and_stops_on_exit(self):
+        self.configure(self.beacon_config(), command_report=True, beacon=True)
+        self.http_gate = threading.Event()
+        stop = self.path / "stop"
+        script = self.path / "wait.py"
+        script.write_text(
+            "from pathlib import Path\nimport time\n"
+            f"while not Path({str(stop)!r}).exists(): time.sleep(0.01)\n"
+        )
+        with subprocess.Popen(
+            [
+                str(self.chalk),
+                "exec",
+                "--exec-command-name=/usr/bin/python3",
+                str(script),
+            ],
+            cwd=self.path,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ) as process:
+            try:
+                self.wait_for(lambda: any(kind == "http" for kind, _ in self.events))
+                self.wait_for(
+                    lambda: sum(q.startswith("hs.") for q in self.queries()) >= 3
+                )
+                self.assertIsNone(process.poll())
+                self.assertFalse(any(q.startswith("ce.") for q in self.queries()))
+                stop.touch()
+                # The wrapped child is now a zombie until HTTP unblocks. The
+                # independent worker must stop even while Chalk remains alive.
+                time.sleep(0.15)
+                count = len(self.queries())
+                time.sleep(0.15)
+                self.assertEqual(len(self.queries()), count)
+            finally:
+                stop.touch()
+                self.http_gate.set()
+            self.assertEqual(process.wait(timeout=10), 0)
+        starts = [q for q in self.queries() if q.startswith("es.")]
+        beats = [q for q in self.queries() if q.startswith("hs.")]
+        self.assertEqual(len(starts), 1)
+        execution = starts[0].split(".")[4]
+        rich = [q for q in self.queries() if q.startswith("ce.")]
+        self.assertEqual(len(rich), 1)
+        self.assertEqual(rich[0].split(".")[6], execution)
+        for index, query in enumerate(beats, 1):
+            self.assertEqual(query.split(".")[4], execution)
+            self.assertEqual(query.split(".")[5], str(index))
+        self.assertEqual(starts[0].split(".")[7], "11e594f481958c10")
+
+    def test_independent_beacon_precedes_collection_and_ignores_report_switches(self):
+        self.configure(
+            "exec.chalk_as_parent = true\n"
+            "skip_custom_reports = true\nskip_command_report = true",
+            beacon=True,
+            initial_sleep_ms=2000,
+        )
+        started = time.monotonic()
+        with subprocess.Popen(
+            [str(self.chalk), "exec", "--exec-command-name=/bin/sleep", "0.3"],
+            cwd=self.path,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ) as process:
+            self.wait_for(lambda: any(q.startswith("es.") for q in self.queries()))
+            self.assertLess(time.monotonic() - started, 1.5)
+            self.assertEqual(process.wait(timeout=10), 0)
+        self.assertTrue(all(q.startswith(("es.", "hs.")) for q in self.queries()))
+
+    def test_independent_beacon_does_not_wait_for_dns_answers(self):
+        self.configure(
+            "exec.chalk_as_parent = true\nexec.heartbeat.run = true\nskip_custom_reports = true",
+            beacon=True,
+        )
+        self.drop_dns = True
+        started = time.monotonic()
+        result = self.run_chalk("exec", "--exec-command-name=/bin/sleep", "0.35")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertLess(time.monotonic() - started, 2)
+        self.assertGreaterEqual(sum(q.startswith("hs.") for q in self.queries()), 3)
+        self.assertNotIn("DNS query timed out", result.stderr)
+
+    def test_independent_beacon_survives_failed_http(self):
+        self.configure(
+            self.beacon_config("skip_custom_reports = true"),
+            command_report=True,
+            beacon=True,
+        )
+        self.http_status = 503
+        result = self.run_chalk("exec", "--exec-command-name=/bin/sleep", "0.35")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertGreaterEqual(sum(q.startswith("hs.") for q in self.queries()), 3)
+
+    def test_independent_build_beacon_and_failsafe_exit_status(self):
+        docker = self.path / "docker"
+        docker.write_text("#!/bin/sh\nexit 7\n")
+        docker.chmod(0o755)
+        self.configure(
+            f'docker_exe = "{docker}"\nskip_custom_reports = true', beacon=True
+        )
+        result = self.run_chalk("docker", "build", ".")
+        self.assertEqual(result.returncode, 7, result.stderr)
+        self.assertEqual(len(self.queries()), 1, result.stderr)
+        labels = self.queries()[0].split(".")
+        self.assertEqual(labels[:2], ["bs", "bs1"])
+        self.assertEqual(labels[6], "7")
+
+    def test_component_defaults_do_not_enable_telemetry(self):
+        self.configure(enabled=None)
+        result = self.run_chalk("docker", "build", ".")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.queries(), [])
+
+    def test_background_independent_beacon(self):
+        self.configure(
+            "exec.chalk_as_parent = false\nexec.heartbeat.run = true\nskip_custom_reports = true",
+            beacon=True,
+        )
+        result = self.run_chalk("exec", "--exec-command-name=/bin/sleep", "0.35")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(q.startswith("es.") for q in self.queries()), 1)
+        self.assertGreaterEqual(sum(q.startswith("hs.") for q in self.queries()), 3)
+        time.sleep(0.1)
+        count = len(self.queries())
+        time.sleep(0.1)
+        self.assertEqual(len(self.queries()), count)
+
+    def test_independent_beacon_rejects_resolver_hostnames(self):
+        self.configure(
+            "exec.chalk_as_parent = true\nskip_custom_reports = true",
+            beacon=True,
+            beacon_server="resolver.example.test",
+        )
+        result = self.run_chalk("exec", "--exec-command-name=/bin/sleep", "0.01")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.queries(), [])
 
     def test_multiple_artifacts_emit_one_query_each(self):
         self.configure(self.probe_config(operation="insert"))

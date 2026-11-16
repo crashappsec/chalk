@@ -3,7 +3,17 @@ name: redbox-reporting
 on:
   pull_request:
     paths:
-      - src/**
+      - src/redbox_beacon.nim
+      - src/reporting.nim
+      - src/reportcache.nim
+      - src/sinks.nim
+      - src/commands/cmd_exec.nim
+      - src/commands/cmd_docker.nim
+      - src/docker/base.nim
+      - src/plugins/system.nim
+      - src/utils/dns.nim
+      - src/utils/sink_impls.nim
+      - src/configs/**
       - configs/co/redbox.c4m
       - tests/integration/test_redbox_reporting.py
       - tests/integration/Dockerfile.redbox
@@ -14,7 +24,17 @@ on:
   push:
     branches: [main]
     paths:
-      - src/**
+      - src/redbox_beacon.nim
+      - src/reporting.nim
+      - src/reportcache.nim
+      - src/sinks.nim
+      - src/commands/cmd_exec.nim
+      - src/commands/cmd_docker.nim
+      - src/docker/base.nim
+      - src/plugins/system.nim
+      - src/utils/dns.nim
+      - src/utils/sink_impls.nim
+      - src/configs/**
       - configs/co/redbox.c4m
       - tests/integration/test_redbox_reporting.py
       - tests/integration/Dockerfile.redbox

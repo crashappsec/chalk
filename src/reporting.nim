@@ -225,7 +225,7 @@ proc doReporting*(
     if not skipCustom:
       try:
         doCustomReporting(beforeCommand = true)
-      except CatchableError:
+      except:
         error("custom reporting before command failed: " & getCurrentExceptionMsg())
         dumpExOnDebug()
     if skipCommand:

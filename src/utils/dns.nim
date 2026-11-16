@@ -344,3 +344,27 @@ proc dnsLookup*(
         "DNS lookup failed for '" & ascii & "' (rcode=" & $rcode & ")",
       )
     break
+
+proc sendDnsDatagram*(domain, server: string) =
+  ## Send one nonblocking UDP query to a numeric resolver, without waiting for
+  ## an answer or retrying. Used only by the independent lifecycle beacon.
+  let
+    ascii = toAsciiDomain(domain)
+    (host, port) = parseServerPort(server)
+    ip = parseIpAddress(host)
+    family = if ip.family == IpAddressFamily.IPv6: Domain.AF_INET6
+             else: Domain.AF_INET
+    packet = buildDnsQuery(ascii, DnsQtype.A, secureRand[uint16]())
+    sock = newSocket(family, SockType.SOCK_DGRAM, Protocol.IPPROTO_UDP,
+                     buffered = false)
+  defer: sock.close()
+  let fd = sock.getFd()
+  let flags = fcntl(fd, F_GETFL, 0)
+  if flags < 0 or fcntl(fd, F_SETFL, flags or O_NONBLOCK) < 0:
+    return
+  var
+    address: Sockaddr_storage
+    length: SockLen
+  toSockAddr(ip, port, address, length)
+  discard nativesockets.sendto(fd, cstring(packet), cint(packet.len), 0,
+                               cast[ptr SockAddr](addr address), length)

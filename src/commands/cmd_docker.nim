@@ -38,6 +38,7 @@ import ".."/[
   policy/state,
   policy/summary,
   reporting,
+  redbox_beacon,
   types,
   utils/exec,
 ]
@@ -84,6 +85,7 @@ proc runCmdDocker*(args: seq[string]) =
     else:
       ctx.dockerPassThrough()
 
+  sendBuildBeacon(exitCode)
   try:
     if exitCode == 0:
       reporting.doReporting("report")

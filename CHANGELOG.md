@@ -5,7 +5,9 @@
 ### New Features
 
 - Configurable Redbox Contract 2 lifecycle reports for builds, exec, and
-  heartbeats, with a domain override and explicit disablement.
+  heartbeats, with a domain override and default-off activation. An independently
+  enabled, best-effort UDP beacon covers exec startup, periodic runtime
+  signals, and build exit without using the reporting pipeline.
 - Custom reports can opt into `report_if_empty` to emit host-only metadata
   when no artifacts were collected, and `before_command` to publish before
   the command report. Docker fallback reporting also covers early spawn
