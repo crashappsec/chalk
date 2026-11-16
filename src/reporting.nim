@@ -150,10 +150,14 @@ proc activeCustomReportTopics*(): seq[string] =
       continue
     result.add(topic)
 
-proc doCustomReporting() =
+proc doCustomReporting(beforeCommand = false, afterOthers = false) =
   for topic in activeCustomReportTopics():
     trace(topic & ": checking custom report")
     let spec = "custom_report." & topic
+    if attrGetOpt[bool](spec & ".before_command").get(false) != beforeCommand:
+      continue
+    if attrGetOpt[bool](spec & ".after_others").get(false) != afterOthers:
+      continue
     var sinkConfs = attrGet[seq[string]](spec & ".sink_configs")
 
     discard registerTopic(topic)
@@ -173,12 +177,13 @@ proc doCustomReporting() =
 
     trace(topic & ": generating custom report")
     let perChalk = attrGetOpt[bool](spec & ".per_chalk").get(false)
-    if perChalk:
-      for chalk in getAllChalks():
+    let chalks = getAllChalks()
+    if perChalk and chalks.len > 0:
+      for chalk in chalks:
         let report = buildHostReportForChalk(chalk, templateToUse)
         if report != "":
           safePublish(topic, report)
-    else:
+    elif not perChalk or attrGetOpt[bool](spec & ".report_if_empty").get(false):
       let report = buildHostReport(templateToUse)
       if report != "":
         safePublish(topic, report)
@@ -219,6 +224,12 @@ proc doReporting*(
     if skipCommand and skipCustom:
       return
     collectRunTimeHostInfo()
+    if not skipCustom:
+      try:
+        doCustomReporting(beforeCommand = true)
+      except:
+        error("custom reporting before command failed: " & getCurrentExceptionMsg())
+        dumpExOnDebug()
     if skipCommand:
       info("Skipping the command report as per the `skip_command_report` directive")
     else:
@@ -227,6 +238,8 @@ proc doReporting*(
       doCustomReporting()
     doPolicyReporting()
     doPolicySummary()
+    if not skipCustom:
+      doCustomReporting(afterOthers = true)
     if writeCache:
       writeReportCache()
     else:

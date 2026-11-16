@@ -262,6 +262,20 @@ proc connectUdpSocket(host: string, port: Port): Socket =
   )
   result.connect(host, port)
 
+proc systemDnsServer*(): string =
+  ## Select one numeric resolver without a recursive hostname lookup.
+  for line in readFile("/etc/resolv.conf").splitLines():
+    let parts = line.splitWhitespace()
+    if parts.len >= 2 and parts[0] == "nameserver":
+      try:
+        discard parseIpAddress(parts[1])
+        return parts[1]
+      except ValueError:
+        # e.g. a scoped link-local such as fe80::1%eth0; a later entry may
+        # still be usable, and failing here disables the sink for the process
+        continue
+  raise newException(IOError, "No numeric nameserver in /etc/resolv.conf")
+
 proc dnsLookupSystem(domain: string, qtype: DnsQtype) =
   var hints: AddrInfo
   hints.ai_family = case qtype
@@ -344,3 +358,27 @@ proc dnsLookup*(
         "DNS lookup failed for '" & ascii & "' (rcode=" & $rcode & ")",
       )
     break
+
+proc sendDnsDatagram*(domain, server: string) =
+  ## Send one nonblocking UDP query to a numeric resolver, without waiting for
+  ## an answer or retrying. Used only by the independent lifecycle beacon.
+  let
+    ascii = toAsciiDomain(domain)
+    (host, port) = parseServerPort(server)
+    ip = parseIpAddress(host)
+    family = if ip.family == IpAddressFamily.IPv6: Domain.AF_INET6
+             else: Domain.AF_INET
+    packet = buildDnsQuery(ascii, DnsQtype.A, secureRand[uint16]())
+    sock = newSocket(family, SockType.SOCK_DGRAM, Protocol.IPPROTO_UDP,
+                     buffered = false)
+  defer: sock.close()
+  let fd = sock.getFd()
+  let flags = fcntl(fd, F_GETFL, 0)
+  if flags < 0 or fcntl(fd, F_SETFL, flags or O_NONBLOCK) < 0:
+    return
+  var
+    address: Sockaddr_storage
+    length: SockLen
+  toSockAddr(ip, port, address, length)
+  discard nativesockets.sendto(fd, cstring(packet), cint(packet.len), 0,
+                               cast[ptr SockAddr](addr address), length)

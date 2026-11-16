@@ -353,7 +353,7 @@ proc getSinkConfigByName*(name: string): Option[SinkConfig] =
     of "auth":
       authName    = attrGetOpt[string](section & "." & k).getOrElse("")
     of "use_search_path", "disallow_http", "prefer_bundled_certs",
-       "require_chalk_mark":
+       "require_chalk_mark", "dns_use_resolv_conf":
       let boxOpt = attrGetOpt[Box](section & "." & k)
       if boxOpt.isSome():
         if boxOpt.get().kind != MkBool:

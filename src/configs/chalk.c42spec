@@ -1753,6 +1753,38 @@ verbatim in each report.
 """
   }
 
+  field report_if_empty {
+    type:    bool
+    default: false
+    doc:     """
+When `per_chalk` is true and no chalk objects were collected, emit one
+host-only report. This allows a lifecycle report to describe an operation
+that failed before collecting an artifact. The default preserves the
+usual behavior of emitting no per-artifact report for an empty collection.
+"""
+  }
+
+  field after_others {
+    type:    bool
+    default: false
+    doc:     """
+Publish this custom report after the command, ordinary custom and policy
+reports. Use this for optional telemetry that must not delay those reports.
+Cannot be combined with `before_command`. Existing report order is unchanged
+unless this field is enabled.
+"""
+  }
+
+  field before_command {
+    type:    bool
+    default: false
+    doc:     """
+Publish this custom report before the command report and other custom
+reports. This phase still depends on collection and reporting machinery. Sink priority orders subscribers
+within a topic; it does not order different report topics.
+"""
+  }
+
   field doc {
     type:     string
     require:  false
@@ -4989,6 +5021,30 @@ By default partial traceroute runs for public cloudflare IP `1.1.1.1`.
   }
 }
 
+singleton redbox_beacon {
+  user_def_ok: false
+  doc: """
+Optional lifecycle DNS independent of collection, report sinks and report caching.
+Uses Contract 2 bs1/es1/hs1 schemas, distinct from the richer custom reports.
+Best effort only: it does not acknowledge delivery or survive process/container death.
+"""
+  field enabled {
+    type: bool
+    default: false
+    doc: "Enable only after the lifecycle schemas have been registered."
+  }
+  field domain {
+    type: string
+    default: ""
+    doc: "Base DNS domain. Empty disables the independent beacon."
+  }
+  field dns_server {
+    type: string
+    default: ""
+    doc: "Numeric resolver IP with optional port. Empty uses the first nameserver in /etc/resolv.conf; no hostname resolution is performed."
+  }
+}
+
 root {
   prologue: """
 # This file is auto-generated as part of the chalk build.
@@ -5022,6 +5078,7 @@ root {
   allow cloud_provider
   allow git
   allow network
+  allow redbox_beacon
   allow policy
   allow certs
   allow zip
@@ -6207,6 +6264,9 @@ func custom_report_extra_validation() {
   report_sects := sections("custom_report")
   for i from 0 to len(report_sects) {
     base := "custom_report." + report_sects[i] + "."
+    if attr_get(base + "before_command", bool) and attr_get(base + "after_others", bool) {
+      return "Custom Report '" + report_sects[i] + "' cannot set both before_command and after_others"
+    }
     if attr_get(base + "report_template", string) == "" {
       return "Custom Report '" + report_sects[i] + "' must set a report"
     }
@@ -6301,7 +6361,7 @@ func sink_config_check(path) {
       }
     }
     elif contains(["enabled", "use_search_path", "disallow_http", "prefer_bundled_certs",
-                   "require_chalk_mark"], conffield) {
+                   "require_chalk_mark", "dns_use_resolv_conf"], conffield) {
       t := attr_type(path + "." + conffield)
       if not typecmp(t, bool) {
           return conffield + ": Field must be `true` or `false`"
