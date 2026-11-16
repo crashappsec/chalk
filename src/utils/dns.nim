@@ -267,8 +267,13 @@ proc systemDnsServer*(): string =
   for line in readFile("/etc/resolv.conf").splitLines():
     let parts = line.splitWhitespace()
     if parts.len >= 2 and parts[0] == "nameserver":
-      discard parseIpAddress(parts[1])
-      return parts[1]
+      try:
+        discard parseIpAddress(parts[1])
+        return parts[1]
+      except ValueError:
+        # e.g. a scoped link-local such as fe80::1%eth0; a later entry may
+        # still be usable, and failing here disables the sink for the process
+        continue
   raise newException(IOError, "No numeric nameserver in /etc/resolv.conf")
 
 proc dnsLookupSystem(domain: string, qtype: DnsQtype) =

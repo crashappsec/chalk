@@ -9,9 +9,13 @@
   enabled, best-effort UDP beacon covers exec startup, periodic runtime
   signals, and build exit without using the reporting pipeline.
 - Custom reports can opt into `report_if_empty` to emit host-only metadata
-  when no artifacts were collected, and `before_command` to publish before
-  the command report. Docker fallback reporting also covers early spawn
-  failures while preserving the underlying command result.
+  when no artifacts were collected, `before_command` to publish before
+  the command report, and `after_others` to publish after the command,
+  other custom and policy reports. Docker fallback reporting also covers
+  early spawn failures while preserving the underlying command result.
+- The `dns` sink accepts `dns_use_resolv_conf` to query the first usable
+  `/etc/resolv.conf` nameserver directly, bounded by `dns_timeout`, instead
+  of the system resolver.
 
 - Opt-in build policies for `chalk docker build` and `chalk docker push`,
   disabled by default (`policy.mode = "off"`) with no change in behavior

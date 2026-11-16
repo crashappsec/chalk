@@ -503,7 +503,7 @@ subscribe("report", "normal_http")
         self.assertEqual(self.queries(), [])
 
     @contextmanager
-    def system_resolver(self):
+    def system_resolver(self, nameservers=("127.0.0.1",)):
         # Tests run in an isolated, network-disabled Linux container. Restore
         # resolver configuration even if a check fails.
         path = Path("/etc/resolv.conf")
@@ -512,7 +512,10 @@ subscribe("report", "normal_http")
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         try:
-            path.write_text("nameserver 127.0.0.1\noptions attempts:1 timeout:1\n")
+            path.write_text(
+                "".join(f"nameserver {address}\n" for address in nameservers)
+                + "options attempts:1 timeout:1\n"
+            )
             yield
         finally:
             path.write_text(original)
@@ -572,6 +575,18 @@ subscribe("report", "system_probe")
                     self.assertEqual(
                         "DNS lookup failed" not in result.stderr, success, result.stderr
                     )
+
+    def test_unusable_first_nameserver_is_skipped(self):
+        self.configure("exec.chalk_as_parent = true", beacon=True, system_resolver=True)
+        # Router advertisements can put a scoped link-local entry first.
+        with self.system_resolver(("fe80::1%eth0", "127.0.0.1")):
+            result = self.run_chalk("exec", "--exec-command-name=/bin/sleep", "0.01")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("Invalid IP Address", result.stderr)
+        events = sorted(
+            q.split(".")[0] for q in self.queries() if q.startswith(("ce.", "es."))
+        )
+        self.assertEqual(events, ["ce", "es"], result.stderr)
 
     def test_opaque_and_absent_workspace_values(self):
         for value in ["sample_team/Case A", None, ""]:
