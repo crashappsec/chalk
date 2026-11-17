@@ -312,7 +312,7 @@ proc testEngine() =
   # a push-only policy does not need the pulled images
   doAssert not evaluateJson("""{"mode": "enforce", "on_error": "block", "registries":
     {"enabled": true, "push_allowed": [["glob", "ghcr.io/acme/*"]]}}""", unchalked)
-  doAssert policyOutcome == nil
+  doAssert policyOutcome.result == "pass"
 
   for output in ["type=image;name=denied.example/app;push=1",
                  "type=image;name=ghcr.io/acme/app:1;push=true;" &
@@ -346,7 +346,8 @@ proc testEngine() =
   doAssert not evaluateJson(readFile(fixture), PolicyInput(command: "build",
     subjects: @[subject("alpine"), subject("cgr.dev/chainguard/static")],
     pushTargets: @["123.dkr.ecr.eu-west-1.amazonaws.com/app:1"]))
-  doAssert policyOutcome == nil
+  doAssert policyOutcome.result == "pass"
+  doAssert policyOutcome.policies[0].rules == @["registries"]
 
 proc testCache() =
   assertEq(parseCacheEntry("ghcr.io/acme/cache")["ref"], "ghcr.io/acme/cache")

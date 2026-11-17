@@ -15,7 +15,7 @@ import pytest
 import requests
 
 from .chalk.runner import Chalk
-from .conf import CONFIGS, DATA, REGISTRY
+from .conf import CONFIGS, DATA, REGISTRY, REPO
 from .utils.docker import Docker
 from .utils.dict import ANY, MISSING, Contains, ContainsDict
 from .utils.git import Git
@@ -34,6 +34,15 @@ def policy_reports(random_hex: str) -> list[ContainsDict]:
         if line.strip():
             reports += [ContainsDict(i) for i in json.loads(line)]
     return reports
+
+
+def passed_report(random_hex: str) -> ContainsDict:
+    # every evaluation is published, including when all policies pass
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="pass", _POLICY_FINDINGS=[])
+    assert report["_POLICY_RESULTS"]
+    assert all(r["result"] == "pass" and r["rules"] for r in report["_POLICY_RESULTS"])
+    return report
 
 
 def image_exists(tag: str) -> bool:
@@ -109,7 +118,82 @@ def test_enforce_allows_golden_image(chalk: Chalk, random_hex: str):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    report = passed_report(random_hex)
+    assert report.has(
+        _POLICY_MODE="enforce",
+        _OP_EXIT_CODE=0,
+        _POLICY_BUILD=Contains({"tags": [f"{random_hex}:latest"]}),
+    )
+    assert report["_POLICY_RESULTS"] == [
+        {
+            "id": "",
+            "mode": "enforce",
+            "on_error": "allow",
+            "result": "pass",
+            "effective_mode": "enforce",
+            "repo": "",
+            "rules": ["golden_images", "custom_check"],
+        }
+    ]
+    assert report["_ACTION_ID"] != result.report["_ACTION_ID"]
+
+
+@pytest.mark.parametrize(
+    "base, policy_result", [("alpine", "pass"), ("busybox", "violation")]
+)
+def test_policy_keys_only_in_policy_report(
+    chalk: Chalk, random_hex: str, tmp_path: Path, base: str, policy_result: str
+):
+    # backends derive one policy event per policy report; _POLICY_* in the
+    # build report Crash Override receives would duplicate and misattribute it
+    co_report = tmp_path / "co-build.jsonl"
+    config = tmp_path / "policy_co_build.c4m"
+    config.write_text((CONFIGS / "policy.c4m").read_text() + f"""
+sink_config co_build_file {{
+  enabled:  true
+  sink:     "file"
+  filename: "{co_report}"
+}}
+
+custom_report co_build {{
+  report_template: "crashoverride"
+  sink_configs:    ["co_build_file"]
+  use_when:        ["build"]
+}}
+""")
+    _, result = chalk.docker_build(
+        content=Docker.dockerfile(f"FROM {base}\nCMD true\n"),
+        config=config,
+        env=policy_env("audit", random_hex),
+        tag=random_hex,
+        run_docker=False,
+    )
+    assert result.exit_code == 0
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT=policy_result)
+    (build_report,) = [
+        r
+        for line in co_report.read_text().splitlines()
+        if line.strip()
+        for r in json.loads(line)
+    ]
+    assert build_report["_OPERATION"] == "build"
+    assert [k for k in build_report if k.startswith("_POLICY_")] == []
+    assert [k for k in result.report if k.startswith("_POLICY_")] == []
+
+
+def test_only_policy_report_template_has_policy_keys():
+    templates = set()
+    for config in (REPO / "src" / "configs").glob("*.c4m"):
+        template = None
+        for line in config.read_text().splitlines():
+            if line.startswith("report_template "):
+                template = line.split()[1]
+            elif line.startswith("}"):
+                template = None
+            elif template and re.match(r"\s*~?key\._POLICY_\w+\.use\s*=\s*true", line):
+                templates.add(template)
+    assert templates == {"policy_report"}
 
 
 def test_audit_reports_without_blocking(chalk: Chalk, random_hex: str):
@@ -354,7 +438,7 @@ def test_unbuilt_stage_is_not_checked(chalk: Chalk, random_hex: str):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def test_enforce_blocks_stage_used_by_run_mount(chalk: Chalk, random_hex: str):
@@ -612,7 +696,7 @@ def test_enforce_allows_named_image_context(chalk: Chalk, random_hex: str, sourc
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 # same document an external policy authoring system produces (shared with unit tests)
@@ -659,8 +743,8 @@ def test_config_json_enforces(chalk: Chalk, random_hex: str):
             "on_error": "allow",
             "result": "blocked",
             "effective_mode": "enforce",
-            "mode_source": "default",
             "repo": "",
+            "rules": ["golden_images"],
         }
     ]
     assert report["_POLICY_FINDINGS"][0]["policy_id"] == "golden-images@3"
@@ -676,7 +760,7 @@ def test_config_json_allows_golden_image(chalk: Chalk, random_hex: str):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 @pytest.mark.parametrize("on_error", ["allow", "block"])
@@ -743,8 +827,8 @@ def test_config_json_multi_audit_violation_does_not_block(
             "on_error": "allow",
             "result": "pass",
             "effective_mode": "enforce",
-            "mode_source": "default",
             "repo": "",
+            "rules": ["golden_images"],
         },
         {
             "id": "chainguard-only@1",
@@ -752,8 +836,8 @@ def test_config_json_multi_audit_violation_does_not_block(
             "on_error": "block",
             "result": "violation",
             "effective_mode": "audit",
-            "mode_source": "default",
             "repo": "",
+            "rules": ["golden_images"],
         },
     ]
     assert report.contains(
@@ -821,17 +905,17 @@ def test_config_json_multi_invalid_entry_is_isolated(chalk: Chalk, random_hex: s
     )
 
 
-ENFORCED_REPO = "github.com/crashappsec/dummy-deployments"
+TARGET_REPO = "github.com/crashappsec/dummy-deployments"
 # the CI job running the tests must not decide which repository is built
 NO_CI_REPO = {"GITHUB_SERVER_URL": "", "GITHUB_REPOSITORY": "", "CI_PROJECT_URL": ""}
 
 
-def rollout_policy(mode: str = "audit", policy_id: str = "golden-images@3") -> dict:
+def rollout_policy(mode: str = "enforce", policy_id: str = "golden-images@3") -> dict:
     config = json.loads(POLICY_CONFIG.read_text())
     config["id"] = policy_id
     config["mode"] = mode
-    config["enforce_repos"] = [
-        ["glob", ENFORCED_REPO],
+    config["target_repos"] = [
+        ["glob", TARGET_REPO],
         ["glob", "github.com/crashappsec/other-*"],
     ]
     return config
@@ -847,7 +931,8 @@ def git_context(path: Path, remote: str) -> Path:
 
 
 def test_report_has_commit_id(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
-    # _COMMIT_ID links the policy report to a PR, as it does for builds
+    # _COMMIT_ID links the policy report to a PR, as it does for builds;
+    # _AUTHOR is the contributor of the policy event, as only this report carries _POLICY_*
     context = git_context(tmp_data_dir, "git@github.com:crashappsec/chalk.git")
     _, result = build(
         chalk,
@@ -860,7 +945,26 @@ def test_report_has_commit_id(chalk: Chalk, random_hex: str, tmp_data_dir: Path)
     )
     assert result.exit_code == 1
     (report,) = policy_reports(random_hex)
-    assert report.has(_COMMIT_ID=Git(context).latest_commit)
+    assert report.has(
+        _COMMIT_ID=Git(context).latest_commit, _AUTHOR=Git(context).author
+    )
+
+
+def test_report_has_build_ref(chalk: Chalk, random_hex: str):
+    # a pull_request build's _COMMIT_ID is the synthetic merge commit, which no PR
+    # lists; BUILD_REF names the PR instead
+    _, result = build(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env={"CI": "true", "GITHUB_SHA": "abc", "GITHUB_REF": "refs/pull/5/merge"},
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(BUILD_REF="refs/pull/5/merge")
 
 
 def test_report_no_commit_id_outside_git(
@@ -878,49 +982,53 @@ def test_report_no_commit_id_outside_git(
     )
     assert result.exit_code == 1
     (report,) = policy_reports(random_hex)
-    assert report.has(_COMMIT_ID=MISSING)
+    assert report.has(_COMMIT_ID=MISSING, _AUTHOR=MISSING)
 
 
 @pytest.mark.parametrize("form", ["single", "list"])
 @pytest.mark.parametrize(
-    "remote",
+    "remote, mode",
     [
-        "git@github.com:crashappsec/dummy-deployments.git",
-        "https://github.com/CrashAppSec/dummy-deployments",
+        ("git@github.com:crashappsec/dummy-deployments.git", "enforce"),
+        ("https://github.com/CrashAppSec/dummy-deployments", "enforce"),
+        ("git@github.com:crashappsec/dummy-deployments.git", "audit"),
     ],
 )
-def test_enforce_repos_blocks_listed_repo(
-    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str, remote: str
+def test_target_repos_applies_in_listed_repo(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str, remote: str, mode: str
 ):
+    blocks = mode == "enforce"
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
-        as_form(rollout_policy(), form),
+        as_form(rollout_policy(mode), form),
         random_hex,
         tag=random_hex,
         context=git_context(tmp_data_dir, remote),
         env=NO_CI_REPO,
-        expected_success=False,
+        expected_success=not blocks,
     )
-    assert result.exit_code == 1
-    assert not image_exists(random_hex)
+    assert result.exit_code == (1 if blocks else 0)
+    assert image_exists(random_hex) != blocks
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_MODE="enforce", _POLICY_RESULT="blocked")
+    assert report.has(
+        _POLICY_MODE=mode, _POLICY_RESULT="blocked" if blocks else "violation"
+    )
     assert report["_POLICY_RESULTS"] == [
         {
             "id": "golden-images@3",
-            "mode": "audit",
+            "mode": mode,
             "on_error": "allow",
-            "result": "blocked",
-            "effective_mode": "enforce",
-            "mode_source": "enforce_repos",
-            "repo": ENFORCED_REPO,
+            "result": "blocked" if blocks else "violation",
+            "effective_mode": mode,
+            "repo": TARGET_REPO,
+            "rules": ["golden_images"],
         }
     ]
 
 
 @pytest.mark.parametrize("form", ["single", "list"])
-def test_enforce_repos_audits_other_repos(
+def test_target_repos_skips_other_repos(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str
 ):
     _, result = build_json(
@@ -934,48 +1042,71 @@ def test_enforce_repos_audits_other_repos(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation")
-    assert report["_POLICY_RESULTS"] == [
-        {
-            "id": "golden-images@3",
-            "mode": "audit",
-            "on_error": "allow",
-            "result": "violation",
-            "effective_mode": "audit",
-            "mode_source": "default",
-            "repo": "github.com/crashappsec/chalk",
-        }
-    ]
+    assert policy_reports(random_hex) == []
 
 
-@pytest.mark.parametrize("form", ["single", "list"])
-def test_enforce_repos_unknown_repo_never_enforces(
-    chalk: Chalk, random_hex: str, tmp_data_dir: Path, form: str
+def test_empty_target_repos_applies_everywhere(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path
 ):
+    config = rollout_policy()
+    config["target_repos"] = []
     # the context is not a git repository and there is no CI repository
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
-        as_form(rollout_policy(), form),
+        json.dumps(config),
+        random_hex,
+        tag=random_hex,
+        context=tmp_data_dir,
+        env=NO_CI_REPO,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report["_POLICY_RESULTS"][0]["result"] == "blocked"
+    assert report["_POLICY_RESULTS"][0]["repo"] == ""
+
+
+@pytest.mark.parametrize("form", ["single", "list"])
+@pytest.mark.parametrize("on_unknown_repo", [None, "skip", "apply"])
+def test_target_repos_unknown_repo(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    form: str,
+    on_unknown_repo: Optional[str],
+):
+    config = rollout_policy()
+    if on_unknown_repo:
+        config["on_unknown_repo"] = on_unknown_repo
+    applies = on_unknown_repo == "apply"
+    # the context is not a git repository and there is no CI repository
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        as_form(config, form),
         random_hex,
         tag=random_hex,
         context=tmp_data_dir,
         env=NO_CI_REPO,
         ignore_errors=True,
+        expected_success=not applies,
     )
-    assert result.exit_code == 0
-    assert image_exists(random_hex)
+    assert result.exit_code == (1 if applies else 0)
+    if not applies:
+        assert image_exists(random_hex)
+        assert policy_reports(random_hex) == []
+        return
     (report,) = policy_reports(random_hex)
-    assert report.has(_POLICY_MODE="audit", _POLICY_RESULT="violation")
+    assert report.has(_POLICY_MODE="enforce", _POLICY_RESULT="blocked")
     assert report["_POLICY_RESULTS"][0] == {
         "id": "golden-images@3",
-        "mode": "audit",
+        "mode": "enforce",
         "on_error": "allow",
-        "result": "violation",
-        "effective_mode": "audit",
-        "mode_source": "default",
+        "result": "blocked",
+        "effective_mode": "enforce",
         "repo": "",
+        "rules": ["golden_images"],
     }
 
 
@@ -995,22 +1126,22 @@ def push_json(chalk: Chalk, image: str, config_json: str, random_hex: str, **kwa
 # https://github.com/crashappsec/chalk/issues/776: push has no build context,
 # so the repository comes from the working directory
 @pytest.mark.parametrize(
-    "base, remote, expected_exit, effective_mode",
+    "base, remote, expected_exit, evaluated",
     [
-        ("busybox", f"https://{ENFORCED_REPO}.git", 1, "enforce"),
-        ("busybox", "https://github.com/crashappsec/chalk.git", 0, "audit"),
-        # passes every policy: no policy report
-        ("alpine", f"https://{ENFORCED_REPO}.git", 0, None),
+        ("busybox", f"https://{TARGET_REPO}.git", 1, True),
+        ("busybox", "https://github.com/crashappsec/chalk.git", 0, False),
+        # passes every policy: still reported
+        ("alpine", f"https://{TARGET_REPO}.git", 0, True),
     ],
 )
-def test_enforce_repos_docker_push(
+def test_target_repos_docker_push(
     chalk: Chalk,
     random_hex: str,
     tmp_data_dir: Path,
     base: str,
     remote: str,
     expected_exit: int,
-    effective_mode: str | None,
+    evaluated: bool,
 ):
     tag = f"{REGISTRY}/{random_hex}"
     build(chalk, f"FROM {base}\nCMD true\n", "off", random_hex, tag=tag)
@@ -1026,19 +1157,20 @@ def test_enforce_repos_docker_push(
     )
     assert result.exit_code == expected_exit
     assert (registry_tags(random_hex) != []) == (expected_exit == 0)
-    if effective_mode is None:
+    if not evaluated:
         assert policy_reports(random_hex) == []
         return
+    if expected_exit == 0:
+        passed_report(random_hex)
+        return
     (report,) = policy_reports(random_hex)
-    assert report["_POLICY_RESULTS"][0]["effective_mode"] == effective_mode
-    assert report["_POLICY_RESULTS"][0]["repo"] == remote.removeprefix(
-        "https://"
-    ).removesuffix(".git")
+    assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
+    assert report["_POLICY_RESULTS"][0]["repo"] == TARGET_REPO
 
 
 # a relative origin is a local path to git and identifies no repository
 @pytest.mark.parametrize("origin", [None, "mirrors/crashappsec/chalk.git"])
-def test_enforce_repos_falls_back_to_ci_repo(
+def test_target_repos_falls_back_to_ci_repo(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path, origin: str | None
 ):
     context = git_context(tmp_data_dir, origin) if origin else tmp_data_dir
@@ -1058,54 +1190,40 @@ def test_enforce_repos_falls_back_to_ci_repo(
     )
     assert result.exit_code == 1
     (report,) = policy_reports(random_hex)
-    assert report["_POLICY_RESULTS"][0]["mode_source"] == "enforce_repos"
-    assert report["_POLICY_RESULTS"][0]["repo"] == ENFORCED_REPO
+    assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
+    assert report["_POLICY_RESULTS"][0]["repo"] == TARGET_REPO
 
 
-def test_enforce_repos_with_mode_off_only_enforces_listed_repos(
+def test_target_repos_with_mode_off_is_off(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path
 ):
-    config = as_form(rollout_policy(mode="off"), "list")
-    other = tmp_data_dir / "other"
-    other.mkdir()
+    config = rollout_policy(mode="off")
+    config["on_unknown_repo"] = "apply"
     _, result = build_json(
         chalk,
         "FROM busybox\nCMD true\n",
-        config,
+        as_form(config, "list"),
         random_hex,
         tag=random_hex,
-        context=git_context(other, "git@github.com:crashappsec/chalk.git"),
+        context=git_context(
+            tmp_data_dir, "git@github.com:crashappsec/other-service.git"
+        ),
         env=NO_CI_REPO,
     )
     assert result.exit_code == 0
+    assert image_exists(random_hex)
     assert policy_reports(random_hex) == []
-
-    listed = tmp_data_dir / "listed"
-    listed.mkdir()
-    _, result = build_json(
-        chalk,
-        "FROM busybox\nCMD true\n",
-        config,
-        random_hex,
-        tag=f"{random_hex}-listed",
-        context=git_context(listed, "git@github.com:crashappsec/other-service.git"),
-        env=NO_CI_REPO,
-        expected_success=False,
-    )
-    assert result.exit_code == 1
-    (report,) = policy_reports(random_hex)
-    assert report["_POLICY_RESULTS"][0]["mode"] == "off"
-    assert report["_POLICY_RESULTS"][0]["effective_mode"] == "enforce"
 
 
 @pytest.mark.parametrize("on_error", ["allow", "block"])
-def test_enforce_repos_invalid_honors_on_error(
+def test_target_repos_invalid_honors_on_error(
     chalk: Chalk, random_hex: str, tmp_data_dir: Path, on_error: str
 ):
-    config = rollout_policy(mode="enforce")
+    config = rollout_policy()
     config["on_error"] = on_error
-    # dropped as invalid, so the declared enforce mode applies everywhere
-    config["enforce_repos"] = ENFORCED_REPO
+    # dropped as invalid, so the policy applies everywhere, even outside the
+    # repositories it meant to target
+    config["target_repos"] = TARGET_REPO
     blocks = on_error == "block"
     _, result = build_json(
         chalk,
@@ -1113,7 +1231,7 @@ def test_enforce_repos_invalid_honors_on_error(
         json.dumps(config),
         random_hex,
         tag=random_hex,
-        context=git_context(tmp_data_dir, f"https://{ENFORCED_REPO}.git"),
+        context=git_context(tmp_data_dir, "https://github.com/crashappsec/chalk.git"),
         env=NO_CI_REPO,
         expected_success=not blocks,
         ignore_errors=True,
@@ -1124,7 +1242,44 @@ def test_enforce_repos_invalid_honors_on_error(
     assert report.contains(
         {"_POLICY_FINDINGS": [{"rule": "config", "kind": "error", "reason": ANY}]}
     )
-    assert "policy.enforce_repos" in report["_POLICY_FINDINGS"][0]["reason"]
+    assert "policy.target_repos" in report["_POLICY_FINDINGS"][0]["reason"]
+
+
+@pytest.mark.parametrize(
+    "remote, blocks",
+    [
+        (f"https://{TARGET_REPO}.git", True),
+        ("https://github.com/crashappsec/chalk.git", False),
+    ],
+)
+def test_invalid_on_unknown_repo_is_config_error(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, remote: str, blocks: bool
+):
+    config = rollout_policy()
+    config["on_error"] = "block"
+    config["on_unknown_repo"] = "always"
+    _, result = build_json(
+        chalk,
+        "FROM busybox\nCMD true\n",
+        json.dumps(config),
+        random_hex,
+        tag=random_hex,
+        context=git_context(tmp_data_dir, remote),
+        env=NO_CI_REPO,
+        expected_success=not blocks,
+        ignore_errors=True,
+    )
+    assert result.exit_code == (1 if blocks else 0)
+    if not blocks:
+        # the valid target_repos still scopes the configuration error
+        assert policy_reports(random_hex) == []
+        return
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="blocked")
+    assert report.contains(
+        {"_POLICY_FINDINGS": [{"rule": "config", "kind": "error", "reason": ANY}]}
+    )
+    assert "policy.on_unknown_repo" in report["_POLICY_FINDINGS"][0]["reason"]
 
 
 # the golden-images policy chalkapi serves to the test workspace
@@ -1182,11 +1337,12 @@ def test_config_json_audit_from_only(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    reports = policy_reports(random_hex)
     if not violations:
-        assert reports == []
+        assert passed_report(random_hex)["_POLICY_RESULTS"][0]["rules"] == [
+            "golden_images"
+        ]
         return
-    (report,) = reports
+    (report,) = policy_reports(random_hex)
     assert report.has(_POLICY_RESULT="violation", _POLICY_MODE="audit")
     assert [f["image"] for f in report["_POLICY_FINDINGS"]] == violations
 
@@ -1232,7 +1388,7 @@ def test_step_summary_audit_violation(chalk: Chalk, random_hex: str, tmp_path: P
         "`docker.io/library/alpine:*`, `cgr.dev/chainguard/*`" in text
     )
     assert "<details><summary>Policy details</summary>" in text
-    assert "| (unnamed) | audit | default mode | violation | 1 |" in text
+    assert "| (unnamed) | audit | all repos | violation | 1 |" in text
     assert "- Chalk version: `" in text
     assert "[!CAUTION]" not in text
 
@@ -1254,7 +1410,25 @@ def test_step_summary_enforce_blocked(chalk: Chalk, random_hex: str, tmp_path: P
         "> [!CAUTION]\n> **Blocked** — `docker build` stopped before building: "
         "1 image is not an approved golden image (enforce)." in text
     )
-    assert "| (unnamed) | enforce | default mode | blocked | 1 |" in text
+    assert "| (unnamed) | enforce | all repos | blocked | 1 |" in text
+
+
+def test_step_summary_pass_skipped_by_default(
+    chalk: Chalk, random_hex: str, tmp_path: Path
+):
+    summary = tmp_path / "summary.md"
+    summary.write_text("untouched\n")
+    _, result = build(
+        chalk,
+        "FROM alpine\nCMD true\n",
+        "enforce",
+        random_hex,
+        tag=random_hex,
+        env=summary_env("enforce", random_hex, summary),
+    )
+    assert result.exit_code == 0
+    passed_report(random_hex)
+    assert summary.read_text() == "untouched\n"
 
 
 def test_step_summary_pass(chalk: Chalk, random_hex: str, tmp_path: Path):
@@ -1265,18 +1439,20 @@ def test_step_summary_pass(chalk: Chalk, random_hex: str, tmp_path: Path):
         "enforce",
         random_hex,
         tag=random_hex,
-        env=summary_env("enforce", random_hex, summary),
+        env={
+            **summary_env("enforce", random_hex, summary),
+            "POLICY_STEP_SUMMARY_ON_PASS": "1",
+        },
     )
     assert result.exit_code == 0
-    # nothing is published to the policy topic when all policies pass
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
     text = summary.read_text()
     assert (
         "> [!TIP]\n> All base images are approved golden images (1 policy checked)."
         in text
     )
     assert "| Image |" not in text
-    assert "| (unnamed) | enforce | default mode | pass | 0 |" in text
+    assert "| (unnamed) | enforce | all repos | pass | 0 |" in text
 
 
 def test_step_summary_disabled(chalk: Chalk, random_hex: str, tmp_path: Path):
@@ -1431,7 +1607,7 @@ def test_cert_policy_skips_ignored_files_and_ca_bundles(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def test_cert_policy_con4m_audit(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
@@ -1595,7 +1771,7 @@ def test_secrets_ignores_files_outside_the_image_context(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def registries_json(
@@ -1673,7 +1849,7 @@ def test_registries_allows_pull(chalk: Chalk, random_hex: str):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 # the build is blocked before docker runs, so nothing reaches the registry
@@ -1858,7 +2034,7 @@ def test_packages_allows_clean_context(
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def test_packages_audits_languages(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
@@ -1977,7 +2153,7 @@ def test_licenses_pass(chalk: Chalk, random_hex: str, tmp_data_dir: Path):
     )
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 @pytest.mark.parametrize("on_error, expected_exit", [("allow", 0), ("block", 1)])
@@ -2136,7 +2312,7 @@ def test_sast_enforce_passes(
     _, result = build_sast(chalk, tmp_data_dir, random_hex, sast)
     assert result.exit_code == 0
     assert image_exists(random_hex)
-    assert policy_reports(random_hex) == []
+    passed_report(random_hex)
 
 
 def test_sast_scans_what_docker_sends(
@@ -2200,3 +2376,374 @@ def test_sast_without_results_honors_on_error(
             }
         ],
     )
+
+
+# GitHub dependency review of pull requests, served by the imds server, whose
+# comparison adds lodash (high, svc/), minimist (critical, development scope,
+# svc/) and pyyaml (critical, other/)
+REVIEW_BASE = "1" * 40
+REVIEW_HEAD = "2" * 40
+LODASH = "pkg:npm/lodash@4.17.20"
+MINIMIST = "pkg:npm/minimist@1.2.5"
+PYYAML = "pkg:pypi/pyyaml@5.3"
+
+
+def review_env(
+    tmp_path: Path,
+    server_imds: str,
+    repo: str,
+    event: str = "pull_request",
+    head: str = REVIEW_HEAD,
+    token: str = "test-token",
+) -> dict[str, str]:
+    payload = {"pull_request": {"base": {"sha": REVIEW_BASE}, "head": {"sha": head}}}
+    if event == "push":
+        payload = {"before": REVIEW_BASE, "after": head}
+    path = tmp_path / f"event-{event}-{head[:8]}.json"
+    path.write_text(json.dumps(payload))
+    return {
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_EVENT_NAME": event,
+        "GITHUB_EVENT_PATH": str(path),
+        "GITHUB_REPOSITORY": repo,
+        "GITHUB_SERVER_URL": "https://github.com",
+        "GITHUB_API_URL": server_imds,
+        "GITHUB_TOKEN": token,
+    }
+
+
+def dependency_reviews(server_imds: str, repo: str) -> int:
+    response = requests.get(f"{server_imds}/dependency-reviews/{repo}")
+    response.raise_for_status()
+    return response.json()["calls"]
+
+
+def monorepo(path: Path, repo: str) -> Path:
+    """a checkout of the GitHub repository `repo` whose svc/ directory is built"""
+    for manifest in ["svc/package-lock.json", "other/requirements.txt"]:
+        (path / manifest).parent.mkdir(parents=True, exist_ok=True)
+        (path / manifest).write_text("{}\n")
+    Git(path).init(remote=f"https://github.com/{repo}.git").add().commit("init")
+    return path / "svc"
+
+
+def build_review(
+    chalk: Chalk,
+    random_hex: str,
+    context: Path,
+    env: dict[str, str],
+    mode: str = "enforce",
+    vulnerabilities: Optional[dict] = None,
+    on_error: str = "allow",
+    **kwargs,
+):
+    config: dict = {"id": "vulns@1", "mode": mode, "on_error": on_error}
+    if vulnerabilities is not None:
+        config["vulnerabilities"] = {"enabled": True, **vulnerabilities}
+    return build_json(
+        chalk,
+        "FROM alpine\nCMD true\n",
+        json.dumps(config),
+        random_hex,
+        context=context,
+        env=env,
+        **kwargs,
+    )
+
+
+def test_dependency_review_enforce_blocks(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    repo = f"vulnerable/{random_hex}"
+    summary = tmp_path / "summary.md"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        {
+            **review_env(tmp_path, server_imds, repo),
+            "GITHUB_STEP_SUMMARY": str(summary),
+        },
+        vulnerabilities={"message": "Upgrade it"},
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    assert not image_exists(random_hex)
+    assert dependency_reviews(server_imds, repo) == 1
+    (report,) = policy_reports(random_hex)
+    # only svc/ is built, and minimist is a development dependency
+    assert report.has(
+        _POLICY_RESULT="blocked",
+        _POLICY_FINDINGS=[
+            {
+                "policy_id": "vulns@1",
+                "rule": "dependency_review",
+                "kind": "violation",
+                "subject": LODASH,
+                "location": "svc/package-lock.json",
+                "severity": "high",
+                "reason": "high GHSA-35jh-r3h4-6jhm: Command Injection in lodash "
+                "(https://github.com/advisories/GHSA-35jh-r3h4-6jhm). Upgrade it",
+            }
+        ],
+    )
+    text = summary.read_text()
+    assert f"| `{LODASH}` svc/package-lock.json | - | vulns@1 |" in text
+    assert "**How to fix:** Upgrade it." in text
+
+
+def test_dependency_review_audit_reviews_repository(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    repo = f"vulnerable/{random_hex}"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        review_env(tmp_path, server_imds, repo),
+        mode="audit",
+        vulnerabilities={
+            "min_severity": "critical",
+            "scopes": ["runtime", "development"],
+            "dependency_review": {"context_only": False},
+        },
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="violation")
+    assert sorted(f["subject"] for f in report["_POLICY_FINDINGS"]) == [
+        MINIMIST,
+        PYYAML,
+    ]
+    assert result.mark.has(DEPENDENCY_REVIEW=MISSING)
+
+
+def test_dependency_review_other_checkout_reviews_repository(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    # a context in a checkout of another repository than the job's (or of
+    # one without an origin) cannot be located in the comparison, so every
+    # manifest counts rather than none
+    repo = f"vulnerable/{random_hex}"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, f"acme/{random_hex}"),
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert sorted(f["subject"] for f in report["_POLICY_FINDINGS"]) == [LODASH, PYYAML]
+
+
+@pytest.mark.parametrize("unmapped_main", [False, True])
+def test_dependency_review_mixed_contexts_review_repository(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    unmapped_main: bool,
+):
+    repo = f"vulnerable/{random_hex}"
+    known = monorepo(tmp_data_dir, repo)
+    unmapped = tmp_path / "copied-context"
+    unmapped.mkdir()
+    (unmapped / "requirements.txt").write_text("pyyaml==5.3\n")
+    main, extra = (unmapped, known) if unmapped_main else (known, unmapped)
+    _, result = build_review(
+        chalk,
+        random_hex,
+        main,
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        tag=random_hex,
+        named_contexts={"extra": extra},
+        buildx=True,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="blocked")
+    assert sorted(f["subject"] for f in report["_POLICY_FINDINGS"]) == [LODASH, PYYAML]
+    assert "some build contexts could not be located" in result.logs
+
+
+def test_dependency_review_symlinked_context(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    # the context is located in its work tree with symlinks resolved, as
+    # libgit2 reports the work tree; otherwise no manifest matches and the
+    # build passes with zero findings
+    repo = f"vulnerable/{random_hex}"
+    monorepo(tmp_data_dir, repo)
+    link = tmp_path / "workspace"
+    link.symlink_to(tmp_data_dir, target_is_directory=True)
+    _, result = build_review(
+        chalk,
+        random_hex,
+        link / "svc",
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        tag=random_hex,
+        expected_success=False,
+    )
+    assert result.exit_code == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(_POLICY_RESULT="blocked")
+    assert [f["subject"] for f in report["_POLICY_FINDINGS"]] == [LODASH]
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        # push is not reviewed by default
+        {"GITHUB_EVENT_NAME": "push"},
+        {"GITHUB_ACTIONS": ""},
+    ],
+)
+def test_dependency_review_skipped_outside_pull_requests(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    env: dict[str, str],
+):
+    repo = f"vulnerable/{random_hex}"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        {**review_env(tmp_path, server_imds, repo), **env},
+        vulnerabilities={},
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_RESULT="pass",
+        _POLICY_FINDINGS=[],
+        _POLICY_RESULTS=[{"id": "vulns@1", "result": "pass", "rules": []}],
+    )
+    assert dependency_reviews(server_imds, repo) == 0
+
+
+@pytest.mark.parametrize(
+    "owner, token", [("forbidden", "test-token"), ("vulnerable", "")]
+)
+def test_dependency_review_unavailable_only_warns(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    owner: str,
+    token: str,
+):
+    repo = f"{owner}/{random_hex}"
+    summary = tmp_path / "summary.md"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        {
+            **review_env(tmp_path, server_imds, repo, token=token),
+            "GITHUB_STEP_SUMMARY": str(summary),
+        },
+        vulnerabilities={},
+        on_error="block",
+        tag=random_hex,
+    )
+    assert result.exit_code == 0
+    assert image_exists(random_hex)
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_RESULT="pass",
+        _POLICY_FINDINGS=[],
+        _POLICY_RESULTS=[
+            {"id": "vulns@1", "result": "pass", "rules": ["dependency_review"]}
+        ],
+    )
+    assert dependency_reviews(server_imds, repo) == (1 if token else 0)
+    text = summary.read_text()
+    assert (
+        f"> [!WARNING]\n> Dependency review of {repo} is unavailable, so "
+        "policy.vulnerabilities cannot check the dependencies this pull request "
+        "adds for vulnerabilities: " in text
+    )
+    assert "| vulns@1 | enforce | all repos | pass | 0 |" in text
+
+
+@pytest.mark.parametrize("on_error, exit_code", [("allow", 0), ("block", 1)])
+def test_dependency_review_failure_honors_on_error(
+    chalk: Chalk,
+    random_hex: str,
+    tmp_data_dir: Path,
+    tmp_path: Path,
+    server_imds: str,
+    on_error: str,
+    exit_code: int,
+):
+    repo = f"broken/{random_hex}"
+    _, result = build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        review_env(tmp_path, server_imds, repo),
+        vulnerabilities={},
+        on_error=on_error,
+        tag=random_hex,
+        ignore_errors=True,
+        expected_success=exit_code == 0,
+    )
+    assert result.exit_code == exit_code
+    # one request, no retries
+    assert dependency_reviews(server_imds, repo) == 1
+    (report,) = policy_reports(random_hex)
+    assert report.has(
+        _POLICY_FINDINGS=[
+            {
+                "rule": "dependency_review",
+                "kind": "error",
+                "subject": repo,
+                "reason": re.compile(
+                    r"^dependency review failed: GitHub returned HTTP 503"
+                ),
+            }
+        ],
+    )
+
+
+def test_dependency_review_push_not_reviewed(
+    chalk: Chalk, random_hex: str, tmp_data_dir: Path, tmp_path: Path, server_imds: str
+):
+    # only builds are reviewed: a push has no build context, and what its
+    # images were built from is not known reliably
+    repo = f"vulnerable/{random_hex}"
+    tag = f"{REGISTRY}/{random_hex}"
+    env = review_env(tmp_path, server_imds, repo)
+    build_review(
+        chalk,
+        random_hex,
+        monorepo(tmp_data_dir, repo),
+        env,
+        mode="audit",
+        vulnerabilities={},
+        tag=tag,
+    )
+    assert dependency_reviews(server_imds, repo) == 1
+    config = json.dumps(
+        {"id": "vulns@1", "mode": "enforce", "vulnerabilities": {"enabled": True}}
+    )
+    _, result = push_json(chalk, tag, config, random_hex, env=env)
+    assert result.exit_code == 0
+    assert dependency_reviews(server_imds, repo) == 1
+    pushed = policy_reports(random_hex)[-1]
+    assert pushed.has(_OPERATION="push", _POLICY_RESULT="pass", _POLICY_FINDINGS=[])

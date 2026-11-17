@@ -31,6 +31,9 @@ import ".."/[
 
 var execId = secureRand[uint64]().toHex().toLower()
 
+proc getExecutionId*(): string =
+  execId
+
 proc recordExternalActions(kind: string, details: string) =
   externalActions.add(@[kind, details])
 

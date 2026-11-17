@@ -1,0 +1,84 @@
+[
+  {
+    "change_type": "added",
+    "manifest": "services/api/package-lock.json",
+    "ecosystem": "npm",
+    "name": "lodash",
+    "version": "4.17.20",
+    "package_url": "pkg:npm/lodash@4.17.20",
+    "license": "MIT",
+    "source_repository_url": "https://github.com/lodash/lodash",
+    "scope": "runtime",
+    "vulnerabilities": [
+      {
+        "severity": "high",
+        "advisory_ghsa_id": "GHSA-35jh-r3h4-6jhm",
+        "advisory_summary": "Command Injection in lodash",
+        "advisory_url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"
+      },
+      {
+        "severity": "moderate",
+        "advisory_ghsa_id": "GHSA-29mw-wpgm-hmr9",
+        "advisory_summary": "Regular Expression Denial of Service (ReDoS) in lodash",
+        "advisory_url": "https://github.com/advisories/GHSA-29mw-wpgm-hmr9"
+      }
+    ]
+  },
+  {
+    "change_type": "added",
+    "manifest": "services/web/package-lock.json",
+    "ecosystem": "npm",
+    "name": "lodash",
+    "version": "4.17.20",
+    "package_url": "pkg:npm/lodash@4.17.20",
+    "license": "MIT",
+    "source_repository_url": "https://github.com/lodash/lodash",
+    "scope": "runtime",
+    "vulnerabilities": [
+      {
+        "severity": "high",
+        "advisory_ghsa_id": "GHSA-35jh-r3h4-6jhm",
+        "advisory_summary": "Command Injection in lodash",
+        "advisory_url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"
+      }
+    ]
+  },
+  {
+    "change_type": "removed",
+    "manifest": "services/api/package-lock.json",
+    "ecosystem": "npm",
+    "name": "lodash",
+    "version": "4.17.19",
+    "package_url": "pkg:npm/lodash@4.17.19",
+    "license": "MIT",
+    "source_repository_url": "https://github.com/lodash/lodash",
+    "scope": "runtime",
+    "vulnerabilities": [
+      {
+        "severity": "high",
+        "advisory_ghsa_id": "GHSA-p6mc-m468-83gw",
+        "advisory_summary": "Prototype Pollution in lodash",
+        "advisory_url": "https://github.com/advisories/GHSA-p6mc-m468-83gw"
+      }
+    ]
+  },
+  {
+    "change_type": "added",
+    "manifest": "services/api/package-lock.json",
+    "ecosystem": "npm",
+    "name": "minimist",
+    "version": "1.2.5",
+    "package_url": "pkg:npm/minimist@1.2.5",
+    "license": "MIT",
+    "source_repository_url": "https://github.com/minimistjs/minimist",
+    "scope": "development",
+    "vulnerabilities": [
+      {
+        "severity": "critical",
+        "advisory_ghsa_id": "GHSA-xvch-5gv4-984h",
+        "advisory_summary": "Prototype Pollution in minimist",
+        "advisory_url": "https://github.com/advisories/GHSA-xvch-5gv4-984h"
+      }
+    ]
+  }
+]

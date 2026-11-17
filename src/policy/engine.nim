@@ -22,11 +22,13 @@ import "."/[
 
 export api, configuration, repo, summary
 
+const configRule = "config" # findings of a policy whose configuration could not be read
+
 type
   PolicyCollector* = proc(): PolicyInput {.closure.}
   ## Adds the build context to the input. Separate from `PolicyCollector` as
   ## it may check out a git context, which changes what docker builds, so it
-  ## runs only when an enabled rule `requiresContext`.
+  ## runs only when an enabled rule requires or uses context information.
   PolicyContextCollector* = proc(input: var PolicyInput) {.closure.}
   ## normalized repository the command builds, empty when unknown
   PolicyRepoResolver* = proc(): string {.closure.}
@@ -43,10 +45,16 @@ proc evaluatePolicy*(settings: PolicyConfig,
     mode:          settings.mode,
     onError:       settings.onError,
     effectiveMode: mode,
-    modeSource:    (if settings.modeSource != "": settings.modeSource else: "default"),
     repo:          settings.repo,
-    hasEnforceRepos: len(settings.enforceRepos) > 0,
+    hasTargetRepos: len(settings.targetRepos) > 0,
   )
+  for rule in rules:
+    result.rules.add(rule.name)
+  # a rule whose configuration could not be loaded did not run, yet its
+  # error finding must belong to one of the policy's rules
+  for f in findings:
+    if f.rule notin ["", configRule] and f.rule notin result.rules:
+      result.rules.add(f.rule)
   var
     findings   = findings
     attributed = false
@@ -78,6 +86,7 @@ proc evaluatePolicy*(settings: PolicyConfig,
       findings.add(PolicyFinding(rule:   rule.name,
                                  kind:   "error",
                                  reason: "could not evaluate: " & getCurrentExceptionMsg()))
+    result.notices.add(takePolicyNotices())
 
   if not attributed:
     for e in input.errors:
@@ -108,6 +117,8 @@ proc evaluatePolicy*(settings: PolicyConfig,
 proc recordPolicyResults*(results: seq[PolicyResult], build: ChalkDict) =
   ## Records the outcome of all evaluated policies for reporting and raises
   ## `PolicyViolation` when any of them blocks the command.
+  if len(results) == 0:
+    return
   var
     findings:   seq[PolicyFinding]
     blockedIds: seq[string]
@@ -132,18 +143,22 @@ proc recordPolicyResults*(results: seq[PolicyResult], build: ChalkDict) =
       else:
         inc(failures)
 
-  if len(findings) == 0:
-    trace("policy: all policies passed")
-    return
-
+  # reported even when every policy passes: every evaluation is a policy event
   let blocked = len(blockedIds) > 0
   policyOutcome = PolicyOutcome(
     mode:     mode,
-    result:   (if blocked: "blocked" elif anyViolation: "violation" else: "error"),
+    result:   (if blocked: "blocked"
+               elif anyViolation: "violation"
+               elif len(findings) > 0: "error"
+               else: "pass"),
     findings: findings,
     policies: results,
     build:    build,
   )
+
+  if len(findings) == 0:
+    trace("policy: all policies passed")
+    return
 
   # audit findings are warnings so they do not pollute _OP_ERRORS;
   # the policy report is the source of truth for audit mode
@@ -175,15 +190,16 @@ proc evaluatePolicies*(settings: PolicyConfig,
   recordPolicyResults(@[evaluatePolicy(settings, rules, input, findings)], build)
 
 proc configError(settings: PolicyConfig): PolicyFinding =
-  PolicyFinding(rule: "config", kind: "error", reason: settings.configError)
+  PolicyFinding(rule: configRule, kind: "error", reason: settings.configError)
 
 proc resolveModes(configs: seq[PolicyConfig], resolver: PolicyRepoResolver): seq[PolicyConfig] =
-  ## the repository is only looked up when a policy has `enforce_repos`
+  ## the repository is only looked up when an evaluated policy has
+  ## `target_repos`
   var
     repo     = ""
     resolved = false
   for p in configs:
-    if len(p.enforceRepos) == 0:
+    if len(p.targetRepos) == 0 or not p.isEvaluated():
       result.add(p)
       continue
     if not resolved:
@@ -193,7 +209,7 @@ proc resolveModes(configs: seq[PolicyConfig], resolver: PolicyRepoResolver): seq
           repo = resolver()
         except CatchableError:
           warn("policy: could not determine repository: " & getCurrentExceptionMsg())
-      trace("policy: repository for enforce_repos: " & (if repo != "": repo else: "unknown"))
+      trace("policy: repository for target_repos: " & (if repo != "": repo else: "unknown"))
     result.add(p.resolveMode(repo))
 
 proc evaluatePolicies*(build:          ChalkDict,
@@ -247,7 +263,7 @@ proc evaluatePolicies*(build:          ChalkDict,
                                          getCurrentExceptionMsg()))
     if collectContext != nil and not contextCollected and not input.collectionFailed:
       for rule in enabled:
-        if rule.requiresContext:
+        if rule.requiresContext or rule.usesContext:
           contextCollected = true
           try:
             collectContext(input)

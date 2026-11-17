@@ -42,6 +42,11 @@ type
     ## build contexts that are not local directories (stdin, URLs, git named
     ## contexts); the engine attributes them to rules that require the context
     contextErrors*: seq[PolicyFinding]
+    ## build only: the path of a `contextDirs` entry within the git work tree
+    ## of the CI job's repository, e.g. `services/api` (empty for its root),
+    ## as repository-relative paths name it; none when the directory is not
+    ## part of it. Nil when unknown.
+    repoPath*: proc(dir: string): Option[string]
     ## Dockerfile of a build, so rules can honor `<Dockerfile>.dockerignore`;
     ## empty for push or when read from stdin
     dockerfilePath*: string
@@ -75,6 +80,9 @@ type
     ## the rule scans `contextDirs`, so a build context it cannot scan is an
     ## error rather than a silent pass
     requiresContext*: bool
+    ## Collects context information when available, with a rule-specific
+    ## fallback rather than automatically treating context errors as findings.
+    usesContext*: bool
     ## Reads the rule's configuration for this evaluation and returns whether
     ## the rule is enabled. Raising reports a configuration error.
     load*:  proc(): bool
@@ -84,7 +92,9 @@ type
     ## optional, describes the loaded configuration for the step summary
     hint*:  proc(): PolicyHint
 
-var registeredRules: seq[PolicyRule]
+var
+  registeredRules: seq[PolicyRule]
+  pendingNotices:  seq[PolicyNotice]
 
 proc newPolicyRule*(name: string,
                     load: proc(): bool,
@@ -103,11 +113,13 @@ proc newPolicyInputRule*(name: string,
                          check: proc(input: PolicyInput): seq[PolicyFinding],
                          requiresAllSubjects = false,
                          requiresContext = false,
-                         hint: proc(): PolicyHint = nil) =
+                         hint: proc(): PolicyHint = nil,
+                         usesContext = false) =
   ## A rule that sees the whole `PolicyInput`, not just its image subjects.
   newPolicyRule(name, load, nil, requiresAllSubjects, hint)
   registeredRules[^1].checkInput      = check
   registeredRules[^1].requiresContext = requiresContext
+  registeredRules[^1].usesContext     = usesContext
 
 iterator policyRules*(): PolicyRule =
   for rule in registeredRules:
@@ -115,6 +127,15 @@ iterator policyRules*(): PolicyRule =
 
 proc hasPolicyRules*(): bool =
   len(registeredRules) > 0
+
+proc addPolicyNotice*(rule, message: string) =
+  ## Reports `message` for the policy being evaluated without affecting its
+  ## result, see `PolicyNotice`
+  pendingNotices.add(PolicyNotice(rule: rule, message: message))
+
+proc takePolicyNotices*(): seq[PolicyNotice] =
+  result = pendingNotices
+  pendingNotices = @[]
 
 proc collectionError*(reason: string, image = ""): PolicyFinding =
   ## the engine attributes it to each rule that requires all subjects

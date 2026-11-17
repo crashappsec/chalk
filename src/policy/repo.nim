@@ -5,8 +5,8 @@
 ## (see https://crashoverride.com/docs/chalk)
 ##
 
-## Repository identity for `enforce_repos`: which repository a docker command
-## builds, and whether a policy is enforced there.
+## Repository identity for `target_repos`: which repository a docker command
+## builds, and whether a policy applies there.
 
 import std/[
   os,
@@ -85,7 +85,7 @@ proc normalizeRepo*(url: string): string =
   normalize(url, pattern = false)
 
 proc normalizeRepoPattern*(pattern: string): string =
-  ## `normalizeRepo` for an `enforce_repos` glob: glob characters (`*`, `?`)
+  ## `normalizeRepo` for a `target_repos` glob: glob characters (`*`, `?`)
   ## are kept verbatim, so `https://github.com/Acme/app?.git` is
   ## `github.com/acme/app?`. Only a numeric port is removed: a glob in the
   ## port position (`github.com:*`) stays part of the host and, as
@@ -125,25 +125,29 @@ proc matchesRepo*(entries: seq[(string, string)], repo: string): bool =
 
 proc resolveMode*(policy: PolicyConfig, repo: string): PolicyConfig =
   ## Sets the policy's effective mode for `repo` (normalized, empty when
-  ## unknown). An unknown repository never escalates to `enforce`.
+  ## unknown): `mode` where `target_repos` applies the policy, else `off`.
   result = policy
-  result.repo       = repo
-  result.modeSource = "default"
+  result.repo          = repo
   result.effectiveMode = policy.mode
-  if len(policy.enforceRepos) == 0:
+  if len(policy.targetRepos) == 0:
     return
   let prefix = if policy.id != "": "policy: " & policy.id & ": " else: "policy: "
-  for (kind, value) in policy.enforceRepos:
+  for (kind, value) in policy.targetRepos:
     if kind != "glob":
-      warn(prefix & "ignoring enforce_repos entry of unsupported kind " & kind)
+      warn(prefix & "ignoring target_repos entry of unsupported kind " & kind)
     elif value.hasCharClass():
-      warn(prefix & "enforce_repos entry " & value & " uses `[...]`, which " &
+      warn(prefix & "target_repos entry " & value & " uses `[...]`, which " &
            "globs do not support; `[` only matches itself")
   if repo == "":
-    let message = prefix & "repository could not be determined, " &
-                  "enforce_repos not applied, using mode " & policy.mode
+    if policy.onUnknownRepo == "apply":
+      trace(prefix & "repository could not be determined, on_unknown_repo is apply, " &
+            "using mode " & policy.mode)
+      return
+    let message = prefix & "repository could not be determined, policy not evaluated " &
+                  "(on_unknown_repo is skip)"
     if policy.mode == "off": trace(message) else: warn(message)
+    result.effectiveMode = "off"
     return
-  if policy.enforceRepos.matchesRepo(repo):
-    result.effectiveMode = "enforce"
-    result.modeSource    = "enforce_repos"
+  if not policy.targetRepos.matchesRepo(repo):
+    trace(prefix & repo & " is not in target_repos, policy not evaluated")
+    result.effectiveMode = "off"

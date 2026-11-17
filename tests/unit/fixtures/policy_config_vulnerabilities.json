@@ -1,0 +1,19 @@
+{
+  "id": "vulnerabilities@1",
+  "mode": "enforce",
+  "on_error": "allow",
+  "vulnerabilities": {
+    "enabled": true,
+    "min_severity": "moderate",
+    "scopes": ["runtime", "development"],
+    "ignore_advisories": ["GHSA-29mw-*"],
+    "ignore_packages": ["pkg:npm/axios@<0.21.1"],
+    "ignore_paths": ["test/*"],
+    "max_findings": 0,
+    "message": "Upgrade vulnerable dependencies",
+    "dependency_review": {
+      "events": ["pull_request", "merge_group"],
+      "context_only": true
+    }
+  }
+}

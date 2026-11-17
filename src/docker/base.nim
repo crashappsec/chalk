@@ -9,10 +9,12 @@
 ## implementation.
 
 import ".."/[
+  collect,
   commands/cmd_help,
   policy/state,
   policy/summary,
   reporting,
+  redbox_beacon,
   types,
   utils/exec,
   utils/files,
@@ -38,13 +40,26 @@ proc dockerFailsafe*(ctx: DockerInvocation) {.noreturn.} =
     exitCode = runCmdNoOutputCapture(docker,
                                      ctx.originalArgs,
                                      ctx.originalStdIn)
-    setExitCode(exitCode)
-    doReporting("fail")
-    showConfigValues()
+  except CatchableError:
+    error("docker: could not run original command: " & getCurrentExceptionMsg())
+    dumpExOnDebug()
   finally:
-    # no-op unless reporting did not get to write it
-    writePolicySummary()
-    quitChalk(exitCode)
+    setExitCode(exitCode)
+    sendBuildBeacon(exitCode)
+    try:
+      # Preparation may have failed before the normal collection setup.
+      initCollection(collectHost = false)
+      doReporting("fail")
+      showConfigValues()
+    except CatchableError:
+      error("docker: could not report fallback: " & getCurrentExceptionMsg())
+      dumpExOnDebug()
+    finally:
+      # Reporting defects must never replace the wrapped command exit status.
+      try:
+        writePolicySummary()
+      finally:
+        quitChalk(exitCode)
 
 proc dockerPolicyBlocked*(ctx: DockerInvocation) {.noreturn.} =
   # unlike other failures, docker must not be re-run without chalk
@@ -52,6 +67,7 @@ proc dockerPolicyBlocked*(ctx: DockerInvocation) {.noreturn.} =
   try:
     error("docker: " & getCurrentExceptionMsg())
     setExitCode(exitCode)
+    sendBuildBeacon(exitCode)
     doReporting("fail")
     showConfigValues()
   except:

@@ -59,6 +59,38 @@ proc commandRepo(ctx: DockerInvocation): string =
 proc repoResolver(ctx: DockerInvocation): PolicyRepoResolver =
   return proc(): string = ctx.commandRepo()
 
+proc repoPathResolver(): proc(dir: string): Option[string] =
+  ## `PolicyInput.repoPath`: a directory within the git work tree it is in,
+  ## unless that is a checkout of another repository than the CI job's
+  var paths = initTable[string, Option[string]]()
+  let ciRepo = repoFromEnv()
+  return proc(dir: string): Option[string] =
+    if dir in paths:
+      return paths[dir]
+    result = none(string)
+    # libgit2 reports the work tree with symlinks resolved; `dir` must be
+    # too, or a symlinked workspace relativizes to `../..` and no manifest
+    # matches, letting every vulnerable dependency through
+    var real = dir
+    try:
+      real = expandFilename(dir)
+    except OSError:
+      trace("policy: could not resolve " & dir & ": " & getCurrentExceptionMsg())
+    let worktree = gitDiscoverWorkTree(real)
+    if worktree != "":
+      let origin = gitOriginRepo(worktree)
+      if ciRepo != "" and origin != ciRepo:
+        trace("policy: " & dir & " is in a checkout of " & origin & ", not " & ciRepo)
+      else:
+        let path = real.relativePath(worktree)
+        if path == ".":
+          result = some("")
+        elif path.startsWith(".."):
+          trace("policy: " & dir & " resolves outside its work tree " & worktree)
+        else:
+          result = some(path)
+    paths[dir] = result
+
 proc isImageContext(value: string): bool =
   ## named contexts that are images or other stages, which image rules check
   value.startsWith("docker-image://") or value.startsWith("oci-layout://") or
@@ -180,6 +212,7 @@ proc evaluateBuildPolicies*(ctx: DockerInvocation) =
   let collectContext = proc(input: var PolicyInput) =
     input.addPolicyContexts(ctx)
     input.addPolicyDockerfile(ctx)
+    input.repoPath = repoPathResolver()
   evaluatePolicies(ctx.buildInfo(), collect, ctx.repoResolver(), collectContext)
 
 proc evaluatePushPolicies*(ctx: DockerInvocation, chalk: ChalkObj) =

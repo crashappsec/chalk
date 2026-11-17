@@ -17,9 +17,9 @@ Build policies are disabled by default. With the default configuration
 - `chalk docker` behaves exactly as before, including falling back to running
   docker without chalk when chalk itself fails.
 
-Policies only take effect once `policy.mode` is set to `audit` or `enforce`,
-or `policy.enforce_repos` lists repositories in which to enforce them (see
-[Per-repository enforcement](#per-repository-enforcement)).
+Policies only take effect once `policy.mode` is set to `audit` or `enforce`.
+`policy.target_repos` can limit them to some repositories (see
+[Repository scoping](#repository-scoping)).
 
 ## Motivation
 
@@ -30,17 +30,21 @@ images", without changing how developers invoke docker.
 
 ## Modes
 
-| Mode      | Evaluates | Policy report on violation | Fails the command |
-| --------- | --------- | -------------------------- | ----------------- |
-| `off`     | no        | no                         | no                |
-| `audit`   | yes       | yes                        | no                |
-| `enforce` | yes       | yes                        | yes (exit 1)      |
+| Mode      | Evaluates | Policy report | Fails the command     |
+| --------- | --------- | ------------- | --------------------- |
+| `off`     | no        | no            | no                    |
+| `audit`   | yes       | yes           | no                    |
+| `enforce` | yes       | yes           | on violation (exit 1) |
 
-`mode` applies to every repository unless `enforce_repos` enforces the policy
-in some of them, see [Per-repository enforcement](#per-repository-enforcement).
+`mode` alone decides whether a policy is enforced. `target_repos` only decides
+in which repositories the policy is evaluated at all, see
+[Repository scoping](#repository-scoping).
 
-A policy report is published only when there is at least one violation or an
-evaluation error. Builds that pass all policies publish nothing extra.
+A policy report is published for every evaluation, including when every
+policy passes (`_POLICY_RESULT` is then `pass`), so consumers see every
+evaluated build and not only the failing ones. Passing does not change
+anything else: only violations block, and the
+[job summary](#github-actions-job-summary) is still skipped by default.
 
 When a policy cannot reach a decision (for example an image digest could not
 be resolved, or an allowlist entry uses an unknown kind), `on_error` decides.
@@ -114,7 +118,8 @@ policy {
 | `policy.id`                            | `string`                                          | `""`              |
 | `policy.config_json`                   | `string` (JSON object, see below)                 | `""`              |
 | `policy.on_error`                      | `string`, one of `allow`, `block`                 | `"allow"`         |
-| `policy.enforce_repos`                 | `list[tuple[string, string]]` (kind, value)       | `[]`              |
+| `policy.target_repos`                  | `list[tuple[string, string]]` (kind, value)       | `[]`              |
+| `policy.on_unknown_repo`               | `string`, one of `skip`, `apply`                  | `"skip"`          |
 | `policy.report_template`               | `string`                                          | `"policy_report"` |
 | `policy.custom_check`                  | `func (string, string, string, string) -> string` | unset             |
 | `policy.golden_images.enabled`         | `bool`                                            | `false`           |
@@ -142,7 +147,7 @@ names and types match con4m, with tuples written as arrays:
   "id": "golden-images@3",
   "mode": "enforce",
   "on_error": "allow",
-  "enforce_repos": [["glob", "github.com/acme/payments"]],
+  "target_repos": [["glob", "github.com/acme/payments"]],
   "golden_images": {
     "enabled": true,
     "check_copy_from": true,
@@ -158,9 +163,10 @@ names and types match con4m, with tuples written as arrays:
 Missing fields take their defaults. The document is validated strictly: invalid
 JSON, unknown fields, wrong types or invalid choices are reported as a single
 `config` evaluation error (kind `error`) and no rule runs. The policy keeps the
-`mode`, `on_error` and `enforce_repos` it declares when those are themselves
-valid, so `on_error` decides as for any other error: an `enforce` policy with
-`on_error = "block"` blocks the build, and a policy in mode `off` stays off.
+`mode`, `on_error`, `target_repos` and `on_unknown_repo` it declares when those
+are themselves valid, so `on_error` decides as for any other error: an
+`enforce` policy with `on_error = "block"` blocks the build where it applies,
+and a policy in mode `off` stays off.
 A policy that declares no valid `mode`, like a document that cannot be used as
 a whole (not JSON, not an object, an invalid `policies` list), is audited: the error is reported and never blocks. An invalid
 `on_error` is `allow`. Only policy settings can be expressed,
@@ -208,8 +214,9 @@ same fields as the single-policy document above:
 - An entry that is invalid (not an object, unknown fields, wrong types,
   invalid choices, missing or duplicate `id`) is reported as a `config`
   evaluation error of that entry (`policy_id` is its `id`, when it has a
-  string one), which blocks only as the entry's own valid `mode`, `on_error`
-  and `enforce_repos` say (see above). The other entries are still evaluated.
+  string one), which blocks only as the entry's own valid `mode`, `on_error`,
+  `target_repos` and `on_unknown_repo` say (see above). The other entries are
+  still evaluated.
   An entry with a duplicate `id` invalidates every entry using that `id`.
 - `policies` cannot be combined with other top-level fields; such a document,
   or one whose `policies` is not an array, is invalid as a whole.
@@ -221,16 +228,17 @@ same fields as the single-policy document above:
 The single-object form remains supported and behaves as a one-entry list
 whose `id` may be empty.
 
-### Per-repository enforcement
+### Repository scoping
 
-To roll out enforcement gradually, a policy can be enforced in some
-repositories while `mode` applies everywhere else:
+To roll a policy out gradually, `target_repos` limits it to some
+repositories. It is evaluated in its `mode` there and not at all anywhere
+else:
 
 ```json
 {
   "id": "golden-images@3",
-  "mode": "audit",
-  "enforce_repos": [
+  "mode": "enforce",
+  "target_repos": [
     ["glob", "github.com/acme/payments"],
     ["glob", "github.com/acme/platform-*"]
   ],
@@ -241,30 +249,41 @@ repositories while `mode` applies everywhere else:
 }
 ```
 
-`enforce_repos` is available in con4m too (`policy.enforce_repos`, a list of
-`(kind, value)` tuples), in the single-policy document and in every entry of
-`policies`.
+To audit everywhere while enforcing in some repositories, configure two
+policies (see [Several policies](#several-policies)): one in `enforce` mode
+with `target_repos` and one in `audit` mode without.
 
-- A command whose repository matches any entry is evaluated in `enforce`
-  mode; in every other repository the policy uses `mode`. With `mode: "off"`
-  the policy is enforced in the listed repositories and not evaluated
-  anywhere else. Without `enforce_repos` (or with an empty list) `mode`
-  applies everywhere, as before.
+`target_repos` and `on_unknown_repo` are available in con4m too
+(`policy.target_repos`, a list of `(kind, value)` tuples, and
+`policy.on_unknown_repo`), in the single-policy document and in every entry
+of `policies`.
+
+- Without `target_repos` (or with an empty list) the policy applies to every
+  repository and chalk does not determine the repository.
+- When the command's repository matches any entry, the policy is evaluated in
+  its `mode`. Otherwise it is not evaluated: like a policy in mode `off`, it
+  is omitted from `_POLICY_RESULTS` and never blocks.
+- `mode` still decides: a policy in mode `off` is never evaluated, whatever
+  `target_repos` says.
+- When the repository cannot be determined, `on_unknown_repo` decides:
+  `skip` (the default) does not evaluate the policy and logs a warning,
+  `apply` evaluates it in its `mode`. Any other value makes the policy
+  invalid.
 - Entries use the matcher kinds of `golden_images.allowed`. Only `glob`
   applies to repositories; a glob without `*` or `?` matches one repository
   exactly. Entries of other kinds (including `digest`) never match and are
-  logged as warnings, so they can never enforce a policy by accident. Values
-  are normalized like repositories (see below), so
-  `https://github.com/Acme/App.git` and `github.com/acme/app` are equivalent,
-  except that glob characters are kept: `github.com/acme/app?` matches
-  `github.com/acme/app1`, not `github.com/acme/app`. Only a numeric port is
-  removed, so a glob in the port position (`github.com:*/acme/app`) never
-  matches.
-- An `enforce_repos` that is not a list of `[kind, value]` string pairs makes
+  logged as warnings. Values are normalized like repositories (see below),
+  so `https://github.com/Acme/App.git` and `github.com/acme/app` are
+  equivalent, except that glob characters are kept: `github.com/acme/app?`
+  matches `github.com/acme/app1`, not `github.com/acme/app`. Only a numeric
+  port is removed, so a glob in the port position (`github.com:*/acme/app`)
+  never matches.
+- A `target_repos` that is not a list of `[kind, value]` string pairs makes
   the policy invalid: it is reported as a `config` evaluation error, like any
-  other invalid policy, with its `mode` and `on_error` and no `enforce_repos`.
-  A valid `enforce_repos` of a policy that is invalid otherwise still applies,
-  so the error can block (`on_error = "block"`) in the listed repositories.
+  other invalid policy, with its `mode` and `on_error` and no `target_repos`,
+  so in every repository. A valid `target_repos` of a policy that is invalid
+  otherwise still applies, so the error is only reported (and can only
+  block, with `on_error = "block"`) in the listed repositories.
 
 The repository is identified as `host/path`, lowercase, without scheme,
 credentials, port or `.git` suffix, e.g. `github.com/acme/app` (GitLab
@@ -285,12 +304,11 @@ same identity. Chalk determines it before docker runs, in this order:
    `GITHUB_REPOSITORY` (GitHub Actions, `GITHUB_SERVER_URL` defaulting to
    `https://github.com`), else `CI_PROJECT_URL` (GitLab CI).
 
-Chalk only determines the repository when some policy has `enforce_repos`.
-When it cannot be determined (for example a context from stdin or a
-directory outside any git repository, outside CI) the policy is never
-escalated to `enforce`: it uses `mode` and its `_POLICY_RESULTS` entry has an
-empty `repo` and `mode_source` `default`. A warning is logged unless `mode` is
-`off`.
+Chalk only determines the repository when some policy that is not in mode
+`off` has `target_repos`. When it cannot be determined (for example a context
+from stdin or a directory outside any git repository, outside CI),
+`on_unknown_repo` decides, as above; a policy it applies has an empty `repo`
+in its `_POLICY_RESULTS` entry.
 
 As with every policy, this is a guardrail rather than a security boundary:
 whoever controls the build can also change the git remote or CI variables.
@@ -961,9 +979,10 @@ Where the SBOM comes from:
 
 The SBOM describes the build context (manifests and lock files), not the
 built image, so OS packages installed by `RUN apk add` and dependencies
-fetched during the build without a lock file are not seen. Vulnerability
-(CVE) checks are not supported; they need a vulnerability scanner such as
-grype or OSV.
+fetched during the build without a lock file are not seen. Known
+vulnerabilities of dependencies a pull request adds are checked by
+`policy.vulnerabilities` (see "Vulnerable dependencies"); a vulnerability
+scan of every package (e.g. grype or OSV) is not supported yet.
 
 The SBOM comes from `policySboms` in `src/policy/sbom.nim`, shared with the
 other rules that read SBOMs (see "Adding rules").
@@ -1274,9 +1293,137 @@ Set `tool.semgrep.semgrep_format: "json"` for exact `CRITICAL` severities
 and `subcategory`, at the cost of the `SAST` key holding semgrep JSON rather
 than SARIF.
 
+### Vulnerable dependencies
+
+`policy.vulnerabilities` blocks pull requests that add dependencies with
+known vulnerabilities. In a GitHub Actions job for a pull request
+(`pull_request`, `pull_request_target`) or merge queue (`merge_group`), chalk
+asks GitHub's [dependency review API](https://docs.github.com/en/rest/dependency-graph/dependency-review)
+which dependencies the head commit adds over the base commit, read from the
+manifests and lock files GitHub's dependency graph supports, and which GitHub
+security advisories affect them, the same comparison
+[`actions/dependency-review-action`](https://github.com/actions/dependency-review-action)
+makes. It is one layer of several: `sast` checks code, `packages` and
+`licenses` the packages of the build context, `secrets` committed secrets,
+and none of them replaces another.
+
+```json
+{
+  "id": "vulnerabilities@1",
+  "mode": "enforce",
+  "vulnerabilities": {
+    "enabled": true,
+    "min_severity": "high",
+    "scopes": ["runtime"],
+    "ignore_advisories": ["GHSA-35jh-r3h4-6jhm"],
+    "ignore_packages": ["pkg:npm/lodash@<4.17.21"],
+    "ignore_paths": ["test/*"],
+    "max_findings": 0,
+    "message": "Upgrade vulnerable dependencies: https://example.com/appsec",
+    "dependency_review": {
+      "events": ["pull_request", "pull_request_target", "merge_group"],
+      "context_only": true
+    }
+  }
+}
+```
+
+```con4m
+policy {
+  mode: "enforce"
+  vulnerabilities {
+    enabled:      true
+    min_severity: "high"
+    dependency_review {
+      events: ["pull_request", "merge_group"]
+    }
+  }
+}
+```
+
+| Field                                                   | Type           | Default        | Meaning                                                                             |
+| ------------------------------------------------------- | -------------- | -------------- | ----------------------------------------------------------------------------------- |
+| `policy.vulnerabilities.enabled`                        | `bool`         | `false`        | review added dependencies                                                           |
+| `policy.vulnerabilities.min_severity`                   | `string`       | `"high"`       | `low`, `medium` (or `moderate`), `high` or `critical`; lower advisories are ignored |
+| `policy.vulnerabilities.scopes`                         | `list[string]` | `["runtime"]`  | `runtime`, `development`, `unknown`, as GitHub determines them (empty: the default) |
+| `policy.vulnerabilities.ignore_advisories`              | `list[string]` | `[]`           | GitHub advisory id globs to ignore, e.g. `GHSA-35jh-r3h4-6jhm`                      |
+| `policy.vulnerabilities.ignore_packages`                | `list[string]` | `[]`           | purl patterns to ignore, as in `policy.packages.denied`                             |
+| `policy.vulnerabilities.ignore_paths`                   | `list[string]` | `[]`           | repository-relative manifest path globs to ignore                                   |
+| `policy.vulnerabilities.max_findings`                   | `int`          | `0`            | violation only when more vulnerable dependencies count                              |
+| `policy.vulnerabilities.message`                        | `string`       | `""`           | guidance appended to every violation                                                |
+| `policy.vulnerabilities.dependency_review.events`       | `list[string]` | PRs and queues | GitHub events whose jobs are reviewed; `push` is opt-in (empty: the default)        |
+| `policy.vulnerabilities.dependency_review.context_only` | `bool`         | `true`         | only manifests docker sends from the build contexts count                           |
+
+GitHub rates advisories `low`, `moderate`, `high` or `critical`; `moderate`
+is reported as `medium`, the SAST and catalog scale. Each added dependency
+with an advisory that counts is one violation per package and advisory, with
+`subject` its purl, `location` the manifest that adds it (others are listed in
+the reason), `severity` the advisory's and `reason`
+`<severity> <GHSA id>: <summary> (<advisory URL>)` plus `message`, most severe
+first, up to 100 plus one summarizing the rest. Removed and unchanged
+dependencies never count, so a pull request is not blocked for
+vulnerabilities its base branch already has. A version an `ignore_packages`
+range cannot compare is not ignored.
+
+**When it runs.** Only on `chalk docker build`, in GitHub Actions
+(`GITHUB_ACTIONS=true`) for one of `dependency_review.events`. `docker push`
+is not reviewed: it has no build context to narrow the review to, and which
+commits its images were built from is not known reliably (a chalk mark is
+unsigned and inherited through `FROM`), so a push-side review would either
+block on manifests the build ignored or skip images it should not.
+Pull requests compare `pull_request.base.sha`
+and `pull_request.head.sha` of the event payload (`GITHUB_EVENT_PATH`),
+merge groups `merge_group.base_sha` and `head_sha`, and pushes (when listed)
+`before` and `after`; a push creating or deleting a branch has nothing to
+compare. Other events, other CI systems and local runs skip the rule
+silently (trace log). The repository is `GITHUB_REPOSITORY`, the API
+`GITHUB_API_URL` (GitHub Enterprise Server too), and the token
+`GITHUB_TOKEN`, which needs `contents: read` (setup-chalk-action exports the
+job's token). The API version `2026-03-10` is requested from `api.github.com`.
+
+**Build contexts.** With `context_only`, only dependencies added in
+manifests inside a local build context count, and not those its
+`.dockerignore` leaves out, so a monorepo pull request only blocks the
+services whose manifests it changes. Manifests are matched by the path of
+the context within its git work tree, with symlinks resolved on both sides;
+a context in a checkout of another repository than `GITHUB_REPOSITORY`, or
+of a repository without an origin while `GITHUB_REPOSITORY` is set, is not
+part of the comparison. When any
+build context cannot be located in the repository (e.g. a remote context),
+every manifest counts and chalk logs a warning, even if other contexts were
+located, so a vulnerable dependency is never let through for not being
+located. If any context cannot be collected (e.g.
+stdin or a URL), dependency review checks the whole repository instead.
+Skipped or unavailable dependency reviews never create context findings.
+
+The comparison is fetched once per process, as every policy enabling the
+review compares the same commits.
+
+**When the review is unavailable.** GitHub answers HTTP 403 when the
+repository has no dependency graph, or is private without GitHub Code
+Security (or Advanced Security), and 401 for a bad token. Then, and without
+`GITHUB_TOKEN`, chalk logs a warning and adds it to the job summary but the
+policy is not affected: no finding, never `on_error`. Rate limits (429, or
+403 with the limit exhausted; the primary limit resets minutes later, so
+chalk does not retry), server errors, network failures, a 404 (unknown
+commits), malformed responses and comparisons over 10,000 changes are an
+evaluation error that `on_error` decides. GitHub reports incomplete
+snapshots (e.g. a pending
+[dependency submission](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/using-the-dependency-submission-api))
+in the `x-github-dependency-graph-snapshot-warnings` header: chalk logs them
+and evaluates what GitHub returned.
+
+**Not covered.** Dependencies GitHub's dependency graph does not see
+(packages installed by `RUN`, vendored code, ecosystems without supported
+manifests), vulnerabilities of dependencies that are not new in the pull
+request, and builds outside GitHub Actions pull requests. A full vulnerability
+scan of every package, in any CI, needs a vulnerability scanner (e.g. grype
+or OSV) and is not supported yet. Deny or allow lists of packages and
+licenses are the `packages` and `licenses` rules, which read the SBOM.
+
 ## Reporting
 
-Findings are published to the `policy` topic, which is subscribed to
+Every evaluation is published to the `policy` topic, which is subscribed to
 `default_out` by default. Subscribe any other sink to forward them, e.g.:
 
 ```con4m
@@ -1295,24 +1442,28 @@ The `policy_report` template includes:
 | ------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `_POLICY_MODE`     | `string`                     | `enforce` if any evaluated policy is enforced, else `audit`                                                                 |
 | `_POLICY_ID`       | `string`                     | `policy.id`, only when a single policy was evaluated and its id is set                                                      |
-| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error`                                            |
-| `_POLICY_RESULTS`  | `list[dict[string, string]]` | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `mode_source`, `repo`                           |
+| `_POLICY_RESULT`   | `string`                     | across policies: `blocked` if any blocked, else `violation` if any, else `error` if any, else `pass`                        |
+| `_POLICY_RESULTS`  | `list[dict[string, any]]`    | per evaluated policy: `id`, `mode`, `on_error`, `result`, `effective_mode`, `repo`, `rules`                                 |
 | `_POLICY_FINDINGS` | `list[dict[string, string]]` | per finding: `policy_id`, `rule`, `kind`, `image`, `digest`, `stage`, `source`, `reason`, `subject`, `location`, `severity` |
 | `_POLICY_BUILD`    | `dict[string, any]`          | `command`, `dockerfile_path`, `context`, `tags`, `platforms`                                                                |
 
-`_POLICY_RESULTS` lists every evaluated policy (effective mode `audit` or
-`enforce`) in configuration order, including those that passed; policies not
-evaluated (mode `off` and not enforced by `enforce_repos`) are omitted. `mode`
-is the configured mode, `effective_mode` the mode the policy was evaluated
-in, `mode_source` is `enforce_repos` when the repository matched
-`enforce_repos` and `default` otherwise, and `repo` is the repository matched
-against `enforce_repos` (empty when the policy has none or the repository
-could not be determined). `result` is one of `pass`, `violation`, `blocked`
+`_POLICY_RESULTS` lists every evaluated policy (mode `audit` or `enforce`) in
+configuration order, including those that passed; policies not evaluated
+(mode `off`, or `target_repos` not applying them) are omitted. `mode` is the
+configured mode and `effective_mode` the mode the policy was evaluated in,
+which is always `mode`. `repo` is the repository matched against
+`target_repos` (empty when the policy has none or the repository could not
+be determined). `result` is one of `pass`, `violation`, `blocked`
 or `error`. A policy's `result` is `blocked` only for enforced policies,
 `violation` for a non-blocking violation and `error` when it only produced
-non-blocking evaluation errors. Every finding carries the `policy_id` of the
+non-blocking evaluation errors. `rules` lists the rules the policy evaluated
+(a JSON array of strings, named like the `rule` of a finding, e.g.
+`golden_images`), so a rule that passed is reported without findings; it
+includes a rule whose configuration could not be loaded and is empty when the
+policy's configuration could not be read (findings with the `config` rule).
+Every finding carries the `policy_id` of the
 policy that produced it (empty when that policy has no id), so a consumer
-storing one row per finding joins it to `_POLICY_RESULTS` by id. The same
+storing one row per finding joins it to `_POLICY_RESULTS` by id and rule. The same
 image violating two policies yields two findings. For example, with the two
 policies above and `FROM busybox`:
 
@@ -1327,8 +1478,8 @@ policies above and `FROM busybox`:
       "on_error": "allow",
       "result": "blocked",
       "effective_mode": "enforce",
-      "mode_source": "default",
-      "repo": ""
+      "repo": "",
+      "rules": ["golden_images"]
     },
     {
       "id": "chainguard-only@1",
@@ -1336,8 +1487,8 @@ policies above and `FROM busybox`:
       "on_error": "block",
       "result": "violation",
       "effective_mode": "audit",
-      "mode_source": "default",
-      "repo": ""
+      "repo": "",
+      "rules": ["golden_images"]
     }
   ],
   "_POLICY_FINDINGS": [
@@ -1368,18 +1519,26 @@ policies above and `FROM busybox`:
 
 plus host-level operation and CI keys (`_OPERATION`, `_ACTION_ID`,
 `_OP_CHALKER_VERSION`, `_OP_EXIT_CODE`, `_OP_ERRORS`, `BUILD_*`) and
-`_COMMIT_ID`, the HEAD commit of the first local git worktree found among the
-build's context directories. `_COMMIT_ID` is the commit builds are linked to
+`_COMMIT_ID` and `_AUTHOR`, the HEAD commit and its author from the first local
+git worktree found among the build's context directories. `_AUTHOR` is what
+Crash Override reports as the contributor of a policy event, which webhook
+filters on `contributor.email` match on; since only the policy report carries
+`_POLICY_*`, it has to carry `_AUTHOR` too. `_COMMIT_ID` is the commit builds are linked to
 pull requests by (matched against a pull request's head or merge commit), so a
 policy report from a `push` build on the default branch can be tied to the
 merged pull request. Builds on `pull_request` events usually check out a
 synthetic merge commit (`refs/pull/N/merge`) that matches neither, the same
-limitation build reports have. `_COMMIT_ID` is absent when there is no local
+limitation build reports have; for those, `BUILD_REF` (`refs/pull/N/merge`)
+names the pull request. `_COMMIT_ID` and `_AUTHOR` are absent when there is no local
 worktree, e.g. for a remote git context
 (`docker build https://github.com/org/repo.git#ref`).
 Artifact-level keys are not included because a blocked build stops before any
 artifact exists; `_POLICY_BUILD` identifies the build instead. Use
 `policy.report_template` to select a different template.
+
+With `FROM cgr.dev/chainguard/static` both policies pass and the report has
+`"_POLICY_RESULT": "pass"`, `"_POLICY_FINDINGS": []` and each policy's
+`"result": "pass"` with the same `rules`.
 
 The policy report is a report of its own. Like every chalk report it carries a
 unique `_ACTION_ID`, which therefore differs from the `_ACTION_ID` of the
@@ -1387,9 +1546,11 @@ unique `_ACTION_ID`, which therefore differs from the `_ACTION_ID` of the
 use `BUILD_URI` (the CI run) together with `_POLICY_BUILD` (`tags`,
 `dockerfile_path`), which identifies the docker invocation within that run.
 
-The `_POLICY_*` keys can also be added to any other report template. When a
-build is blocked, chalk additionally publishes the regular `fail` report with
-`_OP_EXIT_CODE = 1`.
+Only the policy report carries the `_POLICY_*` keys. Adding them to another
+report template (e.g. the `build` or `push` report) reports each evaluation
+twice, so backends that derive policy events from reports would count it
+twice and attribute it to the wrong report. When a build is blocked, chalk
+additionally publishes the regular `fail` report with `_OP_EXIT_CODE = 1`.
 
 Blocking findings and evaluation errors are logged as errors. Audit-mode
 violations are logged as warnings (prefixed with
@@ -1400,23 +1561,31 @@ findings on the console.
 ### GitHub Actions job summary
 
 When `GITHUB_STEP_SUMMARY` is set (GitHub Actions), every `chalk docker build`
-or `chalk docker push` that evaluates policies appends a short Markdown section
-to the [job summary](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary),
-including when all policies pass and when the command is blocked:
+or `chalk docker push` whose evaluated policies report findings appends a short
+Markdown section to the [job summary](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary),
+including when the command is blocked. When every policy passes nothing is
+written, so conformant builds don't add a section to every job; set
+`policy.github_step_summary_on_pass = true` to write one anyway. Notices, i.e.
+what a rule could not check without it being an evaluation error (e.g. GitHub
+dependency review being unavailable, see "Vulnerable dependencies"), are only
+shown here and also make chalk write the section. The section has:
 
 - an alert stating the outcome: `CAUTION` when blocked, `WARNING` for audit
   violations that `enforce` would block, `NOTE` when policies could only report
-  evaluation errors, `TIP` when all passed;
+  evaluation errors, `TIP` when all passed (only with
+  `github_step_summary_on_pass`);
+- a `WARNING` alert per distinct notice;
 - the command and its first image tag;
 - when there are findings, a table of the offending images (digest shortened),
   how each is used (`FROM`, `COPY --from`, `RUN --mount from` and the stage) and
   why (the policy's `message`, else the finding's reason), and a "How to fix"
   line with the `message` and up to 10 allowed patterns;
-- a collapsed "Policy details" block with each evaluated policy's mode, why it
-  has that mode (`enforce_repos` match, default, or unknown repository), result
-  and finding count, the chalk version, the repository used for
-  `enforce_repos`, and the location of the uploaded policy report when the
-  `policy` topic goes to a `presign` sink (without the presigned query string).
+- a collapsed "Policy details" block with each evaluated policy's mode, scope
+  (all repositories, `target_repos` match, or unknown repository applied by
+  `on_unknown_repo`), result and finding count, the chalk version, the
+  repository used for `target_repos`, and the location of the uploaded policy
+  report when the `policy` topic goes to a `presign` sink (without the
+  presigned query string).
 
 Sections are appended, never truncated, so several chalk invocations in one
 step each add theirs. Rows are capped (50 findings, 50 policies) to stay well

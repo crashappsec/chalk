@@ -143,14 +143,16 @@ proc testInvalidConfigHonorsDeclaredMode() =
   doAssert policyOutcome.policies[0].mode == "enforce"
   doAssert policyOutcome.policies[0].onError == "allow"
 
-  # a valid enforce_repos is kept, an invalid one is not
-  var configs = parsePolicyJson("""{"mode": "off", "enforce_repos": [["glob", "github.com/a/*"]], """ &
-                                broken & "}")
+  # a valid target_repos and on_unknown_repo are kept, invalid ones are not
+  var configs = parsePolicyJson("""{"mode": "off", "target_repos": [["glob", "github.com/a/*"]], """ &
+                                """"on_unknown_repo": "apply", """ & broken & "}")
   doAssert configs[0].mode == "off" and configs[0].configError != ""
-  doAssert configs[0].enforceRepos == @[("glob", "github.com/a/*")]
-  doAssert configs[0].mayBeEvaluated()
-  configs = parsePolicyJson("""{"mode": "enforce", "enforce_repos": [["glob"]]}""")
-  doAssert configs[0].mode == "enforce" and configs[0].enforceRepos.len == 0
+  doAssert configs[0].targetRepos == @[("glob", "github.com/a/*")]
+  doAssert configs[0].onUnknownRepo == "apply"
+  doAssert not configs[0].isEvaluated()
+  configs = parsePolicyJson("""{"mode": "enforce", "target_repos": [["glob"]], "on_unknown_repo": 1}""")
+  doAssert configs[0].mode == "enforce" and configs[0].targetRepos.len == 0
+  doAssert configs[0].onUnknownRepo == "skip"
   setPolicyJson("")
 
 proc goldenImagesRule(): PolicyRule =
@@ -252,9 +254,14 @@ proc testAuditAndEnforceDecideIndependently() =
   doAssert policyOutcome.findings[0].policyId == "golden-images@3"
   doAssert policyOutcome.findings[1].policyId == "chainguard-only@1"
 
-  # all pass: nothing is reported
+  # all pass: still reported
   (blocked, collected) = evaluateJson(multi, @[subject("cgr.dev/chainguard/static")])
-  doAssert not blocked and policyOutcome == nil
+  doAssert not blocked
+  doAssert policyOutcome.result == "pass" and policyOutcome.mode == "enforce"
+  doAssert results() == @[("golden-images@3", "pass"), ("chainguard-only@1", "pass")]
+  doAssert policyOutcome.findings.len == 0
+  for r in policyOutcome.policies:
+    doAssert r.rules == @["golden_images"]
 
 proc testOnErrorPerPolicy() =
   let doc = """{"policies": [

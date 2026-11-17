@@ -4,6 +4,19 @@
 
 ### New Features
 
+- Configurable Redbox Contract 2 lifecycle reports for builds, exec, and
+  heartbeats, with a domain override and default-off activation. An independently
+  enabled, best-effort UDP beacon covers exec startup, periodic runtime
+  signals, and build exit without using the reporting pipeline.
+- Custom reports can opt into `report_if_empty` to emit host-only metadata
+  when no artifacts were collected, `before_command` to publish before
+  the command report, and `after_others` to publish after the command,
+  other custom and policy reports. Docker fallback reporting also covers
+  early spawn failures while preserving the underlying command result.
+- The `dns` sink accepts `dns_use_resolv_conf` to query the first usable
+  `/etc/resolv.conf` nameserver directly, bounded by `dns_timeout`, instead
+  of the system resolver.
+
 - Opt-in build policies for `chalk docker build` and `chalk docker push`,
   disabled by default (`policy.mode = "off"`) with no change in behavior
   unless enabled. The new `policy` configuration section restricts base images (and `COPY --from`
@@ -23,31 +36,51 @@
   `mount` set to `true`, so push checks them too.
   Unlike other failures, a policy block never falls back to running docker
   without chalk, and a failure before policies run is handled by
-  `policy.on_error` instead of silently rerunning docker. Violations and
-  evaluation errors are published to the new `policy` topic with the
+  `policy.on_error` instead of silently rerunning docker. Every evaluation,
+  including one where all policies pass (`_POLICY_RESULT` `pass`), is
+  published to the new `policy` topic with the
   `policy_report` template and the new `_POLICY_MODE`, `_POLICY_ID`, `_POLICY_RESULT`,
-  `_POLICY_RESULTS` (outcome of each policy), `_POLICY_FINDINGS` (each with
-  the `policy_id` that produced it) and `_POLICY_BUILD` keys. Each policy report carries its
+  `_POLICY_RESULTS` (outcome of each policy and the `rules` it evaluated), `_POLICY_FINDINGS` (each with
+  the `policy_id` that produced it) and `_POLICY_BUILD` keys. Only the policy
+  report carries these keys; the Crash Override `build` and `push` reports do
+  not. Each policy report carries its
   own `_ACTION_ID`, like every chalk report; correlate it with the build or
-  push report via `BUILD_URI` and `_POLICY_BUILD`. It also carries `_COMMIT_ID` so it
-  can be linked to the pull request that introduced the violation. See
+  push report via `BUILD_URI` and `_POLICY_BUILD`. It also carries `_COMMIT_ID` and
+  `_AUTHOR` so it can be linked to the pull request and contributor that
+  introduced the violation, and `BUILD_REF`, which names the pull request
+  (`refs/pull/N/merge`) when `_COMMIT_ID` is its synthetic merge commit. See
   `docs/design-build-policy.md`.
-  A policy can be enforced in selected repositories only via `enforce_repos`
+  A policy can be limited to selected repositories via `target_repos`
   (glob entries over the normalized `host/owner/name` of the git origin of the
   build context, or of the working directory for `docker push`, falling back
-  to the CI job's repository), while `mode` applies
-  elsewhere; an undeterminable repository never escalates to `enforce`.
-  `_POLICY_RESULTS` entries report `effective_mode`, `mode_source` and `repo`.
-  Glob characters in `enforce_repos` entries are kept when the entry is
+  to the CI job's repository): it is evaluated in its `mode` there and not
+  evaluated elsewhere. `on_unknown_repo` (`skip` by default, or `apply`)
+  decides when the repository cannot be determined. `mode` alone decides
+  enforcement. `_POLICY_RESULTS` entries report `effective_mode` and `repo`.
+  Glob characters in `target_repos` entries are kept when the entry is
   normalized, so `github.com/acme/app?` matches `github.com/acme/app1`
   rather than being cut at the `?` like a URL query.
   In GitHub Actions (`GITHUB_STEP_SUMMARY` set), the policy outcome is also
   appended to the job summary as a short Markdown section: an alert with the
   outcome, the offending images and how to fix them, and collapsed per-policy
   details including the uploaded policy report location when the `policy`
-  topic uses a `presign` sink. Written even when the command is blocked, never
-  affects the command, and can be turned off with
+  topic uses a `presign` sink. Written only when a policy has findings
+  (violations or evaluation errors), including when the command is blocked;
+  set `policy.github_step_summary_on_pass = true` to also write it when every
+  policy passes. Never affects the command, and can be turned off with
   `policy.github_step_summary = false`.
+
+- New `policy.vulnerabilities` build policy: in GitHub Actions pull request
+  and merge group jobs, chalk asks GitHub's dependency review API which
+  dependencies the pull request adds and blocks (or audits) those with GitHub
+  security advisories at or above `min_severity`, like
+  `actions/dependency-review-action`, with `scopes`, `ignore_advisories`,
+  `ignore_packages`, `ignore_paths`, `max_findings` and `message`. Only
+  manifests inside the build contexts count
+  (`dependency_review.context_only`); `docker push` is not reviewed.
+  Repositories without the dependency graph or GitHub Code Security, or jobs
+  without `GITHUB_TOKEN`, only get a warning in the log and the job summary.
+  See `docs/design-build-policy.md`.
 
 - New loadable config `configs/ai_provenance.c4m` adding the `X_AI_AUTHORSHIP`
   chalk-time host key, which records AI coding agent involvement in a build as

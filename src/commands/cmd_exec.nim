@@ -18,6 +18,7 @@ import ".."/[
   config,
   plugin_api,
   reporting,
+  redbox_beacon,
   run_management,
   sinks,
   subscan,
@@ -457,6 +458,7 @@ proc runCmdExec*(args: seq[string]) =
       randVal = randInt() / high(int)
 
     if randVal > inRange:
+      startExecBeacon(ppid)
       handleExec(allOpts, argsToPass)
 
   let
@@ -471,6 +473,7 @@ proc runCmdExec*(args: seq[string]) =
       error("Chalk could not fork child process to exec " & cmdName)
       setExitCode(1)
     else:
+      startExecBeacon(pid)
       trace("Chalk is parent process: " & $(ppid) & ". Child pid: " & $(pid))
       let
         execNice    = attrGet[int]("exec.nice")
@@ -523,6 +526,7 @@ proc runCmdExec*(args: seq[string]) =
             "Child pid: " & $(pid))
       handleExec(allOpts, argsToPass)
     else:
+      startExecBeacon(ppid)
       let cpid = getpid() # get pid after fork of child process
       trace("Chalk is child process: " & $(cpid))
       let

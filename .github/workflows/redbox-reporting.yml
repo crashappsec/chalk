@@ -1,0 +1,73 @@
+name: redbox-reporting
+
+on:
+  pull_request:
+    paths:
+      - src/redbox_beacon.nim
+      - src/reporting.nim
+      - src/reportcache.nim
+      - src/sinks.nim
+      - src/commands/cmd_exec.nim
+      - src/commands/cmd_docker.nim
+      - src/docker/base.nim
+      - src/plugins/system.nim
+      - src/utils/dns.nim
+      - src/utils/sink_impls.nim
+      - src/configs/**
+      - configs/co/redbox.c4m
+      - tests/integration/test_redbox_reporting.py
+      - tests/integration/Dockerfile.redbox
+      - .github/workflows/redbox-reporting.yml
+      - Dockerfile
+      - chalk.nimble
+      - config.nims
+  push:
+    branches: [main]
+    paths:
+      - src/redbox_beacon.nim
+      - src/reporting.nim
+      - src/reportcache.nim
+      - src/sinks.nim
+      - src/commands/cmd_exec.nim
+      - src/commands/cmd_docker.nim
+      - src/docker/base.nim
+      - src/plugins/system.nim
+      - src/utils/dns.nim
+      - src/utils/sink_impls.nim
+      - src/configs/**
+      - configs/co/redbox.c4m
+      - tests/integration/test_redbox_reporting.py
+      - tests/integration/Dockerfile.redbox
+      - .github/workflows/redbox-reporting.yml
+      - Dockerfile
+      - chalk.nimble
+      - config.nims
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # 4.1.6
+      - name: Fetch pinned dependencies
+        run: make nimble.paths
+      - name: Build compiler and test images
+        run: |
+          docker build --target deps --build-context nimutils=../nimutils -t chalk-redbox-build:ci .
+          docker build -f tests/integration/Dockerfile.redbox -t chalk-redbox-tests:ci .
+      - name: Compile Chalk
+        run: |
+          docker run --rm \
+            -v "$PWD:$PWD" \
+            -v "$PWD/../con4m:$PWD/../con4m:ro" \
+            -v "$PWD/../nimutils:$PWD/../nimutils:ro" \
+            -w "$PWD" chalk-redbox-build:ci nimble build -y
+      - name: Test lifecycle reporting without external network access
+        run: |
+          docker run --rm --network none \
+            -v "$PWD:$PWD" -w "$PWD" \
+            chalk-redbox-tests:ci python3 tests/integration/test_redbox_reporting.py ./chalk

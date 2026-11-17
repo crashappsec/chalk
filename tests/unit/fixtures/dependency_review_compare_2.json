@@ -1,0 +1,52 @@
+[
+  {
+    "change_type": "added",
+    "manifest": "services/api/requirements.txt",
+    "ecosystem": "pip",
+    "name": "pyyaml",
+    "version": "5.3",
+    "package_url": "pkg:pypi/pyyaml@5.3",
+    "license": "MIT",
+    "source_repository_url": "https://github.com/yaml/pyyaml",
+    "scope": "runtime",
+    "vulnerabilities": [
+      {
+        "severity": "critical",
+        "advisory_ghsa_id": "GHSA-8q59-q68h-6hv4",
+        "advisory_summary": "Improper Input Validation in PyYAML",
+        "advisory_url": "https://github.com/advisories/GHSA-8q59-q68h-6hv4"
+      }
+    ]
+  },
+  {
+    "change_type": "added",
+    "manifest": "test/fixtures/package.json",
+    "ecosystem": "npm",
+    "name": "axios",
+    "version": "0.21.0",
+    "package_url": "pkg:npm/axios@0.21.0",
+    "license": "MIT",
+    "source_repository_url": "https://github.com/axios/axios",
+    "scope": "runtime",
+    "vulnerabilities": [
+      {
+        "severity": "high",
+        "advisory_ghsa_id": "GHSA-4w2v-q235-vp99",
+        "advisory_summary": "Server-Side Request Forgery in Axios",
+        "advisory_url": "https://github.com/advisories/GHSA-4w2v-q235-vp99"
+      }
+    ]
+  },
+  {
+    "change_type": "added",
+    "manifest": "services/api/package-lock.json",
+    "ecosystem": "npm",
+    "name": "express",
+    "version": "4.21.2",
+    "package_url": "pkg:npm/express@4.21.2",
+    "license": "MIT",
+    "source_repository_url": "https://github.com/expressjs/express",
+    "scope": "runtime",
+    "vulnerabilities": []
+  }
+]

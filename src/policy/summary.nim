@@ -256,6 +256,18 @@ proc callout(policies: seq[PolicyResult], command: string): seq[string] =
     "> " & (if golden: "All base images are approved golden images"
             else: "All images passed the build policy") & " (" & checked & " checked)."]
 
+proc notices(policies: seq[PolicyResult]): seq[string] =
+  ## every distinct notice, as each policy enabling a rule repeats it
+  var seen: seq[string]
+  for p in policies:
+    for n in p.notices:
+      if n.message in seen:
+        continue
+      seen.add(n.message)
+      result.add("")
+      result.add("> [!WARNING]")
+      result.add("> " & mdText(n.message.sentence(), 500))
+
 proc howToFix(policies: seq[PolicyResult]): seq[string] =
   for p in policies:
     var rules: seq[string]
@@ -287,12 +299,12 @@ proc howToFix(policies: seq[PolicyResult]): seq[string] =
     result.add("**How to fix:** " & line)
     result.add("")
 
-proc whyThisMode(p: PolicyResult): string =
-  if p.modeSource == "enforce_repos":
-    return "enforce_repos match (" & mdCode(p.repo, 100) & ")"
-  if p.hasEnforceRepos and p.repo == "":
-    return "repo unknown → default mode"
-  "default mode"
+proc scope(p: PolicyResult): string =
+  if not p.hasTargetRepos:
+    return "all repos"
+  if p.repo == "":
+    return "repo unknown → on_unknown_repo: apply"
+  "target_repos match (" & mdCode(p.repo, 100) & ")"
 
 proc renderPolicySummary*(policies:        seq[PolicyResult],
                           build:           ChalkDict,
@@ -302,6 +314,7 @@ proc renderPolicySummary*(policies:        seq[PolicyResult],
     command = buildCommand(build)
     tags    = buildTags(build)
   var lines = callout(policies, command)
+  lines.add(notices(policies))
   lines.add("")
   var heading = "#### Chalk build policy · docker " & mdText(command, 20)
   if len(tags) > 0:
@@ -338,16 +351,16 @@ proc renderPolicySummary*(policies:        seq[PolicyResult],
 
   lines.add("<details><summary>Policy details</summary>")
   lines.add("")
-  lines.add("| Policy | Mode | Why this mode | Result | Findings |")
+  lines.add("| Policy | Mode | Scope | Result | Findings |")
   lines.add("| --- | --- | --- | --- | --- |")
   var repo = ""
   for i, p in policies:
-    if p.hasEnforceRepos and repo == "":
+    if p.hasTargetRepos and repo == "":
       repo = if p.repo != "": p.repo else: "unknown"
     if i >= maxPolicyRows:
       continue
     lines.add("| " & mdText(policyName(p.id)) & " | " & mdText(p.effectiveMode) & " | " &
-              p.whyThisMode() & " | " & mdText(p.result) & " | " & $len(p.findings) & " |")
+              p.scope() & " | " & mdText(p.result) & " | " & $len(p.findings) & " |")
   if len(policies) > maxPolicyRows:
     lines.add("")
     lines.add("_" & $(len(policies) - maxPolicyRows) & " more policies not shown._")
@@ -366,11 +379,25 @@ proc stepSummaryEnabled(): bool =
   getEnv("GITHUB_STEP_SUMMARY") != "" and
     attrGetOpt[bool]("policy.github_step_summary").get(true)
 
+proc allPassed(policies: seq[PolicyResult]): bool =
+  ## and nothing to say, as notices are only shown in the summary
+  for p in policies:
+    if p.result != "pass" or len(p.notices) > 0:
+      return false
+  true
+
 proc recordPolicySummary*(policies: seq[PolicyResult], build: ChalkDict) =
   ## Queues the outcome of one evaluation for `writePolicySummary`.
+  ## A fully conformant evaluation adds nothing unless asked to, so jobs
+  ## only get a section when a policy has something to say.
   try:
-    if stepSummaryEnabled():
-      pendingSummaries.add(PendingSummary(policies: policies, build: build))
+    if not stepSummaryEnabled():
+      return
+    if allPassed(policies) and
+       not attrGetOpt[bool]("policy.github_step_summary_on_pass").get(false):
+      trace("policy: all policies passed; no step summary (github_step_summary_on_pass is off)")
+      return
+    pendingSummaries.add(PendingSummary(policies: policies, build: build))
   except CatchableError:
     warn("policy: could not prepare the GitHub step summary: " & getCurrentExceptionMsg())
 
