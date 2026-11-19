@@ -53,6 +53,7 @@ On a disposable local Linux Podman fixture, run:
 ```sh
 python3 tests/integration/podman_compatibility_probe.py --expect-podman 6.1.4 --expect-buildah 1.45.2
 ```
+
 The probe builds temporary images and checks named contexts, exec-form RUN
 mounts from a context, COPY permissions, and inherited ONBUILD execution.
 It removes its images after the check.
@@ -62,13 +63,13 @@ on both native architectures. Other pairs receive one unchanged native build.
 The measurements establish no general minimum version.
 
 | Podman | Buildah |
-| --- | --- |
-| 4.9.4 | 1.33.7 |
-| 5.0.3 | 1.35.4 |
-| 5.2.5 | 1.37.5 |
-| 5.4.2 | 1.39.4 |
-| 5.6.2 | 1.41.5 |
-| 6.1.4 | 1.45.2 |
+| ------ | ------- |
+| 4.9.4  | 1.33.7  |
+| 5.0.3  | 1.35.4  |
+| 5.2.5  | 1.37.5  |
+| 5.4.2  | 1.39.4  |
+| 5.6.2  | 1.41.5  |
+| 6.1.4  | 1.45.2  |
 
 The [native capability measurement pipeline](https://gitlab.com/crashappsec/chalk-orchestration/-/pipelines/3066209923)
 retains the 12 fixture receipts. Access requires repository permission.
