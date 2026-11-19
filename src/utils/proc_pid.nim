@@ -176,7 +176,7 @@ proc loadStatus*(self: ProcInfo): ProcInfo {.discardable.} =
   if "FDSize" in map:
     self.fdsize  = some(parseInt(map["FDSize"]))
   if "Groups" in map:
-    self.groups  = some(parseInts(map["Groups"].split(' ')))
+    self.groups  = some(parseInts(map["Groups"].splitWhitespace()))
   if "Seccomp" in map:
     self.seccomp = some(seccompMap.getOrDefault(map["Seccomp"], seccompMap[""]))
 
