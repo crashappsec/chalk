@@ -334,7 +334,12 @@ class TestPodmanRun(unittest.TestCase):
             ) as temp:
                 pidfile = Path(temp) / "child.pid"
                 process = subprocess.Popen(
-                    [str(self.probe), "runner-cancel", str(pidfile), str(sent_signal)],
+                    [
+                        str(self.probe),
+                        "runner-cancel",
+                        str(pidfile),
+                        str(int(sent_signal)),
+                    ],
                     stdin=subprocess.DEVNULL,
                 )
                 child = None
