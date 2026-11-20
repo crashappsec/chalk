@@ -190,8 +190,11 @@ proc main() =
 
   # An option that IS given must still name something we can instrument.
   expectBuild(@["build", "-t", "foo", "--platform", "linux/arm64", "."])
-  expectPass(@["build", "-t", "foo", "--format", "oci", "."])
-  expectPass(@["build", "--format", "oci", "."])
+  expectBuild(@["build", "-t", "foo", "--format", "oci", "."])
+  expectBuildUntagged(@["build", "--format=oci", "."])
+  expectBuildUntagged(@["build", "--format=OCI", "."])
+  expectBuildUntagged(@["build", "--format", "Docker", "."])
+  expectPass(@["build", "--format", "unknown", "."])
   expectPass(@["build", "-t", "foo", "-f", "-", "."])
   expectBuild(@["build", "-t", "foo", "-t", "bar", "."])
   expectBuild(@["build", "-t", "foo", "--no-cache", "."])
@@ -202,7 +205,6 @@ proc main() =
   let implied = expectBuildRoute(@["build", "-t", "foo", "."])
   assertEq(implied.spec.containerfileArg, "")
   assertEq(implied.spec.requestedPlatform, none(ChalkPlatform))
-  assertEq(implied.spec.imageFormat, "")
   assertEq(implied.spec.fileValueIndex, -1)
   assertEq(implied.spec.contextArg, ".")
 

@@ -91,7 +91,6 @@ proc decideFinalBase*(rootImage: string, commandPlatform: Option[ChalkPlatform],
       kind: fbdAccept,
       root: BaseExec(
         entrypoint: image.entrypoint,
-        user:       image.user,
         cmd:        image.cmd,
         platform:   image.platform,
         binding:    image.binding,

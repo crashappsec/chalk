@@ -111,7 +111,6 @@ type
     containerfileArg*:      string
     tags*:                  seq[string]
     requestedPlatform*:     Option[ChalkPlatform]
-    imageFormat*:           string
     quietOutput*:           bool
     target*:                string
     customerIidFile*:       string
