@@ -250,11 +250,10 @@ proc collectRepos*(exe, image: string, chalk: ChalkObj,
       continue
     try:
       let
-        # asImageRepo needs only the manifest digest, so the config blob is
-        # not fetched -- it is a separate round trip and an extra failure mode.
+        # A standalone manifest needs its config blob to check the platform.
         fetched   = fetchImageManifest(parsedRef, chalk.platform,
                                        ifManySystemPlatform = false,
-                                       fetchConfig          = false)
+                                       fetchConfig          = chalk.platform.isKnown())
         imageRepo = fetched.asImageRepo(tags = @[parsedRef.tag])
       chalk.repos[parsedRef.repo] =
         imageRepo + chalk.repos.getOrDefault(parsedRef.repo)
