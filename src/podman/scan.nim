@@ -324,6 +324,11 @@ proc scanPodmanImage*(exe, image: string,
       if not recognizablePodmanMark(parseJson(mark.get())):
         raise newException(ValueError, "unrecognized mark")
       let extracted = extractOneChalkJson(mark.get(), image)
+      if "CHALK_ID" in extracted:
+        let identity = extracted["CHALK_ID"]
+        if identity.isNil() or identity.kind != MkStr:
+          warn("podman: invalid image mark identity")
+          return none(ChalkObj)
       chalk.collectedData.merge(
         projectPodmanMarkHistory(extracted, chalk.collectedData),
       )
