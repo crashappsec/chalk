@@ -9,6 +9,8 @@ import sys
 import tempfile
 import time
 
+from podman_compatibility_probe import DEFAULT_BASE_IMAGE
+
 binary = Path(sys.argv[1]).resolve()
 podman = shutil.which("podman")
 assert podman
@@ -18,7 +20,7 @@ checks = []
 observations = []
 images = []
 suffix = str(os.getpid())
-alpine = "docker.io/library/alpine@sha256:eafc1edb577d2e9b458664a15f23ea1c370214193226069eb22921169fc7e43f"
+alpine = DEFAULT_BASE_IMAGE
 
 
 def invoke(argv, *, cwd=None, env=None, require_success=True):
@@ -147,6 +149,7 @@ os.execv(os.environ['PODMAN_STARTUP_REAL'], [os.environ['PODMAN_STARTUP_REAL'], 
         for name, contents in cases + [("already-wrapped", "")]:
             if name == "already-wrapped":
                 contents = f'FROM {wrapped_base} AS base\nFROM base\nCMD ["rechalk"]\n'
+            root_reference = contents.splitlines()[0].split()[1]
             (context / "Containerfile").write_text(contents)
             native_tag = tag(name + "-native")
             wrapped_tag = tag(name + "-wrapped")
@@ -163,12 +166,20 @@ os.execv(os.environ['PODMAN_STARTUP_REAL'], [os.environ['PODMAN_STARTUP_REAL'], 
                 name + " instrumented once",
                 len(builds) == 1 and "--build-context" in builds[0],
             )
-            root_inspections = [
+            json_inspections = [
                 args
                 for args in recorded
                 if args[:2] == ["image", "inspect"]
                 and args[-2:] == ["--format", "json"]
             ]
+            root_inspections = [
+                args for args in json_inspections if args[2] == root_reference
+            ]
+            print(
+                f"{name}: {len(json_inspections)} JSON inspections, "
+                f"{len(root_inspections)} for selected root {root_reference}",
+                flush=True,
+            )
             check(name + " root lookup count", len(root_inspections) == 1)
             native = inspect(native_tag)["Config"]
             actual = inspect(wrapped_tag)["Config"]
