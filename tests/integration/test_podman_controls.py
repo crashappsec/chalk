@@ -73,6 +73,7 @@ if argv[:2] == ["image", "inspect"]:
             "User": "",
             "Entrypoint": ["/chalk", "exec", "--heartbeat", "--", "/bin/true"],
             "Cmd": [],
+            "OnBuild": ["USER 10002"] if argv[2] == "localhost/control:user-hook" else [],
         },
     }]))
     sys.exit(0)
@@ -206,6 +207,36 @@ with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
     assert "ONBUILD USER 0:0\n" in nonroot_derived
     assert "ONBUILD USER 10001:10001\n" in nonroot_derived
     evidence.append({"case": nonroot_case["name"], "instrumented": True})
+
+    variable_user_case = invoke(
+        root,
+        fake_dir,
+        calls,
+        "variable-user",
+        'FROM scratch\nARG APP_UID=10001\nUSER $APP_UID\nENTRYPOINT ["/bin/true"]\n',
+    )
+    assert variable_user_case["result"].returncode == 0, variable_user_case
+    assert [call["argv"] for call in variable_user_case["calls"]] == [
+        variable_user_case["argv"]
+    ], variable_user_case
+    assert variable_user_case["new_workspaces"] == [], variable_user_case
+    evidence.append({"case": variable_user_case["name"], "instrumented": False})
+
+    inherited_user_case = invoke(
+        root,
+        fake_dir,
+        calls,
+        "inherited-user-hook",
+        'FROM localhost/control:user-hook\nENTRYPOINT ["/bin/true"]\n',
+    )
+    assert inherited_user_case["result"].returncode == 0, inherited_user_case
+    assert [
+        call["argv"]
+        for call in inherited_user_case["calls"]
+        if call["argv"][:1] == ["build"]
+    ] == [inherited_user_case["argv"]], inherited_user_case
+    assert inherited_user_case["new_workspaces"] == [], inherited_user_case
+    evidence.append({"case": inherited_user_case["name"], "instrumented": False})
 
     cmd_case = invoke(
         root,

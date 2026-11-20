@@ -40,6 +40,7 @@ type
     psrUnsupportedHostArch,
     psrRemoteHost,
     psrNoStartup,
+    psrUnresolvedUser,
     psrImageBindingUnavailable,
     psrIncompatibleImagePlatform,
     psrUnresolvedImagePlatform,
@@ -223,6 +224,8 @@ proc formatReason(skip: PodmanSkip): string =
     return "remote Podman hosts are unsupported"
   of psrNoStartup:
     return "image startup configuration is unavailable"
+  of psrUnresolvedUser:
+    return "effective image user cannot be resolved before instrumentation"
   of psrImageBindingUnavailable:
     return "an immutable selected-base identity is unavailable"
   of psrIncompatibleImagePlatform:

@@ -7,6 +7,7 @@
 
 import std/[
   os,
+  strutils,
 ]
 import ".."/[
   attestation_api,
@@ -228,6 +229,12 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
     emitPodmanSkip(PodmanSkip(operation: poBuild, reason: resolved.reason))
     execReplacingSelf(exe, route.spec.originalArgs)
   var spec = resolved.spec
+  if '$' in spec.startup.user:
+    emitPodmanSkip(PodmanSkip(
+      operation: poBuild,
+      reason:    PodmanSkipReason(kind: psrUnresolvedUser),
+    ))
+    execReplacingSelf(exe, spec.originalArgs)
   disableReportCacheForRun()
 
   let info = runCaptured(exe, @["info", "--format", "json"])
@@ -275,6 +282,14 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
                              inspected, resolved.target)
   if base.kind == fbdSkip:
     emitPodmanSkip(PodmanSkip(operation: poBuild, reason: base.reason))
+    execReplacingSelf(exe, spec.originalArgs)
+
+  if spec.startup.user == "" and inspected.isSome() and
+      inspected.get().hasOnBuildUser:
+    emitPodmanSkip(PodmanSkip(
+      operation: poBuild,
+      reason:    PodmanSkipReason(kind: psrUnresolvedUser),
+    ))
     execReplacingSelf(exe, spec.originalArgs)
 
   let startup = podman_exec.planStartup(spec.startup, base.root)

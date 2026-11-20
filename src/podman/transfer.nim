@@ -150,17 +150,19 @@ proc runPodmanPull*(exe: string, route: podman_types.PodmanRoute): int =
     return result
 
   let chalk = chalkOpt.get()
-  chalk.withErrorContext():
-    if not chalk.isChalked():
-      warn("podman: " & chalk.name &
-           " is not chalked. reporting will be limited")
-    initCollection()
-    # Lets a pulled image be verified against its attestation, and matches what
-    # docker records for the same operation.
-    collectRepos(exe, route.image, chalk, cancellation)
-    if cancellation.isSome():
-      return cancellationExit(cancellation.get())
-    chalk.reportTransfer("pull", route)
+  let registryAccess =
+    if route.authfile == "": dockerRegistryAccess
+    else: newAuthFileRegistryAccess(route.authfile)
+  withRegistryAccess(registryAccess):
+    chalk.withErrorContext():
+      if not chalk.isChalked():
+        warn("podman: " & chalk.name &
+             " is not chalked. reporting will be limited")
+      initCollection()
+      collectRepos(exe, route.image, chalk, cancellation)
+      if cancellation.isSome():
+        return cancellationExit(cancellation.get())
+      chalk.reportTransfer("pull", route)
 
 proc runOriginalPushOnce(
     exe: string,

@@ -147,6 +147,7 @@ os.execv(os.environ['PODMAN_STARTUP_REAL'], [os.environ['PODMAN_STARTUP_REAL'], 
         for name, contents in cases + [("already-wrapped", "")]:
             if name == "already-wrapped":
                 contents = f'FROM {wrapped_base} AS base\nFROM base\nCMD ["rechalk"]\n'
+            root_reference = contents.splitlines()[0].split()[1]
             (context / "Containerfile").write_text(contents)
             native_tag = tag(name + "-native")
             wrapped_tag = tag(name + "-wrapped")
@@ -166,7 +167,7 @@ os.execv(os.environ['PODMAN_STARTUP_REAL'], [os.environ['PODMAN_STARTUP_REAL'], 
             root_inspections = [
                 args
                 for args in recorded
-                if args[:2] == ["image", "inspect"]
+                if args[:3] == ["image", "inspect", root_reference]
                 and args[-2:] == ["--format", "json"]
             ]
             check(name + " root lookup count", len(root_inspections) == 1)
