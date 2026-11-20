@@ -776,6 +776,110 @@ class NativeSecurityRunner:
         self.ledger.write_text("")
         self.ledger.chmod(0o600)
 
+    def run_authfile_pull(self, root, name, form, reference):
+        case_root = root / name
+        case_root.mkdir()
+        config, additional_report, custom_log, report_cache = self.write_case_config(
+            case_root
+        )
+        env, _ = self.case_environment(
+            case_root, additional_report, custom_log, report_cache
+        )
+        registry = reference.split("/", 1)[0]
+        valid = base64.b64encode(PUBLIC_CREDENTIAL.encode()).decode()
+        conflict = base64.b64encode(b"docker-user:wrong-password").decode()
+        authfile = case_root / "podman-auth.json"
+        authfile.write_text(json.dumps({"auths": {registry: {"auth": valid}}}))
+        docker_config = Path(env["HOME"]) / ".docker" / "config.json"
+        docker_config.parent.mkdir()
+        docker_config.write_text(json.dumps({"auths": {registry: {"auth": conflict}}}))
+        repository, tag = reference.split("/", 1)[1].rsplit(":", 1)
+        url = f"http://{registry}/v2/{repository}/manifests/{tag}"
+        accept = (
+            "application/vnd.oci.image.manifest.v1+json,"
+            "application/vnd.docker.distribution.manifest.v2+json"
+        )
+        try:
+            with urllib.request.urlopen(
+                urllib.request.Request(
+                    url, headers={"Authorization": "Basic " + conflict}
+                ),
+                timeout=5,
+            ) as response:
+                conflict_status = response.status
+        except urllib.error.HTTPError as error:
+            conflict_status = error.code
+        self.require(name, "registry rejects Docker credential", conflict_status == 401)
+        request = urllib.request.Request(
+            url, headers={"Authorization": "Basic " + valid, "Accept": accept}
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            manifest = response.read()
+            digest = response.headers["Docker-Content-Digest"]
+        self.require(
+            name,
+            "registry served a standalone image manifest",
+            bool(json.loads(manifest).get("config"))
+            and digest == "sha256:" + hashlib.sha256(manifest).hexdigest(),
+        )
+        self.remove_local_reference(name, reference)
+        auth_args = (
+            ["--authfile=" + str(authfile)]
+            if form == "equals"
+            else ["--authfile", authfile.name]
+        )
+        native_args = ["pull", *auth_args, "--tls-verify=false", reference]
+        self.ledger.write_text("")
+        result = self.command(
+            name,
+            "Chalk pull status",
+            [
+                self.chalk,
+                "--config-file=" + str(config),
+                "--use-embedded-config",
+                "--skip-custom-reports",
+                "--no-color",
+                "--log-level=trace",
+                "podman",
+                *native_args,
+            ],
+            cwd=case_root,
+            env=env,
+        )
+        pulls = [entry for entry in self.read_ledger(name) if entry[:1] == ["pull"]]
+        self.require(
+            name, "one native pull with selected auth file", pulls == [native_args]
+        )
+        self.require(
+            name,
+            "private standalone manifest collected with matching platform",
+            f"collected registry manifest for {reference} @ {digest}".encode()
+            in result.stderr,
+        )
+        report = self.operation_report(
+            name,
+            "pull report",
+            self.reports_from_file(name, "additional report", additional_report),
+            "pull",
+        )
+        artifacts = report.get("_CHALKS", [])
+        self.require(
+            name,
+            "pulled artifact preserves the embedded Chalk ID",
+            [artifact.get("CHALK_ID") for artifact in artifacts]
+            == [HISTORICAL_CHALK_ID],
+        )
+        self.receipt["cases"].append(
+            {
+                "name": name,
+                "credential_form": form,
+                "conflicting_docker_credential": True,
+                "manifest_digest": digest,
+                "native_status": result.returncode,
+                "passed": True,
+            }
+        )
+
     def remove_local_reference(self, case, reference):
         result = self.command(
             case,
@@ -912,6 +1016,12 @@ class NativeSecurityRunner:
                     invalid_ref,
                     invalid_identity=True,
                     reject_credentials=True,
+                )
+                self.run_authfile_pull(
+                    root, "pull-authfile-equals", "equals", equals_ref
+                )
+                self.run_authfile_pull(
+                    root, "pull-authfile-separated", "separated", separated_ref
                 )
             except NativeSecurityFailure as error:
                 failure = error
