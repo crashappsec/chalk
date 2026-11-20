@@ -16,6 +16,10 @@
 - The `dns` sink accepts `dns_use_resolv_conf` to query the first usable
   `/etc/resolv.conf` nameserver directly, bounded by `dns_timeout`, instead
   of the system resolver.
+- Collect customer-generated Podman SPDX JSON 2.2 and 2.3 documents into
+  `_IMAGE_SBOM` from native Buildah outputs, `chalk --sbom-handoff` on
+  `podman push`, and `chalk extract podman` registry attachments. Collection
+  does not launch a scanner or retry a native build.
 
 - Opt-in build policies for `chalk docker build` and `chalk docker push`,
   disabled by default (`policy.mode = "off"`) with no change in behavior
@@ -102,6 +106,19 @@
   ([#765](https://github.com/crashappsec/chalk/pull/765))
 
 ### Bug Fixes
+
+- Restore the established Docker build fallback. A failed rewritten build or
+  non-policy wrapping exception runs the original Docker command and returns
+  its result. Policy refusals remain terminal. Podman keeps its separate rule
+  against replay after an injected build or transfer launch.
+- Protect confidential Podman transfer arguments across reports and caches,
+  preserve native push when instrumentation preparation fails, and prevent
+  embedded marks from overriding current engine observations.
+- Pass heredoc Containerfiles through before parsing their bodies. Instrument
+  only Podman and Buildah release pairs demonstrated by the capability fixtures.
+- Add independent `podman.wrap_entrypoint`, enabled by default. Disable it to
+  run an unchanged native Podman build. Unsupported virtual Podman builds now
+  fail before engine invocation.
 
 - Component variable parameters (`parameter var`) now use configured values,
   including values supplied via `chalk load --params`. Previously parameters

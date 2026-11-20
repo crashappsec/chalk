@@ -1,0 +1,344 @@
+##
+## Copyright (c) 2026, Crash Override, Inc.
+##
+## This file is part of Chalk
+## (see https://crashoverride.com/docs/chalk)
+##
+
+import std/[
+  os,
+]
+import ".."/[
+  attestation_api,
+  chalkjson,
+  collect,
+  config,
+  plugin_api,
+  reportcache,
+  run_management,
+  types,
+  utils/files,
+  utils/exec,
+  utils/json,
+]
+import "../docker"/ids
+import "./cmdline"
+import "./chalk_platform"
+import "./exec" as podman_exec
+import "./host"
+import "./image"
+import "./inject"
+import "./notice"
+import "./platform"
+import "./report"
+import "./run"
+import "./scan"
+import "./sbom"
+import "./transfer"
+import "./types" as podman_types
+
+proc redactCollectedArgs(spec: podman_types.PodmanBuildSpec,
+                         chalk: ChalkObj = nil) =
+  redactPodmanRetainedState(spec.confidentialArgs)
+  if chalk != nil:
+    redactPodmanReportFields(chalk.collectedData, spec.confidentialArgs)
+
+proc doPodmanReporting(spec: podman_types.PodmanBuildSpec, topic: string,
+                       chalk: ChalkObj = nil) =
+  if chalk != nil:
+    redactPodmanReportFields(chalk.collectedData, spec.confidentialArgs)
+  doPodmanReporting(
+    spec.reportArgs,
+    spec.confidentialArgs,
+    topic,
+    spec.quietOutput,
+  )
+
+proc reportAttemptFailure(spec: podman_types.PodmanBuildSpec, status: int): int =
+  setExitCode(status)
+  try:
+    doPodmanReporting(spec, "fail")
+  except:
+    discard
+  return status
+
+proc failOpenOriginal(exe: string, spec: podman_types.PodmanBuildSpec,
+                      step: PodmanAttemptStep,
+                      attemptStatus = none(int)): int =
+  emitPodmanRetryStart(step, attemptStatus)
+  let retried = runAttached(exe, spec.originalArgs)
+  if isCancellation(retried):
+    return cancellationExit(retried)
+  let status = childStatus(retried)
+  if status == 0:
+    emitPodmanRetryResult(NativeRetryResult(kind: nrSucceeded))
+  else:
+    emitPodmanRetryResult(NativeRetryResult(kind: nrExited, status: status))
+  return reportAttemptFailure(spec, status)
+
+proc writeMark(spec: podman_types.PodmanBuildSpec,
+               ws: podman_types.PodmanWorkspace,
+               target: ChalkPlatform, baseChalk: ChalkObj): Option[ChalkObj] =
+  let chalk = newChalk(
+    name         = primaryTag(spec),
+    resourceType = {ResourceImage},
+    codec        = getPluginByName("podman"),
+    chalkId      = dockerGenerateChalkId(),
+  )
+  chalk.baseChalk = baseChalk
+  let baseImage = parseImage(spec.startup.rootImage, defaultTag = "")
+  let dict = chalk.collectedData
+  dict.setIfNeeded("DOCKER_BASE_IMAGE", spec.startup.rootImage)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REPO", baseImage.repo)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_REGISTRY", baseImage.registry)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_NAME", baseImage.name)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_TAG", baseImage.tag)
+  dict.setIfNeeded("DOCKER_BASE_IMAGE_DIGEST", baseImage.digest)
+  if baseChalk != nil:
+    dict.setIfNeeded("DOCKER_BASE_IMAGE_CONFIG_DIGEST", baseChalk.imageId.extractDockerHash())
+    if baseChalk.extract != nil:
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_CHALK", baseChalk.extract)
+      dict.setIfNeeded("DOCKER_BASE_IMAGE_METADATA_ID", baseChalk.extract.getOrDefault("METADATA_ID"))
+  chalk.collectedData.setIfNeeded("DOCKER_FILE", spec.containerfileText)
+  chalk.collectedData.setIfNeeded("DOCKER_FILE_CHALKED", ws.derivedText)
+  chalk.collectedData.setIfNeeded("DOCKERFILE_PATH", spec.resolvedContainerfile)
+  chalk.collectedData.setIfNeeded("DOCKER_CONTEXT", spec.contextArg)
+  chalk.collectedData.setIfNeeded("DOCKER_PLATFORM", $target)
+  chalk.collectedData.setIfNeeded("DOCKER_PLATFORMS", @[$target])
+  if len(spec.tags) > 0:
+    chalk.collectedData.setIfNeeded("DOCKER_TAGS", spec.tags)
+  if spec.target != "":
+    chalk.collectedData.setIfSubscribed("DOCKER_TARGET", spec.startup.stageAlias)
+  redactCollectedArgs(spec)
+  collectChalkTimeArtifactInfo(chalk)
+  redactCollectedArgs(spec, chalk)
+  let mark = chalk.getChalkMarkAsStr()
+  writeFile(ws.assetContext / "chalk.json", mark)
+  discard chmodFilePermissions(ws.assetContext / "chalk.json", "0444")
+  chalk.marked = true
+  return some(chalk)
+
+proc finalizeImage(exe: string, spec: podman_types.PodmanBuildSpec,
+                   ws: podman_types.PodmanWorkspace, chalk: ChalkObj,
+                   snapshots: seq[podman_types.HostFileSnapshot],
+                   workingDir: string,
+                   cancellation: var Option[podman_types.ChildResult]): int =
+  var imageId = ""
+  if fileExists(ws.iidFile):
+    imageId = extractDockerHash(tryToLoadFile(ws.iidFile).strip())
+  if imageId == "" and primaryTag(spec) != "":
+    let inspected = runCaptured(exe, @["image", "inspect", primaryTag(spec)])
+    if isCancellation(inspected.child):
+      return cancellationExit(inspected.child)
+    if inspected.child.kind == podman_types.ceExited and
+        inspected.child.exitCode == 0:
+      try:
+        imageId = extractDockerHash(parseJson(inspected.stdout)[0]{"Id"}.getStr())
+      except:
+        discard
+  if imageId != "":
+    chalk.imageId = imageId
+    chalk.cachedEndingHash = imageId
+    if chalk.name == "":
+      # An untagged build has no other handle for the artifact.
+      chalk.name = imageId
+  collectLocalImageMetadata(exe, chalk, cancellation)
+  if cancellation.isSome():
+    return cancellationExit(cancellation.get())
+  chalk.addToAllChalks()
+  chalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("build")
+  maybeCollectNativeSbom(exe, spec, chalk, snapshots, workingDir, cancellation)
+  if cancellation.isSome():
+    return cancellationExit(cancellation.get())
+  collectRunTimeArtifactInfo(chalk)
+  try:
+    doPodmanReporting(spec, "report", chalk)
+  except:
+    error("podman post-command: reporting failed")
+  return 0
+
+proc beginAcceptedCollection(spec: podman_types.PodmanBuildSpec) =
+  setFullCommandName("build")
+  forceReportKeys(["_OP_ARTIFACT_TYPE", "PODMAN_IMAGE_ID"])
+  setContextDirectories(@[spec.resolvedContext])
+  loadAttestation(forceLoad = true, withPrivateKey = true)
+  initCollection()
+
+proc podmanWrapEntrypointEnabled(): bool =
+  # Some unit tests call runPodmanCommand without loading the configuration
+  # stack. Preserve the production default in that narrow test environment.
+  if con4mRuntime == nil:
+    return true
+  return attrGetOpt[bool]("podman.wrap_entrypoint").get(true)
+
+proc virtualChalkEnabled(): bool =
+  if con4mRuntime == nil:
+    return false
+  return attrGetOpt[bool]("virtual_chalk").get(false)
+
+proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
+  let route = classifyPodmanArgs(args)
+  # Virtual output is unsupported for Podman. Reject before routing can pass
+  # an unrecognized build spelling or global-option form to the native engine.
+  if virtualChalkEnabled():
+    emitPodmanVirtualChalkError()
+    return 2
+
+  if exe == "":
+    var operation = none(PodmanOperation)
+    case route.kind
+    of prPassThrough:
+      if route.skip.isSome():
+        operation = some(route.skip.get().operation)
+    of prInstrument:
+      operation = some(poBuild)
+    of prPush:
+      operation = some(poPush)
+    of prPull:
+      operation = some(poPull)
+    if operation.isSome():
+      emitPodmanSkip(PodmanSkip(
+        operation: operation.get(),
+        reason: PodmanSkipReason(kind: psrNativeExecutableUnavailable),
+      ))
+    return 127
+
+  if route.kind == prInstrument and not podmanWrapEntrypointEnabled():
+    execReplacingSelf(exe, route.spec.originalArgs)
+
+  if route.kind in {prInstrument, prPush, prPull}:
+    setArgs(route.reportArgs)
+
+
+  if route.kind == prPassThrough:
+    if route.skip.isSome():
+      emitPodmanSkip(route.skip.get())
+    execReplacingSelf(exe, route.originalArgs)
+
+  case route.kind
+  of prPull:
+    return runPodmanPull(exe, route)
+  of prPush:
+    return runPodmanPush(exe, route)
+  else:
+    discard
+
+  let resolved = resolvePodmanInputs(route.spec, chalkPath)
+  if resolved.kind == pirRefused:
+    emitPodmanSkip(PodmanSkip(operation: poBuild, reason: resolved.reason))
+    execReplacingSelf(exe, route.spec.originalArgs)
+  var spec = resolved.spec
+  disableReportCacheForRun()
+
+  let info = runCaptured(exe, @["info", "--format", "json"])
+  if isCancellation(info.child):
+    return cancellationExit(info.child)
+  if info.child.kind != podman_types.ceExited or info.child.exitCode != 0:
+    try:
+      beginAcceptedCollection(spec)
+    except:
+      discard
+    let status =
+      if info.child.kind == podman_types.ceExited: some(info.child.exitCode)
+      else: none(int)
+    return failOpenOriginal(exe, spec, pasHostInspection, status)
+  let hostPlatform = checkPodmanHost(info.stdout, resolved.target)
+  if hostPlatform.kind == phrRefused:
+    emitPodmanSkip(PodmanSkip(operation: poBuild,
+                             reason: hostPlatform.reason))
+    execReplacingSelf(exe, spec.originalArgs)
+  spec.guardNoNetwork = guardCanSkipNetwork(info.stdout)
+
+  let
+    fromPlatform = spec.startup.fromPlatform
+    rootImage = spec.startup.rootImage
+    rootIsScratch = rootImage == "scratch"
+    declaredSkip = declaredPlatformSkip(fromPlatform, resolved.target)
+  if declaredSkip.isSome():
+    emitPodmanSkip(PodmanSkip(operation: poBuild,
+                             reason: declaredSkip.get()))
+    execReplacingSelf(exe, spec.originalArgs)
+
+  var
+    cancellation = none(podman_types.ChildResult)
+    inspected = none(InspectedBaseImage)
+  # Platform compatibility is independent of startup inheritance: an explicit
+  # ENTRYPOINT must not skip this check.
+  if not rootIsScratch:
+    inspected = fetchBaseImage(exe, rootImage, cancellation, resolved.target,
+                               spec.pullPolicy,
+                               spec.requestedPlatform, spec.startup.rootFromPlatform,
+                               spec.startup.effectiveStageCount)
+    if cancellation.isSome():
+      return cancellationExit(cancellation.get())
+  let base = decideFinalBase(rootImage, spec.requestedPlatform, fromPlatform,
+                             inspected, resolved.target)
+  if base.kind == fbdSkip:
+    emitPodmanSkip(PodmanSkip(operation: poBuild, reason: base.reason))
+    execReplacingSelf(exe, spec.originalArgs)
+
+  let startup = podman_exec.planStartup(spec.startup, base.root)
+  if startup.kind == podman_exec.sprRefuse:
+    emitPodmanSkip(PodmanSkip(
+      operation: poBuild,
+      reason:    PodmanSkipReason(kind: psrNoStartup),
+    ))
+    execReplacingSelf(exe, spec.originalArgs)
+  spec.startupPlan = some(startup.plan)
+
+  try:
+    beginAcceptedCollection(spec)
+  except:
+    return failOpenOriginal(exe, spec, pasCollectionInitialization)
+
+  let wsOpt = preparePodmanBuild(spec, chalkPath)
+  if wsOpt.isNone():
+    return failOpenOriginal(exe, spec, pasWorkspacePreparation)
+  let ws = wsOpt.get()
+
+  var chalkOpt: Option[ChalkObj]
+  try:
+    var baseChalk: ChalkObj
+    if inspected.isSome():
+      let scanned = scanPodmanImage(exe, inspected.get().imageId, cancellation)
+      if cancellation.isSome():
+        return cancellationExit(cancellation.get())
+      if scanned.isSome():
+        baseChalk = scanned.get()
+        baseChalk.collectedData["_OP_ARTIFACT_CONTEXT"] = pack("base")
+        baseChalk.addToAllArtifacts()
+    chalkOpt = writeMark(spec, ws, resolved.target, baseChalk)
+  except:
+    return failOpenOriginal(exe, spec, pasMarkCreation)
+  if chalkOpt.isNone():
+    return failOpenOriginal(exe, spec, pasMarkCreation)
+  let chalk = chalkOpt.get()
+  let workingDir = getCurrentDir()
+  var snapshots: seq[podman_types.HostFileSnapshot]
+  if isSubscribedKey("_IMAGE_SBOM") and hasNativeSbomDocument(spec.sbom):
+    snapshots = snapshotSbomHostOutputs(spec.sbom, workingDir)
+
+  # Calling the launch adapter ends fallback eligibility, even if it cannot
+  # determine whether the child ran (including ceSpawnFailed after waitpid).
+  var injected: podman_types.ChildResult
+  try:
+    injected = runAttached(exe, makeInjectedArgs(spec, ws))
+  except:
+    error("podman build outcome is unknown")
+    return reportAttemptFailure(spec, 1)
+  if isCancellation(injected):
+    return cancellationExit(injected)
+  if injected.kind != podman_types.ceExited or injected.exitCode != 0:
+    return reportAttemptFailure(spec, childStatus(injected))
+
+  try:
+    let status = finalizeImage(exe, spec, ws, chalk, snapshots, workingDir,
+                               cancellation)
+    if status != 0:
+      return status
+  except:
+    error("podman post-command: collection failed")
+  return 0
+
+proc runPodman*(args: seq[string]): int =
+  return runPodmanCommand(resolvePodmanExe(), args, getMyAppPath())

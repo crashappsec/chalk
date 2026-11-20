@@ -71,7 +71,13 @@ var
   cacheOpenFailed  = false
   cacheReadOnly    = false
   dirtyCache       = false
+  cacheDisabled    = false
 
+proc disableReportCacheForRun*() =
+  cacheDisabled = true
+
+proc reportCacheEnabled(): bool =
+  not cacheDisabled and attrGet[bool]("use_report_cache")
 
 template doPanicWrite(s: string) =
   try:
@@ -123,7 +129,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
       " subscribers)")
 
     if n == 0 and startSubscriptions != 0:
-      if attrGet[bool]("use_report_cache"):
+      if reportCacheEnabled():
         error("For topic '" & topic & "': No output config is working, but " &
               "failures will be stored in the report cache")
       else:
@@ -140,7 +146,7 @@ template tracePublish(topic, m: string, prevSuccesses = false) =
           error("Re-run with --force-output to try again, getting a report " &
             "on the console if io config fails again.")
     elif n != startSubscriptions:
-      if attrGet[bool]("use_report_cache"):
+      if reportCacheEnabled():
         error("For topic '" & topic & "': publish failures will be cached.")
       else:
         error("No report cache is enabled; sink configs with failures will " &
@@ -372,7 +378,7 @@ proc handleFallbacks(topic, msg: string) =
         sinkErrors.add(primary)
 
 proc safePublish*(topic, msg: string) =
-  if not attrGet[bool]("use_report_cache"):
+  if not reportCacheEnabled():
     tracePublish(topic, msg)
     return
 
@@ -411,7 +417,7 @@ proc writeReportCache*() =
   # Everything else we might have published was probably mainly intended
   # for the console.
 
-  if not attrGet[bool]("use_report_cache"):
+  if not reportCacheEnabled():
     return
 
   if cacheReadOnly:

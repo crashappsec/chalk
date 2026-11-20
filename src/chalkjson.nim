@@ -31,7 +31,8 @@ import "."/[
   utils/strings,
 ]
 export json
-export nimutils
+export nimutils except getMyAppPath
+export app_path
 
 const
   jsonWSChars      = ['\x20', '\x0a', '\x0d', '\x09']

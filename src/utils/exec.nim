@@ -17,12 +17,23 @@ import "."/[
 
 var exitCode = 0
 
+when defined(posix):
+  proc libcExit(status: cint) {.importc: "exit", header: "<stdlib.h>", noreturn.}
+
 # this const is not available in nim stdlib hence manual c import
 var TIOCNOTTY {.importc, header: "sys/ioctl.h".}: cuint
 var RLIMIT_AS {.importc, header: "sys/resource.h".}: cint
 
 proc quitChalk*(errCode = exitCode) {.noreturn.} =
   quit(errCode)
+
+proc quitChalkWithStatus*(errCode: int) {.noreturn.} =
+  when defined(posix):
+    # Nim saturates POSIX quit codes above int8.high to 127. A child process
+    # status uses the full unsigned byte, including 128 + signal.
+    libcExit(cint(errCode))
+  else:
+    quit(errCode)
 
 proc getExitCode*(): int =
   return exitCode
