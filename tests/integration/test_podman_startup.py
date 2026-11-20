@@ -9,6 +9,8 @@ import sys
 import tempfile
 import time
 
+from podman_compatibility_probe import DEFAULT_BASE_IMAGE
+
 binary = Path(sys.argv[1]).resolve()
 podman = shutil.which("podman")
 assert podman
@@ -18,7 +20,7 @@ checks = []
 observations = []
 images = []
 suffix = str(os.getpid())
-alpine = "docker.io/library/alpine@sha256:eafc1edb577d2e9b458664a15f23ea1c370214193226069eb22921169fc7e43f"
+alpine = DEFAULT_BASE_IMAGE
 
 
 def invoke(argv, *, cwd=None, env=None, require_success=True):
