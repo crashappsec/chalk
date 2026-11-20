@@ -284,14 +284,6 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
     emitPodmanSkip(PodmanSkip(operation: poBuild, reason: base.reason))
     execReplacingSelf(exe, spec.originalArgs)
 
-  if spec.startup.user == "" and inspected.isSome() and
-      inspected.get().hasOnBuildUser:
-    emitPodmanSkip(PodmanSkip(
-      operation: poBuild,
-      reason:    PodmanSkipReason(kind: psrUnresolvedUser),
-    ))
-    execReplacingSelf(exe, spec.originalArgs)
-
   let startup = podman_exec.planStartup(spec.startup, base.root)
   if startup.kind == podman_exec.sprRefuse:
     emitPodmanSkip(PodmanSkip(

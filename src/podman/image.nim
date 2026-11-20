@@ -27,7 +27,6 @@ import "./types" as podman_types
 type
   InspectedBaseImage* = object
     user*:        string
-    hasOnBuildUser*: bool
     entrypoint*:  JsonNode
     cmd*:         JsonNode
     platform*:    DeclaredPlatform
@@ -77,16 +76,10 @@ proc parseInspectedBaseImage*(raw: string): Option[InspectedBaseImage] =
     var
       entrypoint: JsonNode = nil
       cmd: JsonNode = nil
-      hasOnBuildUser = false
       repoDigests: seq[string]
     if config != nil and config.kind == JObject:
       entrypoint = asNonEmptyArray(config{"Entrypoint"})
       cmd = asNonEmptyArray(config{"Cmd"})
-      for hook in config{"OnBuild"}.getElems():
-        let instruction = hook.getStr().splitWhitespace(maxsplit = 1)
-        if instruction.len > 0 and cmpIgnoreCase(instruction[0], "USER") == 0:
-          hasOnBuildUser = true
-          break
     let rawRepoDigests = img{"RepoDigests"}
     if rawRepoDigests != nil and rawRepoDigests.kind == JArray:
       for item in rawRepoDigests:
@@ -106,7 +99,6 @@ proc parseInspectedBaseImage*(raw: string): Option[InspectedBaseImage] =
           )
     return some(InspectedBaseImage(
       user:        config{"User"}.getStr(),
-      hasOnBuildUser: hasOnBuildUser,
       entrypoint:  entrypoint,
       cmd:         cmd,
       platform:    platform,

@@ -73,7 +73,6 @@ if argv[:2] == ["image", "inspect"]:
             "User": "",
             "Entrypoint": ["/chalk", "exec", "--heartbeat", "--", "/bin/true"],
             "Cmd": [],
-            "OnBuild": ["USER 10002"] if argv[2] == "localhost/control:user-hook" else [],
         },
     }]))
     sys.exit(0)
@@ -221,22 +220,6 @@ with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
     ], variable_user_case
     assert variable_user_case["new_workspaces"] == [], variable_user_case
     evidence.append({"case": variable_user_case["name"], "instrumented": False})
-
-    inherited_user_case = invoke(
-        root,
-        fake_dir,
-        calls,
-        "inherited-user-hook",
-        'FROM localhost/control:user-hook\nENTRYPOINT ["/bin/true"]\n',
-    )
-    assert inherited_user_case["result"].returncode == 0, inherited_user_case
-    assert [
-        call["argv"]
-        for call in inherited_user_case["calls"]
-        if call["argv"][:1] == ["build"]
-    ] == [inherited_user_case["argv"]], inherited_user_case
-    assert inherited_user_case["new_workspaces"] == [], inherited_user_case
-    evidence.append({"case": inherited_user_case["name"], "instrumented": False})
 
     cmd_case = invoke(
         root,
