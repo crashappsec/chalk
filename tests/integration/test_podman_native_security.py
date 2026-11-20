@@ -301,12 +301,12 @@ class NativeSecurityRunner:
             time.sleep(0.25)
         raise NativeSecurityFailure(case, "authenticated registry readiness")
 
-    def write_fixture(self, root, source):
-        context = root / "crafted-image"
+    def write_fixture(self, root, source, chalk_id=HISTORICAL_CHALK_ID):
+        context = root / source.rsplit(":", 1)[-1]
         context.mkdir()
         mark = {
             "MAGIC": "dadfedabbadabbed",
-            "CHALK_ID": HISTORICAL_CHALK_ID,
+            "CHALK_ID": chalk_id,
             "PODMAN_IMAGE_ID": "sha256:" + FORGED_DIGEST,
             "_CURRENT_HASH": FORGED_DIGEST,
             "_IMAGE_CONFIG_DIGEST": FORGED_DIGEST,
@@ -396,8 +396,8 @@ class NativeSecurityRunner:
             raise NativeSecurityFailure("fixture", "installed mark document") from None
         self.require(
             "fixture",
-            "historical Chalk ID",
-            installed.get("CHALK_ID") == HISTORICAL_CHALK_ID,
+            "embedded Chalk ID",
+            installed.get("CHALK_ID") == chalk_id,
         )
 
     def write_case_config(self, case_root):
@@ -600,7 +600,18 @@ class NativeSecurityRunner:
         )
         return env, home / ".local" / "chalk" / "chalk.log"
 
-    def run_case(self, root, name, operation, form, source, reference):
+    def run_case(
+        self,
+        root,
+        name,
+        operation,
+        form,
+        source,
+        reference,
+        *,
+        invalid_identity=False,
+        reject_credentials=False,
+    ):
         case_root = root / name
         case_root.mkdir()
         config, additional_report, custom_log, report_cache = self.write_case_config(
@@ -609,10 +620,11 @@ class NativeSecurityRunner:
         env, default_report = self.case_environment(
             case_root, additional_report, custom_log, report_cache
         )
+        credential = PUBLIC_CREDENTIAL
+        if reject_credentials:
+            credential += "-rejected"
         credential_args = (
-            ["--creds=" + PUBLIC_CREDENTIAL]
-            if form == "equals"
-            else ["--creds", PUBLIC_CREDENTIAL]
+            ["--creds=" + credential] if form == "equals" else ["--creds", credential]
         )
         if operation == "push":
             native_args = [
@@ -630,6 +642,18 @@ class NativeSecurityRunner:
                 reference,
             ]
 
+        expected_status = 0
+        if reject_credentials:
+            native = self.command(
+                name,
+                "native transfer status",
+                [self.podman, *native_args],
+                expected=None,
+            )
+            expected_status = native.returncode
+            self.require(
+                name, "native transfer rejected credentials", expected_status != 0
+            )
         self.ledger.write_text("")
         self.ledger.chmod(0o600)
         result = self.command(
@@ -648,6 +672,7 @@ class NativeSecurityRunner:
             cwd=case_root,
             env=env,
             timeout=300,
+            expected=expected_status,
         )
         entries = self.read_ledger(name)
         launches = [entry for entry in entries if entry and entry[0] == operation]
@@ -673,6 +698,40 @@ class NativeSecurityRunner:
             "retained password confinement",
             PUBLIC_PASSWORD.encode() not in retained,
         )
+
+        if invalid_identity:
+            self.require(
+                name,
+                "scan rejected invalid identity",
+                b"invalid image mark identity" in result.stderr,
+            )
+            for path in (default_report, additional_report):
+                if path.exists():
+                    reports = self.reports_from_file(name, "transfer report", path)
+                    self.require(
+                        name,
+                        "no collected artifact",
+                        all(not report.get("_CHALKS") for report in reports),
+                    )
+            if report_cache.is_file() and report_cache.stat().st_size:
+                reports = self.reports_from_cache(name, report_cache)
+                self.require(
+                    name,
+                    "no cached artifact",
+                    all(not report.get("_CHALKS") for report in reports),
+                )
+            self.receipt["cases"].append(
+                {
+                    "name": name,
+                    "operation": operation,
+                    "native_status": result.returncode,
+                    "native_launches": len(launches),
+                    "collected_artifacts": 0,
+                    "passed": True,
+                }
+            )
+            self.ledger.write_text("")
+            return
 
         inspected = self.inspect_image(
             name, source if operation == "push" else reference
@@ -821,6 +880,39 @@ class NativeSecurityRunner:
                     source,
                     separated_ref,
                 )
+                invalid_source = source.removesuffix(":source") + ":invalid-id"
+                invalid_ref = repository + ":invalid-id"
+                self.image_references.append(invalid_ref)
+                self.write_fixture(root, invalid_source, chalk_id=["invalid"])
+                self.run_case(
+                    root,
+                    "push-invalid-id",
+                    "push",
+                    "equals",
+                    invalid_source,
+                    invalid_ref,
+                    invalid_identity=True,
+                )
+                self.remove_local_reference("pull-invalid-id", invalid_ref)
+                self.run_case(
+                    root,
+                    "pull-invalid-id",
+                    "pull",
+                    "equals",
+                    invalid_source,
+                    invalid_ref,
+                    invalid_identity=True,
+                )
+                self.run_case(
+                    root,
+                    "push-invalid-id-native-failure",
+                    "push",
+                    "equals",
+                    invalid_source,
+                    invalid_ref,
+                    invalid_identity=True,
+                    reject_credentials=True,
+                )
             except NativeSecurityFailure as error:
                 failure = error
             except Exception:
@@ -844,7 +936,7 @@ class NativeSecurityRunner:
                 f"{failure.case}: {failure.field}\n"
             )
             return 1
-        print("4 Podman native security cases passed")
+        print(f"{len(self.receipt['cases'])} Podman native security cases passed")
         return 0
 
     def write_receipt(self):
