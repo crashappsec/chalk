@@ -43,6 +43,138 @@ def run(args, *, required=True, **kwargs):
     return result
 
 
+def check_descendant_users(root, prefix, env, ledger):
+    context = root / "descendant-users"
+    context.mkdir()
+    recipe = context / "Containerfile"
+    (context / "start.sh").write_text(
+        'echo application "$(id -u):$(id -g)" "${CALLER_HOOK:-direct}"\n'
+    )
+    startup = 'ENTRYPOINT ["/bin/sh", "/start.sh"]\n'
+
+    def build(contents, format_args, wrapped):
+        recipe.write_text(contents)
+        image = "localhost/chalk-descendant-user:" + uuid.uuid4().hex
+        images.append(image)
+        argv = ["build", "--pull=never", *format_args, "--tag", image, str(context)]
+        if wrapped:
+            ledger.write_text("")
+            result = run([*prefix, "podman", *argv], env=env)
+            builds = [
+                call
+                for line in ledger.read_text().splitlines()
+                if (call := json.loads(line))[:1] == ["build"]
+            ]
+            assert len(builds) == 1 and "--build-context" in builds[0], (
+                builds,
+                result.stderr,
+            )
+            assert [arg for arg in builds[0] if arg.startswith("--format")] == [
+                arg for arg in format_args if arg.startswith("--format")
+            ], builds
+        else:
+            run([engine, *argv])
+        assert recipe.read_text() == contents
+        return image
+
+    def image_state(image):
+        inspection = json.loads(run([engine, "image", "inspect", image]).stdout)[0]
+        output = run([engine, "run", "--rm", "--network=none", image]).stdout.strip()
+        return inspection["ManifestType"], output
+
+    def image_mark(image):
+        return json.loads(
+            run(
+                [
+                    engine,
+                    "run",
+                    "--rm",
+                    "--network=none",
+                    "--entrypoint",
+                    "/bin/cat",
+                    image,
+                    "/chalk.json",
+                ]
+            ).stdout
+        )
+
+    users = [
+        ("literal", "USER 10011:10012\n", "application 10011:10012 direct"),
+        (
+            "variable",
+            "ARG APP_USER=10021:10022\nUSER $APP_USER\n",
+            "application 10021:10022 direct",
+        ),
+        (
+            "deferred",
+            "USER 10031:10032\nONBUILD USER 10033:10034\nONBUILD ENV CALLER_HOOK=applied\n",
+            "application 10033:10034 applied",
+        ),
+    ]
+    for user_case, instructions, expected in users:
+        parent_recipe = f"FROM {DEFAULT_BASE_IMAGE}\nCOPY start.sh /start.sh\n{instructions}{startup}"
+        for fmt, flags, manifest_type in [
+            ("default", [], None),
+            ("oci", ["--format", "oci"], "application/vnd.oci.image.manifest.v1+json"),
+            (
+                "docker",
+                ["--format=docker"],
+                "application/vnd.docker.distribution.manifest.v2+json",
+            ),
+        ]:
+            parent_flags = ["--format=docker"] if user_case == "deferred" else flags
+            native_parent = build(parent_recipe, parent_flags, False)
+            parent = build(parent_recipe, parent_flags, True)
+            assert image_state(parent) == image_state(native_parent), (user_case, fmt)
+            child_recipe = f"FROM {parent}\n"
+            native_child = build(child_recipe, flags, False)
+            child = build(child_recipe, flags, True)
+            native_type, native_startup = image_state(native_child)
+            wrapped_type, wrapped_startup = image_state(child)
+            assert native_type == wrapped_type, (
+                user_case,
+                fmt,
+                native_type,
+                wrapped_type,
+            )
+            if manifest_type:
+                assert native_type == manifest_type, (user_case, fmt, native_type)
+            assert native_startup == wrapped_startup == expected, (
+                user_case,
+                fmt,
+                expected,
+                native_startup,
+                wrapped_startup,
+            )
+            parent_mark = image_mark(parent)
+            native_mark = image_mark(native_child)
+            child_mark = image_mark(child)
+            assert native_mark == parent_mark, (user_case, fmt)
+            assert parent_mark["CHALK_ID"] and child_mark["CHALK_ID"], (user_case, fmt)
+            assert child_mark["CHALK_ID"] != parent_mark["CHALK_ID"], (user_case, fmt)
+            assert (
+                child_mark["DOCKER_BASE_IMAGE_CHALK"]["CHALK_ID"]
+                == parent_mark["CHALK_ID"]
+            )
+            record["cases"].append(
+                {
+                    "name": f"{user_case}-user-{fmt}-descendant",
+                    "passed": True,
+                    "native_format": native_type,
+                    "wrapped_format": wrapped_type,
+                    "native_startup": native_startup,
+                    "wrapped_startup": wrapped_startup,
+                    "parent_chalk_id": parent_mark["CHALK_ID"],
+                    "native_child_chalk_id": native_mark["CHALK_ID"],
+                    "wrapped_child_chalk_id": child_mark["CHALK_ID"],
+                    "wrapped_child_parent_chalk_id": child_mark[
+                        "DOCKER_BASE_IMAGE_CHALK"
+                    ]["CHALK_ID"],
+                }
+            )
+            save()
+
+
 try:
     info = json.loads(run([engine, "info", "--format", "json"]).stdout)
     record["engine"] = info
@@ -179,13 +311,12 @@ try:
                 manifest = json.load(saved.extractfile("manifest.json"))
                 image_config = json.load(saved.extractfile(manifest[0]["Config"]))
             hooks = image_config.get("config", {}).get("OnBuild") or []
+            assert not hooks, (name, hooks)
             if wrapped:
                 mark = json.loads(mark_path.read_text())
                 assert mark.get("CHALK_ID"), (name, mark)
-                assert hooks, name
             else:
                 assert extracted.returncode != 0
-                assert not hooks, name
                 assert (
                     run(
                         [
@@ -286,6 +417,7 @@ try:
         assert ledger.read_text() == ""
         assert run([engine, "image", "exists", image], required=False).returncode != 0
         record["cases"].append({"name": "virtual-unsupported", "passed": True})
+        check_descendant_users(root, prefix, env, ledger)
     record["passed"] = True
 finally:
     for container in containers:

@@ -203,8 +203,8 @@ with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
         "podman.wrap_entrypoint = true\n",
     )
     nonroot_derived = assert_instrumented(nonroot_case)
-    assert "ONBUILD USER 0:0\n" in nonroot_derived
-    assert "ONBUILD USER 10001:10001\n" in nonroot_derived
+    assert "USER 10001:10001\n" in nonroot_derived
+    assert "ONBUILD" not in nonroot_derived
     evidence.append({"case": nonroot_case["name"], "instrumented": True})
 
     cmd_case = invoke(

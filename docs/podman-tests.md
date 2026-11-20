@@ -41,10 +41,15 @@ startup planning. Chalk does not generate a derived recipe for those inputs.
 ## Configure Podman wrapping
 
 Set `podman.wrap_entrypoint = false` in a Chalk configuration file to run the
-original Podman build without a mark, copied Chalk binary, ONBUILD hook, or
-startup rewrite. The default is `true`, independent of Docker wrapping
+original Podman build without a mark, copied Chalk binary, or startup rewrite. The default is `true`, independent of Docker wrapping
 configuration. Unsupported virtual Podman commands exit with usage status 2
 before invoking the engine.
+
+Chalk wraps explicit OCI and Docker builds. When the caller omits
+`--format`, Podman chooses the output format. Chalk preserves caller-authored
+instructions and leaves their execution to Podman. A native child can inherit
+its parent's `/chalk.json`. A wrapped build of a child writes a new mark
+with parent lineage.
 
 ## Verify engine capabilities
 

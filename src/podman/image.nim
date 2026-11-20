@@ -26,7 +26,6 @@ import "./types" as podman_types
 
 type
   InspectedBaseImage* = object
-    user*:        string
     entrypoint*:  JsonNode
     cmd*:         JsonNode
     platform*:    DeclaredPlatform
@@ -98,7 +97,6 @@ proc parseInspectedBaseImage*(raw: string): Option[InspectedBaseImage] =
             (if variant == "": "" else: "/" & variant),
           )
     return some(InspectedBaseImage(
-      user:        config{"User"}.getStr(),
       entrypoint:  entrypoint,
       cmd:         cmd,
       platform:    platform,

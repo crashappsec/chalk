@@ -1423,7 +1423,6 @@ type
     stageAliases*:        HashSet[string]
     stageAlias*:          string  ## selected stage alias; empty if unnamed
     rootImage*:           string  ## external root image
-    user*:                string  ## last USER in the selected inheritance chain
     cmdInFinal*:          bool    ## CMD was declared in the selected stage
     fromPlatform*:        DeclaredPlatform
     rootFromPlatform*:    DeclaredPlatform
@@ -1513,7 +1512,6 @@ type StageExec = object
   entrypointLine:   Option[int]
   cmd:              StartupValue
   cmdLine:          Option[int]
-  user:             string
   cmdHere:          bool
   rootImage:        string
   rootFromPlatform: DeclaredPlatform
@@ -1893,9 +1891,6 @@ proc getFinalExecConfig*(contents: string, target = ""): tuple[
             (cur.cmd.kind == svExec and len(cur.cmd.argv) > 0):
           cur.cmdHere = true
 
-    elif obj of UserInfo:
-      cur.user = UserInfo(obj).str
-
     elif obj of ShellInfo:
       let item = ShellInfo(obj)
       if item.error == "":
@@ -1950,7 +1945,6 @@ proc getFinalExecConfig*(contents: string, target = ""): tuple[
     stageAliases:        aliases,
     stageAlias:          selectedAlias,
     rootImage:           selected.rootImage,
-    user:                selected.user,
     cmdInFinal:          selected.cmdHere,
     fromPlatform:        selected.fromPlatform,
     rootFromPlatform:    selected.rootFromPlatform,
