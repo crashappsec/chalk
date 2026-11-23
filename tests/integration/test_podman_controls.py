@@ -142,19 +142,22 @@ def invoke(
         "}\n"
         'subscribe("report", "controls_file")\n'
         'subscribe("fail", "controls_file")\n'
-        'subscribe("virtual", "controls_file")\n'
-        + config_text
+        'subscribe("virtual", "controls_file")\n' + config_text
     )
     calls.write_text("")
     before = workspaces()
-    argv = build_argv if build_argv is not None else [
-        "build",
-        "--tag",
-        "localhost/control:test",
-        "--label",
-        "control=exact argv",
-        ".",
-    ]
+    argv = (
+        build_argv
+        if build_argv is not None
+        else [
+            "build",
+            "--tag",
+            "localhost/control:test",
+            "--label",
+            "control=exact argv",
+            ".",
+        ]
+    )
     env = dict(
         os.environ,
         HOME=str(home),

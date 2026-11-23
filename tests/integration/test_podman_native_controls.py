@@ -265,10 +265,13 @@ try:
             virtual_flags = ["--virtual"] if name == "virtual" else []
             result = run([*prefix, *virtual_flags, "podman", *argv], env=env)
             if virtual_flags:
-                assert result.stderr.splitlines().count(
-                    "chalk: Running the native Podman build. "
-                    "Chalk did not produce a virtual mark."
-                ) == 1, result.stderr
+                assert (
+                    result.stderr.splitlines().count(
+                        "chalk: Running the native Podman build. "
+                        "Chalk did not produce a virtual mark."
+                    )
+                    == 1
+                ), result.stderr
             calls = [json.loads(line) for line in ledger.read_text().splitlines()]
             builds = [call for call in calls if call[:1] == ["build"]]
             assert len(builds) == 1, (name, calls)
