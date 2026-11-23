@@ -200,6 +200,7 @@ try:
         )
         cases = [
             ("default", "", "", '["/bin/echo", "hello"]', '["tail"]', True),
+            ("virtual", "", "", '["/bin/echo", "hello"]', '["tail"]', False),
             (
                 "explicit-on",
                 "podman.wrap_entrypoint = true\n",
@@ -261,7 +262,13 @@ try:
                 "--skip-command-report",
                 "--skip-custom-reports",
             ]
-            run([*prefix, "podman", *argv], env=env)
+            virtual_flags = ["--virtual"] if name == "virtual" else []
+            result = run([*prefix, *virtual_flags, "podman", *argv], env=env)
+            if virtual_flags:
+                assert result.stderr.splitlines().count(
+                    "chalk: Running the native Podman build. "
+                    "Chalk did not produce a virtual mark."
+                ) == 1, result.stderr
             calls = [json.loads(line) for line in ledger.read_text().splitlines()]
             builds = [call for call in calls if call[:1] == ["build"]]
             assert len(builds) == 1, (name, calls)
@@ -396,27 +403,6 @@ try:
                 }
             )
             save()
-        image = "localhost/chalk-native-virtual-" + uuid.uuid4().hex
-        ledger.write_text("")
-        virtual = run(
-            [
-                *prefix,
-                "--virtual",
-                "podman",
-                "build",
-                "--layer-label",
-                "unknown=value",
-                "--tag",
-                image,
-                str(context),
-            ],
-            env=env,
-            required=False,
-        )
-        assert virtual.returncode == 2
-        assert ledger.read_text() == ""
-        assert run([engine, "image", "exists", image], required=False).returncode != 0
-        record["cases"].append({"name": "virtual-unsupported", "passed": True})
         check_descendant_users(root, prefix, env, ledger)
     record["passed"] = True
 finally:
