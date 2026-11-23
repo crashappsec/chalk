@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,11 @@ if argv and argv[0] == "build" and "--build-context" in argv:
 with open(os.environ["PODMAN_CONTROL_CALLS"], "a") as stream:
     stream.write(json.dumps(record) + "\n")
 
+native_argv = json.loads(os.environ.get("PODMAN_CONTROL_NATIVE_ARGV", "null"))
+if argv == native_argv:
+    print("native podman stdout")
+    sys.exit(int(os.environ["PODMAN_CONTROL_NATIVE_EXIT"]))
+
 if argv == ["info", "--format", "json"]:
     print(json.dumps({
         "host": {
@@ -65,7 +71,7 @@ if argv[:2] == ["image", "inspect"]:
     print(json.dumps([{
         "Id": "sha256:" + "a" * 64,
         "Digest": "sha256:" + "b" * 64,
-        "RepoTags": ["localhost/control:test"],
+        "RepoTags": [],
         "RepoDigests": [],
         "Os": "linux",
         "Architecture": os.environ["PODMAN_CONTROL_ARCH"],
@@ -75,6 +81,14 @@ if argv[:2] == ["image", "inspect"]:
             "Cmd": [],
         },
     }]))
+    sys.exit(0)
+
+if argv and argv[0] == "create":
+    print("control-scan-container")
+    sys.exit(0)
+if argv[:2] == ["cp", "control-scan-container:/chalk.json"]:
+    sys.exit(1)  # The existing image has no mark.
+if argv == ["rm", "--force", "control-scan-container"]:
     sys.exit(0)
 
 sys.stderr.write("unexpected fake Podman invocation: " + repr(argv) + "\n")
@@ -103,6 +117,8 @@ def invoke(
     config_text="",
     extra_flags=(),
     build_argv=None,
+    wrapper=None,
+    native_status=None,
 ):
     case_root = root / name
     home = case_root / "home"
@@ -110,15 +126,28 @@ def invoke(
     home.mkdir(parents=True)
     context.mkdir()
     (context / "Containerfile").write_text(source)
-    config = case_root / "chalk.c4m"
+    config = (home if wrapper else case_root) / "chalk.c4m"
+    report = case_root / "report.json"
     config.write_text(
         'log_format = "plain"\n'
         "custom_report.terminal_chalk_time.enabled = false\n"
-        "custom_report.terminal_other_op.enabled = false\n" + config_text
+        "custom_report.terminal_other_op.enabled = false\n"
+        "skip_custom_reports = true\n"
+        'podman_log_level = "error"\n'
+        "sink_config controls_file {\n"
+        "  enabled: true\n"
+        '  sink: "file"\n'
+        '  filename: env("PODMAN_CONTROL_REPORT")\n'
+        "  use_search_path: false\n"
+        "}\n"
+        'subscribe("report", "controls_file")\n'
+        'subscribe("fail", "controls_file")\n'
+        'subscribe("virtual", "controls_file")\n'
+        + config_text
     )
     calls.write_text("")
     before = workspaces()
-    argv = build_argv or [
+    argv = build_argv if build_argv is not None else [
         "build",
         "--tag",
         "localhost/control:test",
@@ -132,9 +161,16 @@ def invoke(
         PATH=str(fake_dir) + os.pathsep + os.environ["PATH"],
         PODMAN_CONTROL_CALLS=str(calls),
         PODMAN_CONTROL_ARCH=binary_arch,
+        PODMAN_CONTROL_REPORT=str(report),
     )
-    result = subprocess.run(
-        [
+    if native_status is not None:
+        env["PODMAN_CONTROL_NATIVE_ARGV"] = json.dumps(argv)
+        env["PODMAN_CONTROL_NATIVE_EXIT"] = str(native_status)
+    if wrapper:
+        env["PATH"] = str(wrapper.parent) + os.pathsep + env["PATH"]
+        command = [str(wrapper)]
+    else:
+        command = [
             str(binary),
             f"--config-file={config}",
             "--use-embedded-config",
@@ -143,8 +179,9 @@ def invoke(
             "--log-level=error",
             *extra_flags,
             "podman",
-            *argv,
-        ],
+        ]
+    result = subprocess.run(
+        [*command, *argv],
         cwd=context,
         env=env,
         capture_output=True,
@@ -158,6 +195,7 @@ def invoke(
         "calls": records(calls),
         "new_workspaces": sorted(workspaces() - before),
         "context_files": sorted(path.name for path in context.iterdir()),
+        "report": report.read_text() if report.exists() else "",
     }
 
 
@@ -264,81 +302,72 @@ with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
         }
     )
 
-    virtual_case = invoke(
-        root,
-        fake_dir,
-        calls,
-        "virtual-refused",
-        'FROM scratch\nENTRYPOINT ["/bin/true"]\n',
-        extra_flags=("--virtual",),
-    )
-    assert virtual_case["result"].returncode == 2, virtual_case["result"]
-    assert virtual_case["calls"] == [], virtual_case
-    assert virtual_case["new_workspaces"] == []
-    assert virtual_case["context_files"] == ["Containerfile"]
-    assert (
-        virtual_case["result"].stderr
-        == "chalk: virtual_chalk is not supported for Podman commands.\n"
-    ), virtual_case["result"].stderr
-    evidence.append(
-        {
-            "case": virtual_case["name"],
-            "exit_code": 2,
-            "engine_calls": 0,
-            "workspace_created": False,
-            "image_created": False,
-        }
+    wrapper = root / "wrapper" / "podman"
+    wrapper.parent.mkdir()
+    shutil.copy2(binary, wrapper)
+    virtual_notice = (
+        "chalk: Running the native Podman build. "
+        "Chalk did not produce a virtual mark.\n"
     )
 
-    for spelling, build_args in [
-        ("global-option", ["--root", str(root / "unused-engine-root"), "build", "."]),
-        ("image-build-alias", ["image", "build", "."]),
-    ]:
-        virtual_form = invoke(
-            root,
-            fake_dir,
-            calls,
-            "virtual-" + spelling,
-            'FROM scratch\nENTRYPOINT ["/bin/true"]\n',
-            extra_flags=("--virtual",),
-            build_argv=build_args,
-        )
-        assert virtual_form["result"].returncode == 2, spelling
-        assert virtual_form["calls"] == [], spelling
-        assert virtual_form["new_workspaces"] == [], spelling
-        evidence.append(
-            {"case": "virtual-" + spelling, "exit_code": 2, "engine_calls": 0}
-        )
-
-    virtual_unsupported_case = invoke(
-        root,
-        fake_dir,
-        calls,
-        "virtual-unsupported-build",
-        'FROM scratch\nENTRYPOINT ["/bin/true"]\n',
-        extra_flags=("--virtual",),
-        build_argv=["build", "--from", "must-not-run", "."],
-    )
-    assert virtual_unsupported_case["result"].returncode == 2, virtual_unsupported_case[
-        "result"
-    ]
-    assert virtual_unsupported_case["calls"] == [], virtual_unsupported_case
-    assert virtual_unsupported_case["new_workspaces"] == []
-    assert virtual_unsupported_case["context_files"] == ["Containerfile"]
-    assert (
-        virtual_unsupported_case["result"].stderr
-        == "chalk: virtual_chalk is not supported for Podman commands.\n"
-    ), virtual_unsupported_case["result"].stderr
-    evidence.append(
-        {
-            "case": virtual_unsupported_case["name"],
-            "exit_code": 2,
-            "engine_calls": 0,
-            "workspace_created": False,
-            "image_created": False,
-            "unsupported_build_flag": "--from",
-        }
-    )
+    for entry in ("cli", "wrapper"):
+        for spelling, args, builds, status in [
+            ("build", ["build", "--label", "control=exact argv", "."], True, 0),
+            ("failed-build", ["build", "--tag", "control:failure", "."], True, 23),
+            ("unsupported-build-option", ["build", "--from", "base", "."], True, 0),
+            ("image-build", ["image", "build", "."], True, 0),
+            ("buildx-build", ["buildx", "build", "."], True, 0),
+            (
+                "global-option",
+                ["--root", "engine root", "image", "build", "."],
+                True,
+                0,
+            ),
+            ("build-help", ["build", "--help"], False, 0),
+            ("ordinary", ["ps", "--all"], False, 0),
+            ("unknown", ["unknown", "build", "."], False, 125),
+            ("unknown-option", ["--unknown", "build", "."], False, 125),
+            ("pull", ["pull", "localhost/control:test"], False, 0),
+            ("push", ["push", "localhost/control:test", "dir:output"], False, 0),
+        ]:
+            name = f"virtual-{entry}-{spelling}"
+            case = invoke(
+                root,
+                fake_dir,
+                calls,
+                name,
+                'FROM scratch\nENTRYPOINT ["/bin/true"]\n',
+                config_text="virtual_chalk = true\n" if entry == "wrapper" else "",
+                extra_flags=("--virtual",) if entry == "cli" else (),
+                build_argv=args,
+                wrapper=wrapper if entry == "wrapper" else None,
+                native_status=status,
+            )
+            proc = case["result"]
+            assert proc.returncode == status, case
+            assert proc.stdout == "native podman stdout\n", case
+            assert proc.stderr == (virtual_notice if builds else ""), case
+            engine_argv = [call["argv"] for call in case["calls"]]
+            assert case["context_files"] == ["Containerfile"], case
+            assert case["new_workspaces"] == [], case
+            if spelling in ("pull", "push"):
+                launches = [argv for argv in engine_argv if argv[0] == spelling]
+                assert launches == [args], case
+                reports = json.loads(case["report"])
+                assert [report["_OPERATION"] for report in reports] == [spelling], case
+            else:
+                assert engine_argv == [args], case
+                assert not case["report"], case
+            evidence.append(
+                {
+                    "case": name,
+                    "native_argv": args,
+                    "exit_code": proc.returncode,
+                    "engine_calls": len(engine_argv),
+                    "notice": proc.stderr.strip(),
+                    "reported": bool(case["report"]),
+                }
+            )
 
 result = {
     "schema_version": 1,

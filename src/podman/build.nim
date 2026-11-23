@@ -178,12 +178,6 @@ proc virtualChalkEnabled(): bool =
 
 proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
   let route = classifyPodmanArgs(args)
-  # Virtual output is unsupported for Podman. Reject before routing can pass
-  # an unrecognized build spelling or global-option form to the native engine.
-  if virtualChalkEnabled():
-    emitPodmanVirtualChalkError()
-    return 2
-
   if exe == "":
     var operation = none(PodmanOperation)
     case route.kind
@@ -202,6 +196,13 @@ proc runPodmanCommand*(exe: string, args: seq[string], chalkPath: string): int =
         reason: PodmanSkipReason(kind: psrNativeExecutableUnavailable),
       ))
     return 127
+
+  let isBuild = route.kind == prInstrument or
+                (route.kind == prPassThrough and route.skip.isSome() and
+                 route.skip.get().operation == poBuild)
+  if isBuild and virtualChalkEnabled():
+    emitPodmanVirtualBuildNotice()
+    execReplacingSelf(exe, route.originalArgs)
 
   if route.kind == prInstrument and not podmanWrapEntrypointEnabled():
     execReplacingSelf(exe, route.spec.originalArgs)

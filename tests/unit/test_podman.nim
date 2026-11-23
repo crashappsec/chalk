@@ -378,8 +378,8 @@ proc main() =
            )),
            "chalk: skipped Podman build processing: Podman and Buildah " &
            "release pair has not passed the instrumentation capability probe.")
-  assertEq(formatPodmanVirtualChalkError(),
-           "chalk: virtual_chalk is not supported for Podman commands.")
+  assertEq(formatPodmanVirtualBuildNotice(),
+           "chalk: Running the native Podman build. Chalk did not produce a virtual mark.")
 
   # Guard network opt-out is feature-detected on the buildah version, never
   # assumed: an older parser would reject the flag and fail every build.

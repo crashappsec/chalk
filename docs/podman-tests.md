@@ -42,8 +42,17 @@ startup planning. Chalk does not generate a derived recipe for those inputs.
 
 Set `podman.wrap_entrypoint = false` in a Chalk configuration file to run the
 original Podman build without a mark, copied Chalk binary, or startup rewrite. The default is `true`, independent of Docker wrapping
-configuration. Unsupported virtual Podman commands exit with usage status 2
-before invoking the engine.
+configuration.
+
+Use `chalk --virtual podman …` or set `virtual_chalk = true` when Chalk is
+installed as `podman`. For recognized builds, Chalk prints one notice to stderr
+and runs Podman once with the original arguments. Podman supplies stdout and
+the exit status. Chalk produces no virtual mark, no injected mark, and no build
+report. Ordinary commands and unknown invocations pass through. Supported pulls
+and pushes still use Chalk's transfer handlers and produce their usual reports.
+
+Run `python3 tests/integration/test_podman_controls.py ./chalk` to check both
+entry points with a recording engine.
 
 Chalk wraps explicit OCI and Docker builds. When the caller omits
 `--format`, Podman chooses the output format. Chalk preserves caller-authored
