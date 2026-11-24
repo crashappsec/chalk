@@ -117,8 +117,11 @@
 - Pass heredoc Containerfiles through before parsing their bodies. Instrument
   only Podman and Buildah release pairs demonstrated by the capability fixtures.
 - Add independent `podman.wrap_entrypoint`, enabled by default. Disable it to
-  run an unchanged native Podman build. Unsupported virtual Podman builds now
-  fail before engine invocation.
+  run an unchanged native Podman build.
+- In virtual mode, run Podman builds once with their original arguments and
+  print a notice that Chalk did not produce a virtual mark. Ordinary commands
+  and unknown invocations pass through. Supported pulls and pushes still
+  produce Chalk reports.
 
 - Component variable parameters (`parameter var`) now use configured values,
   including values supplied via `chalk load --params`. Previously parameters
