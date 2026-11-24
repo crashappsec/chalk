@@ -1,5 +1,6 @@
 /* Link only into the diagnostic binary with --wrap=chalk_podman_run_attached. */
 #include "podman/run.h"
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,12 @@ int __wrap_chalk_podman_run_attached(const char *exe, char *const argv[],
     if (injected && fault && strcmp(fault, "unknown") == 0) {
         out->kind = CHALK_PODMAN_SPAWNFAILED;
         out->exit_code = 127;
+    }
+    if (injected && fault && strcmp(fault, "timeout") == 0) {
+        out->timed_out = 1;
+    }
+    if (injected && fault && strcmp(fault, "forwarded") == 0) {
+        out->forwarded = SIGTERM;
     }
     return result;
 }

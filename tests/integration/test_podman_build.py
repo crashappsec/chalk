@@ -205,8 +205,6 @@ os.execv(os.environ['PODMAN_TEST_REAL'], [os.environ['PODMAN_TEST_REAL'], *sys.a
                     env["PODMAN_TEST_REMOVE_IID"] = "1"
                 if mode == "setup-failure":
                     env["PODMAN_TEST_INFO_EXIT"] = "17"
-                if mode == "fallback":
-                    env["PODMAN_TEST_INJECTED_EXIT"] = "17"
                 exe = real_podman if mode == "ordinary" else str(wrapped_dir / "podman")
                 report_offset = (
                     len(report_log.read_text()) if report_log.exists() else 0
@@ -555,7 +553,7 @@ os.execv(os.environ['PODMAN_TEST_REAL'], [os.environ['PODMAN_TEST_REAL'], *sys.a
                         ".",
                     ]
                     calls.write_text("")
-                    refused = subprocess.run(
+                    result = subprocess.run(
                         [str(wrapped_dir / "podman"), *reserved_argv],
                         cwd=reserved,
                         env=env,
@@ -564,8 +562,10 @@ os.execv(os.environ['PODMAN_TEST_REAL'], [os.environ['PODMAN_TEST_REAL'], *sys.a
                         timeout=180,
                     )
                     check(
-                        name + " guard refuses the single attempt",
-                        refused.returncode != 0,
+                        name + " guard failure and successful native retry",
+                        result.returncode == 0
+                        and "reserved Chalk paths are occupied" in result.stderr
+                        and "retrying the original build" in result.stderr,
                     )
                     records = [
                         json.loads(line) for line in calls.read_text().splitlines()
@@ -576,11 +576,11 @@ os.execv(os.environ['PODMAN_TEST_REAL'], [os.environ['PODMAN_TEST_REAL'], *sys.a
                         if record["args"][:1] == ["build"]
                     ]
                     check(
-                        name + " one instrumented attempt without replay",
-                        len(builds) == 1 and "--build-context" in builds[0],
+                        name + " one instrumented attempt and exact native retry",
+                        len(builds) == 2
+                        and "--build-context" in builds[0]
+                        and builds[1] == reserved_argv,
                     )
-                    # A separate native control verifies the original recipe's content.
-                    run([real_podman, *reserved_argv], cwd=reserved)
                     info = json.loads(run([real_podman, "image", "inspect", tag]))[0]
                     if name == "entrypoint-chalk":
                         check(

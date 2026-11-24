@@ -125,10 +125,15 @@ jobs:
           docker compose run --rm --no-deps chalk nimble build -y
           docker compose run --rm --no-deps chalk nim c -d:debug --out:.developer-diagnostics/docker-build-status tests/integration/docker_build_status.nim
 
-      - name: Verify Docker fallback and Podman pre-launch controls
+          docker compose run --rm --no-deps chalk sh -ec '
+            cc -Isrc -c tests/integration/podman_launch_wrap.c -o .developer-diagnostics/podman-launch-wrap.o
+            nim c --passL:-Wl,--wrap=chalk_podman_run_attached --passL:"$PWD/.developer-diagnostics/podman-launch-wrap.o" --out:.developer-diagnostics/podman-launch-diagnostic src/chalk.nim
+          '
+
+      - name: Verify Docker fallback and Podman build controls
         if: ${{ (inputs.suite || 'all') == 'all' }}
         run: |
           python3 tests/integration/test_docker_fallback.py .developer-diagnostics/docker-build-status --chalk "$PWD/chalk"
-          python3 tests/integration/test_podman_controls.py "$PWD/chalk"
+          python3 tests/integration/test_podman_controls.py "$PWD/chalk" .developer-diagnostics/podman-launch-diagnostic
           python3 tests/integration/test_podman_heredoc.py "$PWD/chalk"
           python3 tests/integration/test_podman_security.py "$PWD/chalk"

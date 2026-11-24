@@ -22,15 +22,15 @@ platform integration cases exercise an amd64 builder and ARM emulation and do
 not establish native arm64 support. Registry cases require a registry. Engine
 checks and registry checks are independent of backend report acceptance. A
 successful pre-launch native fallback does not establish successful instrumentation.
-Once Chalk attempts an instrumented Podman launch, it never replays the
-original build. Preparation errors may run the original command once.
-Docker retains its established fallback: a failed rewritten build or a
-non-policy wrapping exception runs the original command. Policy refusal never
-starts a fallback. Test these contracts separately.
+Chalk retries an instrumented Podman build once with the original arguments
+after a confirmed nonzero exit without cancellation or timeout. The build can
+repeat steps and their side effects. Preparation errors may also run the
+original command. Docker runs the original command after a failed rewritten
+build or a non-policy wrapping exception. A Docker policy refusal is terminal.
 
 The `unit-tests` workflow automatically runs the Nim suite, the Python process
-and platform checks, the Docker fallback diagnostic, and the Podman controls
-and heredoc command checks. The `podman-contracts` workflow builds the candidate
+and platform checks, the Docker fallback diagnostic, and the Podman controls,
+retry, and heredoc checks. The `podman-contracts` workflow builds the candidate
 and runs native build, authenticated registry, and capability checks on
 AMD64 and ARM64 with pinned Podman 6.1.4 and Buildah 1.45.2. These checks do not
 establish connected backend delivery.

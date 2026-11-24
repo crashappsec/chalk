@@ -422,39 +422,38 @@ sys.exit(result.returncode)
             'FROM scratch\nENTRYPOINT ["/scratch-start"]\nCMD ["scratch-cmd"]\n'
         )
         for quiet in (False, True):
-            scratch = tag("scratch-single-attempt-" + str(quiet))
+            scratch = tag("scratch-build-" + str(quiet))
             args = ["build", "--network=none", "-t", scratch, "."]
             if quiet:
                 args.insert(1, "-q")
             calls.write_text("")
             result, _ = wrapped_invoke(args, cwd=context, require_success=False)
-            check(
-                "shell guard failure is nonzero " + str(quiet), result.returncode != 0
-            )
             builds = [
-                json.loads(line)
+                argv
                 for line in calls.read_text().splitlines()
-                if json.loads(line) and json.loads(line)[0] == "build"
+                if (argv := json.loads(line))[:1] == ["build"]
             ]
+            check("scratch build succeeds " + str(quiet), result.returncode == 0)
             check(
-                "scratch single attempt without replay " + str(quiet),
-                len(builds) == 1 and "--build-context" in builds[0],
+                "scratch build is instrumented first " + str(quiet),
+                builds and "--build-context" in builds[0],
             )
+            if len(builds) > 1:
+                check(
+                    "scratch retries original once " + str(quiet), builds[1:] == [args]
+                )
+                check(
+                    "scratch retry notice " + str(quiet),
+                    "retrying the original build" in result.stderr,
+                )
+            inspected, _ = invoke([podman, "image", "inspect", scratch])
             check(
-                "scratch failure has no successful fallback notice " + str(quiet),
-                "retrying" not in result.stderr
-                and "Build succeeded" not in result.stderr,
-            )
-            inspected, _ = invoke(
-                [podman, "image", "inspect", scratch], require_success=False
-            )
-            check(
-                "scratch failure creates no image " + str(quiet),
-                inspected.returncode != 0,
+                "scratch build created an image " + str(quiet),
+                inspected.returncode == 0,
             )
             observations.append(
                 {
-                    "scratch_single_attempt": {
+                    "scratch_build": {
                         "quiet": quiet,
                         "status": result.returncode,
                         "build_count": len(builds),

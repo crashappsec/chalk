@@ -14,17 +14,19 @@ image whose contents contradict its own platform metadata.
 The command-line classifier supports an explicit set of build options. Other
 options, unsupported Containerfile forms, unavailable startup configuration,
 reserved image paths, and unsupported context arrangements can prevent
-instrumentation. Before an instrumented build launch, the wrapper can refuse
-instrumentation or fall back to the original command. After attempting the
-launch, the wrapper never repeats the original build, including when process
-startup or termination is indeterminate. It preserves a known engine result
-through optional collection, reporting, and cleanup failures. An unknown
-post-launch outcome fails nonzero.
+instrumentation. Chalk can run the original command if preparation fails.
+If an instrumented build exits normally with a nonzero status, Chalk prints
+the status to stderr, retries once with the original arguments, and returns
+the native exit status. Both attempts write to the caller's stdout and stderr.
+A build can run twice and repeat any side effects of its steps.
 
-The reserved-path check currently requires `/bin/sh`. The check can fail in a
-scratch or shell-free image, or when a customer file occupies a reserved path.
-That failure ends the single attempt without producing a successful native
-fallback image. Existing cancellation and timeout handling remains in effect.
+Cancellation, signal termination, timeouts, indeterminate launch or wait
+outcomes, and post-build collection failures do not trigger a retry.
+
+The reserved-path check runs before Chalk copies its files into the image.
+A customer file at a reserved path can cause the instrumented attempt to fail.
+The native retry uses the original recipe, so it can succeed and preserve
+the customer file and startup configuration.
 
 The oldest supported Podman and Buildah versions have not been established.
 Version-specific successful comparisons establish observations for those

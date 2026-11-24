@@ -43,6 +43,48 @@ def run(args, *, required=True, **kwargs):
     return result
 
 
+def check_reserved_paths(root, prefix, env, ledger):
+    context = root / "reserved-paths"
+    context.mkdir()
+    (context / "Containerfile").write_text(
+        f"FROM {DEFAULT_BASE_IMAGE}\n"
+        "COPY --chmod=0755 app /chalk\n"
+        "COPY customer.json /chalk.json\n"
+        'ENTRYPOINT ["/chalk"]\nCMD ["default"]\n'
+    )
+    (context / "app").write_text(
+        '#!/bin/sh\nprintf "reserved application %s: " "$*"\ncat /chalk.json\n'
+    )
+    (context / "customer.json").write_text("customer json\n")
+    image = "localhost/chalk-reserved-paths:" + uuid.uuid4().hex
+    images.append(image)
+    argv = ["build", "--pull=never", "--tag", image, str(context)]
+    ledger.write_text("")
+    result = run([*prefix, "podman", *argv], env=env)
+    stderr = result.stderr
+    assert "podman: reserved Chalk paths are occupied or unreadable" in stderr, stderr
+    assert "retrying the original build without instrumentation." in stderr, stderr
+    assert "Build succeeded; Chalk did not instrument this build." in stderr, stderr
+    builds = [
+        call
+        for line in ledger.read_text().splitlines()
+        if (call := json.loads(line))[:1] == ["build"]
+    ]
+    assert len(builds) == 2 and "--build-context" in builds[0], builds
+    assert builds[1] == argv, builds
+    startup = run([engine, "run", "--rm", "--network=none", image]).stdout
+    assert startup == "reserved application default: customer json\n", startup
+    record["cases"].append(
+        {
+            "name": "reserved-paths-native-retry",
+            "passed": True,
+            "builds": builds,
+            "startup": startup,
+        }
+    )
+    save()
+
+
 def check_descendant_users(root, prefix, env, ledger):
     context = root / "descendant-users"
     context.mkdir()
@@ -406,6 +448,7 @@ try:
                 }
             )
             save()
+        check_reserved_paths(root, prefix, env, ledger)
         check_descendant_users(root, prefix, env, ledger)
     record["passed"] = True
 finally:

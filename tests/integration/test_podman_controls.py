@@ -9,6 +9,7 @@ import sys
 import tempfile
 
 binary = Path(sys.argv[1]).resolve()
+launch_diagnostic = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else None
 output = Path("artifacts/podman/controls.json")
 output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -29,6 +30,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import signal
 import sys
 
 argv = sys.argv[1:]
@@ -48,6 +50,8 @@ with open(os.environ["PODMAN_CONTROL_CALLS"], "a") as stream:
 native_argv = json.loads(os.environ.get("PODMAN_CONTROL_NATIVE_ARGV", "null"))
 if argv == native_argv:
     print("native podman stdout")
+    if os.environ.get("PODMAN_CONTROL_BUILD_EXIT"):
+        print("native podman stderr", file=sys.stderr)
     sys.exit(int(os.environ["PODMAN_CONTROL_NATIVE_EXIT"]))
 
 if argv == ["info", "--format", "json"]:
@@ -65,7 +69,14 @@ if argv == ["info", "--format", "json"]:
 if argv and argv[0] == "build":
     if "--iidfile" in argv:
         Path(argv[argv.index("--iidfile") + 1]).write_text("sha256:" + "a" * 64 + "\n")
-    sys.exit(int(os.environ.get("PODMAN_CONTROL_BUILD_EXIT", "0")))
+    status = os.environ.get("PODMAN_CONTROL_BUILD_EXIT")
+    if status:
+        print("instrumented podman stdout", flush=True)
+        print("instrumented podman stderr", file=sys.stderr, flush=True)
+        if status == "signal":
+            os.kill(os.getpid(), signal.SIGKILL)
+        sys.exit(int(status))
+    sys.exit(0)
 
 if argv[:2] == ["image", "inspect"]:
     print(json.dumps([{
@@ -119,6 +130,8 @@ def invoke(
     build_argv=None,
     wrapper=None,
     native_status=None,
+    instrumented_status=None,
+    launch_fault=None,
 ):
     case_root = root / name
     home = case_root / "home"
@@ -169,12 +182,18 @@ def invoke(
     if native_status is not None:
         env["PODMAN_CONTROL_NATIVE_ARGV"] = json.dumps(argv)
         env["PODMAN_CONTROL_NATIVE_EXIT"] = str(native_status)
+    if instrumented_status is not None:
+        env["PODMAN_CONTROL_BUILD_EXIT"] = str(instrumented_status)
+    launch_ledger = case_root / "launches"
+    if launch_fault:
+        env["STAGE_LAUNCH_FAULT"] = launch_fault
+        env["STAGE_LAUNCH_LEDGER"] = str(launch_ledger)
     if wrapper:
         env["PATH"] = str(wrapper.parent) + os.pathsep + env["PATH"]
         command = [str(wrapper)]
     else:
         command = [
-            str(binary),
+            str(launch_diagnostic if launch_fault else binary),
             f"--config-file={config}",
             "--use-embedded-config",
             "--skip-custom-reports",
@@ -199,6 +218,7 @@ def invoke(
         "new_workspaces": sorted(workspaces() - before),
         "context_files": sorted(path.name for path in context.iterdir()),
         "report": report.read_text() if report.exists() else "",
+        "launches": launch_ledger.read_text().splitlines() if launch_fault else [],
     }
 
 
@@ -214,6 +234,109 @@ def assert_instrumented(case):
     return builds[0]["derived_containerfile"]
 
 
+def check_build_retries(root, fake_dir, calls):
+    source = 'FROM scratch\nENTRYPOINT ["/bin/true"]\n'
+    confidential = "PASSWORD=retry secret"
+    argv = ["build", "--build-arg", confidential, "--label", "test=exact argv", "."]
+    retry_notice = (
+        "chalk: Instrumented Podman build exited with status 17; "
+        "retrying the original build without instrumentation."
+    )
+    for status, notice in (
+        (0, "chalk: Build succeeded; Chalk did not instrument this build."),
+        (
+            23,
+            "chalk: the native Podman retry exited with status 23; "
+            "Chalk did not instrument this build.",
+        ),
+    ):
+        case = invoke(
+            root,
+            fake_dir,
+            calls,
+            f"retry-exit-{status}",
+            source,
+            build_argv=argv,
+            instrumented_status=17,
+            native_status=status,
+        )
+        engine_calls = [call["argv"] for call in case["calls"]]
+        assert len(engine_calls) == 3, case
+        assert engine_calls[0] == ["info", "--format", "json"], case
+        assert "--build-context" in engine_calls[1] and engine_calls[2] == argv, case
+        result = case["result"]
+        assert result.returncode == status, case
+        assert result.stdout.splitlines()[:2] == [
+            "instrumented podman stdout",
+            "native podman stdout",
+        ], case
+        stderr = result.stderr.splitlines()
+        assert [
+            line
+            for line in stderr
+            if line
+            in {
+                retry_notice,
+                notice,
+                "instrumented podman stderr",
+                "native podman stderr",
+            }
+        ] == [
+            "instrumented podman stderr",
+            retry_notice,
+            "native podman stderr",
+            notice,
+        ], case
+        report = case["report"]
+        assert confidential not in report and "<<redact>>" in report, report
+        reports = json.loads(report)
+        assert len(reports) == 1 and not reports[0].get("_CHALKS"), reports
+        evidence.append(
+            {
+                "case": case["name"],
+                "build_count": 2,
+                "native_argv_preserved": True,
+                "status": status,
+                "fallback_report_redacted": True,
+            }
+        )
+
+    outcomes = [
+        ("exit-130", 130, None, 130, 1),
+        ("exit-143", 143, None, 143, 1),
+        ("signal", "signal", None, 137, 1),
+    ]
+    if launch_diagnostic:
+        outcomes += [
+            ("forwarded", 17, "forwarded", 143, 1),
+            ("timeout", 17, "timeout", 17, 1),
+            ("spawn", 17, "spawn", 127, 0),
+            ("unknown", 17, "unknown", 127, 1),
+        ]
+    for name, first_status, fault, status, recorded_builds in outcomes:
+        case = invoke(
+            root,
+            fake_dir,
+            calls,
+            name,
+            source,
+            build_argv=argv,
+            instrumented_status=first_status,
+            native_status=0,
+            launch_fault=fault,
+        )
+        builds = [
+            call["argv"] for call in case["calls"] if call["argv"][:1] == ["build"]
+        ]
+        assert len(builds) == recorded_builds, case
+        assert all("--build-context" in build for build in builds), case
+        if fault:
+            assert case["launches"] == ["injected"], case
+        assert case["result"].returncode == status, case
+        assert "retrying the original build" not in case["result"].stderr, case
+        evidence.append({"case": name, "launch_attempts": 1, "status": status})
+
+
 evidence = []
 with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
     root = Path(temp)
@@ -223,6 +346,7 @@ with tempfile.TemporaryDirectory(prefix="podman-controls-") as temp:
     fake.write_text(FAKE_PODMAN)
     fake.chmod(0o755)
     calls = root / "calls.jsonl"
+    check_build_retries(root, fake_dir, calls)
 
     default_case = invoke(
         root,

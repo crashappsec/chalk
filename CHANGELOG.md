@@ -109,8 +109,11 @@
 
 - Restore the established Docker build fallback. A failed rewritten build or
   non-policy wrapping exception runs the original Docker command and returns
-  its result. Policy refusals remain terminal. Podman keeps its separate rule
-  against replay after an injected build or transfer launch.
+  its result. Policy refusals remain terminal.
+- Retry an instrumented Podman build once with the original arguments after a
+  confirmed nonzero exit without cancellation or timeout. Chalk returns the
+  native exit status. Both attempts can run customer build steps and repeat
+  their side effects.
 - Protect confidential Podman transfer arguments across reports and caches,
   preserve native push when instrumentation preparation fails, and prevent
   embedded marks from overriding current engine observations.
