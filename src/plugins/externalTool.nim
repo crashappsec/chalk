@@ -64,6 +64,10 @@ proc runTool*(tool: string, path: string, force = false, record = true,
   if not force and key in alreadyRan:
     raise newException(AlreadyRanError, "")
   let timeout = if deadline > 0: timeoutExe() else: ""
+  # Record an attempt before discovery and execution. Once recorded, failures
+  # and empty results also suppress ordinary reruns for this tool and path.
+  if record:
+    alreadyRan.incl(key)
 
   trace("Running tool: " & tool & " - " & path)
   result = ChalkDict()
@@ -105,16 +109,13 @@ proc runTool*(tool: string, path: string, force = false, record = true,
     d.del("info")
 
   trace(tool & ": produced keys " & $(d.keys().toSeq()))
-  if record:
-    alreadyRan.incl(key)
   return d
 
 proc runOneTool(tool: string, path: string): ChalkDict =
-  # cache external tool results in GitHub Actions to avoid redundant executions
-  # within the same workflow job. This optimization only works on GitHub runners
-  # because they provide a job-specific RUNNER_TEMP directory that persists for
-  # the entire job but is cleaned up afterwards. This ensures cached data doesn't
-  # persist across jobs where repository content may have changed.
+  # Reuse tool output within a GitHub Actions job through RUNNER_TEMP.
+  # The key contains only the tool name and scan path. Changes to files,
+  # configuration, or scanner versions do not invalidate an existing entry.
+  # This cache is separate from the container engine's layer cache.
   # See: https://docs.github.com/en/actions/reference/workflows-and-actions/variables
   let
     CI          = getEnv("CI")
@@ -208,6 +209,9 @@ proc toolBase(path: string): ChalkDict =
         error(tool & ": " & getCurrentExceptionMsg())
 
 proc getToolPath(path: string): string =
+  # Context scans prefer the containing repository root, which can include
+  # files outside a narrower build context. For SBOM tools, this is source
+  # inventory. Image inventory is collected separately as _IMAGE_SBOM.
   let
     git = getPluginByName("vctl_git")
   try:

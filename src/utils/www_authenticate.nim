@@ -18,9 +18,11 @@ import pkg/[
   nimutils/logging,
 ]
 import "."/[
+  bounded_http,
   http,
   json,
   strings,
+  uri,
   tables,
 ]
 
@@ -38,6 +40,8 @@ type
       url:   string
     of other:
       discard
+
+  TokenFetch* = proc(url: string, headers: HttpHeaders): Response
 
 proc `$`(self: AuthChallenge): string =
   var options = ""
@@ -69,24 +73,16 @@ proc initBearerChallenge(options: var OrderedTable[string, string]): AuthChallen
                        url:     $uri)
 
 proc elicitHeaders(
-    self:           AuthChallenge,
-    headers:        HttpHeaders = newHttpHeaders(),
-    timeout:        int         = 1000,
-    retries:        int         = 0,
-    connectRetries: int         = 0,
+    self:    AuthChallenge,
+    headers: HttpHeaders,
+    fetch:   TokenFetch,
 ): HttpHeaders =
   case self.kind:
   of other:
     raise newException(ValueError, "unsupported auth challenge scheme: " & self.scheme)
   of bearer:
     trace("http: fetching bearer token from: " & self.url)
-    let tokenResponse = safeRequest(
-      self.url,
-      headers        = headers,
-      timeout        = timeout,
-      retries        = retries,
-      connectRetries = connectRetries,
-    )
+    let tokenResponse = fetch(self.url, headers)
     if not tokenResponse.code().is2xx():
       raise newException(ValueError,
                          "Bearer auth realm URL did not return valid response: " &
@@ -102,21 +98,16 @@ proc elicitHeaders(
     result = newHttpHeaders({"Authorization": "Bearer " & token})
 
 proc elicitHeaders*(
-    challenges:     seq[AuthChallenge],
-    headers:        HttpHeaders = newHttpHeaders(),
-    timeout:        int         = 1000,
-    retries:        int         = 0,
-    connectRetries: int         = 0,
+    challenges: seq[AuthChallenge],
+    headers:    HttpHeaders,
+    fetch:      TokenFetch,
 ): HttpHeaders =
   result = newHttpHeaders()
   for challenge in challenges:
     try:
-      return challenge.elicitHeaders(
-        headers        = headers,
-        timeout        = timeout,
-        retries        = retries,
-        connectRetries = connectRetries,
-      )
+      return challenge.elicitHeaders(headers, fetch)
+    except HttpDeadlineError, HttpBodyTooLargeError, HttpTlsError:
+      raise
     except:
       continue
 
@@ -156,6 +147,19 @@ proc parseAuthChallenges(data: string): seq[AuthChallenge] =
     challenge.add(word)
   if len(challenge) > 0:
     result.add(parseAuthChallenge(challenge))
+
+proc statusAccepted(response: Response,
+                    acceptStatusCodes: openArray[Slice[int]],
+                    rejectStatusCodes: openArray[Slice[int]],
+                    ): bool =
+  let code =
+    try:
+      int(response.code())
+    except ValueError:
+      return false
+  if len(acceptStatusCodes) > 0 and not acceptStatusCodes.anyIt(code in it):
+    return false
+  return not rejectStatusCodes.anyIt(code in it)
 
 proc authHeadersSafeRequest*(url: Uri | string,
                              httpMethod: HttpMethod | string = HttpGet,
@@ -201,14 +205,18 @@ proc authHeadersSafeRequest*(url: Uri | string,
       wwwAuthenticate = response.headers["www-authenticate"]
       challenges      = parseAuthChallenges(wwwAuthenticate)
     newHeaders        = challenges.elicitHeaders(
-      headers        = authHeaders,
-      timeout        = timeout,
-      retries        = retries,
-      connectRetries = connectRetries,
+      headers = authHeaders,
+      fetch   = proc(tokenUrl: string, tokenHeaders: HttpHeaders): Response =
+        safeRequest(
+          tokenUrl,
+          headers        = tokenHeaders,
+          timeout        = timeout,
+          retries        = retries,
+          connectRetries = connectRetries,
+        ),
     )
     authHeaders       = authHeaders.update(newHeaders)
 
-    # reattempt request
     response = safeRequest(
       url               = url,
       httpMethod        = httpMethod,
@@ -227,16 +235,11 @@ proc authHeadersSafeRequest*(url: Uri | string,
       rejectStatusCodes = rejectStatusCodes,
     )
 
-  try:
-    discard response.check(
-      url               = url,
-      acceptStatusCodes = acceptStatusCodes,
-      rejectStatusCodes = rejectStatusCodes,
-    )
-  except:
-    # reattempt the request with retries as above response error
-    # might be transient however however never retried as
-    # status code is never checked on the first call
+  # The first request carries no accepted codes so that a 401 challenge can
+  # be answered. A final status outside them is requested again through
+  # safeRequest, whose retry loop covers transient failures that the
+  # unchecked first request never retried.
+  if not response.statusAccepted(acceptStatusCodes, rejectStatusCodes):
     response = safeRequest(
       url               = url,
       httpMethod        = httpMethod,
@@ -256,6 +259,73 @@ proc authHeadersSafeRequest*(url: Uri | string,
     )
 
   return (newHeaders, response)
+
+proc authHeadersBoundedRequest*(url: Uri,
+                                httpMethod: HttpMethod,
+                                budget: HttpBudget,
+                                body = "",
+                                headers: HttpHeaders = newHttpHeaders(),
+                                pinnedCert: string = "",
+                                verifyMode = CVerifyPeer,
+                                sameOriginRedirects = false,
+                                acceptStatusCodes: openArray[Slice[int]] = @[],
+                                ): (HttpHeaders, Response, Uri) =
+  ## `authHeadersSafeRequest` over `boundedRequest`: the challenge, its token
+  ## fetch, and the answered request all draw on the same `budget`.
+  var
+    authHeaders = headers
+    newHeaders  = newHttpHeaders()
+    exchange    = boundedRequest(
+      url,
+      httpMethod,
+      budget,
+      body       = body,
+      headers    = authHeaders,
+      pinnedCert = pinnedCert,
+      verifyMode = verifyMode,
+      sameOriginRedirects = sameOriginRedirects,
+    )
+
+  var response = exchange.response
+  if (
+    sameOrigin(url, exchange.effectiveUri) and
+    response.code() == Http401 and
+    response.headers.hasKey("www-authenticate")
+  ):
+    trace("http: eliciting auth headers via www-authenticate for " & $url)
+    let challenges = parseAuthChallenges(response.headers["www-authenticate"])
+    newHeaders     = challenges.elicitHeaders(
+      headers = authHeaders,
+      fetch   = proc(tokenUrl: string, tokenHeaders: HttpHeaders): Response =
+        let target = parseUri(tokenUrl)
+        if url.scheme == "https" and target.scheme != "https" and
+            tokenHeaders.hasKey("Authorization"):
+          raise newException(HttpPeerVerificationError,
+                             "registry token endpoint would expose credentials over plaintext")
+        try:
+          boundedRequest(target, HttpGet, budget, headers = tokenHeaders).response
+        except HttpTlsProtocolError:
+          raise newException(HttpTlsError, "registry token endpoint did not complete TLS"),
+    )
+    authHeaders    = authHeaders.update(newHeaders)
+
+    try:
+      exchange = boundedRequest(
+        url,
+        httpMethod,
+        budget,
+        body       = body,
+        headers    = authHeaders,
+        pinnedCert = pinnedCert,
+        verifyMode = verifyMode,
+        sameOriginRedirects = sameOriginRedirects,
+      )
+    except HttpTlsProtocolError:
+      raise newException(HttpTlsError, "registry TLS failed after its authentication challenge")
+
+    response = exchange.response
+  discard response.check(url, acceptStatusCodes = acceptStatusCodes)
+  return (newHeaders, response, exchange.effectiveUri)
 
 proc authSafeRequest*(url: Uri | string,
                       httpMethod: HttpMethod | string = HttpGet,

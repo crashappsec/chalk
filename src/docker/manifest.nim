@@ -49,6 +49,8 @@ proc requestManifestJson(name: DockerImage, flags = @["--raw"], fallback = true)
   ## however if that fails withs 401 error, attept to manually
   ## fetch the manifest via the URL from the error message
   ## as the error could be due to www-authenticate challenge
+  if not registryUsesDockerDiscovery():
+    raise newException(ValueError, "Docker manifest discovery is disabled for this registry access")
   if not hasBuildX():
     raise newException(ValueError, "No buildx to iteract with registry")
   let key = name.asRepoDigest() & $flags
@@ -124,7 +126,7 @@ proc mimickLocalConfig(self: DockerManifest) =
   ## to match local docker inspect json output
   if self.kind != DockerManifestType.config:
     raise newException(AssertionDefect, "can only mimick config json on config manifest")
-  if isDockerOverlayFS():
+  if registryUsesDockerDiscovery() and isDockerOverlayFS():
     self.json["id"] = %(self.image.digest.extractDockerHash())
   else:
     self.json["id"] = %(self.digest.extractDockerHash())
@@ -213,6 +215,8 @@ proc fetch(self:            DockerManifest,
           trace("docker: " & getCurrentExceptionMsg())
           raise
         except:
+          if not registryUsesDockerDiscovery():
+            raise
           error("docker: " & getCurrentExceptionMsg())
           requestManifestJson(self.asImage())
       self.setJson(data, check = checkJson)
@@ -234,6 +238,8 @@ proc fetch(self:            DockerManifest,
         trace("docker: " & getCurrentExceptionMsg())
         raise
       except:
+        if not registryUsesDockerDiscovery():
+          raise
         error("docker: " & getCurrentExceptionMsg())
         requestManifestJson(self.asImage())
     self.setJson(data, check = checkJson)
@@ -576,11 +582,12 @@ proc fetchManifest*(name:            DockerImage,
     cacheKeys.add(name.asRepoDigest())
   if name.tag != "":
     cacheKeys.add(name.asRepoTag())
-  for key in cacheKeys:
-    if key in manifestCache:
-      result = manifestCache[key]
-      result.fetch(fetchConfig = fetchConfig, fetchManifests = fetchManifests)
-      return result
+  if registryUsesDockerDiscovery():
+    for key in cacheKeys:
+      if key in manifestCache:
+        result = manifestCache[key]
+        result.fetch(fetchConfig = fetchConfig, fetchManifests = fetchManifests)
+        return result
   try:
     let
       meta = manifestHead(name)
@@ -590,19 +597,22 @@ proc fetchManifest*(name:            DockerImage,
     trace("docker: " & getCurrentExceptionMsg())
     raise
   except:
+    if not registryUsesDockerDiscovery():
+      raise
     error("docker: " & getCurrentExceptionMsg())
     let data = requestManifestJson(name)
     result = newManifest(name, data)
   result.fetch(fetchConfig = fetchConfig, fetchManifests = fetchManifests)
-  if name.digest != "":
-    manifestCache[name.asRepoDigest()] = result
-  elif name.tag != "":
-    manifestCache[name.asRepoTag()] = result
-  else:
-    manifestCache[name.asRepoRef()] = result
-  if result.kind == DockerManifestType.list:
-    for image in result.manifests:
-      manifestCache[image.asImage().asRepoDigest()] = image
+  if registryUsesDockerDiscovery():
+    if name.digest != "":
+      manifestCache[name.asRepoDigest()] = result
+    elif name.tag != "":
+      manifestCache[name.asRepoTag()] = result
+    else:
+      manifestCache[name.asRepoRef()] = result
+    if result.kind == DockerManifestType.list:
+      for image in result.manifests:
+        manifestCache[image.asImage().asRepoDigest()] = image
 
 proc fetchListManifest*(name:            DockerImage,
                         platforms:       seq[DockerPlatform] = @[],

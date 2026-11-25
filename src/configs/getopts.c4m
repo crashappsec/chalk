@@ -209,6 +209,15 @@ causes them to not get deleted.  Specifically, docker temporary files
 """
   }
 
+  flag_arg sbom_handoff {
+    field_to_set: "sbom_handoff"
+    doc: """
+Path to a customer-written SPDX handoff file. Used as
+`chalk --sbom-handoff FILE podman push IMAGE` after CI has generated the
+document. Chalk does not create this file.
+"""
+  }
+
   flag_yn skip_command_report {
     field_to_set: "skip_command_report"
     yes_aliases: []
@@ -435,6 +444,34 @@ This command will attempt to extract chalk marks in all containers,
 container images for anything it can find on the local machine, AND will
 search the current working directory for chalk marks.
 """
+    }
+
+    command podman {
+      args: (0, 0)
+      shortdoc: "Collect a Podman image SBOM attachment"
+      doc: """
+Read the mark from a local Podman image and collect an existing SPDX
+JSON registry attachment for the published manifest. This does not
+start the image, mint a new identity, or create attachments.
+
+Required flags: --image, --registry-reference.
+"""
+      flag_arg image {
+        field_to_set: "extract.podman_image"
+        doc: "Local Podman image (name, tag, or image ID)"
+      }
+      flag_arg registry_reference {
+        field_to_set: "extract.podman_registry_reference"
+        doc: "Published image as REGISTRY/REPOSITORY@sha256:DIGEST"
+      }
+      flag_arg authfile {
+        field_to_set: "extract.podman_authfile"
+        doc: "Podman registry auth file. REGISTRY_AUTH_FILE is used when omitted."
+      }
+      flag_arg sbom_attachment {
+        field_to_set: "extract.podman_sbom_attachment"
+        doc: "Attachment digest when more than one application/spdx+json attachment exists"
+      }
     }
 }
 
@@ -683,6 +720,19 @@ Chalk a container operation.  This always transparently calls docker, as long as
 Currently, Chalk only collects metadata for 'docker' and 'push' commands.
 <p>
 All arguments appearing after the word 'docker' are passed to docker.  No flags to chalk can appear after the command.
+"""
+  }
+
+  command podman {
+    shortdoc: "Run a podman command, then chalk supported builds"
+    args:    (0, high())
+    ignore_all_flags: true
+    doc: """
+Chalk a Podman operation. This always transparently calls podman, as long as it is anywhere in your path (even if 'chalk' is named or symlinked as 'podman').
+
+Unsupported Podman invocations are executed unchanged.
+<p>
+All arguments appearing after the word 'podman' are passed to podman.  No flags to chalk can appear after the command.
 """
   }
 
