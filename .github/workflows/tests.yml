@@ -26,6 +26,13 @@ on:
       - "!src/docs/**"
       - Dockerfile
   workflow_dispatch:
+    inputs:
+      syft_identity_run:
+        description: Syft fork Actions run ID that produced the Linux AMD64 binary.
+        type: string
+      syft_identity_sha256:
+        description: Expected SHA-256 of the Linux AMD64 Syft executable.
+        type: string
 
 permissions:
   contents: read
@@ -50,7 +57,7 @@ jobs:
       ) || (
         github.event_name == 'push'
       ) || (
-        github.event_name == 'workflow_dispatch'
+        github.event_name == 'workflow_dispatch' && inputs.syft_identity_run == '' && inputs.syft_identity_sha256 == ''
       ) || (
         github.event_name == 'schedule'
       )
@@ -151,3 +158,53 @@ jobs:
         if: failure()
         run: |
           docker compose logs | grep -v health
+
+  syft-identity:
+    if: github.event_name == 'workflow_dispatch' && (inputs.syft_identity_run != '' || inputs.syft_identity_sha256 != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      SYFT_RUN_ID: ${{ inputs.syft_identity_run }}
+      SYFT_SHA256: ${{ inputs.syft_identity_sha256 }}
+    steps:
+      - name: Validate trial inputs
+        run: |
+          [[ "$SYFT_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$SYFT_SHA256" =~ ^[a-f0-9]{64}$ ]]
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29
+        with:
+          persist-credentials: false
+      - name: Get the GitHub App token for the Syft fork artifact
+        id: org-token
+        uses: crashappsec/action-github-app-token@main
+        with:
+          app_id: ${{ secrets.CHALK_GITHUB_APP_ID }}
+          private_key: ${{ secrets.CHALK_GITHUB_APP_PRIVATE_KEY }}
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ steps.org-token.outputs.token }}
+          repository: crashappsec/syft
+          run-id: ${{ inputs.syft_identity_run }}
+          name: syft-linux-amd64
+          path: ${{ runner.temp }}/syft-identity
+      - name: Verify trial binaries
+        run: |
+          cd "$RUNNER_TEMP/syft-identity"
+          printf '%s  syft\n' "$SYFT_SHA256" | sha256sum -c -
+          curl --fail --silent --show-error --location --output chalk \
+            https://dl.crashoverride.run/chalk-commit-builds/chalk-a80005763f769313d47147292d4b3216ae111b96-Linux-x86_64
+          echo '828b8d8aae008911a8ff63be6c4d49e27ab56b5bea54463718650cc07c84db3a  chalk' | sha256sum -c -
+          chmod 555 chalk
+      - name: Build with Chalk and verify the stored SBOM
+        run: |
+          python3 tests/syft-identity/trial.py \
+            "$RUNNER_TEMP/syft-identity/chalk" "$RUNNER_TEMP/syft-identity/syft" \
+            "$SYFT_SHA256" "$RUNNER_TEMP/syft-identity-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: syft-identity-evidence
+          path: ${{ runner.temp }}/syft-identity-evidence
+          if-no-files-found: ignore
